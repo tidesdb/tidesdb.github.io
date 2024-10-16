@@ -8,12 +8,154 @@
     <meta name='keywords' content='storage engine, rocksdb alternative, c++ data store, database api, lsm-tree, log-structured-merge-tree, open-source, tidesdb'>
     <link rel="icon" type="image/png" href="assets/favicon-48x48.png" sizes="48x48" />
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/themes/prism.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/0.0.1/prism.min.js"></script>
     <link rel="shortcut icon" href="assets/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="TidesDB" />
     <link rel="manifest" href="assets/site.webmanifest" />
     <style>
+
+        code[class*="language-"],
+        pre[class*="language-"] {
+            color: #c5c8c6;
+            text-shadow: 0 1px rgba(0, 0, 0, 0.3);
+            font-family: Inconsolata, Monaco, Consolas, 'Courier New', Courier, monospace;
+            direction: ltr;
+            text-align: left;
+            white-space: pre;
+            word-spacing: normal;
+            word-break: normal;
+            line-height: 1.5;
+
+            -moz-tab-size: 4;
+            -o-tab-size: 4;
+            tab-size: 4;
+
+            -webkit-hyphens: none;
+            -moz-hyphens: none;
+            -ms-hyphens: none;
+            hyphens: none;
+        }
+
+        /* Code blocks */
+        pre[class*="language-"] {
+            padding: 1em;
+            margin: .5em 0;
+            overflow: auto;
+            border-radius: 0.3em;
+        }
+
+        :not(pre) > code[class*="language-"],
+        pre[class*="language-"] {
+            background: #1d1f21;
+        }
+
+        /* Inline code */
+        :not(pre) > code[class*="language-"] {
+            padding: .1em;
+            border-radius: .3em;
+        }
+
+        .token.comment,
+        .token.prolog,
+        .token.doctype,
+        .token.cdata {
+            color: #7C7C7C;
+        }
+
+        .token.punctuation {
+            color: #c5c8c6;
+        }
+
+        .namespace {
+            opacity: .7;
+        }
+
+        .token.property,
+        .token.keyword,
+        .token.tag {
+            color: #96CBFE;
+        }
+
+        .token.class-name {
+            color: #FFFFB6;
+            text-decoration: underline;
+        }
+
+        .token.boolean,
+        .token.constant {
+            color: #99CC99;
+        }
+
+        .token.symbol,
+        .token.deleted {
+            color: #f92672;
+        }
+
+        .token.number {
+            color: #FF73FD;
+        }
+
+        .token.selector,
+        .token.attr-name,
+        .token.string,
+        .token.char,
+        .token.builtin,
+        .token.inserted {
+            color: #A8FF60;
+        }
+
+        .token.variable {
+            color: #C6C5FE;
+        }
+
+        .token.operator {
+            color: #EDEDED;
+        }
+
+        .token.entity {
+            color: #FFFFB6;
+            /* text-decoration: underline; */
+        }
+
+        .token.url {
+            color: #96CBFE;
+        }
+
+        .language-css .token.string,
+        .style .token.string {
+            color: #87C38A;
+        }
+
+        .token.atrule,
+        .token.attr-value {
+            color: #F9EE98;
+        }
+
+        .token.function {
+            color: #DAD085;
+        }
+
+        .token.regex {
+            color: #E9C062;
+        }
+
+        .token.important {
+            color: #fd971f;
+        }
+
+        .token.important,
+        .token.bold {
+            font-weight: bold;
+        }
+        .token.italic {
+            font-style: italic;
+        }
+
+        .token.entity {
+            cursor: help;
+        }
+
         body {
             background: rgb(25, 25, 29);
             font-family: Arial, sans-serif;
@@ -71,6 +213,13 @@
            text-align: center;
         }
 
+        .intro {
+            font-size: 1.2em;
+            line-height: 1.6;
+            margin-top: 20px;
+            font-weight: lighter;
+        }
+
 
     </style>
 </head>
@@ -85,10 +234,17 @@
                 </ul>
             </ul>
             </nav>
+
             <div class="cover">
                <h1>Unlock speed where every write counts.</h1>
             </div>
 
+            <h4 class="intro">
+                TidesDB is a light-weight C++ library that provides an embeddable, persistent key-value store for fast flash and ram storage.
+
+                TidesDB has a robust feature-set, and was designed from the ground up to be a high-performance, low-latency storage engine. It is optimized for write and read-heavy workloads.
+                
+            </h4>
             <h2>User Guide</h2>
     
             <h3>Basic Usage</h3>
@@ -104,23 +260,24 @@ int main() {
     lsmt-&gt;Close();
     return 0;
 }</code></pre>
-                </li>
+                </li><br/>
                 <li><strong>Insert a key-value pair:</strong>
                     <p>TidesDB takes keys and values as vectors of bytes, there is no limit to key and or value size.</p>
                     <p>Writing to the same key updates the value.</p>
                     <pre><code class="language-cpp">lsmt-&gt;Put({1, 2, 3}, {4, 5, 6});</code></pre>
-                </li>
+                </li><br/>
                 <li><strong>Retrieve a value by key:</strong>
                     <pre><code class="language-cpp">auto value = lsmt-&gt;Get({1, 2, 3});</code></pre>
-                </li>
+                </li><br/>
                 <li><strong>Delete a key-value pair:</strong>
                     <pre><code class="language-cpp">lsmt-&gt;Delete({1, 2, 3});</code></pre>
-                </li>
+                </li><br/>
                 <li><strong>Close the LSMT:</strong>
                     <p>Flushes memtable to disk on close.</p>
+                    <p>Commits any active transactions.</p>
                     <pre><code class="language-cpp">lsmt-&gt;Close();</code></pre>
                 </li>
-            </ol>
+            </ol><br/>
         
             <h2>API Guide</h2>
         
@@ -171,7 +328,6 @@ int main() {
                         <li><code>BeginTransaction</code>: Begins a transaction on the LSMT.</li>
                         <li><code>CommitTransaction</code>: Commits a transaction on the LSMT.</li>
                         <li><code>RollbackTransaction</code>: Rolls back a transaction on the LSMT.</li>
-                        <li><code>RunRecoveredOperations</code>: Runs the recovered operations on the LSMT.</li>
                     </ul>
 
                     <pre><code class="language-cpp">bool Put(const std::vector&lt;uint8_t&gt;& key, const std::vector&lt;uint8_t&gt;& value);
@@ -182,13 +338,12 @@ std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&g
 std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; GreaterThan(const std::vector&lt;uint8_t&gt;& key) const;
 std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; Range(const std::vector&lt;uint8_t&gt;& start, const std::vector&lt;uint8_t&gt;& end) const;
 std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; NRange(const std::vector&lt;uint8_t&gt;& start, const std::vector&lt;uint8_t&gt;& end) const;
-std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; LessThanEq(const std::vector&lt;uint8_t&gt;& key);
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; LessThanEq(const std::vector&lt;uint8_t&gt;& key) const;
 std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; GreaterThanEq(const std::vector&lt;uint8_t&gt;& key) const;
 void Close();
 Transaction* BeginTransaction();
 bool CommitTransaction(Transaction* tx);
 void RollbackTransaction(Transaction* tx);
-bool LSMT::RunRecoveredOperations(const std::vector&lt;Operation&gt; &operations)
                     </code></pre>
                 </li>
             </ul></br/>
@@ -232,11 +387,11 @@ void AddDelete(const std::vector&lt;uint8_t&gt; &key);</code></pre>
                 <li><strong>Methods:</strong>
                     <ul>
                         <li><code>WriteOperation</code>: Writes an operation to the WAL.</li>
-                        <li><code>Recover</code>: Recovers the operations from the WAL.</li>
+                        <li><code>Recover</code>: Recovers LSMT from WAL</li>
                         <li><code>Close</code>: Closes the WAL.</li>
                     </ul>
                     <pre><code class="language-cpp">bool WriteOperation(const Operation& op) const;
-std::vector&lt;Operation&gt; Recover() const;
+bool Recover(LSMT &lsmt) const
 void Close() const;</code></pre>
                 </li>
             </ul>
@@ -262,7 +417,7 @@ OpDelete</code></pre>
             </ul>
         
             <h3>Example</h3>
-            <pre><code class="language-cpp">#include "library.h"
+            <pre><code class="language-cpp">#include "libtidesdb.h"
         
 int main() {
     auto lsmt = TidesDB::LSMT::New("data_directory", std::filesystem::perms::owner_all, 1024 * 1024, 60, 4);
@@ -276,6 +431,5 @@ int main() {
     
         <footer>&copy; 2024 TidesDB, all rights reserved.</footer>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/prism.min.js"></script>
 </body>
 </html>
