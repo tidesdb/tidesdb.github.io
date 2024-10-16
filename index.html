@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TidesDB - A fast opensource embedded key-value store</title>
+    <meta name='description' content='High-performance, durable, transactional embedded storage engine designed for flash and RAM optimization.'>
+    <meta name='keywords' content='storage engine, rocksdb alternative, c++ data store, database api, lsm-tree, log-structured-merge-tree, open-source, tidesdb'>
+    <link rel="icon" type="image/png" href="assets/favicon-48x48.png" sizes="48x48" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/themes/prism.min.css">
+    <link rel="shortcut icon" href="assets/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="TidesDB" />
+    <link rel="manifest" href="assets/site.webmanifest" />
+    <style>
+        body {
+            background: rgb(25, 25, 29);
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: rgb(230, 230, 230);
+        }
+
+        .wrap {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        nav {
+            padding-left: 10px;
+            padding-right: 10px;
+            line-height: 50px;
+            height: 50px;
+        }
+
+        nav h2 {
+            margin: 0;
+            padding: 0;
+            float: left;
+        }
+
+        nav ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            float: right;
+        }
+
+        nav ul li {
+            padding-left: 20px;
+            float: left;
+        }
+
+        a, a:visited {
+            color: #188db8;
+            text-decoration: none;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+
+
+        .cover {
+           color: #2596be;
+           text-align: center;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <nav><h2><img src="assets/tidesdb-logo.svg" width="146" /></h2>
+    
+            <ul>
+                <ul>
+                    <li><a href="./">Docs</a></li>
+                    <li><a href="https://github.com/tidesdb/tidesdb" target="_blank">Github</a></li>
+                </ul>
+            </ul>
+            </nav>
+            <div class="cover">
+               <h1>Unlock speed where every write counts.</h1>
+            </div>
+
+            <h2>User Guide</h2>
+    
+            <h3>Basic Usage</h3>
+            <ol>
+                <li><strong>Initialize the LSMT:</strong>
+                    <pre><code class="language-cpp">#include "libtidesdb.h"
+        
+int main() {
+    auto lsmt = TidesDB::LSMT::New("data_directory", std::filesystem::perms::owner_all, 1024 * 1024, 60, 4);
+    // Use the LSMT instance
+    lsmt-&gt;Put({1, 2, 3}, {4, 5, 6});
+    auto value = lsmt->Get({1, 2, 3});
+    lsmt-&gt;Close();
+    return 0;
+}</code></pre>
+                </li>
+                <li><strong>Insert a key-value pair:</strong>
+                    <p>TidesDB takes keys and values as vectors of bytes, there is no limit to key and or value size.</p>
+                    <p>Writing to the same key updates the value.</p>
+                    <pre><code class="language-cpp">lsmt-&gt;Put({1, 2, 3}, {4, 5, 6});</code></pre>
+                </li>
+                <li><strong>Retrieve a value by key:</strong>
+                    <pre><code class="language-cpp">auto value = lsmt-&gt;Get({1, 2, 3});</code></pre>
+                </li>
+                <li><strong>Delete a key-value pair:</strong>
+                    <pre><code class="language-cpp">lsmt-&gt;Delete({1, 2, 3});</code></pre>
+                </li>
+                <li><strong>Close the LSMT:</strong>
+                    <p>Flushes memtable to disk on close.</p>
+                    <pre><code class="language-cpp">lsmt-&gt;Close();</code></pre>
+                </li>
+            </ol>
+        
+            <h2>API Guide</h2>
+        
+            <h3>Classes and Methods</h3>
+        
+            <h4><code>TidesDB::LSMT</code></h4>
+            <ul>
+                <li><strong>Constructor:</strong>
+                    <ul>
+                        <li><strong>Parameters:</strong>
+                            <ul>
+                                <li><code>directory</code>: The directory where the data is stored.</li>
+                                <li><code>memtable_flush_size</code>: The size of the memtable in bytes.</li>
+                                <li><code>compaction_interval</code>: The interval of sstables required to run compaction.</li>
+                                <li><code>pager</code>: The pager instance to use for reading and writing data.</li>
+                                <li><code>sstables</code>: A vector of SSTable instances to use for reading and writing data.</li>
+                            </ul><br/>
+                        </li>
+                    </ul>
+                    <pre><code class="language-cpp">LSMT(const std::string &directory, int memtable_flush_size, int compaction_interval, const std::shared_ptr&lt;Pager&gt; &pager, const std::vector&lt;std::shared_ptr&lt;SSTable&gt;&gt; &sstables);</code></pre>
+                </li><br/>
+                <li><strong>Static Method:</strong>
+                    <ul>
+                        <li><strong>Parameters:</strong>
+                            <ul>
+                                <li><code>directory</code>: The directory where the data is stored.</li>
+                                <li><code>directoryPerm</code>: The permissions to set on the directory.</li>
+                                <li><code>memtableFlushSize</code>: The size of the memtable in bytes.</li>
+                                <li><code>compactionInterval</code>: The interval of sstables required to run compaction.</li>
+                            </ul>
+                        </li>
+                    </ul><br/>
+                    <pre><code class="language-cpp">static std::unique_ptr&lt;LSMT&gt; New(const std::string &directory, std::filesystem::perms directoryPerm, int memtableFlushSize, int compactionInterval);</code></pre>
+                </li><br/>
+                <li><strong>Methods:</strong>
+                    <ul>
+                        <li><code>Put</code>: Inserts a key-value pair into the LSMT.</li>
+                        <li><code>Delete</code>: Deletes a key-value pair from the LSMT.</li>
+                        <li><code>Get</code>: Retrieves the value associated with a key from the LSMT.</li>
+                        <li><code>NGet</code>: Retrieves the key-value pairs not associated with a key from the LSMT.</li>
+                        <li><code>LessThan</code>: Retrieves the key-value pairs with keys less than a given key from the LSMT.</li>
+                        <li><code>GreaterThan</code>: Retrieves the key-value pairs with keys greater than a given key from the LSMT.</li>
+                        <li><code>Range</code>: Retrieves the key-value pairs with keys in a given range from the LSMT.</li>
+                        <li><code>NRange</code>: Retrieves the key-value pairs with keys not in the given range from the LSMT.</li>
+                        <li><code>LessThanEq</code>: Retrieves the key-value pairs with keys less than or equal to a given key from the LSMT.</li>
+                        <li><code>GreaterThanEq</code>: Retrieves the key-value pairs with keys greater than or equal to a given key from the LSMT.</li>
+                        <li><code>Close</code>: Closes the LSMT and flushes the memtable to disk.</li>
+                        <li><code>BeginTransaction</code>: Begins a transaction on the LSMT.</li>
+                        <li><code>CommitTransaction</code>: Commits a transaction on the LSMT.</li>
+                        <li><code>RollbackTransaction</code>: Rolls back a transaction on the LSMT.</li>
+                        <li><code>RunRecoveredOperations</code>: Runs the recovered operations on the LSMT.</li>
+                    </ul>
+
+                    <pre><code class="language-cpp">bool Put(const std::vector&lt;uint8_t&gt;& key, const std::vector&lt;uint8_t&gt;& value);
+bool Delete(const std::vector&lt;uint8_t&gt;& key);
+std::vector&lt;uint8_t&gt; Get(const std::vector&lt;uint8_t&gt;& key);
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; NGet(const std::vector&lt;uint8_t&gt;& key) const;
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; LessThan(const std::vector&lt;uint8_t&gt;& key) const;
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; GreaterThan(const std::vector&lt;uint8_t&gt;& key) const;
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; Range(const std::vector&lt;uint8_t&gt;& start, const std::vector&lt;uint8_t&gt;& end) const;
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; NRange(const std::vector&lt;uint8_t&gt;& start, const std::vector&lt;uint8_t&gt;& end) const;
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; LessThanEq(const std::vector&lt;uint8_t&gt;& key);
+std::vector&lt;std::pair&lt;std::vector&lt;uint8_t&gt;, std::vector&lt;uint8_t&gt;&gt;&gt; GreaterThanEq(const std::vector&lt;uint8_t&gt;& key) const;
+void Close();
+Transaction* BeginTransaction();
+bool CommitTransaction(Transaction* tx);
+void RollbackTransaction(Transaction* tx);
+bool LSMT::RunRecoveredOperations(const std::vector&lt;Operation&gt; &operations)
+                    </code></pre>
+                </li>
+            </ul></br/>
+        
+            <h4><code>TidesDB::Pager</code></h4>
+            <ul>
+                <li><strong>Constructor:</strong>
+                    <pre><code class="language-cpp">Pager(const std::string &filename, std::ios::openmode mode);</code></pre>
+                </li>
+                <li><strong>Methods:</strong>
+                    <pre><code class="language-cpp">int64_t Write(const std::vector&lt;uint8_t&gt; &data);
+std::vector&lt;uint8_t&gt; Read(int64_t page_number);
+int64_t PagesCount();</code></pre>
+                </li>
+            </ul>
+        
+            <h4><code>TidesDB::AVLTree</code></h4>
+            <ul>
+                <li><strong>Methods:</strong>
+                    <pre><code class="language-cpp">void insert(const std::vector&lt;uint8_t&gt;& key, const std::vector&lt;uint8_t&gt;& value);
+void deleteKV(const std::vector&lt;uint8_t&gt;& key);
+std::vector&lt;uint8_t&gt; Get(const std::vector&lt;uint8_t&gt;& key);
+void inOrderTraversal(std::function&lt;void(const std::vector&lt;uint8_t&gt;&, const std::vector&lt;uint8_t&gt;&)&gt; func);
+void clear();</code></pre>
+                </li>
+            </ul>
+        
+            <h4><code>TidesDB::Transaction</code></h4>
+            <ul>
+                <li><strong>Methods:</strong>
+                    <pre><code class="language-cpp">void AddPut(const std::vector&lt;uint8_t&gt; &key, const std::vector&lt;uint8_t&gt; &value);
+void AddDelete(const std::vector&lt;uint8_t&gt; &key);</code></pre>
+                </li>
+            </ul>
+        
+            <h4><code>TidesDB::Wal</code></h4>
+            <ul>
+                <li><strong>Constructor:</strong>
+                    <pre><code class="language-cpp">Wal(Pager* pager);</code></pre>
+                </li>
+                <li><strong>Methods:</strong>
+                    <ul>
+                        <li><code>WriteOperation</code>: Writes an operation to the WAL.</li>
+                        <li><code>Recover</code>: Recovers the operations from the WAL.</li>
+                        <li><code>Close</code>: Closes the WAL.</li>
+                    </ul>
+                    <pre><code class="language-cpp">bool WriteOperation(const Operation& op) const;
+std::vector&lt;Operation&gt; Recover() const;
+void Close() const;</code></pre>
+                </li>
+            </ul>
+        
+            <h3>Enumerations</h3>
+        
+            <h4><code>TidesDB::OperationType</code></h4>
+            <ul>
+                <li><strong>Values:</strong>
+                    <pre><code class="language-cpp">OpPut,
+OpDelete</code></pre>
+                </li>
+            </ul>
+        
+            <h3>Utility Functions</h3>
+            <ul>
+                <li><strong>ConvertToUint8Vector:</strong>
+                    <pre><code class="language-cpp">std::vector&lt;uint8_t&gt; ConvertToUint8Vector(const std::vector&lt;char&gt;& input);</code></pre>
+                </li>
+                <li><strong>ConvertToCharVector:</strong>
+                    <pre><code class="language-cpp">std::vector&lt;char&gt; ConvertToCharVector(const std::vector&lt;uint8_t&gt;& input);</code></pre>
+                </li>
+            </ul>
+        
+            <h3>Example</h3>
+            <pre><code class="language-cpp">#include "library.h"
+        
+int main() {
+    auto lsmt = TidesDB::LSMT::New("data_directory", std::filesystem::perms::owner_all, 1024 * 1024, 60, 4);
+    lsmt-&gt;Put({1, 2, 3}, {4, 5, 6});
+    auto value = lsmt-&gt;Get({1, 2, 3});
+    lsmt-&gt;Close();
+    return 0;
+}</code></pre>
+        
+        <p>This guide provides a basic overview of how to use the <code>TidesDB</code> library. For more detailed information, refer to the source code and comments within the library.</p>
+    
+        <footer>&copy; 2024 TidesDB, all rights reserved.</footer>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/prism.min.js"></script>
+</body>
+</html>
