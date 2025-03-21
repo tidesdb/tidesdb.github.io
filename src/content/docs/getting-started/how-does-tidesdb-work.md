@@ -42,6 +42,8 @@ A distinctive aspect of TidesDB is its organization around column families. Each
 
 This design allows for domain-specific optimization and isolation between different types of data stored in the same database.
 
+![](/column-family-board.png)
+
 ## 4. Core Components and Mechanisms
 ### 4.1 Memtable
 The memtable is an in-memory data structure that serves as the first landing point for all write operations. Key features include:
@@ -57,6 +59,8 @@ SSTables are the immutable on-disk components of TidesDB. Their design includes:
 - **Block Indices**: Optionally maintained indices that allow direct access to specific blocks without scanning the entire file
 - **Min-Max Key Range**: Each SSTable stores the minimum and maximum keys it contains to optimize range queries. This block lives at block 0
 - **Immutability**: Once written, SSTables are never modified (only eventually merged or deleted)
+
+![](/sst-block-format-board.png)
 
 ### 4.3 Write-Ahead Log (WAL)
 For durability, TidesDB implements a write-ahead logging mechanism:
@@ -134,6 +138,8 @@ TidesDB implements two distinct compaction strategies:
 - Blocks less than manual compaction
 - Continues until system shutdown
 
+![](/sst-pair-merge-board.png)
+
 ### 6.3 Compaction Mechanics
 During compaction:
 
@@ -142,6 +148,8 @@ During compaction:
 3. For each key, only the newest version is retained
 4. Tombstones (deletion markers) and expired TTL entries are purged
 5. Original SSTables are deleted after successful merge
+
+![](/sst-pair-merge-tombstone-board.png)
 
 ## 7. Performance Optimizations
 ### 7.1 Block Indices
