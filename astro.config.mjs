@@ -63,6 +63,9 @@ export default defineConfig({
 				},
 				{
 					label: 'GitHub', link: 'https://github.com/tidesdb',
+				},
+				{
+					label: 'Discord Community', link: 'https://discord.gg/tWEmjR66cy',
 				}
 			],
 		}),
