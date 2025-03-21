@@ -1,0 +1,45 @@
+---
+title: Simple. Speedy. Solid.
+description: Get started building your docs site with Starlight.
+template: splash
+hero:
+  tagline: TidesDB is an embeddable persistant key-value storage engine.
+  actions:
+    - text: Learn
+      link: getting-started/what-is-tidesdb
+      icon: right-arrow
+    - text: Get started with TidesDB
+      link: https://tidesdb.com/
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import Footer from '../../components/Footer.astro';
+
+<CardGrid>
+	<Card title="Log Structured" icon="document">
+		TidesDB is built on the idea of a log structured merge tree.  It is a storage engine in nature written entirely in C.  It is accessed as a library.  Keys and values are simply raw sequences of bytes with no predetermined size restrictions.
+	</Card>
+	<Card title="Optimized for modern hardware" icon="seti:plan">
+		TidesDB is designed to work efficiently with modern storage solutions like flash drives and SSDs. It takes advantage of the improved read/write capabilities of these technologies to provide good performance in low-latency environments.
+	</Card>
+</CardGrid>
+<Card title="Basic to Advanced Storage Operations" icon="seti:favicon">
+		TidesDB provides a comprehensive database solution with features ranging from basic to advanced operations. It supports ACID-compliant transactions tied to specific column families, concurrent multi-threaded access, and atomic operations that ensure data integrity. 
+		
+		TidesDB offers efficient data navigation through bidirectional cursors, durability via write-ahead logging, and performance optimization through multithreaded compaction and bloom filters. 
+		
+		TidesDB includes practical capabilities such as flexible compression options (Snappy, LZ4, ZSTD), time-to-live settings, and block indices for faster reads. With an intuitive API, robust error handling, and cross-platform compatibility (Linux, MacOS, Windows), TidesDB delivers both functionality and ease of use while supporting advanced querying through range and filter operations, all backed by detailed performance metrics accessible through its public API.
+</Card>
+<CardGrid>
+	<Card title="Time to live" icon="seti:clock">
+		TTL time-to-live for key-value pairs with real time tombstoning.
+	</Card>
+	<Card title="Multiplatform" icon="apple">
+		TidesDB is designed to work on Windows, Linux and Mac.
+	</Card>
+</CardGrid>
+
+
+<Footer/>
