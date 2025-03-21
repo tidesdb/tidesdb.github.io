@@ -61,6 +61,9 @@ export default defineConfig({
 				{
 					label: 'Node.JS Reference',slug: 'reference/nodejs'
 				},
+				{
+					label: 'GitHub', link: 'https://github.com/tidesdb',
+				}
 			],
 		}),
 	],
