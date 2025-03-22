@@ -85,7 +85,7 @@ When a key-value pair is written to TidesDB:
 2. The key-value pair is inserted into the memtable
 3. If the memtable size exceeds the flush threshold:
 
-- The system will block momentarily
+- The column family will block momentarily
 - The memtable is flushed to disk (sorted run) as an SSTable
 - The corresponding WAL is truncated
 - The memtable is cleared for new writes
