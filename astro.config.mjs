@@ -9,7 +9,6 @@ export default defineConfig({
 		starlight({
 			title: 'TidesDB',
 			customCss: [
-				// Relative path to your custom CSS file
 				'./src/styles/custom.css',
 			  ],
 			logo: {
