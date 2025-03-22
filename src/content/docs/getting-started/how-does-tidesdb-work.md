@@ -175,5 +175,11 @@ TidesDB allows fine-tuning through various configurable parameters:
 - Skip list configuration
 - Bloom filter usage
 - Compression settings
-- Compaction trigger thresholds
-- Block Indices (Build with`TDB_BLOCK_INDICES=0`)
+- Compaction trigger thresholds and utilization
+
+#### On build
+Before you build TidesDB you can choose to modify these configuration constants:
+- Block indices `TDB_BLOCK_INDICES`
+- Debug log `TDB_DEBUG_LOG`
+- Log rotation/truncation `TDB_DEBUG_LOG_TRUNCATE_AT`
+- Limit max memory usage for key-value pairs ingested `TDB_AVAILABLE_MEMORY_THRESHOLD`
