@@ -19,7 +19,7 @@ An LSM-tree typically consists of multiple components:
 
 - In-memory buffers (memtables) that accept writes
 - Immutable on-disk files (SSTables - Sorted String Tables)
-- Background processes that sort-merge these components
+- Processes that merge SSTables to reduce storage overhead and improve read performance
 
 This structure allows for efficient writes by initially storing data in memory and then periodically flushing to disk in larger batches, reducing the I/O overhead associated with random writes.
 
@@ -48,7 +48,7 @@ This design allows for domain-specific optimization and isolation between differ
 ### 4.1 Memtable
 The memtable is an in-memory data structure that serves as the first landing point for all write operations. Key features include:
 
-- **Skip List Implementation**: TidesDB uses a skip list data structure to maintain sorted key-value pairs in memory
+- **Skip List Implementation**: TidesDB employs a skip list data structure to efficiently maintain key-value pairs in sorted order. The implementation performs byte-by-byte lexicographical comparison to establish the sorting order of keys, ensuring consistent and predictable data organization in memory. This comparison algorithm applies to retrieval and merge comparisons as well system-wide. 
 - **Configurable Parameters**: Maximum level and probability can be tuned
 - **Size Threshold**: When the memtable reaches a configurable size threshold, it is flushed to disk as an SSTable
 
@@ -85,11 +85,10 @@ When a key-value pair is written to TidesDB:
 2. The key-value pair is inserted into the memtable
 3. If the memtable size exceeds the flush threshold:
 
-- The memtable becomes immutable
-- A new memtable is created for new writes
-- The immutable memtable is flushed to disk as an SSTable
+- The system will block momentarily
+- The memtable is flushed to disk (sorted run) as an SSTable
 - The corresponding WAL is truncated
-
+- The memtable is cleared for new writes
 
 
 ### 5.2 Read Path
@@ -148,6 +147,7 @@ During compaction:
 3. For each key, only the newest version is retained
 4. Tombstones (deletion markers) and expired TTL entries are purged
 5. Original SSTables are deleted after successful merge
+6. If a merge is interrupted, the system will clean up after on restart. Interruption does not corrupt.
 
 ![](/sst-pair-merge-tombstone-board.png)
 
@@ -155,7 +155,7 @@ During compaction:
 ### 7.1 Block Indices
 TidesDB employs block indices to optimize read performance:
 
-- Each SSTable contains a final block with a sorted binary hash array
+- Each SSTable contains a final block with a sorted binary hash array (SBHA)
 - This structure allows direct access to the block containing a specific key
 - Significantly reduces I/O by avoiding full SSTable scans
 
@@ -176,3 +176,4 @@ TidesDB allows fine-tuning through various configurable parameters:
 - Bloom filter usage
 - Compression settings
 - Compaction trigger thresholds
+- Block Indices (Build with`TDB_BLOCK_INDICES=0`)
