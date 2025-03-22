@@ -26,11 +26,9 @@ import Footer from '../../components/Footer.astro';
 	</Card>
 </CardGrid>
 <Card title="Basic to Advanced Storage Operations" icon="seti:favicon">
-		TidesDB provides a comprehensive database solution with features ranging from basic to advanced operations. It supports ACID-compliant transactions tied to specific column families, concurrent multi-threaded access, and atomic operations that ensure data integrity. 
-		
-		TidesDB offers efficient data navigation through bidirectional cursors, durability via write-ahead logging, and performance optimization through multithreaded compaction and bloom filters. 
-		
-		TidesDB includes practical capabilities such as flexible compression options (Snappy, LZ4, ZSTD), time-to-live settings, and block indices for faster reads. With an intuitive API, robust error handling, and cross-platform compatibility (Linux, MacOS, Windows), TidesDB delivers both functionality and ease of use while supporting advanced querying through range and filter operations, all backed by detailed performance metrics accessible through its public API.
+		TidesDB is a comprehensive storage engine featuring ACID-compliant transactions, concurrent multi-threaded access, and atomic operations to ensure data integrity. It supports bidirectional cursors, write-ahead logging, and optimizations through multithreaded compaction and bloom filters.
+
+		The system offers multiple compression options (Snappy, LZ4, ZSTD), time-to-live settings, and block indices for faster reads. With an intuitive API, user-friendly error handling, and cross-platform support for Linux, MacOS, and Windows, TidesDB combines powerful functionality with ease of use. It also supports advanced range and filter queries and provides column-family statistics via its public API.
 </Card>
 <CardGrid>
 	<Card title="Time to live" icon="seti:clock">
@@ -40,6 +38,8 @@ import Footer from '../../components/Footer.astro';
 		TidesDB is designed to work on Windows, Linux and Mac.
 	</Card>
 </CardGrid>
-
+<Card title="Cross-language" icon="seti:db">
+		TidesDB provides a variety of FFI libraries for languages such as C++, Python, Lua, GO and more!
+</Card>
 
 <Footer/>
