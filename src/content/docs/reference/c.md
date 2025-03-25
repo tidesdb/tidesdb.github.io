@@ -526,7 +526,7 @@ uint8_t *value = NULL;
 size_t value_size = 0;
 
 /* Iterate forward through key-value pairs */
-while ((err = tidesdb_cursor_next(cursor)) == NULL) {
+do {
    err = tidesdb_cursor_get(
        cursor,     /* Cursor            */
        &key,       /* Output key        */
@@ -546,7 +546,7 @@ while ((err = tidesdb_cursor_next(cursor)) == NULL) {
    /* Free the key and value when done to prevent memory leaks */
    free(key);
    free(value);
-}
+} while ((err = tidesdb_cursor_next(cursor)) == NULL);
 
 /* 
 * Check if we reached the end of the cursor or if there was an error
@@ -562,7 +562,7 @@ if (err != NULL && err->code != TIDESDB_ERR_AT_END_OF_CURSOR) {
 #### Iterating Backward
 ```c
 /* Iterate backward through key-value pairs */
-while ((err = tidesdb_cursor_prev(cursor)) == NULL) {
+do {
     err = tidesdb_cursor_get(
         cursor,     /* Cursor            */
         &key,       /* Output key        */
@@ -582,7 +582,7 @@ while ((err = tidesdb_cursor_prev(cursor)) == NULL) {
     /* Free the key and value when done */
     free(key);
     free(value);
-}
+} while ((err = tidesdb_cursor_prev(cursor)) == NULL);
 
 /* Check if we reached the start of the cursor or if there was an error */
 if (err != NULL && err->code != TIDESDB_ERR_AT_START_OF_CURSOR) {
