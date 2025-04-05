@@ -497,18 +497,20 @@ tidesdb_txn_free(txn);
 ### Cursor Operations
 Cursors allow you to iterate through key-value pairs in a column family.
 
+> You can use a `tidesdb_merge_cursor` if you want all keys to be sorted from all sources.  
+
 #### Initializing a Cursor
 ```c
 /*
 * Initialize a cursor to iterate through key-value pairs
 * A cursor allows bi-directional sequential access to the TidesDB isntance contents
 */
-tidesdb_cursor_t *cursor = NULL;
+tidesdb_cursor_t *cursor = NULL; /* or tidesdb_merge_cursor_t */
 tidesdb_err_t *err = tidesdb_cursor_init(
    tdb,          /* TidesDB instance  */
    "users",      /* Column family name */
    &cursor       /* Cursor pointer     */
-);
+); /* or tidesdb_merge_cursor_init */
 
 if (err != NULL) {
    printf("Error initializing cursor: %s (code: %d)\n", err->message, err->code);
@@ -533,7 +535,7 @@ do {
        &key_size,  /* Output key size   */
        &value,     /* Output value      */
        &value_size /* Output value size */
-   );
+   ); /* or tidesdb_merge_cursor_get */
    
    if (err != NULL) {
        printf("Error getting cursor value: %s (code: %d)\n", err->message, err->code);
@@ -546,7 +548,7 @@ do {
    /* Free the key and value when done to prevent memory leaks */
    free(key);
    free(value);
-} while ((err = tidesdb_cursor_next(cursor)) == NULL);
+} while ((err = tidesdb_cursor_next(cursor)) == NULL); /* or tidesdb_merge_cursor_next */
 
 /* 
 * Check if we reached the end of the cursor or if there was an error
@@ -569,7 +571,7 @@ do {
         &key_size,  /* Output key size   */
         &value,     /* Output value      */
         &value_size /* Output value size */
-    );
+    ); /* or tidesdb_merge_cursor_get */
     
     if (err != NULL) {
         printf("Error getting cursor value: %s (code: %d)\n", err->message, err->code);
@@ -582,7 +584,7 @@ do {
     /* Free the key and value when done */
     free(key);
     free(value);
-} while ((err = tidesdb_cursor_prev(cursor)) == NULL);
+} while ((err = tidesdb_cursor_prev(cursor)) == NULL); /* or tidesdb_merge_cursor_prev */
 
 /* Check if we reached the start of the cursor or if there was an error */
 if (err != NULL && err->code != TIDESDB_ERR_AT_START_OF_CURSOR) {
@@ -593,7 +595,7 @@ if (err != NULL && err->code != TIDESDB_ERR_AT_START_OF_CURSOR) {
 
 #### Freeing a Cursor
 ```c
-tidesdb_cursor_free(cursor);
+tidesdb_cursor_free(cursor); /* or tidesdb_merge_cursor_free
 ```
 
 ### Compaction Operations
