@@ -8,17 +8,119 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'TidesDB',
+			description: 'Fast, embeddable LSM-tree based key-value storage engine library written in C. ACID transactions, high concurrency, cross-platform support.',
 			customCss: [
 				'./src/styles/custom.css',
 			  ],
 			logo: {
-				light: './src/assets/tidesdb-logo-v0.1-final.png',
+				light: './src/assets/tidesdb-logo-v0.1.svg',
 				dark: './src/assets/tidesdb-logo-v0.1.svg',
 				replacesTitle: true,
 			},
 			social: {
 				github: 'https://github.com/tidesdb/tidesdb',
+				discord: 'https://discord.gg/tWEmjR66cy',
 			},
+			head: [
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'keywords',
+						content: 'tidesdb, database, key-value store, lsm-tree, storage engine, embedded database, c library, nosql, acid transactions, high performance database, column family, write-ahead log, bloom filter, data compression, cross-platform database, database library, key value database, fast database, embeddable storage, database engine, persistent storage, in-memory database, disk storage, concurrent database, transactional database, open source database'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'author',
+						content: 'TidesDB Team'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:type',
+						content: 'website'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:site_name',
+						content: 'TidesDB'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:title',
+						content: 'TidesDB - Fast Embeddable Storage Engine'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:description',
+						content: 'High-performance LSM-tree based key-value storage engine library written in C. Features ACID transactions, column families, compression, and cross-platform support.'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:url',
+						content: 'https://tidesdb.com'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'twitter:card',
+						content: 'summary_large_image'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'twitter:title',
+						content: 'TidesDB - Fast Embeddable Storage Engine'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'twitter:description',
+						content: 'High-performance LSM-tree based key-value storage engine library written in C. ACID transactions, high concurrency, cross-platform.'
+					}
+				},
+				{
+					tag: 'link',
+					attrs: {
+						rel: 'canonical',
+						href: 'https://tidesdb.com'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'robots',
+						content: 'index, follow'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'language',
+						content: 'English'
+					}
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'revisit-after',
+						content: '7 days'
+					}
+				}
+			],
 			sidebar: [
 				{
 					label: 'Getting started',

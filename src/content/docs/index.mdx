@@ -1,45 +1,75 @@
 ---
-title: Surf writes. Sail reads. Anchor reliability.
-description: TidesDB is a fast embeddable persistent storage engine engine library for C, C++, Python, GO and more.
+title: Fast, embeddable storage engine
+description: A high-performance LSM-tree based key-value storage engine library written in C. Build databases or use directly as a standalone store.
 template: splash
 hero:
-  tagline: TidesDB is an embeddable persistant key-value store.
+  tagline: High-performance key-value storage engine for modern applications.
   actions:
     - text: Get started
       link: getting-started/what-is-tidesdb
       icon: right-arrow
-    - text: Currently in BETA testing
-      link: https://tidesdb.com/
-      icon: warning
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/tidesdb/tidesdb
+      icon: external
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import Footer from '../../components/Footer.astro';
 
-<CardGrid>
-	<Card title="Log Structured" icon="document">
-		TidesDB is built on the idea of a log structured merge tree.  It is a storage engine in nature written entirely in C.  It is accessed as a library.  Keys and values are simply raw sequences of bytes with no predetermined size restrictions.
-	</Card>
-	<Card title="Optimized for modern hardware" icon="seti:plan">
-		TidesDB is designed to work efficiently with modern storage solutions like flash drives and SSDs. It takes advantage of the improved read/write capabilities of these technologies to provide good performance in low-latency environments.
-	</Card>
-</CardGrid>
-<Card title="Basic to Advanced Storage Operations" icon="seti:favicon">
-		TidesDB is a comprehensive storage engine featuring ACID-compliant transactions, concurrent multi-threaded access, and atomic operations to ensure data integrity. It supports bidirectional cursors, write-ahead logging, and optimizations through multithreaded compaction and bloom filters.
+<div class="wave-container">
+	<div class="wave wave-1"></div>
+	<div class="wave wave-2"></div>
+	<div class="wave wave-3"></div>
+</div>
 
-		The system offers multiple compression options (Snappy, LZ4, ZSTD), time-to-live settings, and block indices for faster reads. With an intuitive API, user-friendly error handling, and cross-platform support for Linux, MacOS, and Windows, TidesDB combines powerful functionality with ease of use. It also supports advanced range and filter queries and provides column-family statistics via its public API.
-</Card>
-<CardGrid>
-	<Card title="Time to live" icon="seti:clock">
-		TTL time-to-live for key-value pairs with real time tombstoning.
+<div class="particles">
+	<div class="particle" style="left: 10%; animation-delay: 0s;"></div>
+	<div class="particle" style="left: 20%; animation-delay: 2s;"></div>
+	<div class="particle" style="left: 30%; animation-delay: 4s;"></div>
+	<div class="particle" style="left: 40%; animation-delay: 1s;"></div>
+	<div class="particle" style="left: 50%; animation-delay: 3s;"></div>
+	<div class="particle" style="left: 60%; animation-delay: 5s;"></div>
+	<div class="particle" style="left: 70%; animation-delay: 2.5s;"></div>
+	<div class="particle" style="left: 80%; animation-delay: 4.5s;"></div>
+	<div class="particle" style="left: 90%; animation-delay: 1.5s;"></div>
+</div>
+
+<CardGrid stagger>
+	<Card title="ACID Transactions" icon="approve-check" style="--card-index: 0">
+		Full transactional support with atomic commits and automatic rollback. Multi-column-family transactions with MVCC-style snapshots.
 	</Card>
-	<Card title="Multiplatform" icon="apple">
-		TidesDB is designed to work on Windows, Linux and Mac.
+	<Card title="High Concurrency" icon="rocket" style="--card-index: 1">
+		Readers don't block readers or writers. Optimized reader-writer locks per column family for maximum throughput.
+	</Card>
+	<Card title="LSM-Tree Architecture" icon="setting" style="--card-index: 2">
+		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance through bloom filters and block indices.
 	</Card>
 </CardGrid>
-<Card title="Cross-language" icon="seti:db">
-		TidesDB provides a variety of FFI libraries for languages such as C++, Python, Lua, GO and more!
-</Card>
+
+<CardGrid stagger>
+	<Card title="Flexible Compression" icon="puzzle" style="--card-index: 3">
+		Support for Snappy, LZ4, and ZSTD compression algorithms. Configure per column family for optimal storage efficiency.
+	</Card>
+	<Card title="Background Compaction" icon="refresh" style="--card-index: 4">
+		Automatic parallel compaction with configurable thread pools. Reduces SSTable count and removes tombstones without blocking operations.
+	</Card>
+	<Card title="Cross-Platform" icon="laptop" style="--card-index: 5">
+		Native support for Linux, macOS, and Windows with platform abstraction layer for consistent behavior.
+	</Card>
+</CardGrid>
+
+<CardGrid stagger>
+	<Card title="Language Bindings" icon="translate" style="--card-index: 6">
+		FFI bindings for C++, Go, Java, Python, Rust, Lua, JavaScript, and many more languages. Use TidesDB in your preferred language.
+	</Card>
+	<Card title="Simple API" icon="open-book" style="--card-index: 7">
+		Clean, intuitive C API with consistent error handling. All functions return 0 on success with detailed error codes.
+	</Card>
+	<Card title="Production Ready" icon="star" style="--card-index: 8">
+		Write-ahead logging, TTL support, custom comparators, and configurable sync modes for durability guarantees.
+	</Card>
+</CardGrid>
 
 <Footer/>
