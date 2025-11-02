@@ -1,851 +1,589 @@
 ---
-title: TidesDB C Reference
-description: TidesDB C FFI Library reference.
+title: TidesDB C API Reference (v1)
+description: Complete C API reference for TidesDB v1
 ---
 
-## Error Handling
-All TidesDB methods return a `tidesdb_err_t*` which contains an error code and message. If no error occurs, NULL is returned.
+## Overview
+
+TidesDB v1 uses a simplified API. All functions return `0` on success and a negative error code on failure.
+
+## Include
 
 ```c
-typedef struct
+#include <tidesdb/tidesdb.h>
+```
+
+You can use other components of TidesDB such as skip list, bloom filter etc. under `tidesdb/` - this also prevents collisions.
+
+## Error Codes
+
+TidesDB provides detailed error codes for production use.
+
+| Error Code | Value | Description |
+|------------|-------|-------------|
+| `TDB_SUCCESS`  | 0 | operation successful |
+| `TDB_ERROR`  | -1 | generic error |
+| `TDB_ERR_MEMORY`  | -2 | memory allocation failed |
+| `TDB_ERR_INVALID_ARGS`  | -3 | invalid arguments passed to function |
+| `TDB_ERR_IO`  | -4 | I/O error (file operations) |
+| `TDB_ERR_NOT_FOUND`  | -5 | key not found |
+| `TDB_ERR_EXISTS`  | -6 | resource already exists |
+| `TDB_ERR_CORRUPT`  | -7 | data corruption detected |
+| `TDB_ERR_LOCK`  | -8 | lock acquisition failed |
+| `TDB_ERR_TXN_COMMITTED`  | -9 | transaction already committed |
+| `TDB_ERR_TXN_ABORTED`  | -10 | transaction aborted |
+| `TDB_ERR_READONLY`  | -11 | write operation on read-only transaction |
+| `TDB_ERR_FULL`  | -12 | database or resource full |
+| `TDB_ERR_INVALID_NAME`  | -13 | invalid name (too long or empty) |
+| `TDB_ERR_COMPARATOR_NOT_FOUND`  | -14 | comparator not found in registry |
+| `TDB_ERR_MAX_COMPARATORS`  | -15 | maximum number of comparators reached |
+| `TDB_ERR_INVALID_CF`  | -16 | invalid column family |
+| `TDB_ERR_THREAD`  | -17 | thread creation or operation failed |
+| `TDB_ERR_CHECKSUM`  | -18 | checksum verification failed |
+
+### Example Error Handling
+
+```c
+int result = tidesdb_txn_put(txn, "my_cf", key, key_size, value, value_size, -1);
+if (result != TDB_SUCCESS)
 {
-    int code;
-    char *message;
-} tidesdb_err_t;
+    switch (result)
+    {
+        case TDB_ERR_MEMORY:
+            fprintf(stderr, "out of memory\n");
+            break;
+        case TDB_ERR_INVALID_ARGS:
+            fprintf(stderr, "invalid arguments\n");
+            break;
+        case TDB_ERR_READONLY:
+            fprintf(stderr, "cannot write to read-only transaction\n");
+            break;
+        default:
+            fprintf(stderr, "operation failed with error code: %d\n", result);
+            break;
+    }
+    return -1;
+}
 ```
 
-## Public Methods Reference
+## Database Operations
 
-### Database Operations
+### Opening a Database
 
-#### Opening a Database
-Opens a TidesDB database instance at the specified path.
 ```c
-tidesdb_t *tdb = NULL;
-tidesdb_err_t *err = tidesdb_open("your_tdb_directory", &tdb);
-if (err != NULL) {
-    printf("Error: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    return 1;
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .enable_debug_logging = 0  /* Optional enable debug logging */
+};
+
+tidesdb_t *db = NULL;
+if (tidesdb_open(&config, &db) != 0)
+{
+    /* Handle error */
+    return -1;
 }
 
-/* 
- * If we get here, TidesDB opened successfully.
- * We can now perform operations.
- */
-printf("TidesDB opened successfully\n");
+/* Close the database */
+if (tidesdb_close(db) != 0)
+{
+    /* Handle error */
+    return -1;
+}
 ```
 
-#### Closing a Database
-Gracefully closes a TidesDB database instance.
+### Debug Logging
 
+TidesDB provides runtime debug logging that can be enabled/disabled dynamically.
+
+**Enable at startup**
 ```c
-tidesdb_err_t *err = tidesdb_close(tdb);
-if (err != NULL) {
-   printf("Error closing TidesDB: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
-}
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .enable_debug_logging = 1  /* Enable debug logging */
+};
 
-/*
-* At this point, we have successfully closed TidesDB
-* and released all associated resources. Any further
-* operations on tdb would be invalid.
-*/
-printf("TidesDB closed successfully\n");
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
 ```
 
-### Column Family Operations
-#### Creating a Column Family
-Creates a new column family with specified configuration.
+**Enable/disable at runtime**
 ```c
-/* 
- * Create a column family with Snappy compression and bloom filters
- * This will optimize read performance while still maintaining
- * good compression ratios for storage efficiency
- */
-tidesdb_err_t *err = tidesdb_create_column_family(
-    tdb,                               /* TidesDB instance                */
-    "users",                           /* Column family name               */
-    (1024 * 1024) * 128,               /* Memtable flush threshold (128MB) */
-    TDB_DEFAULT_SKIP_LIST_MAX_LEVEL,   /* Skip list max level              */
-    TDB_DEFAULT_SKIP_LIST_PROBABILITY, /* Skip list probability            */
-    true,                              /* Enable compression               */
-    TDB_COMPRESS_SNAPPY,               /* Use Snappy compression           */
-    true                               /* Enable bloom filters             */
-);
+extern int _tidesdb_debug_enabled;  /* Global debug flag */
 
-if (err != NULL) {
-    printf("Error creating column family: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    return 1;
-}
-printf("Column family 'users' created successfully\n");
+/* Enable debug logging */
+_tidesdb_debug_enabled = 1;
+
+/* Your operations here - debug logs will be written to stderr */
+
+/* Disable debug logging */
+_tidesdb_debug_enabled = 0;
 ```
 
-#### Dropping a Column Family
-Deletes a column family and all its associated data.
-```c
-/*
- * Dropping a Column Family
- * Deletes a column family and all its associated data.
- * WARNING: This operation cannot be undone and will
- * permanently remove all data in this family.
- */
-tidesdb_err_t *err = tidesdb_drop_column_family(tdb, "users");
-if (err != NULL) {
-    printf("Error dropping column family: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    return 1;
-}
-printf("Column family 'users' dropped successfully\n");
+**Output**
+Debug logs are written to **stderr** with the format:
+```
+[TidesDB DEBUG] filename:line: message
 ```
 
-#### Listing Column Families
-Gets a list of all column families in the TidesDB instance.
-
-```c
-/*
-* List all column families in the TidesDB instance
-* The function allocates memory for the result,
-* which must be freed by the caller
-*/
-char *column_families = NULL;
-tidesdb_err_t *err = tidesdb_list_column_families(tdb, &column_families);
-if (err != NULL) {
-   printf("Error listing column families: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
-}
-
-printf("Column families: %s\n", column_families);
-free(column_families); /* Don't forget to free the memory */
+**Redirect to file**
+```bash
+./your_program 2> tidesdb_debug.log  # Redirect stderr to file
 ```
 
-#### Getting Column Family Statistics
-Retrieves detailed information about a column family.
+## Column Family Operations
+
+### Creating a Column Family
+
+Column families are isolated key-value stores. Use the config struct for customization or use defaults.
+
 ```c
-/*
-* Get statistics for a column family
-* This provides detailed information about the state of
-* the specified column family within the TidesDB instance 
-*/
-tidesdb_column_family_stat_t *stat = NULL;
-tidesdb_err_t *err = tidesdb_get_column_family_stat(tdb, "users", &stat);
-if (err != NULL) {
-   printf("Error getting column family stats: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
+/* Create with default configuration */
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+
+if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
+{
+    /* Handle error */
+    return -1;
 }
-
-/* Display the column family statistics */
-printf("Column family: %s\n", stat->cf_name);
-printf("Number of SSTables: %d\n", stat->num_sstables);
-printf("Memtable size: %zu bytes\n", stat->memtable_size);
-printf("Memtable entries: %zu\n", stat->memtable_entries_count);
-printf("Incremental merging: %s\n", stat->incremental_merging ? "Yes" : "No");
-printf("Flush threshold: %d bytes\n", stat->config.flush_threshold);
-
-/* Free the stats when done to prevent memory leaks */
-tidesdb_free_column_family_stat(stat);
 ```
 
-### Key-Value Operations
-#### Putting a Key-Value Pair
-Stores a key-value pair in a column family.
+**Custom configuration example**
 ```c
-/*
-* Store a simple key-value pair with no expiration
-* This associates a JSON user profile with the key "user:1001"
-* in the "users" column family
-*/
-uint8_t key[] = "user:1001";
-uint8_t value[] = "{\"name\":\"Alice\",\"email\":\"alice@example.com\"}";
+tidesdb_column_family_config_t cf_config = {
+    .memtable_flush_size = 128 * 1024 * 1024,   /* 128MB */
+    .max_sstables_before_compaction = 512,      /* trigger compaction at 512 SSTables (min 2 required) */
+    .compaction_threads = 4,                    /* use 4 threads for parallel compaction (0 = single-threaded) */
+    .max_level = 12,                            /* skip list max level */
+    .probability = 0.25f,                       /* skip list probability */
+    .compressed = 1,                            /* enable compression */
+    .compress_algo = COMPRESS_LZ4,              /* use LZ4 */
+    .bloom_filter_fp_rate = 0.01,               /* 1% false positive rate */
+    .enable_background_compaction = 1,          /* enable background compaction */
+    .use_sbha = 1,                              /* use sorted binary hash array */
+    .sync_mode = TDB_SYNC_BACKGROUND,           /* background fsync */
+    .sync_interval = 1000,                      /* fsync every 1000ms (1 second) */
+    .comparator_name = NULL                     /* NULL = use default "memcmp" */
+};
 
-tidesdb_err_t *err = tidesdb_put(
-   tdb,              /* TidesDB instance            */
-   "users",          /* Column family name           */
-   key,              /* Key                          */
-   sizeof(key),      /* Key size                     */
-   value,            /* Value                        */
-   sizeof(value),    /* Value size                   */
-   -1                /* TTL (-1 means no expiration) */
-);
-
-if (err != NULL) {
-   printf("Error putting key-value pair: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
+if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
+{
+    /* Handle error */
+    return -1;
 }
-printf("Key-value pair stored successfully\n");
 ```
 
-#### Putting a Key-Value Pair with TTL
-Stores a key-value pair that will expire after a specified time.
+**Using custom comparator**
 ```c
-/*
-* Store a key-value pair with expiration (TTL)
-* This associates a session with user ID 1001
-* The session will expire automatically after 1 hour
-*/
-uint8_t key[] = "session:12345";
-uint8_t value[] = "{\"user_id\":\"1001\",\"authenticated\":true}";
+/* Register custom comparator first (see examples/custom_comparator.c) */
+tidesdb_register_comparator("reverse", my_reverse_compare);
 
-/* Set TTL to 1 hour from now */
-time_t ttl = time(NULL) + (60 * 60);
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+cf_config.comparator_name = "reverse";  /* use registered comparator */
 
-tidesdb_err_t *err = tidesdb_put(
-   tdb,              /* TidesDB instance     */
-   "sessions",       /* Column family name    */
-   key,              /* Key                   */
-   sizeof(key),      /* Key size              */
-   value,            /* Value                 */
-   sizeof(value),    /* Value size            */
-   ttl               /* TTL (1 hour from now) */
-);
-
-if (err != NULL) {
-   printf("Error putting key-value pair with TTL: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
+if (tidesdb_create_column_family(db, "sorted_cf", &cf_config) != 0)
+{
+    /* Handle error */
+    return -1;
 }
-printf("Key-value pair with TTL stored successfully\n");
 ```
 
-#### Getting a Key-Value Pair
-Retrieves a value by its key from a column family.
+### Dropping a Column Family
+
 ```c
-/*
-* Retrieve a key-value pair from the TidesDB instance
-* Looks up the value associated with the key "user:1001"
-* The function allocates memory for the result,
-* which must be freed by the caller
-*/
-uint8_t key[] = "user:1001";
-uint8_t *value_out = NULL;
-size_t value_len = 0;
-
-tidesdb_err_t *err = tidesdb_get(
-   tdb,              /* TidesDB instance  */
-   "users",          /* Column family name */
-   key,              /* Key                */
-   sizeof(key),      /* Key size           */
-   &value_out,       /* Output value       */
-   &value_len        /* Output value size  */
-);
-
-if (err != NULL) {
-   printf("Error getting key-value pair: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
+if (tidesdb_drop_column_family(db, "my_cf") != 0)
+{
+    /* Handle error */
+    return -1;
 }
-
-printf("Retrieved value: %.*s\n", (int)value_len, value_out);
-
-/* Don't forget to free the value when done to prevent memory leaks */
-free(value_out);
 ```
 
-#### Deleting a Key-Value Pair
-Removes a key-value pair from a column family.
+### Getting a Column Family
+
+Retrieve a column family pointer to use in operations.
 
 ```c
-/*
-* Delete a key-value pair from the TidesDB instance
-* This completely removes the entry for "user:1001"
-* from the "users" column family
-*/
-uint8_t key[] = "user:1001";
-
-tidesdb_err_t *err = tidesdb_delete(
-   tdb,              /* TidesDB instance  */
-   "users",          /* Column family name */
-   key,              /* Key                */
-   sizeof(key)       /* Key size           */
-);
-
-if (err != NULL) {
-   printf("Error deleting key-value pair: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (cf == NULL)
+{
+    /* Column family not found */
+    return -1;
 }
-printf("Key-value pair deleted successfully\n");
 ```
 
-#### Range and Filter Operations
-##### Range Queries
-Retrieves a range of key-value pairs between two keys.
+### Listing Column Families
+
+Get all column family names in the database.
+
 ```c
-/*
-* Perform a range query to retrieve all users with IDs between 1000 and 2000
-* This returns all key-value pairs where the key is lexicographically
-* between start_key and end_key (inclusive)
-*/
-uint8_t start_key[] = "user:1000";
-uint8_t end_key[] = "user:2000";
-tidesdb_key_value_pair_t **result = NULL;
-size_t result_size = 0;
+char **names = NULL;
+int count = 0;
 
-tidesdb_err_t *err = tidesdb_range(
-   tdb,                /* TidesDB instance   */
-   "users",            /* Column family name  */
-   start_key,          /* Start key           */
-   sizeof(start_key),  /* Start key size      */
-   end_key,            /* End key             */
-   sizeof(end_key),    /* End key size        */
-   &result,            /* Output result array */
-   &result_size        /* Output result size  */
-);
-
-if (err != NULL) {
-   printf("Error in range query: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
+if (tidesdb_list_column_families(db, &names, &count) == 0)
+{
+    printf("Found %d column families:\n", count);
+    for (int i = 0; i < count; i++)
+    {
+        printf("  - %s\n", names[i]);
+        free(names[i]);  /* Free each name */
+    }
+    free(names);  /* Free the array */
 }
-
-printf("Found %zu key-value pairs in range\n", result_size);
-
-/* Process results */
-for (size_t i = 0; i < result_size; i++) {
-   printf("Key: %.*s, Value: %.*s\n", 
-       (int)result[i]->key_size, result[i]->key,
-       (int)result[i]->value_size, result[i]->value);
-   
-   /* Free each key-value pair when done */
-   _tidesdb_free_key_value_pair(result[i]);
-}
-
-/* Free the result array */
-free(result);
 ```
 
-##### Filter Queries
-Retrieves key-value pairs that match a specific filter function.
+### Column Family Statistics
+
+Get detailed statistics about a column family.
+
 ```c
-/*
-* Define a filter function to find users with "admin" in their value
-* This will search through all users and return only those that match
-* our criteria (containing the string "admin" in their value)
-*/
-bool is_admin_user(const tidesdb_key_value_pair_t *kv) {
-   /* Check if "admin" is in the value */
-   for (uint32_t i = 0; i <= kv->value_size - 5; i++) {
-       if (memcmp(kv->value + i, "admin", 5) == 0) {
-           return true;
-       }
-   }
-   return false;
+tidesdb_column_family_stat_t *stats = NULL;
+
+if (tidesdb_get_column_family_stats(db, "my_cf", &stats) == 0)
+{
+    printf("Column Family: %s\n", stats->name);
+    printf("Comparator: %s\n", stats->comparator_name);
+    printf("SSTables: %d\n", stats->num_sstables);
+    printf("Total SSTable Size: %zu bytes\n", stats->total_sstable_size);
+    printf("Memtable Size: %zu bytes\n", stats->memtable_size);
+    printf("Memtable Entries: %d\n", stats->memtable_entries);
+    printf("Compression: %s\n", stats->config.compressed ? "enabled" : "disabled");
+    printf("Bloom Filter FP Rate: %.4f\n", stats->config.bloom_filter_fp_rate);
+    
+    free(stats);
 }
-
-tidesdb_key_value_pair_t **result = NULL;
-size_t result_size = 0;
-
-tidesdb_err_t *err = tidesdb_filter(
-   tdb,               /* TidesDB instance */
-   "users",           /* Column family name */
-   is_admin_user,     /* Filter function */
-   &result,           /* Output result array */
-   &result_size       /* Output result size */
-);
-
-if (err != NULL) {
-   printf("Error in filter query: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
-}
-
-printf("Found %zu admin users\n", result_size);
-
-/* Process results */
-for (size_t i = 0; i < result_size; i++) {
-   printf("Admin user - Key: %.*s, Value: %.*s\n", 
-       (int)result[i]->key_size, result[i]->key,
-       (int)result[i]->value_size, result[i]->value);
-   
-   /* Free each key-value pair when done */
-   _tidesdb_free_key_value_pair(result[i]);
-}
-
-/* Free the result array */
-free(result);
 ```
 
-### Transactions
-Transactions allow you to perform multiple operations atomically.
+**Statistics include**
+- Column family name and comparator
+- Number of SSTables and total size
+- Memtable size and entry count
+- Full configuration (compression, bloom filters, sync mode, etc.)
 
-#### Beginning a Transaction
+## Transactions
+
+All operations in TidesDB v1 are done through transactions for ACID guarantees.
+
+### Basic Transaction
+
 ```c
-/*
-* Begin a transaction on the 'users' column family
-* Transactions allow multiple operations to be executed atomically
-* Either all operations succeed, or none of them are applied
-*/
 tidesdb_txn_t *txn = NULL;
-tidesdb_err_t *err = tidesdb_txn_begin(
-   tdb,          /* TidesDB instance */
-   &txn,         /* Transaction pointer */
-   "users"       /* Column family name */
-);
-
-if (err != NULL) {
-   printf("Error beginning transaction: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
-}
-printf("Transaction started successfully\n");
-
-/*
-* Adding Operations to a Transaction
-* We can add multiple operations that will be executed atomically
-*/
-
-/* Put operation - add or update a user */
-uint8_t key1[] = "user:1001";
-uint8_t value1[] = "{\"name\":\"Alice\",\"role\":\"admin\"}";
-err = tidesdb_txn_put(
-   txn,              /* Transaction */
-   key1,             /* Key         */
-   sizeof(key1),     /* Key size    */
-   value1,           /* Value       */
-   sizeof(value1),   /* Value size  */
-   -1                /* TTL         */
-);
-
-if (err != NULL) {
-   printf("Error adding put operation to transaction: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   tidesdb_txn_rollback(txn);
-   tidesdb_txn_free(txn);
-   return 1;
+if (tidesdb_txn_begin(db, &txn) != 0)
+{
+    return -1;
 }
 
-/* Delete operation - remove a user */
-uint8_t key2[] = "user:1002";
-err = tidesdb_txn_delete(
-   txn,             /* Transaction */
-   key2,            /* Key         */
-   sizeof(key2)     /* Key size    */
-);
+/* Put a key-value pair */
+const uint8_t *key = (uint8_t *)"mykey";
+const uint8_t *value = (uint8_t *)"myvalue";
 
-if (err != NULL) {
-   printf("Error adding delete operation to transaction: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   tidesdb_txn_rollback(txn);
-   tidesdb_txn_free(txn);
-   return 1;
-}
-```
-
-#### Getting a Value in a Transaction
-```c
-/*
-* Read a value within the transaction context
-* This allows you to see the effects of previous operations
-* in the transaction before it is committed
-*/
-uint8_t key[] = "user:1001";
-uint8_t *value_out = NULL;
-size_t value_len = 0;
-
-err = tidesdb_txn_get(
-   txn,             /* Transaction       */
-   key,             /* Key               */
-   sizeof(key),     /* Key size          */
-   &value_out,      /* Output value      */
-   &value_len       /* Output value size */
-);
-
-if (err != NULL) {
-   printf("Error getting value in transaction: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-} else {
-   printf("Value in transaction: %.*s\n", (int)value_len, value_out);
-   free(value_out); /* Free the allocated memory */
-}
-```
-
-#### Committing a Transaction
-```c
-err = tidesdb_txn_commit(txn);
-if (err != NULL) {
-    printf("Error committing transaction: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    tidesdb_txn_rollback(txn);
+if (tidesdb_txn_put(txn, "my_cf", key, 5, value, 7, -1) != 0)
+{
     tidesdb_txn_free(txn);
-    return 1;
+    return -1;
 }
-printf("Transaction committed successfully\n");
-```
 
-#### Rolling Back a Transaction
-```c
-err = tidesdb_txn_rollback(txn);
-if (err != NULL) {
-    printf("Error rolling back transaction: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
+/* Commit the transaction */
+if (tidesdb_txn_commit(txn) != 0)
+{
     tidesdb_txn_free(txn);
-    return 1;
+    return -1;
 }
-printf("Transaction rolled back successfully\n");
-```
 
-#### Freeing a Transaction
-```c
 tidesdb_txn_free(txn);
 ```
 
-### Cursor Operations
-Cursors allow you to iterate through key-value pairs in a column family.
+### With TTL (Time-to-Live)
 
-> You can use a `tidesdb_merge_cursor` if you want all keys to be sorted from all sources.  
-
-#### Initializing a Cursor
 ```c
-/*
-* Initialize a cursor to iterate through key-value pairs
-* A cursor allows bi-directional sequential access to the TidesDB isntance contents
-*/
-tidesdb_cursor_t *cursor = NULL; /* or tidesdb_merge_cursor_t */
-tidesdb_err_t *err = tidesdb_cursor_init(
-   tdb,          /* TidesDB instance  */
-   "users",      /* Column family name */
-   &cursor       /* Cursor pointer     */
-); /* or tidesdb_merge_cursor_init */
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
 
-if (err != NULL) {
-   printf("Error initializing cursor: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-   return 1;
-}
-printf("Cursor initialized successfully\n");
+const uint8_t *key = (uint8_t *)"temp_key";
+const uint8_t *value = (uint8_t *)"temp_value";
+
+/* TTL is Unix timestamp (seconds since epoch) - absolute expiration time */
+time_t ttl = time(NULL) + 60;  /* Expires 60 seconds from now */
+
+/* Use -1 for no expiration */
+tidesdb_txn_put(txn, "my_cf", key, 8, value, 10, ttl);
+tidesdb_txn_commit(txn);
+tidesdb_txn_free(txn);
 ```
 
-#### Iterating Forward
+**TTL Examples**
 ```c
-uint8_t *key = NULL;
-size_t key_size = 0;
+/* No expiration */
+time_t ttl = -1;
+
+/* Expire in 5 minutes */
+time_t ttl = time(NULL) + (5 * 60);
+
+/* Expire in 1 hour */
+time_t ttl = time(NULL) + (60 * 60);
+
+/* Expire at specific time (e.g., midnight) */
+time_t ttl = 1730592000;  /* Specific Unix timestamp */
+```
+
+### Getting a Key-Value Pair
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin_read(db, &txn);  /* Read-only transaction */
+
+const uint8_t *key = (uint8_t *)"mykey";
 uint8_t *value = NULL;
 size_t value_size = 0;
 
-/* Iterate forward through key-value pairs */
-do {
-   err = tidesdb_cursor_get(
-       cursor,     /* Cursor            */
-       &key,       /* Output key        */
-       &key_size,  /* Output key size   */
-       &value,     /* Output value      */
-       &value_size /* Output value size */
-   ); /* or tidesdb_merge_cursor_get */
-   
-   if (err != NULL) {
-       printf("Error getting cursor value: %s (code: %d)\n", err->message, err->code);
-       tidesdb_err_free(err);
-       break;
-   }
-   
-   printf("Key: %.*s, Value: %.*s\n", (int)key_size, key, (int)value_size, value);
-   
-   /* Free the key and value when done to prevent memory leaks */
-   free(key);
-   free(value);
-} while ((err = tidesdb_cursor_next(cursor)) == NULL); /* or tidesdb_merge_cursor_next */
-
-/* 
-* Check if we reached the end of the cursor or if there was an error
-* TIDESDB_ERR_AT_END_OF_CURSOR is a special error code that indicates
-* we've processed all items in the TidesDB instance
-*/
-if (err != NULL && err->code != TIDESDB_ERR_AT_END_OF_CURSOR) {
-   printf("Error iterating cursor: %s (code: %d)\n", err->message, err->code);
-   tidesdb_err_free(err);
-}
-```
-
-#### Iterating Backward
-```c
-/* Iterate backward through key-value pairs */
-do {
-    err = tidesdb_cursor_get(
-        cursor,     /* Cursor            */
-        &key,       /* Output key        */
-        &key_size,  /* Output key size   */
-        &value,     /* Output value      */
-        &value_size /* Output value size */
-    ); /* or tidesdb_merge_cursor_get */
-    
-    if (err != NULL) {
-        printf("Error getting cursor value: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        break;
-    }
-    
-    printf("Key: %.*s, Value: %.*s\n", (int)key_size, key, (int)value_size, value);
-    
-    /* Free the key and value when done */
-    free(key);
+if (tidesdb_txn_get(txn, "my_cf", key, 5, &value, &value_size) == 0)
+{
+    /* Use value */
+    printf("Value: %.*s\n", (int)value_size, value);
     free(value);
-} while ((err = tidesdb_cursor_prev(cursor)) == NULL); /* or tidesdb_merge_cursor_prev */
-
-/* Check if we reached the start of the cursor or if there was an error */
-if (err != NULL && err->code != TIDESDB_ERR_AT_START_OF_CURSOR) {
-    printf("Error iterating cursor: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-}
-```
-
-#### Freeing a Cursor
-```c
-tidesdb_cursor_free(cursor); /* or tidesdb_merge_cursor_free
-```
-
-### Compaction Operations
-#### Manual Compaction
-Compacts SSTables to improve read performance and reduce storage space.
-```c
-tidesdb_err_t *err = tidesdb_compact_sstables(
-    tdb,         /* TidesDB instance                       */
-    "users",     /* Column family name                      */
-    4            /* Number of threads to use for compaction */
-);
-
-if (err != NULL) {
-    printf("Error compacting SSTables: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    return 1;
-}
-printf("SSTables compacted successfully\n");
-```
-
-#### Automatic Incremental Compaction
-Starts a background thread that incrementally merges SSTables.
-```c
-tidesdb_err_t *err = tidesdb_start_incremental_merge(
-    tdb,         /* TidesDB instance                             */
-    "users",     /* Column family name                            */
-    30,          /* Merge interval in seconds                     */
-    10           /* Minimum number of SSTables to trigger a merge */
-);
-
-if (err != NULL) {
-    printf("Error starting incremental merge: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    return 1;
-}
-printf("Incremental merge started successfully\n");
-```
-
-### Range Deletion Operations
-Deletes all key-value pairs within a specified range.
-```c
-uint8_t start_key[] = "session:1000";
-uint8_t end_key[] = "session:2000";
-
-tidesdb_err_t *err = tidesdb_delete_by_range(
-    tdb,                /* TidesDB instance   */
-    "sessions",         /* Column family name  */
-    start_key,          /* Start key           */
-    sizeof(start_key),  /* Start key size      */
-    end_key,            /* End key             */
-    sizeof(end_key)     /* End key size        */
-);
-
-if (err != NULL) {
-    printf("Error deleting by range: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    return 1;
-}
-printf("Range deleted successfully\n");
-```
-
-### Deleting by Filter
-Deletes all key-value pairs that match a specific filter function.
-```c
-/* Define a filter function to find expired sessions */
-bool is_expired_session(const tidesdb_key_value_pair_t *kv) {
-    /* Check if "expired" is in the value */
-    for (uint32_t i = 0; i <= kv->value_size - 7; i++) {
-        if (memcmp(kv->value + i, "expired", 7) == 0) {
-            return true;
-        }
-    }
-    return false;
 }
 
-tidesdb_err_t *err = tidesdb_delete_by_filter(
-    tdb,                /* TidesDB instance  */
-    "sessions",         /* Column family name */
-    is_expired_session  /* Filter function    */
-);
-
-if (err != NULL) {
-    printf("Error deleting by filter: %s (code: %d)\n", err->message, err->code);
-    tidesdb_err_free(err);
-    return 1;
-}
-printf("Filtered items deleted successfully\n");
+tidesdb_txn_free(txn);
 ```
 
+### Deleting a Key-Value Pair
 
-### Complete Example
 ```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <tidesdb/tidesdb.h>
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
 
-int main() {
-    tidesdb_t *tdb = NULL;
-    tidesdb_err_t *err = NULL;
-    
-    /* Open a new TidesDB instance */
-    err = tidesdb_open("./my_tidesdb", &tdb);
-    if (err != NULL) {
-        printf("Error opening TidesDB: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        return 1;
-    }
-    printf("TidesDB opened successfully\n");
-    
-    /* Create a column family */
-    err = tidesdb_create_column_family(
-        tdb,
-        "users",
-        (1024 * 1024) * 64,  /* 64MB flush threshold */
-        TDB_DEFAULT_SKIP_LIST_MAX_LEVEL,
-        TDB_DEFAULT_SKIP_LIST_PROBABILITY,
-        true,
-        TDB_COMPRESS_SNAPPY,
-        true
-    );
-    
-    if (err != NULL) {
-        printf("Error creating column family: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    printf("Column family 'users' created successfully\n");
-    
-    /* Put some key-value pairs */
-    uint8_t key1[] = "user:1001";
-    uint8_t value1[] = "{\"name\":\"Alice\",\"email\":\"alice@example.com\"}";
-    
-    err = tidesdb_put(tdb, "users", key1, sizeof(key1), value1, sizeof(value1), -1);
-    if (err != NULL) {
-        printf("Error putting key-value pair: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    
-    uint8_t key2[] = "user:1002";
-    uint8_t value2[] = "{\"name\":\"Bob\",\"email\":\"bob@example.com\"}";
-    
-    err = tidesdb_put(tdb, "users", key2, sizeof(key2), value2, sizeof(value2), -1);
-    if (err != NULL) {
-        printf("Error putting key-value pair: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    printf("Key-value pairs stored successfully\n");
-    
-    /* Get a value */
-    uint8_t *value_out = NULL;
-    size_t value_len = 0;
-    
-    err = tidesdb_get(tdb, "users", key1, sizeof(key1), &value_out, &value_len);
-    if (err != NULL) {
-        printf("Error getting key-value pair: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    
-    printf("Retrieved value for user:1001: %.*s\n", (int)value_len, value_out);
-    free(value_out);
-    
-    /* Use a transaction */
-    tidesdb_txn_t *txn = NULL;
-    err = tidesdb_txn_begin(tdb, &txn, "users");
-    if (err != NULL) {
-        printf("Error beginning transaction: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    
-    uint8_t key3[] = "user:1003";
-    uint8_t value3[] = "{\"name\":\"Charlie\",\"email\":\"charlie@example.com\"}";
-    
-    err = tidesdb_txn_put(txn, key3, sizeof(key3), value3, sizeof(value3), -1);
-    if (err != NULL) {
-        printf("Error adding put operation to transaction: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_txn_rollback(txn);
-        tidesdb_txn_free(txn);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    
-    err = tidesdb_txn_commit(txn);
-    if (err != NULL) {
-        printf("Error committing transaction: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_txn_rollback(txn);
-        tidesdb_txn_free(txn);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    printf("Transaction committed successfully\n");
+const uint8_t *key = (uint8_t *)"mykey";
+tidesdb_txn_delete(txn, "my_cf", key, 5);
+
+tidesdb_txn_commit(txn);
+tidesdb_txn_free(txn);
+```
+
+### Multi-Operation Transaction
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+/* Multiple operations in one transaction */
+tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
+tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
+tidesdb_txn_delete(txn, "my_cf", (uint8_t *)"old_key", 7);
+
+/* Commit atomically - all or nothing */
+if (tidesdb_txn_commit(txn) != 0)
+{
+    /* On error, transaction is automatically rolled back */
     tidesdb_txn_free(txn);
-    
-    /* Use a cursor to iterate through all key-value pairs */
-    tidesdb_cursor_t *cursor = NULL;
-    err = tidesdb_cursor_init(tdb, "users", &cursor);
-    if (err != NULL) {
-        printf("Error initializing cursor: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        tidesdb_close(tdb);
-        return 1;
-    }
-    
-    printf("\nAll users:\n");
+    return -1;
+}
+
+tidesdb_txn_free(txn);
+```
+
+### Transaction Rollback
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key", 3, (uint8_t *)"value", 5, -1);
+
+/* Decide to rollback instead of commit */
+tidesdb_txn_rollback(txn);
+tidesdb_txn_free(txn);
+/* No changes were applied */
+```
+
+## Iterators
+
+Iterators provide efficient forward and backward traversal over key-value pairs.
+
+### Forward Iteration
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin_read(db, &txn);
+
+tidesdb_iter_t *iter = NULL;
+if (tidesdb_iter_new(txn, "my_cf", &iter) != 0)
+{
+    tidesdb_txn_free(txn);
+    return -1;
+}
+
+/* Seek to first entry */
+tidesdb_iter_seek_to_first(iter);
+
+while (tidesdb_iter_valid(iter))
+{
     uint8_t *key = NULL;
     size_t key_size = 0;
-    value_out = NULL;
-    value_len = 0;
+    uint8_t *value = NULL;
+    size_t value_size = 0;
     
-    while ((err = tidesdb_cursor_next(cursor)) == NULL) {
-        err = tidesdb_cursor_get(cursor, &key, &key_size, &value_out, &value_len);
-        if (err != NULL) {
-            printf("Error getting cursor value: %s (code: %d)\n", err->message, err->code);
-            tidesdb_err_free(err);
-            break;
-        }
-        
-        printf("Key: %.*s, Value: %.*s\n", (int)key_size, key, (int)value_len, value_out);
-        
+    if (tidesdb_iter_key(iter, &key, &key_size) == 0 &&
+        tidesdb_iter_value(iter, &value, &value_size) == 0)
+    {
+        /* Use key and value */
+        printf("Key: %.*s, Value: %.*s\n", 
+               (int)key_size, key, (int)value_size, value);
         free(key);
-        free(value_out);
+        free(value);
     }
     
-    if (err != NULL && err->code != TIDESDB_ERR_AT_END_OF_CURSOR) {
-        printf("Error iterating cursor: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-    }
-    
-    tidesdb_cursor_free(cursor);
-    
-    /* Close TidesDB */
-    err = tidesdb_close(tdb);
-    if (err != NULL) {
-        printf("Error closing TidesDB: %s (code: %d)\n", err->message, err->code);
-        tidesdb_err_free(err);
-        return 1;
-    }
-    printf("TidesDB closed successfully\n");
-    
-    return 0;
+    tidesdb_iter_next(iter);
 }
+
+tidesdb_iter_free(iter);
+tidesdb_txn_free(txn);
+```
+
+### Backward Iteration
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin_read(db, &txn);
+
+tidesdb_iter_t *iter = NULL;
+tidesdb_iter_new(txn, "my_cf", &iter);
+
+/* Seek to last entry */
+tidesdb_iter_seek_to_last(iter);
+
+while (tidesdb_iter_valid(iter))
+{
+    /* Process entries in reverse order */
+    tidesdb_iter_prev(iter);
+}
+
+tidesdb_iter_free(iter);
+tidesdb_txn_free(txn);
+```
+
+## Custom Comparators
+
+Register custom key comparison functions for specialized sorting.
+
+### Register a Comparator
+
+```c
+/* Define your comparison function */
+int my_reverse_compare(const uint8_t *key1, size_t key1_size,
+                       const uint8_t *key2, size_t key2_size, void *ctx)
+{
+    int result = memcmp(key1, key2, key1_size < key2_size ? key1_size : key2_size);
+    return -result;  /* reverse order */
+}
+
+/* Register it before creating column families */
+tidesdb_register_comparator("reverse", my_reverse_compare);
+
+/* Use in column family */
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+cf_config.comparator_name = "reverse";
+tidesdb_create_column_family(db, "sorted_cf", &cf_config);
+```
+
+**Built-in comparators**
+- `"memcmp"` - Binary comparison (default)
+- `"string"` - Lexicographic string comparison
+- `"numeric"` - Numeric comparison for uint64_t keys
+
+See `examples/custom_comparator.c` for more examples.
+
+## Sync Modes
+
+Control durability vs performance tradeoff.
+
+```c
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+
+/* TDB_SYNC_NONE - Fastest, least durable (OS handles flushing) */
+cf_config.sync_mode = TDB_SYNC_NONE;
+
+/* TDB_SYNC_BACKGROUND - Balanced (fsync every N milliseconds in background) */
+cf_config.sync_mode = TDB_SYNC_BACKGROUND;
+cf_config.sync_interval = 1000;  /* fsync every 1000ms (1 second) */
+
+/* TDB_SYNC_FULL - Most durable (fsync on every write) */
+cf_config.sync_mode = TDB_SYNC_FULL;
+
+tidesdb_create_column_family(db, "my_cf", &cf_config);
+```
+
+## Background Compaction
+
+TidesDB v1 features automatic background compaction with optional parallel execution.
+
+**Automatic background compaction** runs when SSTable count reaches the configured threshold:
+
+```c
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+cf_config.enable_background_compaction = 1;       /* Enable background compaction */
+cf_config.max_sstables_before_compaction = 512;   /* Trigger at 512 SSTables (default) */
+cf_config.compaction_threads = 4;                 /* Use 4 threads for parallel compaction */
+
+tidesdb_create_column_family(db, "my_cf", &cf_config);
+/* Background thread automatically compacts when threshold is reached */
+```
+
+**Parallel Compaction**
+- Set `compaction_threads > 0` to enable parallel compaction
+- Uses semaphore-based thread pool for concurrent SSTable pair merging
+- Each thread compacts one pair of SSTables independently
+- Automatically limits threads to available CPU cores
+- Set `compaction_threads = 0` for single-threaded compaction (default 4 threads)
+
+**Manual compaction** can be triggered at any time (requires minimum 2 SSTables):
+
+```c
+tidesdb_compact(cf);  /* Automatically uses parallel compaction if compaction_threads > 0 */
+```
+
+**Benefits**
+- Removes tombstones and expired TTL entries
+- Merges duplicate keys (keeps latest version)
+- Reduces SSTable count
+- Background compaction runs in separate thread (non-blocking)
+- Parallel compaction significantly speeds up large compactions
+- Manual compaction requires minimum 2 SSTables to merge
+
+## Concurrency Model
+
+TidesDB is designed for high concurrency with minimal blocking.
+
+**Reader-Writer Locks**
+- Each column family has a reader-writer lock
+- **Multiple readers can read concurrently** - no blocking between readers
+- **Writers don't block readers** - readers can access data while writes are in progress
+- **Writers block other writers** - only one writer per column family at a time
+
+**Transaction Isolation**
+- Read transactions (`tidesdb_txn_begin_read`) acquire read locks
+- Write transactions (`tidesdb_txn_begin`) acquire write locks on commit
+- Transactions are isolated - changes not visible until commit
+
+**Optimal for**
+- Read-heavy workloads (unlimited concurrent readers)
+- Mixed read/write workloads (readers never wait for writers)
+- Multi-column-family applications (different CFs can be written concurrently)
+
+**Example - Concurrent Operations**
+```c
+/* Thread 1 Reading */
+tidesdb_txn_t *read_txn;
+tidesdb_txn_begin_read(db, &read_txn);
+tidesdb_txn_get(read_txn, "my_cf", key, key_size, &value, &value_size);
+/* Can read while Thread 2 is writing */
+
+/* Thread 2 Writing */
+tidesdb_txn_t *write_txn;
+tidesdb_txn_begin(db, &write_txn);
+tidesdb_txn_put(write_txn, "my_cf", key, key_size, value, value_size, -1);
+tidesdb_txn_commit(write_txn);  /* Briefly blocks other writers only */
+
+/* Thread 3 Reading different CF */
+tidesdb_txn_t *other_txn;
+tidesdb_txn_begin_read(db, &other_txn);
+tidesdb_txn_get(other_txn, "other_cf", key, key_size, &value, &value_size);
+/* No blocking - different column family */
 ```
