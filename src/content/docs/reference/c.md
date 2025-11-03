@@ -151,7 +151,7 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 ```c
 tidesdb_column_family_config_t cf_config = {
     .memtable_flush_size = 128 * 1024 * 1024,   /* 128MB */
-    .max_sstables_before_compaction = 512,      /* trigger compaction at 512 SSTables (min 2 required) */
+    .max_sstables_before_compaction = 128,      /* trigger compaction at 128 SSTables (min 2 required) */
     .compaction_threads = 4,                    /* use 4 threads for parallel compaction (0 = single-threaded) */
     .max_level = 12,                            /* skip list max level */
     .probability = 0.25f,                       /* skip list probability */
