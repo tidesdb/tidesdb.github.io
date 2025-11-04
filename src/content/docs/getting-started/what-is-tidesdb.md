@@ -26,27 +26,6 @@ TidesDB is a fast and efficient embedded key-value storage engine library writte
 - **Parallel Compaction** Multi-threaded SSTable merging for improved performance
 - **Bidirectional Iterators** Efficient forward and backward traversal with merge-sort across data sources
 
-## Language Bindings
-
-TidesDB can be accessed through FFI bindings for multiple programming languages, making it accessible to a wide range of developers and use cases.
-
-Available bindings include:
-- **C++** - [tidesdb-cpp](https://github.com/tidesdb/tidesdb-cpp)
-- **Go** - [tidesdb-go](https://github.com/tidesdb/tidesdb-go)
-- **Java** - [tidesdb-java](https://github.com/tidesdb/tidesdb-java)
-- **Python** - [tidesdb-python](https://github.com/tidesdb/tidesdb-python)
-- **Rust** - [tidesdb-rust](https://github.com/tidesdb/tidesdb-rust)
-- **Lua** - [tidesdb-lua](https://github.com/tidesdb/tidesdb-lua)
-- **C#** - [tidesdb-csharp](https://github.com/tidesdb/tidesdb-csharp)
-- **JavaScript/Node.js** - [tidesdb-js](https://github.com/tidesdb/tidesdb-js)
-- **Zig** - [tidesdb-zig](https://github.com/tidesdb/tidesdb-zig)
-
-And many more including Scala, Objective-C, PHP, Perl, Ruby, Swift, Haskell, D, Kotlin, Julia, R, Dart, Nim, OCaml, F#, Erlang, and Elixir.
-
-## Development Status
-
-TidesDB is actively developed and maintained. The project is working towards TidesDB 1.0 as the first stable major release.
-
 ## Community
 
 Join the [TidesDB Discord Community](https://discord.gg/tWEmjR66cy) to ask questions, work on development, and discuss the future of TidesDB.
