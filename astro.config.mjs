@@ -133,36 +133,6 @@ export default defineConfig({
 				 	label: 'Building TidesDB', slug: 'reference/building' 
 				},
 				{
-					label: 'C Reference', slug: 'reference/c'
-				},
-				{
-					label: 'C++ Reference',slug: 'reference/cpp'
-				},
-				{
-					label: 'GO Reference', slug: 'reference/go'
-				},
-				{
-					label: 'Python Reference',  slug: 'reference/python'
-				},
-				{
-					label: 'Lua Reference', slug: 'reference/lua' 
-				},
-				{
-					label: 'Java Reference',slug: 'reference/java'
-				},
-				{
-					label: 'Rust Reference',slug: 'reference/rust'
-				},
-				{
-					label: 'Zig Reference',slug: 'reference/zig'
-				},
-				{
-					label: 'C# Reference',slug: 'reference/csharp'
-				},
-				{
-					label: 'Node.JS Reference',slug: 'reference/nodejs'
-				},
-				{
 					label: 'GitHub', link: 'https://github.com/tidesdb',
 				},
 				{
