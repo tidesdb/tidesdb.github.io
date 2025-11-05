@@ -8,7 +8,7 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'TidesDB',
-			description: 'Fast, embeddable LSM-tree based key-value storage engine library written in C. ACID transactions, high concurrency, cross-platform support.',
+			description: 'Fast, embeddable LSM-tree based key-value storage engine library written in C. ACID transactions, great read concurrency, cross-platform support.',
 			customCss: [
 				'./src/styles/custom.css',
 			  ],
