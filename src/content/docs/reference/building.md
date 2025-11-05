@@ -110,7 +110,9 @@ ctest -C Debug --verbose
 ctest -C Release --verbose
 ```
 
-**Note:** MSVC requires Visual Studio 2019 16.8 or later for C11 atomics support (`/experimental:c11atomics`). Both Debug and Release builds are fully supported.
+:::note
+MSVC requires Visual Studio 2019 16.8 or later for C11 atomics support (`/experimental:c11atomics`). Both Debug and Release builds are fully supported.
+:::
 
 ## Default Configuration Values
 

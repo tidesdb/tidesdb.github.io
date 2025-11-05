@@ -130,7 +130,11 @@ export default defineConfig({
 					],
 				},
 				{
-				 	label: 'Building TidesDB', slug: 'reference/building' 
+					label: 'Reference',
+					items: [
+						{ label: 'Building TidesDB', slug: 'reference/building' },
+						{ label: 'C API Reference', slug: 'reference/c' },
+					],
 				},
 				{
 					label: 'GitHub', link: 'https://github.com/tidesdb',
