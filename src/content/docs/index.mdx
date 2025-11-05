@@ -38,9 +38,9 @@ import Footer from '../../components/Footer.astro';
 
 <CardGrid stagger>
 	<Card title="ACID Transactions" icon="approve-check" style="--card-index: 0">
-		Full transactional support with atomic commits and automatic rollback. Multi-column-family transactions with MVCC-style snapshots.
+		Atomic, consistent, isolated (Read Committed), and durable. Transactions support multiple operations across column families. Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers.
 	</Card>
-	<Card title="High Concurrency" icon="rocket" style="--card-index: 1">
+	<Card title="Great Concurrency" icon="rocket" style="--card-index: 1">
 		Readers don't block readers or writers. Optimized reader-writer locks per column family for maximum throughput.
 	</Card>
 	<Card title="LSM-Tree Architecture" icon="setting" style="--card-index: 2">

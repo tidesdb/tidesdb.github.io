@@ -15,9 +15,9 @@ TidesDB is a fast and efficient embedded key-value storage engine library writte
 
 ## Core Features
 
-- **ACID Transactions** Full transactional support with atomic commits and automatic rollback on failure
+- **ACID Transactions** Atomic, consistent, isolated (Read Committed), and durable. Transactions support multiple operations across column families with automatic rollback on failure
 - **Column Families** Isolated key-value stores with independent configuration and optimization
-- **Concurrent Access** Readers don't block readers, writers don't block readers (MVCC-style snapshots)
+- **Concurrent Access** Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers. Readers don't block readers or writers
 - **Write-Ahead Log (WAL)** Ensures durability with automatic crash recovery
 - **Compression** Support for Snappy, LZ4, and ZSTD compression algorithms
 - **TTL Support** Automatic expiration of key-value pairs based on time-to-live
