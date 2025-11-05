@@ -23,7 +23,12 @@ An LSM-tree typically consists of multiple components
 
 This structure allows for efficient writes by initially storing data in memory and then periodically flushing to disk in larger batches, reducing the I/O overhead associated with random writes.
 
+
 ## 3. TidesDB Architecture
+
+![Architecture Diagram](../../../assets/img1.png)
+
+
 ### 3.1 Overview
 TidesDB implements a two-level LSM-tree architecture.
 
@@ -52,18 +57,245 @@ The memtable is an in-memory data structure that serves as the first landing poi
 - **Size Threshold** When the memtable reaches a configurable size threshold, it is flushed to disk as an SSTable
 - **Atomic Operations** Uses `_Atomic` types for thread-safe size tracking and version management
 
-### 4.2 SSTables (Sorted String Tables)
+### 4.2 Block Manager Format
+
+The block manager is TidesDB's low-level storage abstraction that manages both WAL files and SSTable files. All persistent data is stored using the block manager format.
+
+#### File Structure
+
+Every block manager file (WAL or SSTable) has the following structure:
+
+```
+[File Header: 12 bytes]
+[Block 0]
+[Block 1]
+[Block 2]
+...
+[Block N]
+```
+
+#### File Header (12 bytes)
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 3 bytes | Magic | `0x544442` ("TDB" in hex) |
+| 3 | 1 byte | Version | Block manager version (currently 1) |
+| 4 | 4 bytes | Block Size | Default block size for this file |
+| 8 | 4 bytes | Padding | Reserved for future use |
+
+#### Block Format
+
+Each block has the following structure:
+
+```
+[Block Size: 8 bytes (uint64_t)]
+[SHA1 Checksum: 20 bytes]
+[Inline Data: variable, up to block_size]
+[Overflow Offset: 8 bytes (uint64_t)]
+[Overflow Data: variable, if size > block_size]
+```
+
+**Block Header (36 bytes minimum)**
+- **Block Size** (8 bytes) - Total size of the data (inline + overflow)
+- **SHA1 Checksum** (20 bytes) - Integrity check for the entire block data
+- **Inline Data** (variable) - First portion of data, up to `block_size` bytes
+- **Overflow Offset** (8 bytes) - File offset to overflow data (0 if no overflow)
+
+**Overflow Handling**
+- If data size ≤ `block_size` (default 32KB): All data stored inline, overflow offset = 0
+- If data size > `block_size`: First 32KB inline, remainder at overflow offset
+- Overflow data written immediately after main block
+- Allows efficient storage of both small and large blocks
+
+#### Block Write Process
+
+1. Compute SHA1 checksum of entire data
+2. Determine inline size (min of data size and block_size)
+3. Calculate remaining overflow size
+4. Build main block buffer:
+   - Block size (8 bytes)
+   - SHA1 checksum (20 bytes)
+   - Inline data (up to 32KB)
+   - Overflow offset (8 bytes, initially 0)
+5. Write main block atomically using `pwrite()`
+6. If overflow exists:
+   - Write overflow data at end of file
+   - Update overflow offset in main block
+7. Optionally fsync based on sync mode
+
+#### Block Read Process
+
+1. Read block size (8 bytes)
+2. Read SHA1 checksum (20 bytes)
+3. Calculate inline size
+4. Read inline data
+5. Read overflow offset (8 bytes)
+6. If overflow offset > 0:
+   - Seek to overflow offset
+   - Read remaining data
+7. Concatenate inline + overflow data
+8. Verify SHA1 checksum
+9. Return block if valid
+
+#### Integrity and Recovery
+
+- **Checksum Verification** - Every block read verifies SHA1 checksum
+- **Atomic Writes** - Uses `pwrite()` for atomic block writes
+- **Last Block Validation** - On open, validates last block integrity
+- **Automatic Truncation** - If last block is corrupt, file is truncated to last valid block
+- **Crash Safety** - Incomplete writes are detected and removed on recovery
+
+#### Cursor Operations
+
+The block manager provides cursor-based sequential access:
+
+- **Forward iteration** - `cursor_next()` moves to next block
+- **Backward iteration** - `cursor_prev()` scans from beginning to find previous block
+- **Random access** - `cursor_goto(pos)` jumps to specific file offset
+- **Position tracking** - Cursor maintains current position and block size
+- **Boundary checks** - `at_first()`, `at_last()`, `has_next()`, `has_prev()`
+
+#### Sync Modes
+
+- **TDB_SYNC_NONE** - No explicit fsync, relies on OS page cache (fastest)
+- **TDB_SYNC_FULL** - Fsync after every block write (most durable)
+- Configurable per file (WAL and SSTable can have different modes)
+
+#### Thread Safety
+
+- **Write mutex** - Serializes all write operations to prevent corruption
+- **Concurrent reads** - Multiple readers can read simultaneously using `pread()`
+- **Atomic operations** - All writes use `pwrite()` for atomicity
+
+### 4.3 SSTables (Sorted String Tables)
 SSTables are the immutable on-disk components of TidesDB. Their design includes
 
 - **Block-Based Structure** Each SSTable consists of multiple blocks containing sorted key-value pairs
 - **Block Indices** Optionally maintained indices that allow direct access to specific blocks without scanning the entire file
-- **Min-Max Key Range** Each SSTable stores the minimum and maximum keys it contains to optimize range queries. This block lives at block 0
+- **Min-Max Key** Each SSTable stores the minimum and maximum keys it contains to optimize key look up
 - **Immutability** Once written, SSTables are never modified (only eventually merged or deleted)
 
-### 4.3 Write-Ahead Log (WAL)
+#### SSTable Block Layout
+
+SSTables use the block manager format with a specific block ordering:
+
+```
+[File Header: 12 bytes - Block Manager Header]
+[Block 0: KV Pair 1]
+[Block 1: KV Pair 2]
+[Block 2: KV Pair 3]
+...
+[Block N-3: KV Pair N]
+[Block N-2: Bloom Filter]
+[Block N-1: Index (SBHA)]
+[Block N: Metadata]
+```
+
+**Block Order (from first to last)**
+1. **Data Blocks** - Key-value pairs in sorted order (blocks 0 to N-3)
+2. **Bloom Filter Block** - Serialized bloom filter (block N-2)
+3. **Index Block** - Sorted Binary Hash Array (SBHA) for direct lookups (block N-1)
+4. **Metadata Block** - Min/max keys and entry count (block N, last block)
+
+#### Data Block Format (KV Pairs)
+
+Each data block contains a single key-value pair:
+
+```
+[KV Header: 24 bytes]
+[Key: variable]
+[Value: variable]
+```
+
+**KV Pair Header (24 bytes)**
+```c
+typedef struct {
+    uint8_t version;        // Format version (currently 1)
+    uint8_t flags;          // TDB_KV_FLAG_TOMBSTONE (0x01) for deletes
+    uint32_t key_size;      // Key size in bytes
+    uint32_t value_size;    // Value size in bytes
+    int64_t ttl;            // Unix timestamp for expiration (-1 = no expiration)
+} tidesdb_kv_pair_header_t;
+```
+
+**Compression**
+- If `compressed = 1` in column family config, entire block is compressed
+- Compression applied to [Header + Key + Value] as a unit
+- Supports Snappy, LZ4, or ZSTD algorithms
+- Decompression happens on read before parsing header
+
+#### Bloom Filter Block
+
+Stored as second-to-last block (N-2):
+- Serialized bloom filter data structure
+- Used to quickly determine if a key might exist in the SSTable
+- Avoids unnecessary disk I/O for non-existent keys
+- False positive rate configurable per column family (default 1%)
+
+#### Index Block (SBHA)
+
+Stored as third-to-last block (N-1):
+- Sorted Binary Hash Array (SBHA) mapping keys to block offsets
+- Enables direct block access without scanning
+- Format: `[key_hash] -> [file_offset]`
+- Only used if `use_sbha = 1` in column family config
+- If disabled, falls back to linear scan through data blocks
+
+#### Metadata Block
+
+Stored as last block (N):
+
+```
+[Magic: 4 bytes (0x5353544D = "SSTM")]
+[Num Entries: 8 bytes (uint64_t)]
+[Min Key Size: 4 bytes (uint32_t)]
+[Min Key: variable]
+[Max Key Size: 4 bytes (uint32_t)]
+[Max Key: variable]
+```
+
+**Purpose**
+- Magic number identifies this as a metadata block
+- Min/max keys to optimize key look up
+- Num entries tracks total KV pairs in SSTable
+- Loaded first during SSTable recovery (cursor starts at last block)
+
+#### SSTable Write Process
+
+1. Iterate through memtable in sorted order
+2. For each KV pair:
+   - Build KV header + key + value
+   - Optionally compress
+   - Write as data block (blocks 0, 1, 2, ...)
+   - Add key to bloom filter
+   - Add key->offset mapping to index
+   - Track min/max keys
+3. Serialize and write bloom filter (block N-2)
+4. Serialize and write index (block N-1)
+5. Build and write metadata block (block N)
+
+#### SSTable Read Process
+
+1. **Load SSTable** (recovery):
+   - Open block manager file
+   - Seek to last block (metadata)
+   - Read and parse metadata (min/max keys, entry count)
+   - Read previous block (index)
+   - Read previous block (bloom filter)
+
+2. **Lookup Key**
+   - Check bloom filter (quick rejection)
+   - If SBHA enabled: lookup offset in index, read specific block
+   - If SBHA disabled: linear scan through data blocks
+   - Decompress block if needed
+   - Parse KV header and extract value
+   - Check TTL expiration
+   - Return value or tombstone marker
+
+### 4.4 Write-Ahead Log (WAL)
 For durability, TidesDB implements a write-ahead logging mechanism with a rotating WAL system tied to memtable lifecycle.
 
-#### 4.3.1 WAL File Naming and Lifecycle
+#### 4.4.1 WAL File Naming and Lifecycle
 
 **File Format** `wal_<memtable_id>.log`
 - Examples: `wal_0.log`, `wal_1.log`, `wal_2.log`
@@ -72,7 +304,7 @@ For durability, TidesDB implements a write-ahead logging mechanism with a rotati
 - **Multiple WAL files can exist simultaneously** - one for active memtable, others for memtables in flush queue
 - WAL files are deleted only after memtable is successfully flushed to SSTable AND freed
 
-#### 4.3.2 WAL Rotation Process
+#### 4.4.2 WAL Rotation Process
 
 TidesDB uses a rotating WAL system that works as follows
 
@@ -85,14 +317,14 @@ TidesDB uses a rotating WAL system that works as follows
 5. **Flush Complete** `wal_0.log` is deleted after memtable is freed
 6. **Concurrent Operations** Multiple memtables can be in flush queue, each with its own WAL file
 
-#### 4.3.3 WAL Features
+#### 4.4.3 WAL Features
 
 - All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable
 - WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD
 - Each column family maintains its own independent WAL files
 - Automatic recovery on database startup reconstructs memtables from WALs
 
-#### 4.3.4 Recovery Process
+#### 4.4.4 Recovery Process
 
 On database startup, TidesDB automatically recovers from WAL files
 
@@ -107,7 +339,14 @@ On database startup, TidesDB automatically recovers from WAL files
 - Uncommitted transactions are discarded (not in WAL)
 - Memtables that were being flushed when crash occurred
 
-### 4.4 Bloom Filters
+**SSTable Recovery Ordering**
+- SSTables are discovered by reading the column family directory
+- Directory order is filesystem-dependent and non-deterministic
+- **SSTables are sorted by ID after loading** to ensure correct read semantics
+- This guarantees newest-to-oldest ordering for read path (searches from end of array backwards)
+- Without sorting, stale data could be returned if newer SSTables load before older ones
+
+### 4.5 Bloom Filters
 To optimize read operations, TidesDB employs Bloom filters
 
 - Probabilistic data structures that quickly determine if a key might exist in an SSTable
@@ -204,10 +443,9 @@ Compression can be applied to both SSTable entries and WAL entries.
 
 ### 7.3 Sync Modes
 
-TidesDB provides three sync modes to balance durability and performance
+TidesDB provides two sync modes to balance durability and performance
 
-- **TDB_SYNC_NONE** Fastest, least durable (OS handles flushing to disk)
-- **TDB_SYNC_BACKGROUND** Balanced approach (fsync every N milliseconds in background thread)
+- **TDB_SYNC_NONE** Fastest, least durable (OS handles flushing to disk via page cache)
 - **TDB_SYNC_FULL** Most durable (fsync on every write operation)
 
 The sync mode can be configured per column family, allowing different durability guarantees for different data types.
@@ -221,9 +459,39 @@ TidesDB allows fine-tuning through various configurable parameters
 - Bloom filter usage and false positive rate
 - Compression settings (algorithm selection)
 - Compaction trigger thresholds and thread count
-- Sync mode and interval
+- Sync mode (TDB_SYNC_NONE or TDB_SYNC_FULL)
 - Debug logging
 - SBHA (Sorted Binary Hash Array) usage
+- Thread pool sizes (flush and compaction)
+
+### 7.5 Thread Pool Architecture
+
+TidesDB uses shared thread pools at the database level for efficient resource management
+
+**Design**
+- **Shared pools** - All column families share the same flush and compaction thread pools
+- **Database-level configuration** - Set once when opening the database
+- **Task-based execution** - Flush and compaction operations are submitted as tasks
+- **Non-blocking** - Application threads don't wait for flush/compaction to complete
+
+**Configuration**
+```c
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .num_flush_threads = 4,      /* 4 threads for flush operations */
+    .num_compaction_threads = 8  /* 8 threads for compaction */
+};
+```
+
+**Benefits**
+- Resource efficiency - one set of threads serves all column families
+- Better thread utilization across workloads
+- Simpler configuration - set once at database level
+- Scalability - easily tune for available CPU cores
+
+**Default values**
+- `num_flush_threads` - Default: 2 (I/O bound, usually 2-4 sufficient)
+- `num_compaction_threads` - Default: 2 (CPU bound, can be higher 4-16)
 
 ## 8. Concurrency and Thread Safety
 
@@ -263,14 +531,17 @@ Each TidesDB database has a root directory containing subdirectories for each co
 ```
 mydb/
 ├── my_cf/
+│   ├── config.cfc         # Persisted column family configuration
 │   ├── wal_1.log
 │   ├── sstable_0.sst
 │   ├── sstable_1.sst
 │   └── sstable_2.sst
 ├── users/
+│   ├── config.cfc
 │   ├── wal_0.log
 │   └── sstable_0.sst
 └── sessions/
+    ├── config.cfc
     └── wal_0.log
 ```
 
@@ -353,7 +624,9 @@ wal_0.log, wal_1.log  [DELETED - both flushes complete]
 **Creating a column family** creates a new subdirectory
 ```c
 tidesdb_create_column_family(db, "my_cf", &cf_config);
-// Creates mydb/my_cf/ directory with initial wal_0.log
+// Creates mydb/my_cf/ directory with:
+//   - initial wal_0.log (for active memtable)
+//   - config.cfc (persisted configuration)
 ```
 
 **Dropping a column family** removes the entire subdirectory
@@ -409,7 +682,7 @@ tar -czf mydb_backup.tar.gz mydb/
 
 ## 10. Error Handling
 
-TidesDB v1 uses simple integer return codes for error handling
+TidesDB 1 uses simple integer return codes for error handling
 
 - `0` (TDB_SUCCESS) indicates successful operation
 - Negative values indicate specific error conditions

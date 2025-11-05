@@ -1,11 +1,11 @@
 ---
-title: TidesDB C API Reference (v1)
-description: Complete C API reference for TidesDB v1
+title: TidesDB 1 C API Reference
+description: Complete C API reference for TidesDB 1
 ---
 
 ## Overview
 
-TidesDB v1 uses a simplified API. All functions return `0` on success and a negative error code on failure.
+TidesDB 1 uses a simplified API. All functions return `0` on success and a negative error code on failure.
 
 ## Include
 
@@ -42,6 +42,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_INVALID_CF`  | -16 | invalid column family |
 | `TDB_ERR_THREAD`  | -17 | thread creation or operation failed |
 | `TDB_ERR_CHECKSUM`  | -18 | checksum verification failed |
+| `TDB_ERR_KEY_DELETED`  | -19 | key has been deleted (tombstone) |
 
 ### Example Error Handling
 
@@ -75,7 +76,9 @@ if (result != TDB_SUCCESS)
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .enable_debug_logging = 0  /* Optional enable debug logging */
+    .enable_debug_logging = 0,  /* Optional: enable debug logging */
+    .num_flush_threads = 2,     /* Optional: flush thread pool size (default: 2) */
+    .num_compaction_threads = 2 /* Optional: compaction thread pool size (default: 2) */
 };
 
 tidesdb_t *db = NULL;
@@ -153,7 +156,7 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 ```c
 tidesdb_column_family_config_t cf_config = {
     .memtable_flush_size = 128 * 1024 * 1024,   /* 128MB */
-    .max_sstables_before_compaction = 512,      /* trigger compaction at 512 SSTables (min 2 required) */
+    .max_sstables_before_compaction = 128,      /* trigger compaction at 128 SSTables (min 2 required) */
     .compaction_threads = 4,                    /* use 4 threads for parallel compaction (0 = single-threaded) */
     .max_level = 12,                            /* skip list max level */
     .probability = 0.25f,                       /* skip list probability */
@@ -163,8 +166,7 @@ tidesdb_column_family_config_t cf_config = {
     .enable_background_compaction = 1,          /* enable background compaction */
     .background_compaction_interval = 1000000,  /* check every 1000000 microseconds (1 second) */
     .use_sbha = 1,                              /* use sorted binary hash array */
-    .sync_mode = TDB_SYNC_BACKGROUND,           /* background fsync */
-    .sync_interval = 1000,                      /* fsync every 1000ms (1 second) */
+    .sync_mode = TDB_SYNC_FULL,                 /* fsync on every write (most durable) */
     .comparator_name = NULL                     /* NULL = use default "memcmp" */
 };
 
@@ -261,9 +263,72 @@ if (tidesdb_get_column_family_stats(db, "my_cf", &stats) == 0)
 - Memtable size and entry count
 - Full configuration (compression, bloom filters, sync mode, etc.)
 
+### Updating Column Family Configuration
+
+Update runtime-safe configuration settings without affecting existing data.
+
+```c
+tidesdb_column_family_update_config_t update_config = {
+    .memtable_flush_size = 128 * 1024 * 1024,   /* increase to 128MB */
+    .max_sstables_before_compaction = 256,      /* trigger at 256 SSTables */
+    .compaction_threads = 8,                    /* use 8 threads */
+    .max_level = 16,                            /* for new memtables */
+    .probability = 0.25f,                       /* for new memtables */
+    .bloom_filter_fp_rate = 0.001,              /* 0.1% FP rate for new SSTables */
+    .enable_background_compaction = 1,          /* enable background compaction */
+    .background_compaction_interval = 500000    /* check every 500ms */
+};
+
+if (tidesdb_update_column_family_config(db, "my_cf", &update_config) == 0)
+{
+    printf("Configuration updated successfully\n");
+}
+```
+
+**Updatable settings** (safe to change at runtime)
+- `memtable_flush_size` - Affects when new flushes trigger
+- `max_sstables_before_compaction` - Affects compaction trigger threshold
+- `compaction_threads` - Number of parallel compaction threads
+- `max_level` - Skip list level for **new** memtables only
+- `probability` - Skip list probability for **new** memtables only
+- `bloom_filter_fp_rate` - False positive rate for **new** SSTables only
+- `enable_background_compaction` - Enable/disable background compaction
+- `background_compaction_interval` - Compaction check interval
+
+**Non-updatable settings** (would corrupt existing data)
+- `compressed` - Cannot change compression on existing SSTables
+- `compress_algo` - Cannot change algorithm on existing SSTables
+- `use_sbha` - Cannot change index structure on existing SSTables
+- `sync_mode` - Cannot change durability mode on existing WALs
+- `comparator_name` - Cannot change sort order on existing data
+
+**Configuration persistence**
+```
+mydb/
+├── my_cf/
+│   ├── config.cfc          ← Configuration saved here
+│   ├── wal_0.log
+│   ├── sstable_0.sst
+│   └── sstable_1.sst
+```
+
+- **On CF creation** Initial config saved to `config.cfc`
+- **On database restart** Config loaded from `config.cfc` (if exists)
+- **On config update** Changes immediately saved to `config.cfc`
+- **If save fails** Returns `TDB_ERR_IO` error code
+
+:::tip[Important Notes]
+- Changes apply immediately to new operations
+- Existing SSTables/memtables retain their original settings
+- New memtables use updated `max_level` and `probability`
+- New SSTables use updated `bloom_filter_fp_rate`
+- Thread-safe - uses write lock during update
+- Configuration persists across database restarts
+:::
+
 ## Transactions
 
-All operations in TidesDB v1 are done through transactions for ACID guarantees.
+All operations in TidesDB 1 are done through transactions for ACID guarantees per column family.
 
 ### Basic Transaction
 
@@ -559,26 +624,27 @@ tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config(
 /* TDB_SYNC_NONE - Fastest, least durable (OS handles flushing) */
 cf_config.sync_mode = TDB_SYNC_NONE;
 
-/* TDB_SYNC_BACKGROUND - Balanced (fsync every N milliseconds in background) */
-cf_config.sync_mode = TDB_SYNC_BACKGROUND;
-cf_config.sync_interval = 1000;  /* fsync every 1000ms (1 second) */
-
 /* TDB_SYNC_FULL - Most durable (fsync on every write) */
 cf_config.sync_mode = TDB_SYNC_FULL;
 
 tidesdb_create_column_family(db, "my_cf", &cf_config);
 ```
 
+:::note[Sync Mode Options]
+- **TDB_SYNC_NONE** - No explicit sync, relies on OS page cache (fastest, least durable)
+- **TDB_SYNC_FULL** - Fsync on every write operation (slowest, most durable)
+:::
+
 ## Background Compaction
 
-TidesDB v1 features automatic background compaction with optional parallel execution.
+TidesDB 1 features automatic background compaction with optional parallel execution.
 
 **Automatic background compaction** runs when SSTable count reaches the configured threshold:
 
 ```c
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 cf_config.enable_background_compaction = 1;       /* Enable background compaction */
-cf_config.max_sstables_before_compaction = 512;   /* Trigger at 512 SSTables (default) */
+cf_config.max_sstables_before_compaction = 128;   /* Trigger at 128 SSTables (default) */
 cf_config.compaction_threads = 4;                 /* Use 4 threads for parallel compaction */
 
 tidesdb_create_column_family(db, "my_cf", &cf_config);
@@ -588,7 +654,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 :::note[Configuration Options]
 - `enable_background_compaction` - Enable/disable automatic background compaction (default: enabled)
 - `background_compaction_interval` - Interval in microseconds between compaction checks (default: 1000000 = 1 second)
-- `max_sstables_before_compaction` - SSTable count threshold to trigger compaction (default: 512, minimum: 2)
+- `max_sstables_before_compaction` - SSTable count threshold to trigger compaction (default: 128, minimum: 2)
 - `compaction_threads` - Number of threads for parallel compaction (default: 4, set to 0 for single-threaded)
 :::
 
@@ -612,6 +678,55 @@ tidesdb_compact(cf);  /* Automatically uses parallel compaction if compaction_th
 - Background compaction runs in separate thread (non-blocking)
 - Parallel compaction significantly speeds up large compactions
 - Manual compaction requires minimum 2 SSTables to merge
+:::
+
+## Thread Pool Architecture
+
+TidesDB uses shared thread pools at the database level for flush and compaction operations.
+
+:::note[Design]
+- **Shared pools** - All column families share the same flush and compaction thread pools
+- **Database-level** - Configured once when opening the database
+- **Task-based** - Flush and compaction tasks are submitted to the pools
+- **Non-blocking** - Operations are asynchronous, don't block application threads
+:::
+
+**Configuration**
+```c
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .num_flush_threads = 4,      /* 4 threads for flush operations */
+    .num_compaction_threads = 8  /* 8 threads for compaction operations */
+};
+
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
+```
+
+**Default values**
+- `num_flush_threads` - Default: 2
+- `num_compaction_threads` - Default: 2
+- Set to `0` to use defaults
+
+**How it works**
+1. **Flush pool** - Handles memtable flush operations across all column families
+2. **Compaction pool** - Handles compaction operations across all column families
+3. **Task submission** - When a memtable needs flushing or compaction is triggered, a task is submitted to the appropriate pool
+4. **Worker threads** - Pool workers pick up tasks and execute them asynchronously
+5. **Shared resources** - Multiple column families can flush/compact simultaneously using the shared pools
+
+:::tip[Benefits]
+- **Resource efficiency** - One set of threads serves all column families
+- **Better utilization** - Threads are shared across workloads
+- **Simpler configuration** - Set once at database level
+- **Scalability** - Easily tune for your hardware (e.g., match CPU core count)
+:::
+
+:::caution[Tuning Guidelines]
+- **Flush threads** - Usually 2-4 is sufficient (I/O bound)
+- **Compaction threads** - Can be higher (4-16) for CPU-intensive workloads
+- **Total threads** - Consider total = flush + compaction + application threads
+- **CPU cores** - Don't exceed available cores significantly
 :::
 
 ## LRU File Handle Cache
