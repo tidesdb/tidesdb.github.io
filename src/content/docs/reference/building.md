@@ -3,6 +3,10 @@ title: Building TidesDB
 description: How to build TidesDB.
 ---
 
+:::tip[Latest Version]
+Check the [latest release](https://github.com/tidesdb/tidesdb/releases/latest) on GitHub for the current version.
+:::
+
 ## Requirements
 
 You need cmake and a C compiler. You also require the `snappy`, `lz4`, `zstd`, and `openssl` libraries.
