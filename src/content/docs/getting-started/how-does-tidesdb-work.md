@@ -18,7 +18,7 @@ The Log-Structured Merge-tree was first introduced by Patrick O'Neil, Edward Che
 An LSM-tree typically consists of multiple components
 
 - In-memory buffers (memtables) that accept writes
-- Immutable on-disk files (SSTables - Sorted String Tables)
+- Immutable on-disk files (SSTables are Sorted String Tables)
 - Processes that merge SSTables to reduce storage overhead and improve read performance
 
 This structure allows for efficient writes by initially storing data in memory and then periodically flushing to disk in larger batches, reducing the I/O overhead associated with random writes.
@@ -63,10 +63,10 @@ The block manager is TidesDB's low-level storage abstraction that manages both W
 
 #### File Structure
 
-Every block manager file (WAL or SSTable) has the following structure:
+Every block manager file (WAL or SSTable) has the following structure
 
 ```
-[File Header: 12 bytes]
+[File Header is 12 bytes]
 [Block 0]
 [Block 1]
 [Block 2]
@@ -85,14 +85,14 @@ Every block manager file (WAL or SSTable) has the following structure:
 
 #### Block Format
 
-Each block has the following structure:
+Each block has the following structure
 
 ```
-[Block Size: 8 bytes (uint64_t)]
-[SHA1 Checksum: 20 bytes]
-[Inline Data: variable, up to block_size]
-[Overflow Offset: 8 bytes (uint64_t)]
-[Overflow Data: variable, if size > block_size]
+[Block Size is 8 bytes (uint64_t)]
+[SHA1 Checksum is 20 bytes]
+[Inline Data is a variable, up to block_size]
+[Overflow Offset is 8 bytes (uint64_t)]
+[Overflow Data is a variable, if size > block_size]
 ```
 
 **Block Header (36 bytes minimum)**
@@ -102,8 +102,8 @@ Each block has the following structure:
 - **Overflow Offset** (8 bytes) - File offset to overflow data (0 if no overflow)
 
 **Overflow Handling**
-- If data size ≤ `block_size` (default 32KB): All data stored inline, overflow offset = 0
-- If data size > `block_size`: First 32KB inline, remainder at overflow offset
+- If data size ≤ `block_size` (default 32KB) All data stored inline, overflow offset = 0
+- If data size > `block_size` First 32KB inline, remainder at overflow offset
 - Overflow data written immediately after main block
 - Allows efficient storage of both small and large blocks
 
@@ -112,13 +112,13 @@ Each block has the following structure:
 1. Compute SHA1 checksum of entire data
 2. Determine inline size (min of data size and block_size)
 3. Calculate remaining overflow size
-4. Build main block buffer:
+4. **Build main block buffer**
    - Block size (8 bytes)
    - SHA1 checksum (20 bytes)
    - Inline data (up to 32KB)
    - Overflow offset (8 bytes, initially 0)
 5. Write main block atomically using `pwrite()`
-6. If overflow exists:
+6. **If overflow exists**
    - Write overflow data at end of file
    - Update overflow offset in main block
 7. Optionally fsync based on sync mode
@@ -130,7 +130,7 @@ Each block has the following structure:
 3. Calculate inline size
 4. Read inline data
 5. Read overflow offset (8 bytes)
-6. If overflow offset > 0:
+6. **If overflow offset > 0**
    - Seek to overflow offset
    - Read remaining data
 7. Concatenate inline + overflow data
@@ -147,7 +147,7 @@ Each block has the following structure:
 
 #### Cursor Operations
 
-The block manager provides cursor-based sequential access:
+The block manager provides cursor-based sequential access
 
 - **Forward iteration** - `cursor_next()` moves to next block
 - **Backward iteration** - `cursor_prev()` scans from beginning to find previous block
@@ -177,10 +177,10 @@ SSTables are the immutable on-disk components of TidesDB. Their design includes
 
 #### SSTable Block Layout
 
-SSTables use the block manager format with a specific block ordering:
+SSTables use the block manager format with a specific block ordering
 
 ```
-[File Header: 12 bytes - Block Manager Header]
+[File Header is 12 bytes - Block Manager Header]
 [Block 0: KV Pair 1]
 [Block 1: KV Pair 2]
 [Block 2: KV Pair 3]
@@ -199,12 +199,12 @@ SSTables use the block manager format with a specific block ordering:
 
 #### Data Block Format (KV Pairs)
 
-Each data block contains a single key-value pair:
+Each data block contains a single key-value pair
 
 ```
-[KV Header: 24 bytes]
-[Key: variable]
-[Value: variable]
+[KV Header is 24 bytes]
+[Key is variable]
+[Value is variable]
 ```
 
 **KV Pair Header (24 bytes)**
@@ -226,7 +226,7 @@ typedef struct {
 
 #### Bloom Filter Block
 
-Stored as second-to-last block (N-2):
+Stored as second-to-last block (N-2)
 - Serialized bloom filter data structure
 - Used to quickly determine if a key might exist in the SSTable
 - Avoids unnecessary disk I/O for non-existent keys
@@ -234,24 +234,24 @@ Stored as second-to-last block (N-2):
 
 #### Index Block (SBHA)
 
-Stored as third-to-last block (N-1):
+Stored as third-to-last block (N-1)
 - Sorted Binary Hash Array (SBHA) mapping keys to block offsets
 - Enables direct block access without scanning
-- Format: `[key_hash] -> [file_offset]`
+- Format `[key_hash] -> [file_offset]`
 - Only used if `use_sbha = 1` in column family config
 - If disabled, falls back to linear scan through data blocks
 
 #### Metadata Block
 
-Stored as last block (N):
+Stored as last block (N)
 
 ```
-[Magic: 4 bytes (0x5353544D = "SSTM")]
-[Num Entries: 8 bytes (uint64_t)]
-[Min Key Size: 4 bytes (uint32_t)]
-[Min Key: variable]
-[Max Key Size: 4 bytes (uint32_t)]
-[Max Key: variable]
+[Magic is 4 bytes (0x5353544D = "SSTM")]
+[Num Entries is 8 bytes (uint64_t)]
+[Min Key Size is 4 bytes (uint32_t)]
+[Min Key is a variable]
+[Max Key Size is 4 bytes (uint32_t)]
+[Max Key is a variable]
 ```
 
 **Purpose**
@@ -263,7 +263,7 @@ Stored as last block (N):
 #### SSTable Write Process
 
 1. Iterate through memtable in sorted order
-2. For each KV pair:
+2. **For each KV pair**
    - Build KV header + key + value
    - Optionally compress
    - Write as data block (blocks 0, 1, 2, ...)
@@ -276,7 +276,7 @@ Stored as last block (N):
 
 #### SSTable Read Process
 
-1. **Load SSTable** (recovery):
+1. **Load SSTable** (recovery)
    - Open block manager file
    - Seek to last block (metadata)
    - Read and parse metadata (min/max keys, entry count)
@@ -285,8 +285,8 @@ Stored as last block (N):
 
 2. **Lookup Key**
    - Check bloom filter (quick rejection)
-   - If SBHA enabled: lookup offset in index, read specific block
-   - If SBHA disabled: linear scan through data blocks
+   - If SBHA enabled a lookup offset in index, read specific block
+   - If SBHA disabled a linear scan through data blocks
    - Decompress block if needed
    - Parse KV header and extract value
    - Check TTL expiration
@@ -298,7 +298,7 @@ For durability, TidesDB implements a write-ahead logging mechanism with a rotati
 #### 4.4.1 WAL File Naming and Lifecycle
 
 **File Format** `wal_<memtable_id>.log`
-- Examples: `wal_0.log`, `wal_1.log`, `wal_2.log`
+- I.e. `wal_0.log`, `wal_1.log`, `wal_2.log`
 - Each memtable has its own dedicated WAL file
 - WAL ID matches the memtable ID (monotonically increasing counter)
 - **Multiple WAL files can exist simultaneously** - one for active memtable, others for memtables in flush queue
@@ -308,12 +308,12 @@ For durability, TidesDB implements a write-ahead logging mechanism with a rotati
 
 TidesDB uses a rotating WAL system that works as follows
 
-1. **Initial State** Active Memtable (ID: 0) → `wal_0.log`
+1. **Initial State** Active Memtable (ID 0) → `wal_0.log`
 2. **Memtable Fills Up** When size >= `memtable_flush_size`, rotation is triggered
 3. **Rotation Occurs**
-   - New Active Memtable (ID: 1) → `wal_1.log` (new WAL created)
-   - Immutable Memtable (ID: 0) → `wal_0.log` (queued for flush)
-4. **Background Flush** Memtable (ID: 0) writes to `sstable_0.sst` while `wal_0.log` still exists
+   - New Active Memtable (ID 1) → `wal_1.log` (new WAL created)
+   - Immutable Memtable (ID 0) → `wal_0.log` (queued for flush)
+4. **Background Flush** Memtable (ID 0) writes to `sstable_0.sst` while `wal_0.log` still exists
 5. **Flush Complete** `wal_0.log` is deleted after memtable is freed
 6. **Concurrent Operations** Multiple memtables can be in flush queue, each with its own WAL file
 
@@ -490,8 +490,8 @@ tidesdb_config_t config = {
 - Scalability - easily tune for available CPU cores
 
 **Default values**
-- `num_flush_threads` - Default: 2 (I/O bound, usually 2-4 sufficient)
-- `num_compaction_threads` - Default: 2 (CPU bound, can be higher 4-16)
+- `num_flush_threads` - Default is 2 `TDB_DEFAULT_THREAD_POOL_SIZE` (I/O bound, usually 2-4 sufficient)
+- `num_compaction_threads` - Default is 2 `TDB_DEFAULT_THREAD_POOL_SIZE` (CPU bound, can be higher 4-16)
 
 ## 8. Concurrency and Thread Safety
 
@@ -571,52 +571,52 @@ mydb/
 
 ### 9.3 WAL Rotation and Memtable Lifecycle Example
 
-This example demonstrates how WAL files are created, rotated, and deleted:
+This example demonstrates how WAL files are created, rotated, and deleted
 
 **1. Initial State**
 ```
-Active Memtable (ID: 0) → wal_0.log
+Active Memtable (ID 0) → wal_0.log
 ```
 
 **2. Memtable Fills Up** (size >= `memtable_flush_size`)
 ```
-Active Memtable (ID: 0) → wal_0.log  [FULL - triggers rotation]
+Active Memtable (ID 0) → wal_0.log  [FULL - triggers rotation]
 ```
 
 **3. Rotation Occurs**
 ```
-New Active Memtable (ID: 1) → wal_1.log  [new WAL created]
-Immutable Memtable (ID: 0) → wal_0.log  [queued for flush]
+New Active Memtable (ID 1) → wal_1.log  [new WAL created]
+Immutable Memtable (ID 0) → wal_0.log  [queued for flush]
 ```
 
 **4. Background Flush (Async)**
 ```
-Active Memtable (ID: 1) → wal_1.log
-Flushing: Memtable (ID: 0) → sstable_0.sst  [writing to disk]
+Active Memtable (ID 1) → wal_1.log
+Flushing Memtable (ID 0) → sstable_0.sst  [writing to disk]
 wal_0.log  [still exists - flush in progress]
 ```
 
 **5. Flush Complete**
 ```
-Active Memtable (ID: 1) → wal_1.log
-SSTable: sstable_0.sst  [persisted]
+Active Memtable (ID 1) → wal_1.log
+sstable_0.sst  [persisted]
 wal_0.log  [DELETED - memtable freed after flush]
 ```
 
 **6. Next Rotation (Before Previous Flush Completes)**
 ```
-New Active Memtable (ID: 2) → wal_2.log  [new active]
-Immutable Memtable (ID: 1) → wal_1.log  [queued for flush]
-Flushing: Memtable (ID: 0) → sstable_0.sst  [still flushing]
+New Active Memtable (ID 2) → wal_2.log  [new active]
+Immutable Memtable (ID 1) → wal_1.log  [queued for flush]
+Flushing Memtable (ID 0) → sstable_0.sst  [still flushing]
 wal_0.log  [still exists - flush not complete]
 ```
 
 **7. After All Flushes Complete**
 ```
-Active Memtable (ID: 2) → wal_2.log
-SSTable: sstable_0.sst
-SSTable: sstable_1.sst
-wal_0.log, wal_1.log  [DELETED - both flushes complete]
+Active Memtable (ID 2) → wal_2.log
+SSTable sstable_0.sst
+SSTable sstable_1.sst
+wal_0.log, wal_1.log  [DELETED means both flushes complete]
 ```
 
 ### 9.4 Directory Management
@@ -624,7 +624,7 @@ wal_0.log, wal_1.log  [DELETED - both flushes complete]
 **Creating a column family** creates a new subdirectory
 ```c
 tidesdb_create_column_family(db, "my_cf", &cf_config);
-// Creates mydb/my_cf/ directory with:
+// Creates mydb/my_cf/ directory with
 //   - initial wal_0.log (for active memtable)
 //   - config.cfc (persisted configuration)
 ```
@@ -667,10 +667,10 @@ find mydb/ -name "sstable_*.sst" -exec ls -lh {} \; | sort -k5 -hr | head -10
 **Backup Strategy**
 ```bash
 # Stop writes, flush all memtables, then backup
-# In your application:
+# In your application
 tidesdb_flush_memtable(cf);  # Force flush before backup
 
-# Then backup:
+# Then backup
 tar -czf mydb_backup.tar.gz mydb/
 ```
 

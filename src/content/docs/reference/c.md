@@ -76,9 +76,9 @@ if (result != TDB_SUCCESS)
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .enable_debug_logging = 0,  /* Optional: enable debug logging */
-    .num_flush_threads = 2,     /* Optional: flush thread pool size (default: 2) */
-    .num_compaction_threads = 2 /* Optional: compaction thread pool size (default: 2) */
+    .enable_debug_logging = 0,  /* Optional enable debug logging */
+    .num_flush_threads = 2,     /* Optional flush thread pool size (default is 2) */
+    .num_compaction_threads = 2 /* Optional compaction thread pool size (default is 2) */
 };
 
 tidesdb_t *db = NULL;
@@ -125,7 +125,7 @@ _tidesdb_debug_enabled = 0;
 ```
 
 **Output**
-Debug logs are written to **stderr** with the format:
+Debug logs are written to **stderr** with the format
 ```
 [TidesDB DEBUG] filename:line: message
 ```
@@ -639,7 +639,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 
 TidesDB 1 features automatic background compaction with optional parallel execution.
 
-**Automatic background compaction** runs when SSTable count reaches the configured threshold:
+**Automatic background compaction** runs when SSTable count reaches the configured threshold
 
 ```c
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
@@ -704,8 +704,8 @@ tidesdb_open(&config, &db);
 ```
 
 **Default values**
-- `num_flush_threads` - Default: 2
-- `num_compaction_threads` - Default: 2
+- `num_flush_threads` - Default is 2
+- `num_compaction_threads` - Default is 2
 - Set to `0` to use defaults
 
 **How it works**
@@ -763,7 +763,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 :::
 
 :::caution[System Limits]
-Ensure your system's file descriptor limit is sufficient for your workload. Check with `ulimit -n` on Unix systems. Increase if needed:
+Ensure your system's file descriptor limit is sufficient for your workload. Check with `ulimit -n` on Unix systems. Increase if needed
 ```bash
 # Temporary (current session)
 ulimit -n 4096
@@ -798,7 +798,7 @@ TidesDB is designed for high concurrency with minimal blocking.
 - **Multi-column-family applications** - Different column families can be written to concurrently
 :::
 
-**Example - Concurrent Operations**
+**Concurrent Operations Example**
 ```c
 /* Thread 1 Reading */
 tidesdb_txn_t *read_txn;
