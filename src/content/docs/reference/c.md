@@ -21,28 +21,32 @@ You can use other components of TidesDB such as skip list, bloom filter etc. und
 
 TidesDB provides detailed error codes for production use.
 
-| Error Code | Value | Description |
-|------------|-------|-------------|
-| `TDB_SUCCESS`  | 0 | operation successful |
-| `TDB_ERROR`  | -1 | generic error |
-| `TDB_ERR_MEMORY`  | -2 | memory allocation failed |
-| `TDB_ERR_INVALID_ARGS`  | -3 | invalid arguments passed to function |
-| `TDB_ERR_IO`  | -4 | I/O error (file operations) |
-| `TDB_ERR_NOT_FOUND`  | -5 | key not found |
-| `TDB_ERR_EXISTS`  | -6 | resource already exists |
-| `TDB_ERR_CORRUPT`  | -7 | data corruption detected |
-| `TDB_ERR_LOCK`  | -8 | lock acquisition failed |
-| `TDB_ERR_TXN_COMMITTED`  | -9 | transaction already committed |
-| `TDB_ERR_TXN_ABORTED`  | -10 | transaction aborted |
-| `TDB_ERR_READONLY`  | -11 | write operation on read-only transaction |
-| `TDB_ERR_FULL`  | -12 | database or resource full |
-| `TDB_ERR_INVALID_NAME`  | -13 | invalid name (too long or empty) |
-| `TDB_ERR_COMPARATOR_NOT_FOUND`  | -14 | comparator not found in registry |
-| `TDB_ERR_MAX_COMPARATORS`  | -15 | maximum number of comparators reached |
-| `TDB_ERR_INVALID_CF`  | -16 | invalid column family |
-| `TDB_ERR_THREAD`  | -17 | thread creation or operation failed |
-| `TDB_ERR_CHECKSUM`  | -18 | checksum verification failed |
-| `TDB_ERR_KEY_DELETED`  | -19 | key has been deleted (tombstone) |
+| Code | Value | Description |
+|------|-------|-------------|
+| `TDB_SUCCESS` | `0` | Operation completed successfully |
+| `TDB_ERROR` | `-1` | Generic error or operation failed |
+| `TDB_ERR_MEMORY` | `-2` | Memory allocation failed |
+| `TDB_ERR_INVALID_ARGS` | `-3` | Invalid arguments passed to function (NULL pointers, invalid sizes, etc.) |
+| `TDB_ERR_IO` | `-4` | I/O operation failed (file read/write error) |
+| `TDB_ERR_NOT_FOUND` | `-5` | Key not found in database |
+| `TDB_ERR_EXISTS` | `-6` | Resource already exists (e.g., column family name collision) |
+| `TDB_ERR_CORRUPT` | `-7` | Data corruption detected (checksum failure, invalid format version, truncated data) |
+| `TDB_ERR_LOCK` | `-8` | Lock acquisition failed |
+| `TDB_ERR_TXN_COMMITTED` | `-9` | Transaction already committed, cannot perform operation |
+| `TDB_ERR_TXN_ABORTED` | `-10` | Transaction already aborted/rolled back, cannot perform operation |
+| `TDB_ERR_READONLY` | `-11` | Operation not allowed on read-only transaction |
+| `TDB_ERR_INVALID_NAME` | `-12` | Invalid name provided (empty, too long, or contains invalid characters) |
+| `TDB_ERR_COMPARATOR_NOT_FOUND` | `-13` | Specified comparator function not registered |
+| `TDB_ERR_MAX_COMPARATORS` | `-14` | Maximum number of comparators reached |
+| `TDB_ERR_INVALID_CF` | `-15` | Invalid or non-existent column family |
+| `TDB_ERR_THREAD` | `-16` | Thread operation failed (mutex, semaphore, or thread creation error) |
+| `TDB_ERR_CHECKSUM` | `-17` | Checksum verification failed during WAL replay or data validation |
+| `TDB_ERR_MEMORY_LIMIT` | `-18` | Key or value size exceeds system memory limits (safety check to prevent OOM) |
+
+- `TDB_ERR_CORRUPT`, `TDB_ERR_CHECKSUM` indicate data integrity issues requiring immediate attention
+- `TDB_ERR_TXN_COMMITTED`, `TDB_ERR_TXN_ABORTED`, `TDB_ERR_READONLY` indicate transaction state violations
+- `TDB_ERR_MEMORY`, `TDB_ERR_MEMORY_LIMIT`, `TDB_ERR_IO` indicate system resource constraints
+- `TDB_ERR_NOT_FOUND`, `TDB_ERR_EXISTS` are normal operational conditions, not failures
 
 ### Example Error Handling
 
