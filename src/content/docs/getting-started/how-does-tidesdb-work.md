@@ -43,6 +43,11 @@ This design choice differs from other implementations like RocksDB and LevelDB, 
 
 ### 3.2 Column Families
 A distinctive aspect of TidesDB is its organization around column families. Each column family
+<div class="architecture-diagram">
+
+![Column Families](../../../assets/img3.png)
+
+</div>
 
 - Operates as an independent key-value store
 - Has its own dedicated memtable and set of SSTables
@@ -53,6 +58,12 @@ This design allows for domain-specific optimization and isolation between differ
 
 ## 4. Core Components and Mechanisms
 ### 4.1 Memtable
+<div class="architecture-diagram">
+
+![Memtable](../../../assets/img4.png)
+
+</div>
+
 The memtable is an in-memory data structure that serves as the first landing 
 point for all write operations. TidesDB implements the memtable as a lock-free 
 skip list, using atomic operations for concurrent reads while writers acquire 
@@ -69,6 +80,11 @@ management throughout the process.
 ### 4.2 Block Manager Format
 
 The block manager is TidesDB's low-level storage abstraction that manages both WAL files and SSTable files. All persistent data is stored using the block manager format.
+<div class="architecture-diagram">
+
+![Block Manager](../../../assets/img5.png)
+
+</div>
 
 #### File Structure
 
@@ -207,6 +223,11 @@ typedef struct {
 - Decompression happens on read before parsing header
 
 #### Bloom Filter Block
+<div class="architecture-diagram">
+
+![Bloom Filter](../../../assets/img7.png)
+
+</div>
 
 Stored as second-to-last block (N-2)
 - Serialized bloom filter data structure
@@ -215,6 +236,11 @@ Stored as second-to-last block (N-2)
 - False positive rate configurable per column family (default 1%)
 
 #### Index Block (SBHA)
+<div class="architecture-diagram">
+
+![Index Block](../../../assets/img6.png)
+
+</div>
 
 Stored as third-to-last block (N-1)
 - Sorted Binary Hash Array (SBHA) mapping keys to block offsets
@@ -274,10 +300,22 @@ Stored as last block (N)
    - Check TTL expiration
    - Return value or tombstone marker
 
+SSTables are read from storage engine level LRU.
+<div class="architecture-diagram">
+
+![LRU](../../../assets/img8.png)
+
+</div>
+
 ### 4.4 Write-Ahead Log (WAL)
 For durability, TidesDB implements a write-ahead logging mechanism with a rotating WAL system tied to memtable lifecycle.
 
 #### 4.4.1 WAL File Naming and Lifecycle
+<div class="architecture-diagram">
+
+   ![WAL/Memtable Lifecycle](../../../assets/img9.png)
+   
+</div>
 
 File Format: `wal_<memtable_id>.log`
 
@@ -618,6 +656,6 @@ Larger `memtable_flush_size` results in fewer, larger SSTables with less compact
 
 ## 10. Error Handling
 
-TidesDB 1 uses simple integer return codes for error handling. A return value of `0` (TDB_SUCCESS) indicates a successful operation, while negative values indicate specific error conditions. Error codes include memory allocation failures, I/O errors, corruption detection, lock failures, and more, allowing for precise error handling in production systems.
+TidesDB uses simple integer return codes for error handling. A return value of `0` (TDB_SUCCESS) indicates a successful operation, while negative values indicate specific error conditions. Error codes include memory allocation failures, I/O errors, corruption detection, lock failures, and more, allowing for precise error handling in production systems.
 
 For a complete list of error codes and their meanings, see the [Error Codes Reference](../../reference/error-codes).
