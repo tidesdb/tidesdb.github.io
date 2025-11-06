@@ -124,7 +124,7 @@ These constants define default values for column family configuration:
 
 ```c
 #define TDB_DEFAULT_MEMTABLE_FLUSH_SIZE            (64 * 1024 * 1024)
-#define TDB_DEFAULT_MAX_SSTABLES                   512
+#define TDB_DEFAULT_MAX_SSTABLES                   128
 #define TDB_DEFAULT_COMPACTION_THREADS             4
 #define TDB_DEFAULT_BACKGROUND_COMPACTION_INTERVAL 1000000
 #define TDB_DEFAULT_MAX_OPEN_FILE_HANDLES          1024
