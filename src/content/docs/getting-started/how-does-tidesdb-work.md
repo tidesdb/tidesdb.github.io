@@ -28,7 +28,6 @@ This structure allows for efficient writes by initially storing data in memory a
 
 ![Architecture Diagram](../../../assets/img2.png)
 
-
 ### 3.1 Overview
 TidesDB uses a two-tiered storage architecture: a memory level that stores 
 recently written key-value pairs in sorted order using a skip list data 

@@ -436,3 +436,12 @@ html {
 .action.primary:hover {
 	animation: none;
 }
+
+/* Invert architecture diagram in dark mode for better visibility */
+:root img[src*='img2.png'] {
+	filter: invert(1);
+}
+
+:root[data-theme='light'] img[src*='img2.png'] {
+	filter: none;
+}
