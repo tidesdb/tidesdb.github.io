@@ -26,7 +26,11 @@ This structure allows for efficient writes by initially storing data in memory a
 
 ## 3. TidesDB Architecture
 
+<div class="architecture-diagram">
+
 ![Architecture Diagram](../../../assets/img2.png)
+
+</div>
 
 ### 3.1 Overview
 TidesDB uses a two-tiered storage architecture: a memory level that stores 
