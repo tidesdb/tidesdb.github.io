@@ -105,46 +105,20 @@ Each block has the following structure
 ```
 
 **Block Header (36 bytes minimum)**
-- **Block Size** (8 bytes) - Total size of the data (inline + overflow)
-- **SHA1 Checksum** (20 bytes) - Integrity check for the entire block data
-- **Inline Data** (variable) - First portion of data, up to `block_size` bytes
-- **Overflow Offset** (8 bytes) - File offset to overflow data (0 if no overflow)
+
+The block header consists of the block size (8 bytes) representing the total size of the data (inline + overflow), an SHA1 checksum (20 bytes) for integrity checking the entire block data, inline data (variable) containing the first portion of data up to `block_size` bytes, and an overflow offset (8 bytes) pointing to overflow data (0 if no overflow).
 
 **Overflow Handling**
-- If data size ≤ `block_size` (default 32KB) All data stored inline, overflow offset = 0
-- If data size > `block_size` First 32KB inline, remainder at overflow offset
-- Overflow data written immediately after main block
-- Allows efficient storage of both small and large blocks
+
+If the data size is less than or equal to `block_size` (default 32KB), all data is stored inline with overflow offset set to 0. If the data size exceeds `block_size`, the first 32KB is stored inline and the remainder is placed at the overflow offset. Overflow data is written immediately after the main block, allowing efficient storage of both small and large blocks.
 
 #### Block Write Process
 
-1. Compute SHA1 checksum of entire data
-2. Determine inline size (min of data size and block_size)
-3. Calculate remaining overflow size
-4. **Build main block buffer**
-   - Block size (8 bytes)
-   - SHA1 checksum (20 bytes)
-   - Inline data (up to 32KB)
-   - Overflow offset (8 bytes, initially 0)
-5. Write main block atomically using `pwrite()`
-6. **If overflow exists**
-   - Write overflow data at end of file
-   - Update overflow offset in main block
-7. Optionally fsync based on sync mode
+The write process begins by computing the SHA1 checksum of the entire data, determining the inline size (minimum of data size and block_size), and calculating the remaining overflow size. The main block buffer is built containing the block size (8 bytes), SHA1 checksum (20 bytes), inline data (up to 32KB), and overflow offset (8 bytes, initially 0). The main block is written atomically using `pwrite()`. If overflow exists, the overflow data is written at the end of the file and the overflow offset in the main block is updated. Finally, fsync is optionally performed based on the sync mode.
 
 #### Block Read Process
 
-1. Read block size (8 bytes)
-2. Read SHA1 checksum (20 bytes)
-3. Calculate inline size
-4. Read inline data
-5. Read overflow offset (8 bytes)
-6. **If overflow offset > 0**
-   - Seek to overflow offset
-   - Read remaining data
-7. Concatenate inline + overflow data
-8. Verify SHA1 checksum
-9. Return block if valid
+The read process reads the block size (8 bytes) and SHA1 checksum (20 bytes), calculates the inline size, and reads the inline data. It then reads the overflow offset (8 bytes). If the overflow offset is greater than 0, it seeks to the overflow offset and reads the remaining data. The inline and overflow data are concatenated, the SHA1 checksum is verified, and the block is returned if valid.
 
 #### Integrity and Recovery
 TidesDB implements multiple layers of data integrity protection. All block 
@@ -167,15 +141,11 @@ position and block size, with boundary checking methods like `at_first()`,
 
 #### Sync Modes
 
-- **TDB_SYNC_NONE** - No explicit fsync, relies on OS page cache (fastest)
-- **TDB_SYNC_FULL** - Fsync after every block write (most durable)
-- Configurable per file (WAL and SSTable can have different modes)
+TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying on the OS page cache. TDB_SYNC_FULL offers the most durability by performing fsync after every block write. The sync mode is configurable per file, allowing WAL and SSTable files to have different modes.
 
 #### Thread Safety
 
-- **Write mutex** - Serializes all write operations to prevent corruption
-- **Concurrent reads** - Multiple readers can read simultaneously using `pread()`
-- **Atomic operations** - All writes use `pwrite()` for atomicity
+A write mutex serializes all write operations to prevent corruption, while concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
 
 ### 4.3 SSTables (Sorted String Tables)
 SSTables serve as TidesDB's immutable on-disk storage layer. Internally, each 
@@ -310,53 +280,32 @@ For durability, TidesDB implements a write-ahead logging mechanism with a rotati
 #### 4.4.1 WAL File Naming and Lifecycle
 
 File Format: `wal_<memtable_id>.log`
-- I.e. `wal_0.log`, `wal_1.log`, `wal_2.log`
-- Each memtable has its own dedicated WAL file
-- WAL ID matches the memtable ID (monotonically increasing counter)
-- **Multiple WAL files can exist simultaneously** - one for active memtable, others for memtables in flush queue
-- WAL files are deleted only after memtable is successfully flushed to SSTable AND freed
+
+WAL files follow the naming pattern `wal_0.log`, `wal_1.log`, `wal_2.log`, etc. Each memtable has its own dedicated WAL file, with the WAL ID matching the memtable ID (a monotonically increasing counter). Multiple WAL files can exist simultaneously—one for the active memtable and others for memtables in the flush queue. WAL files are deleted only after the memtable is successfully flushed to an SSTable and freed.
 
 #### 4.4.2 WAL Rotation Process
 
-TidesDB uses a rotating WAL system that works as follows
+TidesDB uses a rotating WAL system that works as follows:
 
-1. **Initial State** Active Memtable (ID 0) → `wal_0.log`
-2. **Memtable Fills Up** When size >= `memtable_flush_size`, rotation is triggered
-3. **Rotation Occurs**
-   - New Active Memtable (ID 1) → `wal_1.log` (new WAL created)
-   - Immutable Memtable (ID 0) → `wal_0.log` (queued for flush)
-4. **Background Flush** Memtable (ID 0) writes to `sstable_0.sst` while `wal_0.log` still exists
-5. **Flush Complete** `wal_0.log` is deleted after memtable is freed
-6. **Concurrent Operations** Multiple memtables can be in flush queue, each with its own WAL file
+Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size reaches `memtable_flush_size`, rotation is triggered. During rotation, a new active memtable (ID 1) is created with `wal_1.log`, while the immutable memtable (ID 0) with `wal_0.log` is queued for flush. The background flush writes memtable (ID 0) to `sstable_0.sst` while `wal_0.log` still exists. Once the flush completes, `wal_0.log` is deleted after the memtable is freed. Multiple memtables can be in the flush queue concurrently, each with its own WAL file.
 
 #### 4.4.3 WAL Features
 
-- All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable
-- WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD
-- Each column family maintains its own independent WAL files
-- Automatic recovery on database startup reconstructs memtables from WALs
+All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable. WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD. Each column family maintains its own independent WAL files, and automatic recovery on database startup reconstructs memtables from WALs.
 
 #### 4.4.4 Recovery Process
 
-On database startup, TidesDB automatically recovers from WAL files
+On database startup, TidesDB automatically recovers from WAL files:
 
-1. Scans column family directory for `wal_*.log` files
-2. Sorts WAL files by ID (oldest to newest)
-3. Replays each WAL file into a new memtable
-4. Reconstructs in-memory state from persisted WAL entries
-5. Continues normal operation with recovered data
+The system scans the column family directory for `wal_*.log` files and sorts them by ID (oldest to newest). It then replays each WAL file into a new memtable, reconstructing the in-memory state from persisted WAL entries before continuing normal operation with the recovered data.
 
 **What Gets Recovered**
-- All committed transactions that were written to WAL
-- Uncommitted transactions are discarded (not in WAL)
-- Memtables that were being flushed when crash occurred
+
+All committed transactions that were written to WAL are recovered. Uncommitted transactions are discarded (as they're not in the WAL), along with memtables that were being flushed when the crash occurred.
 
 **SSTable Recovery Ordering**
-- SSTables are discovered by reading the column family directory
-- Directory order is filesystem-dependent and non-deterministic
-- **SSTables are sorted by ID after loading** to ensure correct read semantics
-- This guarantees newest-to-oldest ordering for read path (searches from end of array backwards)
-- Without sorting, stale data could be returned if newer SSTables load before older ones
+
+SSTables are discovered by reading the column family directory, where directory order is filesystem-dependent and non-deterministic. SSTables are sorted by ID after loading to ensure correct read semantics, guaranteeing newest-to-oldest ordering for the read path (which searches from the end of the array backwards). Without sorting, stale data could be returned if newer SSTables load before older ones.
 
 ### 4.5 Bloom Filters
 To optimize read operations, TidesDB employs Bloom filters--probabilistic data 
@@ -432,54 +381,25 @@ independently without blocking application operations, merging SSTable pairs
 incrementally throughout the database lifecycle until shutdown.
 
 ### 6.3 Compaction Mechanics
-During compaction
 
-1. SSTables are paired (typically oldest with second-oldest)
-2. Pairs are merged into new SSTables 
-3. For each key, only the newest version is retained
-4. Tombstones (deletion markers) and expired TTL entries are purged
-5. Original SSTables are deleted after successful merge
-6. If a merge is interrupted, the system will clean up after on restart. Interruption does not corrupt.
+During compaction, SSTables are paired (typically oldest with second-oldest) and merged into new SSTables. For each key, only the newest version is retained, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge. If a merge is interrupted, the system will clean up after on restart without causing corruption.
 
 ## 7. Performance Optimizations
 ### 7.1 Block Indices
-TidesDB employs block indices to optimize read performance
 
-- Each SSTable contains a final block with a sorted binary hash array (SBHA)
-- This structure allows direct access to the block containing a specific key
-- Significantly reduces I/O by avoiding full SSTable scans
+TidesDB employs block indices to optimize read performance. Each SSTable contains a final block with a sorted binary hash array (SBHA), which allows direct access to the block containing a specific key and significantly reduces I/O by avoiding full SSTable scans.
 
 ### 7.2 Compression
-TidesDB supports multiple compression algorithms
 
-- **Snappy** Emphasizes speed over compression ratio
-- **LZ4** Balanced approach with good speed and reasonable compression
-- **ZSTD** Higher compression ratio at the cost of some performance
-
-Compression can be applied to both SSTable entries and WAL entries.
+TidesDB supports multiple compression algorithms: Snappy emphasizes speed over compression ratio, LZ4 provides a balanced approach with good speed and reasonable compression, and ZSTD offers a higher compression ratio at the cost of some performance. Compression can be applied to both SSTable entries and WAL entries.
 
 ### 7.3 Sync Modes
 
-TidesDB provides two sync modes to balance durability and performance
-
-- **TDB_SYNC_NONE** Fastest, least durable (OS handles flushing to disk via page cache)
-- **TDB_SYNC_FULL** Most durable (fsync on every write operation)
-
-The sync mode can be configured per column family, allowing different durability guarantees for different data types.
+TidesDB provides two sync modes to balance durability and performance. TDB_SYNC_NONE is fastest but least durable, relying on the OS to handle flushing to disk via page cache. TDB_SYNC_FULL is most durable, performing fsync on every write operation. The sync mode can be configured per column family, allowing different durability guarantees for different data types.
 
 ### 7.4 Configurable Parameters
 
-TidesDB allows fine-tuning through various configurable parameters
-
-- Memtable flush thresholds
-- Skip list configuration (max level and probability)
-- Bloom filter usage and false positive rate
-- Compression settings (algorithm selection)
-- Compaction trigger thresholds and thread count
-- Sync mode (TDB_SYNC_NONE or TDB_SYNC_FULL)
-- Debug logging
-- SBHA (Sorted Binary Hash Array) usage
-- Thread pool sizes (flush and compaction)
+TidesDB allows fine-tuning through various configurable parameters including memtable flush thresholds, skip list configuration (max level and probability), bloom filter usage and false positive rate, compression settings (algorithm selection), compaction trigger thresholds and thread count, sync mode (TDB_SYNC_NONE or TDB_SYNC_FULL), debug logging, SBHA (Sorted Binary Hash Array) usage, and thread pool sizes (flush and compaction).
 
 ### 7.5 Thread Pool Architecture
 
@@ -502,14 +422,12 @@ tidesdb_config_t config = {
 ```
 
 **Benefits**
-- Resource efficiency - one set of threads serves all column families
-- Better thread utilization across workloads
-- Simpler configuration - set once at database level
-- Scalability - easily tune for available CPU cores
+
+One set of threads serves all column families providing resource efficiency, with better thread utilization across workloads. Configuration is simpler since it's set once at the database level, and the system is easily scalable to tune for available CPU cores.
 
 **Default values**
-- `num_flush_threads` - Default is 2 `TDB_DEFAULT_THREAD_POOL_SIZE` (I/O bound, usually 2-4 sufficient)
-- `num_compaction_threads` - Default is 2 `TDB_DEFAULT_THREAD_POOL_SIZE` (CPU bound, can be higher 4-16)
+
+The `num_flush_threads` defaults to 2 (TDB_DEFAULT_THREAD_POOL_SIZE) and is I/O bound, so 2-4 is usually sufficient. The `num_compaction_threads` also defaults to 2 (TDB_DEFAULT_THREAD_POOL_SIZE) but is CPU bound, so it can be set higher (4-16).
 
 ## 8. Concurrency and Thread Safety
 
@@ -681,10 +599,8 @@ find mydb/ -name "sstable_*.sst" -exec ls -lh {} \; | sort -k5 -hr | head -10
 ### 9.6 Best Practices
 
 **Disk Space Monitoring**
-- Monitor WAL file count - typically 1-3 per column family (1 active + 1-2 in flush queue)
-- Many WAL files (>5) may indicate flush backlog, slow I/O, or configuration issue
-- Monitor SSTable count - triggers compaction at `max_sstables_before_compaction`
-- Set appropriate `memtable_flush_size` based on write patterns and flush speed
+
+Monitor WAL file count, which is typically 1-3 per column family (1 active + 1-2 in flush queue). Many WAL files (>5) may indicate a flush backlog, slow I/O, or configuration issue. Monitor SSTable count as it triggers compaction at `max_sstables_before_compaction`. Set appropriate `memtable_flush_size` based on write patterns and flush speed.
 
 **Backup Strategy**
 ```bash
@@ -697,16 +613,11 @@ tar -czf mydb_backup.tar.gz mydb/
 ```
 
 **Performance Tuning**
-- Larger `memtable_flush_size` = fewer, larger SSTables = less compaction
-- Smaller `memtable_flush_size` = more, smaller SSTables = more compaction
-- Adjust `max_sstables_before_compaction` based on read/write ratio
-- Use `enable_background_compaction` for automatic maintenance
+
+Larger `memtable_flush_size` results in fewer, larger SSTables with less compaction, while smaller `memtable_flush_size` creates more, smaller SSTables with more compaction. Adjust `max_sstables_before_compaction` based on your read/write ratio, and use `enable_background_compaction` for automatic maintenance.
 
 ## 10. Error Handling
 
-TidesDB 1 uses simple integer return codes for error handling
+TidesDB 1 uses simple integer return codes for error handling. A return value of `0` (TDB_SUCCESS) indicates a successful operation, while negative values indicate specific error conditions. Error codes include memory allocation failures, I/O errors, corruption detection, lock failures, and more, allowing for precise error handling in production systems.
 
-- `0` (TDB_SUCCESS) indicates successful operation
-- Negative values indicate specific error conditions
-- Error codes include memory allocation failures, I/O errors, corruption detection, lock failures, and more
-- Detailed error codes allow for precise error handling in production systems
+For a complete list of error codes and their meanings, see the [Error Codes Reference](../../reference/error-codes).

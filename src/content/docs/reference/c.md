@@ -1,11 +1,11 @@
 ---
-title: TidesDB 1 C API Reference
-description: Complete C API reference for TidesDB 1
+title: TidesDB C API Reference
+description: Complete C API reference for TidesDB
 ---
 
 ## Overview
 
-TidesDB 1 uses a simplified API. All functions return `0` on success and a negative error code on failure.
+TidesDB uses a simple API. All functions return `0` on success and a negative error code on failure.
 
 ## Include
 
@@ -316,23 +316,15 @@ mydb/
 │   └── sstable_1.sst
 ```
 
-- **On CF creation** Initial config saved to `config.cfc`
-- **On database restart** Config loaded from `config.cfc` (if exists)
-- **On config update** Changes immediately saved to `config.cfc`
-- **If save fails** Returns `TDB_ERR_IO` error code
+On column family creation, the initial config is saved to `config.cfc`. On database restart, the config is loaded from `config.cfc` (if it exists). On config update, changes are immediately saved to `config.cfc`. If the save fails, it returns a `TDB_ERR_IO` error code.
 
 :::tip[Important Notes]
-- Changes apply immediately to new operations
-- Existing SSTables/memtables retain their original settings
-- New memtables use updated `max_level` and `probability`
-- New SSTables use updated `bloom_filter_fp_rate`
-- Thread-safe - uses write lock during update
-- Configuration persists across database restarts
+Changes apply immediately to new operations, while existing SSTables and memtables retain their original settings. New memtables use the updated `max_level` and `probability`, and new SSTables use the updated `bloom_filter_fp_rate`. The update operation is thread-safe, using a write lock during the update, and configuration persists across database restarts.
 :::
 
 ## Transactions
 
-All operations in TidesDB 1 are done through transactions for ACID guarantees per column family.
+All operations in TidesDB are done through transactions for ACID guarantees per column family.
 
 ### Basic Transaction
 
@@ -532,26 +524,158 @@ tidesdb_iter_free(iter);
 tidesdb_txn_free(txn);
 ```
 
+### Iterator Seek Operations
+
+TidesDB provides efficient seek operations that allow you to position an iterator at a specific key or key range without scanning from the beginning. This is particularly powerful for range queries, prefix scans, and targeted lookups.
+
+#### Seek to Specific Key
+
+**`tidesdb_iter_seek(iter, key, key_size)`** Positions iterator at the first key >= target key
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin_read(db, &txn);
+
+tidesdb_iter_t *iter = NULL;
+tidesdb_iter_new(txn, "my_cf", &iter);
+
+/* Seek to specific key */
+const char *target = "user:1000";
+if (tidesdb_iter_seek(iter, (uint8_t *)target, strlen(target)) == 0)
+{
+    /* Iterator is now positioned at "user:1000" or the next key after it */
+    if (tidesdb_iter_valid(iter))
+    {
+        uint8_t *key = NULL;
+        size_t key_size = 0;
+        tidesdb_iter_key(iter, &key, &key_size);
+        printf("Found: %.*s\n", (int)key_size, key);
+        free(key);
+    }
+}
+
+tidesdb_iter_free(iter);
+tidesdb_txn_free(txn);
+```
+
+**`tidesdb_iter_seek_for_prev(iter, key, key_size)`** Positions iterator at the last key <= target key
+
+```c
+/* Seek for reverse iteration */
+const char *target = "user:2000";
+if (tidesdb_iter_seek_for_prev(iter, (uint8_t *)target, strlen(target)) == 0)
+{
+    /* Iterator is now positioned at "user:2000" or the previous key before it */
+    while (tidesdb_iter_valid(iter))
+    {
+        /* Iterate backwards from this point */
+        tidesdb_iter_prev(iter);
+    }
+}
+```
+
+#### Range Queries
+
+Seek operations are ideal for scanning a specific range of keys
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin_read(db, &txn);
+
+tidesdb_iter_t *iter = NULL;
+tidesdb_iter_new(txn, "my_cf", &iter);
+
+const char *start_key = "user:1000";
+const char *end_key = "user:2000";
+
+/* Seek to start of range */
+tidesdb_iter_seek(iter, (uint8_t *)start_key, strlen(start_key));
+
+while (tidesdb_iter_valid(iter))
+{
+    uint8_t *key = NULL;
+    size_t key_size = 0;
+    tidesdb_iter_key(iter, &key, &key_size);
+    
+    /* Check if we've passed the end of range */
+    if (key_size >= strlen(end_key) && 
+        memcmp(key, end_key, strlen(end_key)) > 0)
+    {
+        free(key);
+        break;
+    }
+    
+    /* Process key in range */
+    printf("Key in range: %.*s\n", (int)key_size, key);
+    free(key);
+    
+    tidesdb_iter_next(iter);
+}
+
+tidesdb_iter_free(iter);
+tidesdb_txn_free(txn);
+```
+
+#### Prefix Scans
+
+Seek operations enable efficient prefix-based scanning
+
+```c
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin_read(db, &txn);
+
+tidesdb_iter_t *iter = NULL;
+tidesdb_iter_new(txn, "my_cf", &iter);
+
+const char *prefix = "logs:2024-11-";
+size_t prefix_len = strlen(prefix);
+
+/* Seek to first key with prefix */
+tidesdb_iter_seek(iter, (uint8_t *)prefix, prefix_len);
+
+while (tidesdb_iter_valid(iter))
+{
+    uint8_t *key = NULL;
+    size_t key_size = 0;
+    tidesdb_iter_key(iter, &key, &key_size);
+    
+    /* Check if key still has the prefix */
+    if (key_size < prefix_len || memcmp(key, prefix, prefix_len) != 0)
+    {
+        free(key);
+        break;  /* No more keys with this prefix */
+    }
+    
+    /* Process key with prefix */
+    printf("Log entry: %.*s\n", (int)key_size, key);
+    free(key);
+    
+    tidesdb_iter_next(iter);
+}
+
+tidesdb_iter_free(iter);
+tidesdb_txn_free(txn);
+```
+
+:::note[Seek Performance Optimizations]
+Seek operations use O(log n) skip list traversal for memtable positioning and binary search for SSTable block lookups instead of linear scans. Entire SSTables are skipped when the target key falls outside their min/max key range, and results are efficiently merged across the active memtable, immutable memtables, and multiple SSTables. This provides 50-100x performance gains over iterating from the beginning for large datasets.
+:::
+
+#### Seek Behavior
+
+When an exact match is found, the iterator positions at that key. For forward seeks without a match, the iterator positions at the next key greater than the target, while backward seeks position at the previous key less than the target. If no suitable key exists, the iterator becomes invalid. Seek operations automatically skip expired TTL entries and tombstones, and search across all sources including the active memtable, immutable memtables, and all SSTables.
+
 ### Iterator Reference Counting and Compaction Safety
 
 TidesDB uses atomic reference counting to ensure safe concurrent access between iterators and compaction.
 
 :::note[How Reference Counting Works]
-- **Automatic Reference Counting** - When an iterator is created, it acquires references on all active SSTables, preventing them from being deleted
-- **Copy-on-Write (COW) Semantics** - Compaction creates new merged SSTables and immediately replaces old ones in the active array, but old SSTables remain in memory for active iterators
-- **Non-Blocking Compaction** - Compaction completes immediately without waiting for iterators to finish, ensuring high throughput
-- **Automatic Cleanup** - When an iterator is freed, it releases its references. SSTables with zero references are automatically deleted (both file and memory)
-- **Heap-Based Merge** - Iterators use a min-heap (forward) or max-heap (backward) to efficiently merge-sort entries from multiple sources
+When an iterator is created, it automatically acquires references on all active SSTables, preventing them from being deleted. Compaction uses copy-on-write semantics, creating new merged SSTables and immediately replacing old ones in the active array, while old SSTables remain in memory for active iterators. This allows compaction to complete immediately without waiting for iterators to finish, ensuring high throughput. When an iterator is freed, it releases its references, and SSTables with zero references are automatically deleted from both file and memory. Iterators use a min-heap for forward iteration or max-heap for backward iteration to efficiently merge-sort entries from multiple sources.
 :::
 
 **How it works**
 
-1. Iterator creation acquires references on all SSTables (increments `ref_count`)
-2. Compaction creates new merged SSTables and swaps them into the active array
-3. Compaction releases its reference on old SSTables (decrements `ref_count`)
-4. Old SSTables remain accessible to active iterators (ref_count > 0)
-5. When iterator is freed, it releases references (decrements `ref_count`)
-6. When `ref_count` drops to 0, the SSTable file is deleted and memory is freed
+Iterator creation acquires references on all SSTables (increments `ref_count`), then compaction creates new merged SSTables and swaps them into the active array. Compaction releases its reference on old SSTables (decrements `ref_count`), but old SSTables remain accessible to active iterators (ref_count > 0). When an iterator is freed, it releases references (decrements `ref_count`), and when `ref_count` drops to 0, the SSTable file is deleted and memory is freed.
 
 ```c
 tidesdb_iter_t *iter = NULL;
@@ -580,10 +704,7 @@ tidesdb_iter_free(iter);  /* Releases references, triggers cleanup if ref_count 
 ```
 
 :::tip[Benefits]
-- **True Snapshot Isolation** - Iterators see a consistent snapshot of data from creation time
-- **No Blocking** - Compaction and iteration proceed independently without waiting
-- **Automatic Resource Management** - No manual cleanup required, reference counting handles everything
-- **Safe Concurrent Access** - Multiple iterators and compaction can run simultaneously
+Iterators see a consistent snapshot of data from creation time, providing true snapshot isolation. Compaction and iteration proceed independently without blocking each other, while automatic resource management through reference counting eliminates the need for manual cleanup. Multiple iterators and compaction can run simultaneously with safe concurrent access.
 :::
 
 ## Custom Comparators
@@ -641,7 +762,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 
 ## Background Compaction
 
-TidesDB 1 features automatic background compaction with optional parallel execution.
+TidesDB features automatic background compaction with optional parallel execution.
 
 **Automatic background compaction** runs when SSTable count reaches the configured threshold
 
@@ -656,18 +777,12 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 ```
 
 :::note[Configuration Options]
-- `enable_background_compaction` - Enable/disable automatic background compaction (default: enabled)
-- `background_compaction_interval` - Interval in microseconds between compaction checks (default: 1000000 = 1 second)
-- `max_sstables_before_compaction` - SSTable count threshold to trigger compaction (default: 128, minimum: 2)
-- `compaction_threads` - Number of threads for parallel compaction (default: 4, set to 0 for single-threaded)
+The `enable_background_compaction` option enables or disables automatic background compaction (default: enabled). The `background_compaction_interval` sets the interval in microseconds between compaction checks (default: 1000000 = 1 second). The `max_sstables_before_compaction` sets the SSTable count threshold to trigger compaction (default: 128, minimum: 2). The `compaction_threads` option specifies the number of threads for parallel compaction (default: 4, set to 0 for single-threaded).
 :::
 
 **Parallel Compaction**
-- Set `compaction_threads > 0` to enable parallel compaction
-- Uses semaphore-based thread pool for concurrent SSTable pair merging
-- Each thread compacts one pair of SSTables independently
-- Automatically limits threads to available CPU cores
-- Set `compaction_threads = 0` for single-threaded compaction (default 4 threads)
+
+Set `compaction_threads > 0` to enable parallel compaction, which uses a semaphore-based thread pool for concurrent SSTable pair merging. Each thread compacts one pair of SSTables independently, and the system automatically limits threads to available CPU cores. Set `compaction_threads = 0` for single-threaded compaction (default 4 threads).
 
 **Manual compaction** can be triggered at any time (requires minimum 2 SSTables):
 
@@ -676,12 +791,7 @@ tidesdb_compact(cf);  /* Automatically uses parallel compaction if compaction_th
 ```
 
 :::tip[Benefits]
-- Removes tombstones and expired TTL entries
-- Merges duplicate keys (keeps latest version)
-- Reduces SSTable count
-- Background compaction runs in separate thread (non-blocking)
-- Parallel compaction significantly speeds up large compactions
-- Manual compaction requires minimum 2 SSTables to merge
+Compaction removes tombstones and expired TTL entries, merges duplicate keys (keeping the latest version), and reduces SSTable count. Background compaction runs in a separate thread without blocking operations, while parallel compaction significantly speeds up large compactions. Manual compaction requires a minimum of 2 SSTables to merge.
 :::
 
 ## Thread Pool Architecture
@@ -689,10 +799,7 @@ tidesdb_compact(cf);  /* Automatically uses parallel compaction if compaction_th
 TidesDB uses shared thread pools at the database level for flush and compaction operations.
 
 :::note[Design]
-- **Shared pools** - All column families share the same flush and compaction thread pools
-- **Database-level** - Configured once when opening the database
-- **Task-based** - Flush and compaction tasks are submitted to the pools
-- **Non-blocking** - Operations are asynchronous, don't block application threads
+All column families share the same flush and compaction thread pools, which are configured once at the database level when opening the database. Flush and compaction tasks are submitted to these pools, and operations are asynchronous and don't block application threads.
 :::
 
 **Configuration**
@@ -713,24 +820,15 @@ tidesdb_open(&config, &db);
 - Set to `0` to use defaults
 
 **How it works**
-1. **Flush pool** - Handles memtable flush operations across all column families
-2. **Compaction pool** - Handles compaction operations across all column families
-3. **Task submission** - When a memtable needs flushing or compaction is triggered, a task is submitted to the appropriate pool
-4. **Worker threads** - Pool workers pick up tasks and execute them asynchronously
-5. **Shared resources** - Multiple column families can flush/compact simultaneously using the shared pools
+
+The flush pool handles memtable flush operations across all column families, while the compaction pool handles compaction operations. When a memtable needs flushing or compaction is triggered, a task is submitted to the appropriate pool. Pool workers pick up tasks and execute them asynchronously, allowing multiple column families to flush or compact simultaneously using the shared resources.
 
 :::tip[Benefits]
-- **Resource efficiency** - One set of threads serves all column families
-- **Better utilization** - Threads are shared across workloads
-- **Simpler configuration** - Set once at database level
-- **Scalability** - Easily tune for your hardware (e.g., match CPU core count)
+One set of threads serves all column families, providing resource efficiency and better utilization as threads are shared across workloads. Configuration is simpler since it's set once at the database level, and the system is easily scalable to match your hardware (e.g., CPU core count).
 :::
 
 :::caution[Tuning Guidelines]
-- **Flush threads** - Usually 2-4 is sufficient (I/O bound)
-- **Compaction threads** - Can be higher (4-16) for CPU-intensive workloads
-- **Total threads** - Consider total = flush + compaction + application threads
-- **CPU cores** - Don't exceed available cores significantly
+Flush threads are usually I/O bound, so 2-4 is sufficient. Compaction threads can be higher (4-16) for CPU-intensive workloads. Consider the total thread count as flush + compaction + application threads, and don't exceed available CPU cores significantly.
 :::
 
 ## LRU File Handle Cache
@@ -738,11 +836,7 @@ tidesdb_open(&config, &db);
 TidesDB features a configurable LRU (Least Recently Used) cache for open file handles to limit system resources while maintaining performance.
 
 :::note[How It Works]
-- Caches open file descriptors for SSTables to avoid repeated open/close operations
-- Uses LRU eviction policy - least recently used files are closed when cache is full
-- Configurable per column family via `max_open_file_handles` setting
-- Set to `0` to disable caching (files opened/closed on each access)
-- Default: 1024 open file handles
+The cache stores open file descriptors for SSTables to avoid repeated open/close operations. It uses an LRU eviction policy where least recently used files are closed when the cache is full. The cache is configurable per column family via the `max_open_file_handles` setting, and can be disabled by setting it to `0` (files opened/closed on each access). The default is 1024 open file handles.
 :::
 
 **Configuration Example**
@@ -760,10 +854,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 ```
 
 :::tip[Performance Considerations]
-- **Higher cache size** = Better performance for read-heavy workloads with many SSTables
-- **Lower cache size** = Reduced system resource usage (file descriptors)
-- **Disabled (0)** = Maximum resource conservation, but slower for repeated reads
-- Monitor system `ulimit -n` to ensure sufficient file descriptor limits
+Higher cache sizes provide better performance for read-heavy workloads with many SSTables, while lower cache sizes reduce system resource usage (file descriptors). Disabling the cache (0) provides maximum resource conservation but results in slower repeated reads. Monitor system `ulimit -n` to ensure sufficient file descriptor limits.
 :::
 
 :::caution[System Limits]
@@ -783,23 +874,15 @@ ulimit -n 4096
 TidesDB is designed for high concurrency with minimal blocking.
 
 :::note[Reader-Writer Locks]
-- Each column family has a reader-writer lock
-- **Multiple readers can read concurrently** - no blocking between readers
-- **Writers don't block readers** - readers can access data while writes are in progress
-- **Writers block other writers** - only one writer per column family at a time
+Each column family has a reader-writer lock that allows multiple readers to read concurrently with no blocking between them. Writers don't block readers, so readers can access data while writes are in progress. However, writers block other writers, allowing only one writer per column family at a time.
 :::
 
 :::caution[Transaction Isolation]
-- Read transactions (`tidesdb_txn_begin_read`) acquire read locks and see a consistent snapshot via COW
-- Write transactions (`tidesdb_txn_begin`) acquire write locks on commit
-- **Isolation Level** Read Committed - changes not visible to other transactions until commit
-- Writers are serialized per column family ensuring atomicity
+Read transactions (`tidesdb_txn_begin_read`) acquire read locks and see a consistent snapshot via copy-on-write. Write transactions (`tidesdb_txn_begin`) acquire write locks on commit. The isolation level is Read Committed, meaning changes are not visible to other transactions until commit. Writers are serialized per column family to ensure atomicity.
 :::
 
 :::tip[Optimal Use Cases]
-- **Read-heavy workloads** - Unlimited concurrent readers with no contention
-- **Mixed read/write workloads** - Readers never wait for writers to complete
-- **Multi-column-family applications** - Different column families can be written to concurrently
+Read-heavy workloads benefit from unlimited concurrent readers with no contention. Mixed read/write workloads perform well since readers never wait for writers to complete. Multi-column-family applications can write to different column families concurrently.
 :::
 
 **Concurrent Operations Example**
