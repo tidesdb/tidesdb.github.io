@@ -26,7 +26,7 @@ This structure allows for efficient writes by initially storing data in memory a
 
 ## 3. TidesDB Architecture
 
-![Architecture Diagram](../../../assets/img1.png)
+![Architecture Diagram](../../../assets/img2.png)
 
 
 ### 3.1 Overview
