@@ -1,6 +1,6 @@
 ---
 // Fetch the latest release version from GitHub API at build time
-let version = 'v0.0.0';
+let version = 'v1.2.3'; // Default to latest known version
 let releaseUrl = 'https://github.com/tidesdb/tidesdb/releases';
 
 try {
@@ -9,9 +9,12 @@ try {
     const data = await response.json();
     version = data.tag_name || version;
     releaseUrl = data.html_url || releaseUrl;
+    console.log('Successfully fetched TidesDB version:', version);
+  } else {
+    console.warn('GitHub API returned non-OK status:', response.status, response.statusText);
   }
 } catch (error) {
-  console.warn('Failed to fetch TidesDB version:', error);
+  console.warn('Failed to fetch TidesDB version from GitHub API, using default:', error.message);
 }
 ---
 
