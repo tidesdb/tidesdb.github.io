@@ -7,24 +7,33 @@ TidesDB is a fast and efficient embedded key-value storage engine library writte
 
 ## Key Characteristics
 
-**Embedded Storage Engine** TidesDB is not a full-featured database server but rather a library that can be embedded directly into your application. This design provides maximum flexibility and minimal overhead.
-
-**Raw Byte Storage** Keys and values in TidesDB are raw sequences of bytes with no predetermined size restrictions, giving you complete control over data serialization.
-
-**LSM-Tree Architecture** Optimized for write-heavy workloads while maintaining efficient read performance through intelligent data organization and compaction strategies.
+TidesDB is an embeddable storage library designed for direct integration 
+into applications. It handles keys and values as raw byte sequences without 
+size restrictions (up to system memory limits), giving you full control over 
+serialization. Optimized for write-heavy workloads, it maintains efficient 
+reads through bloom filters, block indices, and compaction.
 
 ## Core Features
 
-- **ACID Transactions** Atomic, consistent, isolated (Read Committed), and durable. Transactions support multiple operations across column families with automatic rollback on failure
-- **Column Families** Isolated key-value stores with independent configuration and optimization
-- **Concurrent Access** Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers. Readers don't block readers or writers
-- **Write-Ahead Log (WAL)** Ensures durability with automatic crash recovery
-- **Compression** Support for Snappy, LZ4, and ZSTD compression algorithms
-- **TTL Support** Automatic expiration of key-value pairs based on time-to-live
-- **Bloom Filters** Reduce disk I/O by quickly filtering non-existent keys
-- **Custom Comparators** Register custom key comparison functions for specialized sorting
-- **Parallel Compaction** Multi-threaded SSTable merging for improved performance
-- **Bidirectional Iterators** Efficient forward and backward traversal with merge-sort across data sources
+- ACID transactions that are atomic, consistent, isolated (read committed), and durable. Transactions support multiple operations across column families. Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers.
+- Writers don't block readers. Readers never block other readers. Background operations will not affect active transactions.
+- Isolated key-value stores. Each column family has its own configuration, memtables, sstables, and write ahead logs.
+- Bidirectional iterators that allow you to iterate forward and backward over key-value pairs with heap-based merge-sort across memtable and sstables. Reference counting prevents premature deletion during iteration.
+- Durability through WAL (write ahead log). Automatic recovery on startup reconstructs memtables from WALs.
+- Optional automatic background compaction when sstable count reaches configured max per column family. You can also trigger manual compactions through the API, parallelized or not.
+- Optional bloom filters to reduce disk reads by checking key existence before reading sstables. Configurable false positive rate.
+- Optional compression via Snappy, LZ4, or ZSTD for sstables and WAL entries. Configurable per column family.
+- Optional TTL (time-to-live) for key-value pairs. Expired entries automatically skipped during reads.
+- Optional custom comparators. You can register custom key comparison functions. Built-in comparators include memcmp, string, numeric.
+- Two sync modes NONE (fastest), FULL (most durable, slowest).
+- Per-column-family configuration includes memtable size, compaction settings, compression, bloom filters, sync mode, and more.
+- Clean, easy-to-use C API. Returns 0 on success, -n on error.
+- Cross-platform support for Linux, macOS, and Windows with platform abstraction layer.
+- Optional use of sorted binary hash array (SBHA). Allows for fast sstable lookups. Direct key-to-block offset mapping without full sstable scans.
+- Efficient deletion through tombstone markers. Removed during compactions.
+- Configurable LRU cache for open file handles. Limits system resources while maintaining performance. Set `max_open_file_handles` to control cache size (0 = disabled).
+- Storage engine thread pools for background flush and compaction with configurable thread counts.
+
 
 ## Community
 
