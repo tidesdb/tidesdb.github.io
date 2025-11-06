@@ -45,8 +45,8 @@ import VersionBadge from '../../components/VersionBadge.astro';
 	<Card title="ACID Transactions" icon="approve-check" style="--card-index: 0">
 		Atomic, consistent, isolated (read committed), and durable. Transactions support multiple operations across column families. Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers within a column family.
 	</Card>
-	<Card title="Great Concurrency" icon="rocket" style="--card-index: 1">
-		Readers don't block readers or writers and vice versa.
+	<Card title="Concurrent" icon="rocket" style="--card-index: 1">
+		Column family readers don't block readers or writer and vice versa.
 	</Card>
 	<Card title="LSM-Tree Architecture" icon="setting" style="--card-index: 2">
 		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance through bloom filters and block indices.
@@ -63,14 +63,8 @@ import VersionBadge from '../../components/VersionBadge.astro';
 	<Card title="Cross-Platform" icon="laptop" style="--card-index: 5">
 		Native support for Linux, macOS, and Windows with platform abstraction layer for consistent behavior.
 	</Card>
-</CardGrid>
-
-<CardGrid stagger>
-	<Card title="Simple API" icon="open-book" style="--card-index: 7">
+	<Card title="Easy to use API" icon="open-book" style="--card-index: 6">
 		Clean, intuitive C API with consistent error handling.
-	</Card>
-	<Card title="Production Ready" icon="star" style="--card-index: 8">
-		Write-ahead logging, TTL support, custom comparators, and configurable sync modes for durability guarantees.
 	</Card>
 </CardGrid>
 
