@@ -30,10 +30,11 @@ This structure allows for efficient writes by initially storing data in memory a
 
 
 ### 3.1 Overview
-TidesDB implements a two-level LSM-tree architecture.
-
-- **Memory level** Stores recently written key-value pairs in sorted order using a skip list data structure
-- **Disk level** Contains multiple SSTables, with newer tables taking precedence over older ones
+TidesDB uses a two-tiered storage architecture: a memory level that stores 
+recently written key-value pairs in sorted order using a skip list data 
+structure, and a disk level containing multiple SSTables. When reading data, 
+newer tables take precedence over older ones, ensuring the most recent 
+version of a key is always retrieved.
 
 This design choice differs from other implementations like RocksDB and LevelDB, which use a multi-level approach with specific level-based compaction strategies.
 
@@ -49,13 +50,18 @@ This design allows for domain-specific optimization and isolation between differ
 
 ## 4. Core Components and Mechanisms
 ### 4.1 Memtable
-The memtable is an in-memory data structure that serves as the first landing point for all write operations. Key features include
-
-- **Skip List Implementation** TidesDB employs a lock-free skip list data structure to efficiently maintain key-value pairs in sorted order. The skip list uses atomic operations for concurrent reads while writers acquire an exclusive lock.
-- **Custom Comparators** Each column family can register a custom key comparison function (memcmp, string, numeric, or user-defined). The comparator determines sort order across the entire system - memtable, SSTables, and iterators all use the same comparison logic for consistency.
-- **Configurable Parameters** Maximum level and probability can be tuned per column family
-- **Size Threshold** When the memtable reaches a configurable size threshold, it is flushed to disk as an SSTable
-- **Atomic Operations** Uses `_Atomic` types for thread-safe size tracking and version management
+The memtable is an in-memory data structure that serves as the first landing 
+point for all write operations. TidesDB implements the memtable as a lock-free 
+skip list, using atomic operations for concurrent reads while writers acquire 
+an exclusive lock to maintain sorted key-value pairs. Each column family can 
+register a custom key comparison function (memcmp, string, numeric, or 
+user-defined) that determines sort order consistently across the entire 
+system--memtable, SSTables, and iterators all use the same comparison logic. 
+The skip list's maximum level and probability parameters are configurable per 
+column family, allowing tuning for specific workloads. When the memtable 
+reaches a configurable size threshold, it is atomically flushed to disk as an 
+SSTable, with atomic types ensuring thread-safe size tracking and version 
+management throughout the process.
 
 ### 4.2 Block Manager Format
 
@@ -138,22 +144,23 @@ Each block has the following structure
 9. Return block if valid
 
 #### Integrity and Recovery
-
-- **Checksum Verification** - Every block read verifies SHA1 checksum
-- **Atomic Writes** - Uses `pwrite()` for atomic block writes
-- **Last Block Validation** - On open, validates last block integrity
-- **Automatic Truncation** - If last block is corrupt, file is truncated to last valid block
-- **Crash Safety** - Incomplete writes are detected and removed on recovery
+TidesDB implements multiple layers of data integrity protection. All block 
+reads verify SHA1 checksums to detect corruption, while writes use `pwrite()` 
+for atomic block-level updates. During startup, the system validates the last 
+block's integrity--if corruption is detected, the file is automatically 
+truncated to the last known-good block. This approach ensures crash safety by 
+guaranteeing that incomplete or corrupted writes are identified and cleaned up 
+during recovery.
 
 #### Cursor Operations
 
-The block manager provides cursor-based sequential access
-
-- **Forward iteration** - `cursor_next()` moves to next block
-- **Backward iteration** - `cursor_prev()` scans from beginning to find previous block
-- **Random access** - `cursor_goto(pos)` jumps to specific file offset
-- **Position tracking** - Cursor maintains current position and block size
-- **Boundary checks** - `at_first()`, `at_last()`, `has_next()`, `has_prev()`
+The block manager provides cursor-based sequential access for efficient data 
+traversal. Cursors support forward iteration via `cursor_next()` and backward 
+iteration through `cursor_prev()`, which scans from the beginning to locate 
+the previous block. Random access is available through `cursor_goto(pos)`, 
+allowing jumps to specific file offsets. Each cursor maintains its current 
+position and block size, with boundary checking methods like `at_first()`, 
+`at_last()`, `has_next()`, and `has_prev()` to prevent out-of-bounds access.
 
 #### Sync Modes
 
@@ -168,12 +175,14 @@ The block manager provides cursor-based sequential access
 - **Atomic operations** - All writes use `pwrite()` for atomicity
 
 ### 4.3 SSTables (Sorted String Tables)
-SSTables are the immutable on-disk components of TidesDB. Their design includes
-
-- **Block-Based Structure** Each SSTable consists of multiple blocks containing sorted key-value pairs
-- **Block Indices** Optionally maintained indices that allow direct access to specific blocks without scanning the entire file
-- **Min-Max Key** Each SSTable stores the minimum and maximum keys it contains to optimize key look up
-- **Immutability** Once written, SSTables are never modified (only eventually merged or deleted)
+SSTables serve as TidesDB's immutable on-disk storage layer. Internally, each 
+SSTable is organized into multiple blocks containing sorted key-value pairs. 
+To accelerate lookups, every SSTable maintains its minimum and maximum keys, 
+allowing the system to quickly determine if a key might exist within it. 
+Optional block indices provide direct access to specific blocks, eliminating 
+the need to scan entire files. The immutable nature of SSTables--once written, 
+they are never modified, only merged or deleted--ensures data consistency and 
+enables lock-free concurrent reads.
 
 #### SSTable Block Layout
 
@@ -297,7 +306,7 @@ For durability, TidesDB implements a write-ahead logging mechanism with a rotati
 
 #### 4.4.1 WAL File Naming and Lifecycle
 
-**File Format** `wal_<memtable_id>.log`
+File Format: `wal_<memtable_id>.log`
 - I.e. `wal_0.log`, `wal_1.log`, `wal_2.log`
 - Each memtable has its own dedicated WAL file
 - WAL ID matches the memtable ID (monotonically increasing counter)
@@ -347,12 +356,12 @@ On database startup, TidesDB automatically recovers from WAL files
 - Without sorting, stale data could be returned if newer SSTables load before older ones
 
 ### 4.5 Bloom Filters
-To optimize read operations, TidesDB employs Bloom filters
-
-- Probabilistic data structures that quickly determine if a key might exist in an SSTable
-- Helps avoid unnecessary disk I/O by filtering out SSTables that definitely don't contain a key
-- Configurable per column family to balance memory usage against read performance
-- Lives at block 1 after min-max block within an SSTable
+To optimize read operations, TidesDB employs Bloom filters--probabilistic data 
+structures that quickly determine if a key might exist in an SSTable. By 
+filtering out SSTables that definitely don't contain a key, Bloom filters help 
+avoid unnecessary disk I/O. Each Bloom filter is configurable per column 
+family to balance memory usage against read performance and is stored at block 
+1 within the SSTable, immediately following the min-max key block.
 
 ## 5. Data Operations
 ### 5.1 Write Path
@@ -383,36 +392,41 @@ When reading a key from TidesDB
 4. The search stops when the key is found or all SSTables have been checked
 
 ### 5.3 Transactions
-TidesDB provides ACID transaction support with multi-column-family capabilities
-
-- **Read and Write Transactions** Separate `tidesdb_txn_begin()` for writes and `tidesdb_txn_begin_read()` for read-only transactions
-- **Multi-Column-Family** A single transaction can operate across multiple column families atomically
-- **Isolation Level** Read Committed isolation - read transactions see a consistent snapshot via COW and don't block writers
-- **Atomic Commit/Rollback** All operations succeed together or automatically rollback on failure
-- **Read-Your-Own-Writes** Within a transaction, you can read uncommitted changes before commit
-- **Writer Locks** Write transactions acquire exclusive locks per column family, but only during commit
-- **No Error Structs** Simple integer return codes (0 = success, -1 = error)
+TidesDB provides ACID transaction support with multi-column-family 
+capabilities. Transactions are initiated through `tidesdb_txn_begin()` for 
+writes or `tidesdb_txn_begin_read()` for read-only operations, with a single 
+transaction capable of operating atomically across multiple column families. 
+The system implements read committed isolation, where read transactions see a 
+consistent snapshot via copy-on-write without blocking writers. Write 
+transactions acquire exclusive locks per column family only during commit, 
+ensuring atomicity--all operations succeed together or automatically rollback 
+on failure. Transactions support read-your-own-writes semantics, allowing 
+uncommitted changes to be read before commit. The API uses simple integer 
+return codes (0 for success, -1 for error) rather than complex error 
+structures.
 
 ### 6. Compaction Strategies
 TidesDB implements two distinct compaction strategies
 
-### 6.1 Parallel Compaction (Manual or Automatic)
+### 6.1 Parallel Compaction
 
-- **Semaphore-Based Thread Pool** Uses POSIX semaphores to limit concurrent thread count
-- **Configurable Threads** Set `compaction_threads` in column family config (default 4)
-- **Pair-Based Merging** Pairs SSTables from oldest to newest, each thread handles one pair
-- **Automatic Routing** If `compaction_threads > 0`, `tidesdb_compact()` automatically uses parallel compaction
-- **Reduces SSTable Count** Approximately halves the number of SSTables in each run
-- **Removes Tombstones** Purges deletion markers and expired TTL entries during merge
-- **Minimum Requirement** Needs at least 2 SSTables to trigger compaction
+TidesDB implements parallel compaction using a semaphore-based thread pool to 
+reduce SSTable count, remove tombstones, and purge expired TTL entries. The 
+number of concurrent threads is configurable via `compaction_threads` in the 
+column family config (default 4). Compaction pairs SSTables from oldest to 
+newest, with each thread processing one pair, approximately halving the 
+SSTable count per run. When `compaction_threads > 0`, `tidesdb_compact()` 
+automatically uses parallel execution. At least 2 SSTables are required to 
+trigger compaction.
 
 ### 6.2 Background Compaction
 
-- **Automatic Trigger** Runs when SSTable count reaches `max_sstables_before_compaction` threshold
-- **Background Thread** Operates independently without blocking application operations
-- **Configurable** Enable with `enable_background_compaction = 1` in column family config
-- **Incremental** Merges pairs incrementally rather than all at once
-- **Continues Until Shutdown** Monitors and compacts throughout the database lifecycle
+Background compaction provides automatic, hands-free SSTable management. 
+Enabled via `enable_background_compaction = 1` in the column family 
+configuration, it automatically triggers when the SSTable count reaches 
+`max_sstables_before_compaction`. A dedicated background thread operates 
+independently without blocking application operations, merging SSTable pairs 
+incrementally throughout the database lifecycle until shutdown.
 
 ### 6.3 Compaction Mechanics
 During compaction
@@ -466,13 +480,14 @@ TidesDB allows fine-tuning through various configurable parameters
 
 ### 7.5 Thread Pool Architecture
 
-TidesDB uses shared thread pools at the database level for efficient resource management
-
-**Design**
-- **Shared pools** - All column families share the same flush and compaction thread pools
-- **Database-level configuration** - Set once when opening the database
-- **Task-based execution** - Flush and compaction operations are submitted as tasks
-- **Non-blocking** - Application threads don't wait for flush/compaction to complete
+For efficient resource management, TidesDB employs shared thread pools at the 
+database level. Rather than maintaining separate pools per column family, all 
+column families share common flush and compaction thread pools configured 
+during database initialization. Operations are submitted as tasks to these 
+pools, enabling non-blocking execution--application threads can continue 
+processing while flush and compaction work proceeds in the background. This 
+architecture minimizes resource overhead and provides consistent, predictable 
+performance across the entire database.
 
 **Configuration**
 ```c
@@ -499,18 +514,21 @@ TidesDB is designed for great concurrency with minimal blocking through a reader
 
 ### 8.1 Reader-Writer Locks
 
-Each column family has its own reader-writer lock
-
-- **Multiple readers can read concurrently** No blocking between readers accessing the same column family
-- **Writers don't block readers** Read operations can proceed while writes are in progress
-- **Writers block other writers** Only one write transaction per column family at a time
+Each column family uses a reader-writer lock to enable efficient concurrent 
+access. Multiple readers can access the same column family simultaneously 
+without blocking each other, and read operations can proceed even while writes 
+are in progress. However, writers acquire exclusive access, allowing only one 
+write transaction per column family at a time to ensure data consistency.
 
 ### 8.2 Transaction Isolation
 
-- **Read transactions** Acquire read locks and see a consistent snapshot of data via COW
-- **Write transactions** Acquire write locks on commit, ensuring atomic updates
-- **Read Committed isolation** Read transactions don't see uncommitted changes from other transactions
-- **Read-your-own-writes** Within a transaction, uncommitted changes are visible
+TidesDB implements read committed isolation with read-your-own-writes 
+semantics. Read transactions acquire read locks and see a consistent snapshot 
+of committed data through copy-on-write, ensuring they never observe 
+uncommitted changes from other transactions. Write transactions acquire write 
+locks only during commit to ensure atomic updates. Within a single 
+transaction, uncommitted changes are immediately visible, allowing operations 
+to read their own writes before commit.
 
 ### 8.3 Optimal Use Cases
 
@@ -548,26 +566,27 @@ mydb/
 ### 9.2 File Naming Conventions
 
 #### Write-Ahead Log (WAL) Files
-- **Format** `wal_<memtable_id>.log`
-- **Examples** `wal_0.log`, `wal_1.log`, `wal_2.log`
-- **Purpose** Durability - records all writes before they're applied to memtable
-- **Lifecycle**
-  - Created when a new memtable is created (on database open or rotation)
-  - Each memtable has its own dedicated WAL file
-  - WAL ID matches the memtable ID (monotonically increasing counter)
-  - Multiple WAL files can exist simultaneously (one for active memtable, others for memtables in flush queue)
-  - Deleted only after memtable is successfully flushed to SSTable AND freed
-  - Automatically recovered on database restart if flush didn't complete
+Write-Ahead Log (WAL) files follow the naming convention `wal_<memtable_id>.log` 
+(e.g., `wal_0.log`, `wal_1.log`) and provide durability by recording all 
+writes before they're applied to the memtable. Each memtable has its own 
+dedicated WAL file with a matching ID based on a monotonically increasing 
+counter. WAL files are created when a new memtable is created--either on 
+database open or during memtable rotation--and multiple WAL files can exist 
+simultaneously: one for the active memtable and others for memtables in the 
+flush queue. A WAL file is deleted only after its corresponding memtable is 
+successfully flushed to an SSTable and freed from memory. If a flush doesn't 
+complete before shutdown, the WAL is automatically recovered on the next 
+database restart, replaying operations to restore consistency.
 
 #### SSTable Files
-- **Format** `sstable_<sstable_id>.sst`
-- **Examples** `sstable_0.sst`, `sstable_1.sst`, `sstable_2.sst`
-- **Purpose** Persistent storage of flushed memtables
-- **Lifecycle**
-  - Created when memtable is flushed (when size exceeds `memtable_flush_size`)
-  - SSTable ID is monotonically increasing per column family
-  - Merged during compaction (old SSTables deleted, new merged SSTable created)
-  - Contains sorted key-value pairs with bloom filter and index metadata
+SSTable files follow the naming convention `sstable_<sstable_id>.sst` (e.g., 
+`sstable_0.sst`, `sstable_1.sst`) and provide persistent storage for flushed 
+memtables. An SSTable is created when a memtable exceeds the 
+`memtable_flush_size` threshold, with IDs assigned using a monotonically 
+increasing counter per column family. Each SSTable contains sorted key-value 
+pairs along with bloom filter and index metadata for efficient lookups. During 
+compaction, old SSTables are merged into new consolidated files, and the 
+original SSTables are deleted after the merge completes successfully.
 
 ### 9.3 WAL Rotation and Memtable Lifecycle Example
 
