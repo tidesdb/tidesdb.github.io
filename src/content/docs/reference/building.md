@@ -131,6 +131,7 @@ These constants define default values for column family configuration:
 #define TDB_DEFAULT_SKIPLIST_LEVELS                12
 #define TDB_DEFAULT_SKIPLIST_PROBABILITY           0.25
 #define TDB_DEFAULT_BLOOM_FILTER_FP_RATE           0.01
+#define TDB_DEFAULT_THREAD_POOL_SIZE               2
 ```
 
 ## Testing
