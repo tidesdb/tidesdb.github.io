@@ -18,7 +18,7 @@ reads through bloom filters, block indices, and compaction.
 - ACID transactions that are atomic, consistent, isolated (read committed), and durable. Transactions support multiple operations across column families. Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers.
 - Writers don't block readers. Readers never block other readers. Background operations will not affect active transactions.
 - Isolated key-value stores. Each column family has its own configuration, memtables, sstables, and write ahead logs.
-- Bidirectional iterators that allow you to iterate forward and backward over key-value pairs with heap-based merge-sort across memtable and sstables. Reference counting prevents premature deletion during iteration.
+- Bidirectional iterators that allow you to iterate forward and backward over key-value pairs with heap-based merge-sort across memtable and sstables. Effective seek operations with O(log n) skip list positioning and SBHA(Sorted Binary Hash Array) positioning(if enabled) in sstables. Reference counting prevents premature deletion during iteration.
 - Durability through WAL (write ahead log). Automatic recovery on startup reconstructs memtables from WALs.
 - Optional automatic background compaction when sstable count reaches configured max per column family. You can also trigger manual compactions through the API, parallelized or not.
 - Optional bloom filters to reduce disk reads by checking key existence before reading sstables. Configurable false positive rate.
@@ -41,4 +41,4 @@ Join the [TidesDB Discord Community](https://discord.gg/tWEmjR66cy) to ask quest
 
 ## Cross-Platform Support
 
-TidesDB supports Linux, macOS, and Windows with a platform abstraction layer for consistent behavior across operating systems.
+TidesDB supports 32-bit and 64-bit Linux, macOS, and Windows with a platform abstraction layer for consistent behavior across operating systems. 

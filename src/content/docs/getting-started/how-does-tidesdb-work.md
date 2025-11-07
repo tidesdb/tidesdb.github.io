@@ -659,3 +659,6 @@ Larger `memtable_flush_size` results in fewer, larger SSTables with less compact
 TidesDB uses simple integer return codes for error handling. A return value of `0` (TDB_SUCCESS) indicates a successful operation, while negative values indicate specific error conditions. Error codes include memory allocation failures, I/O errors, corruption detection, lock failures, and more, allowing for precise error handling in production systems.
 
 For a complete list of error codes and their meanings, see the [Error Codes Reference](../../reference/error-codes).
+
+## 11. Memory Management
+If a key value pair exceeds `TDB_MEMORY_PERCENTAGE` which is 60% of the available memory on your system TidesDB will throw a `TDB_ERR_MEMORY_LIMIT` error. This is to prevent the system from running out of memory or haulting.
