@@ -153,13 +153,12 @@ header .social-icons svg:hover {
 /* card styling */
 .card {
 	border: 1px solid var(--sl-color-gray-6);
-	border-radius: 8px;
+	border-radius: 12px;
 	transition: all 0.2s ease;
 }
 
 .card:hover {
 	border-color: var(--sl-color-accent);
-	box-shadow: 0 4px 12px rgba(25, 62, 220, 0.15);
 	transform: translateY(-2px);
 }
 
@@ -406,9 +405,9 @@ html {
 /* Glowing effect on hover */
 .card:hover {
 	box-shadow: 
-		0 4px 12px rgba(25, 62, 220, 0.15),
+		0 4px 12px rgba(104, 121, 190, 0.15),
 		0 0 20px rgba(25, 62, 220, 0.1),
-		inset 0 0 60px rgba(25, 62, 220, 0.05);
+		inset 0 0 60px rgba(44, 80, 240, 0.05);
 }
 
 /* Hero title gradient animation */
@@ -461,6 +460,10 @@ html {
 
 .action.primary:hover {
 	animation: none;
+}
+
+.card {
+	border: none;
 }
 
 /* Invert architecture diagram in dark mode for better visibility */
