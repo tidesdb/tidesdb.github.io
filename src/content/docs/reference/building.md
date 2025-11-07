@@ -63,7 +63,7 @@ ldconfig
 
 ### Windows
 
-#### Option 1: MinGW-w64 (Recommended for Windows)
+#### MinGW-w64 
 MinGW-w64 provides a GCC-based toolchain with better C11 support and POSIX compatibility.
 
 **Prerequisites**
@@ -79,15 +79,15 @@ Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
 # Configure with MinGW
 cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_C_COMPILER=gcc -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
 
-# Build
-cmake --build build
+# Build (Debug or Release)
+cmake --build build --config Release
 
 # Run tests
 cd build
 ctest --verbose  # or use --output-on-failure to only show failures
 ```
 
-#### Option 2: MSVC (Visual Studio)
+#### MSVC (Visual Studio)
 **Prerequisites**
 - Install [Visual Studio 2019 or later](https://visualstudio.microsoft.com/) with C++ development tools
 - Install [CMake](https://cmake.org/download/)
@@ -102,8 +102,6 @@ Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
 cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
 
 # Build (Debug or Release)
-cmake --build build --config Debug
-# or
 cmake --build build --config Release
 
 # Run tests

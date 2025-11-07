@@ -526,7 +526,7 @@ tidesdb_txn_free(txn);
 
 ### Iterator Seek Operations
 
-TidesDB provides efficient seek operations that allow you to position an iterator at a specific key or key range without scanning from the beginning. This is particularly powerful for range queries, prefix scans, and targeted lookups.
+TidesDB provides seek operations that allow you to position an iterator at a specific key or key range without scanning from the beginning.  If you have the SBHA( Sorted Binary Hash Array) enabled for the column family these types of seek operations will be faster.
 
 #### Seek to Specific Key
 
@@ -574,91 +574,8 @@ if (tidesdb_iter_seek_for_prev(iter, (uint8_t *)target, strlen(target)) == 0)
 }
 ```
 
-#### Range Queries
-
-Seek operations are ideal for scanning a specific range of keys
-
-```c
-tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin_read(db, &txn);
-
-tidesdb_iter_t *iter = NULL;
-tidesdb_iter_new(txn, "my_cf", &iter);
-
-const char *start_key = "user:1000";
-const char *end_key = "user:2000";
-
-/* Seek to start of range */
-tidesdb_iter_seek(iter, (uint8_t *)start_key, strlen(start_key));
-
-while (tidesdb_iter_valid(iter))
-{
-    uint8_t *key = NULL;
-    size_t key_size = 0;
-    tidesdb_iter_key(iter, &key, &key_size);
-    
-    /* Check if we've passed the end of range */
-    if (key_size >= strlen(end_key) && 
-        memcmp(key, end_key, strlen(end_key)) > 0)
-    {
-        free(key);
-        break;
-    }
-    
-    /* Process key in range */
-    printf("Key in range: %.*s\n", (int)key_size, key);
-    free(key);
-    
-    tidesdb_iter_next(iter);
-}
-
-tidesdb_iter_free(iter);
-tidesdb_txn_free(txn);
-```
-
-#### Prefix Scans
-
-Seek operations enable efficient prefix-based scanning
-
-```c
-tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin_read(db, &txn);
-
-tidesdb_iter_t *iter = NULL;
-tidesdb_iter_new(txn, "my_cf", &iter);
-
-const char *prefix = "logs:2024-11-";
-size_t prefix_len = strlen(prefix);
-
-/* Seek to first key with prefix */
-tidesdb_iter_seek(iter, (uint8_t *)prefix, prefix_len);
-
-while (tidesdb_iter_valid(iter))
-{
-    uint8_t *key = NULL;
-    size_t key_size = 0;
-    tidesdb_iter_key(iter, &key, &key_size);
-    
-    /* Check if key still has the prefix */
-    if (key_size < prefix_len || memcmp(key, prefix, prefix_len) != 0)
-    {
-        free(key);
-        break;  /* No more keys with this prefix */
-    }
-    
-    /* Process key with prefix */
-    printf("Log entry: %.*s\n", (int)key_size, key);
-    free(key);
-    
-    tidesdb_iter_next(iter);
-}
-
-tidesdb_iter_free(iter);
-tidesdb_txn_free(txn);
-```
-
 :::note[Seek Performance Optimizations]
-Seek operations use O(log n) skip list traversal for memtable positioning and binary search for SSTable block lookups instead of linear scans. Entire SSTables are skipped when the target key falls outside their min/max key range, and results are efficiently merged across the active memtable, immutable memtables, and multiple SSTables. This provides 50-100x performance gains over iterating from the beginning for large datasets.
+Seek operations use O(log n) skip list traversal for memtable positioning and (if enabled) SBHA for SSTable block lookups instead of linear scans. Entire SSTables are skipped when the target key falls outside their min/max key range, and results are efficiently merged across the active memtable, immutable memtables, and multiple SSTables. This provides 50-100x performance gains over iterating from the beginning for large datasets.
 :::
 
 #### Seek Behavior
