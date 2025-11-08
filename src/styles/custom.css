@@ -152,13 +152,13 @@ header .social-icons svg:hover {
 
 /* card styling */
 .card {
-	border: 1px solid var(--sl-color-gray-6);
-	border-radius: 12px;
+	border: none!important;
+	border-radius: 34px;
 	transition: all 0.2s ease;
 }
 
 .card:hover {
-	border-color: var(--sl-color-accent);
+	border: none!important;
 	transform: translateY(-2px);
 }
 
