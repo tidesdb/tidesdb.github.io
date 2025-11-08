@@ -20,7 +20,7 @@ pre,
 
 /* Light mode colors (default) */
 :root[data-theme='light'] {
-	--sl-color-accent-low: #e3f2fd;
+	--sl-color-accent-low: #b4dbf7;
 	--sl-color-accent: #193EDC;
 	--sl-color-accent-high: #0a2540;
 	--sl-color-white: #0a2540;
@@ -40,8 +40,8 @@ pre,
 /* Dark mode colors */
 :root {
 	--sl-color-accent-low: #0d1f5c;
-	--sl-color-accent: #3d6eff;
-	--sl-color-accent-high: #8ba9ff;
+	--sl-color-accent: #2c57d8;
+	--sl-color-accent-high: #809ae0;
 	--sl-color-white: #ffffff;
 	--sl-color-gray-1: #f6f9fc;
 	--sl-color-gray-2: #e3e8ee;
@@ -402,12 +402,8 @@ html {
 	height: 300%;
 }
 
-/* Glowing effect on hover */
 .card:hover {
-	box-shadow: 
-		0 4px 12px rgba(104, 121, 190, 0.15),
-		0 0 20px rgba(25, 62, 220, 0.1),
-		inset 0 0 60px rgba(44, 80, 240, 0.05);
+		box-shadow: rgba(50, 50, 93, 0.02) 0px 30px 60px -12px inset, rgba(0, 0, 0, 0.02) 0px 18px 36px -18px inset;
 }
 
 /* Hero title gradient animation */
@@ -463,6 +459,7 @@ html {
 }
 
 .card {
+	box-shadow: none;
 	border: none;
 }
 
@@ -473,4 +470,19 @@ html {
 
 :root[data-theme='light'] .architecture-diagram img {
 	filter: none;
+}
+
+.pagination-links a {
+	box-shadow: none!important;
+	border: none!important;
+}
+
+input[type="select"], select {
+	color: white;
+}
+
+input[type="select"]:focus, select:focus {
+	outline: none;
+	border: none;
+	box-shadow: none;
 }
