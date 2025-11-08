@@ -491,6 +491,7 @@ html {
 
 .link-title {
 	font-size: 1.3rem!important;
+	font-weight: bold!important;
 	color: var(--sl-color-accent-high)!important;
 }
 
@@ -580,6 +581,8 @@ input[type="select"]:focus, select:focus {
 	border-bottom: none;
 }
 
+
+
 /* when screen gets to small, hide the sidebar */
 @media (max-width: 768px) {
 .pagination-links {
@@ -587,7 +590,7 @@ input[type="select"]:focus, select:focus {
 }
 
 .pagination-links a {
-	font-size: 0.6rem!important;
+	font-size: 0.8rem!important;
 	box-shadow: none!important;
 	border: none!important;
 	color: var(--sl-color-accent-high)!important;
@@ -595,7 +598,8 @@ input[type="select"]:focus, select:focus {
 }
 
 .link-title {
-	font-size: 0.8rem!important;
+	font-size: 1.1rem!important;
+	font-weight: bold!important;
 	color: var(--sl-color-accent-high)!important;
 }
 }
