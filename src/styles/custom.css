@@ -9,6 +9,22 @@ body {
 	font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+a, a:visited {
+	color: var(--sl-color-accent);
+	text-decoration: none;
+	border-bottom: 2px solid var(--sl-color-accent);
+	transition: all 0.2s ease;
+}
+
+.sidebar-content a, .sidebar-content a:visited {
+	border-bottom: none;
+}
+
+.right-sidebar-container a,
+.right-sidebar-container a:visited {
+	border-bottom: none;
+}
+
 code,
 pre,
 .sl-markdown-content code,
@@ -493,6 +509,18 @@ input[type="select"]:focus, select:focus {
 	color: #535307!important;
 }
 
+.starlight-aside--note a, .starlight-aside--note a:visited {
+	border-bottom: 2px solid #535307;
+	transition: all 0.2s ease;
+	color: #535307!important;
+}
+
+.starlight-aside--note a:hover {
+	border-bottom: 2px solid #535307;
+	transition: all 0.2s ease;
+	color: #535307!important;
+}
+
 .starlight-aside--tip {
 	background: rgb(193, 255, 182);
 	border-left: 4px solid #306327!important;
@@ -500,6 +528,18 @@ input[type="select"]:focus, select:focus {
 }
 
 .starlight-aside--tip .starlight-aside__title {
+	color: #306327!important;
+}
+
+.starlight-aside--tip a, .starlight-aside--tip a:visited {
+	border-bottom: 2px solid #306327;
+	transition: all 0.2s ease;
+	color: #306327!important;
+}
+
+.starlight-aside--tip a:hover {
+	border-bottom: 2px solid #306327;
+	transition: all 0.2s ease;
 	color: #306327!important;
 }
 
@@ -511,5 +551,17 @@ input[type="select"]:focus, select:focus {
 }
 
 .starlight-aside--caution .starlight-aside__title {
+	color: #862a19!important;
+}
+
+.starlight-aside--caution a, .starlight-aside--caution a:visited {
+	border-bottom: 2px solid #862a19;
+	transition: all 0.2s ease;
+	color: #862a19!important;
+}
+
+.starlight-aside--caution a:hover {
+	border-bottom: 2px solid #862a19;
+	transition: all 0.2s ease;
 	color: #862a19!important;
 }
