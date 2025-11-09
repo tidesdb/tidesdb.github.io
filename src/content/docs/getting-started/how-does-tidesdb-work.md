@@ -65,8 +65,8 @@ Readers acquire references to the memtable before accessing it, while writers
 acquire an exclusive lock on the column family. Each column family can 
 register a custom key comparison function (memcmp, string, numeric, or 
 user-defined) that determines sort order consistently across the entire 
-system--memtable, SSTables, and iterators all use the same comparison logic. 
-The skip list's maximum level and probability parameters are configurable per 
+system--memtable, SSTables, block indexes, and iterators all use the same comparison logic. 
+The skip list's flush write buffer threshold, maximum level and probability parameters are configurable per 
 column family, allowing tuning for specific workloads. When the memtable 
 reaches a configurable size threshold, it becomes immutable and is queued for 
 flushing while a new active memtable is created. The immutable memtable is 
@@ -543,7 +543,7 @@ Each TidesDB database has a root directory containing subdirectories for each co
 ```
 mydb/
 ├── my_cf/
-│   ├── config.cfc         # Persisted column family configuration
+│   ├── config.cfc        
 │   ├── wal_1.log
 │   ├── sstable_0.sst
 │   ├── sstable_1.sst
