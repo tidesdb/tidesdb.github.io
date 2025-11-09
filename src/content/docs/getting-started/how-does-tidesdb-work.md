@@ -31,11 +31,11 @@ This structure allows for efficient writes by initially storing data in memory a
 ### 3.1 Overview
 TidesDB uses a two-tiered storage architecture: a memory level that stores 
 recently written key-value pairs in sorted order using a skip list data 
-structure, and a disk level containing multiple SSTables. When reading data, 
+structure which is associated with a write ahead log (WAL) that stores commited transactions, and a disk level containing multiple SSTables with an effective append only block layout. When reading data, 
 newer tables take precedence over older ones, ensuring the most recent 
 version of a key is always retrieved.
 
-This design choice differs from other implementations like RocksDB and LevelDB, which use a multi-level approach with specific level-based compaction strategies.
+This design choice differs from other implementations like RocksDB and LevelDB, which use a multi-level approach with specific level-based compaction policies.
 
 ### 3.2 Column Families
 A distinctive aspect of TidesDB is its organization around column families. Each column family
@@ -209,7 +209,9 @@ SSTables use the block manager format with sequential block ordering:
 3. **Index Block** (optional) · Only written if `enable_block_indexes = 1`
 4. **Metadata Block** (required) · Always the last block in the file
 
-**Note** · The exact block positions of bloom filter and index depend on how many KV pairs exist and which features are enabled. During SSTable loading, the system reads backwards from the end: metadata (last), then index (if present), then bloom filter (if present).
+:::note
+The exact block positions of bloom filter and index depend on how many KV pairs exist and which features are enabled. During SSTable loading, the system reads backwards from the end: metadata (last), then index (if present), then bloom filter (if present).
+:::
 
 #### Data Block Format (KV Pairs)
 
@@ -417,8 +419,8 @@ uncommitted changes to be read before commit. The API uses simple integer
 return codes (0 for success, -1 for error) rather than complex error 
 structures.
 
-### 6. Compaction Strategies
-TidesDB implements two distinct compaction strategies
+### 6. Compaction Policy
+TidesDB implements two distinct compaction techniques
 
 ### 6.1 Parallel Compaction
 
