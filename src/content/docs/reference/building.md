@@ -301,7 +301,7 @@ cmake --build build
 #### Stress Test with No Compression
 ```bash
 cmake -B build \
-  -DBENCH_NUM_OPERATIONS=1000000 \
+  -DBENCH_NUM_OPERATIONS=10000000 \
   -DBENCH_KEY_SIZE=128 \
   -DBENCH_VALUE_SIZE=4096 \
   -DBENCH_NUM_THREADS=16 \
