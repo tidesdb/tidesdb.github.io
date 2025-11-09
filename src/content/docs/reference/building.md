@@ -17,7 +17,7 @@ Check the [latest release](https://github.com/tidesdb/tidesdb/releases/latest) o
   - MSVC 2019 16.8+ (Windows)
 
 ### Required Dependencies
-TidesDB requires the following libraries for compression and cryptographic operations:
+TidesDB requires the following libraries for compression and cryptographic operations
 
 - **[Snappy](https://github.com/google/snappy)** - Fast compression/decompression
 - **[LZ4](https://github.com/lz4/lz4)** - Extremely fast compression
@@ -160,7 +160,7 @@ These constants define default values for column family configuration
 
 ## Testing
 
-After building, run the test suite to verify everything works:
+After building, run the test suite to verify everything works
 
 ```bash
 cd build
