@@ -4,10 +4,6 @@ description: A high level description of how TidesDB works.
 ---
 
 ## 1. Introduction
-TidesDB is a fast, efficient key-value storage engine library implemented in C, designed around the log-structured merge-tree (LSM-tree) paradigm. 
-
-Rather than being a full-featured database management system, TidesDB serves as a foundational library that developers can use to build database systems or utilize directly as a standalone key-value or column store.
-
 Here we explore the inner workings of TidesDB, its architecture, core components, and operational mechanisms.
 
 ## 2. Theoretical Foundation
@@ -64,9 +60,7 @@ This design allows for domain-specific optimization and isolation between differ
 
 </div>
 
-The memtable is an in-memory data structure that serves as the first landing 
-point for all write operations. TidesDB implements the memtable as a lock-free 
-skip list, using atomic operations and reference counting for concurrent access. 
+The memtable is the first landing point for all column family write operations. TidesDB implements the memtable structure as a pair in which includes a COW (Copy-On-Write) skip list, using atomic operations and reference counting for concurrent read access and a WAL (Write-Ahead Log) for recovery. 
 Readers acquire references to the memtable before accessing it, while writers 
 acquire an exclusive lock on the column family. Each column family can 
 register a custom key comparison function (memcmp, string, numeric, or 
@@ -372,15 +366,6 @@ All committed transactions that were written to WAL are recovered. Uncommitted t
 **SSTable Recovery Ordering**
 
 SSTables are discovered by reading the column family directory, where directory order is filesystem-dependent and non-deterministic. SSTables are sorted by ID after loading to ensure correct read semantics, guaranteeing newest-to-oldest ordering for the read path (which searches from the end of the array backwards). Without sorting, stale data could be returned if newer SSTables load before older ones.
-
-### 4.5 Bloom Filters
-To optimize read operations, TidesDB employs Bloom filters--probabilistic data 
-structures that quickly determine if a key might exist in an SSTable. By 
-filtering out SSTables that definitely don't contain a key, Bloom filters help 
-avoid unnecessary disk I/O. Each Bloom filter is configurable per column 
-family to balance memory usage against read performance. The bloom filter is 
-serialized and stored as the second-to-last block in the SSTable file, just 
-before the index block.
 
 ## 5. Data Operations
 ### 5.1 Write Path

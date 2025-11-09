@@ -88,14 +88,12 @@ tidesdb_config_t config = {
 tidesdb_t *db = NULL;
 if (tidesdb_open(&config, &db) != 0)
 {
-    /* Handle error */
     return -1;
 }
 
 /* Close the database */
 if (tidesdb_close(db) != 0)
 {
-    /* Handle error */
     return -1;
 }
 ```
@@ -108,7 +106,7 @@ TidesDB provides runtime debug logging that can be enabled/disabled dynamically.
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .enable_debug_logging = 1  /* Enable debug logging */
+    .enable_debug_logging = 1  
 };
 
 tidesdb_t *db = NULL;
@@ -122,7 +120,7 @@ extern int _tidesdb_debug_enabled;  /* Global debug flag */
 /* Enable debug logging */
 _tidesdb_debug_enabled = 1;
 
-/* Your operations here - debug logs will be written to stderr */
+/* Your operations here -- debug logs will be written to stderr */
 
 /* Disable debug logging */
 _tidesdb_debug_enabled = 0;
@@ -151,7 +149,6 @@ tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config(
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 {
-    /* Handle error */
     return -1;
 }
 ```
@@ -178,7 +175,6 @@ tidesdb_column_family_config_t cf_config = {
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 {
-    /* Handle error */
     return -1;
 }
 ```
@@ -193,7 +189,6 @@ cf_config.comparator_name = "reverse";  /* use registered comparator */
 
 if (tidesdb_create_column_family(db, "sorted_cf", &cf_config) != 0)
 {
-    /* Handle error */
     return -1;
 }
 ```
@@ -203,7 +198,6 @@ if (tidesdb_create_column_family(db, "sorted_cf", &cf_config) != 0)
 ```c
 if (tidesdb_drop_column_family(db, "my_cf") != 0)
 {
-    /* Handle error */
     return -1;
 }
 ```
@@ -235,9 +229,9 @@ if (tidesdb_list_column_families(db, &names, &count) == 0)
     for (int i = 0; i < count; i++)
     {
         printf("  - %s\n", names[i]);
-        free(names[i]);  /* Free each name */
+        free(names[i]);
     }
-    free(names);  /* Free the array */
+    free(names);
 }
 ```
 
@@ -314,7 +308,7 @@ if (tidesdb_update_column_family_config(db, "my_cf", &update_config) == 0)
 ```
 mydb/
 ├── my_cf/
-│   ├── config.cfc          ← Configuration saved here
+│   ├── config.cfc    
 │   ├── wal_0.log
 │   ├── sstable_0.sst
 │   └── sstable_1.sst
@@ -339,7 +333,6 @@ if (tidesdb_txn_begin(db, &txn) != 0)
     return -1;
 }
 
-/* Put a key-value pair */
 const uint8_t *key = (uint8_t *)"mykey";
 const uint8_t *value = (uint8_t *)"myvalue";
 
@@ -349,7 +342,6 @@ if (tidesdb_txn_put(txn, "my_cf", key, 5, value, 7, -1) != 0)
     return -1;
 }
 
-/* Commit the transaction */
 if (tidesdb_txn_commit(txn) != 0)
 {
     tidesdb_txn_free(txn);
@@ -368,7 +360,7 @@ tidesdb_txn_begin(db, &txn);
 const uint8_t *key = (uint8_t *)"temp_key";
 const uint8_t *value = (uint8_t *)"temp_value";
 
-/* TTL is Unix timestamp (seconds since epoch) - absolute expiration time */
+/* TTL is Unix timestamp (seconds since epoch) -- absolute expiration time */
 time_t ttl = time(NULL) + 60;  /* Expires 60 seconds from now */
 
 /* Use -1 for no expiration */
@@ -437,7 +429,7 @@ tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
 tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
 tidesdb_txn_delete(txn, "my_cf", (uint8_t *)"old_key", 7);
 
-/* Commit atomically - all or nothing */
+/* Commit atomically -- all or nothing */
 if (tidesdb_txn_commit(txn) != 0)
 {
     /* On error, transaction is automatically rolled back */
@@ -492,7 +484,6 @@ while (tidesdb_iter_valid(iter))
     if (tidesdb_iter_key(iter, &key, &key_size) == 0 &&
         tidesdb_iter_value(iter, &value, &value_size) == 0)
     {
-        /* Use key and value */
         printf("Key: %.*s, Value: %.*s\n", 
                (int)key_size, key, (int)value_size, value);
         free(key);
@@ -515,7 +506,6 @@ tidesdb_txn_begin_read(db, &txn);
 tidesdb_iter_t *iter = NULL;
 tidesdb_iter_new(txn, "my_cf", &iter);
 
-/* Seek to last entry */
 tidesdb_iter_seek_to_last(iter);
 
 while (tidesdb_iter_valid(iter))
@@ -603,7 +593,7 @@ tidesdb_iter_t *iter = NULL;
 tidesdb_iter_new(txn, "my_cf", &iter);  /* Acquires references on SSTables */
 tidesdb_iter_seek_to_first(iter);
 
-/* Compaction can occur here - new SSTables replace old ones */
+/* Compaction can occur here -- new SSTables replace old ones */
 /* But iterator still has valid references to old SSTables */
 
 while (tidesdb_iter_valid(iter))
@@ -827,5 +817,5 @@ tidesdb_txn_commit(write_txn);  /* Briefly blocks other writers only */
 tidesdb_txn_t *other_txn;
 tidesdb_txn_begin_read(db, &other_txn);
 tidesdb_txn_get(other_txn, "other_cf", key, key_size, &value, &value_size);
-/* No blocking - different column family */
+/* No blocking -- different column family */
 ```

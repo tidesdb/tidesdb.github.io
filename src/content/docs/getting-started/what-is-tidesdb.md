@@ -7,8 +7,7 @@ TidesDB is a fast and efficient embedded key-value storage engine library writte
 
 ## Key Characteristics
 
-TidesDB is an embeddable storage library designed for direct integration 
-into applications. It handles keys and values as raw byte sequences without 
+TidesDB is designed for direct integration into applications. It handles keys and values as raw byte sequences without 
 size restrictions (up to system memory limits), giving you full control over 
 serialization. Optimized for write-heavy workloads, it maintains efficient 
 reads through bloom filters, block indices, and compaction.
