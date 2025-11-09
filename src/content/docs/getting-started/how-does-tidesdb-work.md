@@ -28,7 +28,7 @@ This structure allows for efficient writes by initially storing data in memory a
 
 <div class="architecture-diagram">
 
-![Architecture Diagram](../../../assets/img2.png)
+![Architecture Diagram](../../../assets/img11.png)
 
 </div>
 
@@ -66,16 +66,19 @@ This design allows for domain-specific optimization and isolation between differ
 
 The memtable is an in-memory data structure that serves as the first landing 
 point for all write operations. TidesDB implements the memtable as a lock-free 
-skip list, using atomic operations for concurrent reads while writers acquire 
-an exclusive lock to maintain sorted key-value pairs. Each column family can 
+skip list, using atomic operations and reference counting for concurrent access. 
+Readers acquire references to the memtable before accessing it, while writers 
+acquire an exclusive lock on the column family. Each column family can 
 register a custom key comparison function (memcmp, string, numeric, or 
 user-defined) that determines sort order consistently across the entire 
 system--memtable, SSTables, and iterators all use the same comparison logic. 
 The skip list's maximum level and probability parameters are configurable per 
 column family, allowing tuning for specific workloads. When the memtable 
-reaches a configurable size threshold, it is atomically flushed to disk as an 
-SSTable, with atomic types ensuring thread-safe size tracking and version 
-management throughout the process.
+reaches a configurable size threshold, it becomes immutable and is queued for 
+flushing while a new active memtable is created. The immutable memtable is 
+flushed to disk as an SSTable by a background thread pool, with reference 
+counting ensuring the memtable isn't freed until all readers complete and the 
+flush finishes.
 
 ### 4.2 Block Manager Format
 
@@ -168,59 +171,79 @@ SSTables serve as TidesDB's immutable on-disk storage layer. Internally, each
 SSTable is organized into multiple blocks containing sorted key-value pairs. 
 To accelerate lookups, every SSTable maintains its minimum and maximum keys, 
 allowing the system to quickly determine if a key might exist within it. 
-Optional block indices provide direct access to specific blocks, eliminating 
-the need to scan entire files. The immutable nature of SSTables--once written, 
-they are never modified, only merged or deleted--ensures data consistency and 
-enables lock-free concurrent reads.
+Optional succinct trie indices provide direct access to specific blocks, 
+eliminating the need to scan entire files. The immutable nature of SSTables--once 
+written, they are never modified, only merged or deleted--ensures data consistency 
+and enables lock-free concurrent reads.
+
+**Reference Counting and Lifecycle**
+
+SSTables use atomic reference counting to manage their lifecycle safely. When an 
+SSTable is accessed (by a read operation, iterator, or compaction), its reference 
+count is incremented. When the operation completes, the reference is released. 
+Only when the reference count reaches zero is the SSTable actually freed from 
+memory. This prevents use-after-free bugs during concurrent operations like 
+compaction (which may delete SSTables) and reads (which may still be accessing them).
+
+**Block Manager Caching**
+
+The underlying block manager file handles are cached in a database-level LRU cache 
+with a configurable capacity (`max_open_file_handles`). When an SSTable is opened, 
+its block manager is added to the cache. If the cache is full, the least recently 
+used block manager is automatically closed. This prevents file descriptor exhaustion 
+while maintaining good performance for frequently accessed SSTables.
 
 #### SSTable Block Layout
 
-SSTables use the block manager format with a specific block ordering
+SSTables use the block manager format with sequential block ordering:
 
 ```
-[File Header is 12 bytes - Block Manager Header]
+[File Header - 12 bytes Block Manager Header]
 [Block 0: KV Pair 1]
 [Block 1: KV Pair 2]
 [Block 2: KV Pair 3]
 ...
-[Block N-3: KV Pair N]
-[Block N-2: Bloom Filter]
-[Block N-1: Index (SBHA)]
-[Block N: Metadata]
+[Block N-1: KV Pair N]
+[Bloom Filter Block] (optional)
+[Index Block] (optional)
+[Metadata Block] (always last)
 ```
 
 **Block Order (from first to last)**
-1. **Data Blocks** - Key-value pairs in sorted order (blocks 0 to N-3)
-2. **Bloom Filter Block** - Serialized bloom filter (block N-2)
-3. **Index Block** - Sorted Binary Hash Array (SBHA) for direct lookups (block N-1)
-4. **Metadata Block** - Min/max keys and entry count (block N, last block)
+1. **Data Blocks** · Key-value pairs in sorted order (sequential blocks starting at 0)
+2. **Bloom Filter Block** (optional) · Only written if `enable_bloom_filter = 1`
+3. **Index Block** (optional) · Only written if `enable_block_indexes = 1`
+4. **Metadata Block** (required) · Always the last block in the file
+
+**Note** · The exact block positions of bloom filter and index depend on how many KV pairs exist and which features are enabled. During SSTable loading, the system reads backwards from the end: metadata (last), then index (if present), then bloom filter (if present).
 
 #### Data Block Format (KV Pairs)
 
 Each data block contains a single key-value pair
 
 ```
-[KV Header is 24 bytes]
+[KV Header is 18 bytes (packed)]
 [Key is variable]
 [Value is variable]
 ```
 
-**KV Pair Header (24 bytes)**
+**KV Pair Header (18 bytes, packed)**
 ```c
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t version;        // Format version (currently 1)
     uint8_t flags;          // TDB_KV_FLAG_TOMBSTONE (0x01) for deletes
     uint32_t key_size;      // Key size in bytes
     uint32_t value_size;    // Value size in bytes
-    int64_t ttl;            // Unix timestamp for expiration (-1 = no expiration)
+    int64_t ttl;            // Unix timestamp for expiration (0 = no expiration)
 } tidesdb_kv_pair_header_t;
 ```
 
 **Compression**
-- If `compressed = 1` in column family config, entire block is compressed
+- If `enable_compression = 1` in column family config, entire block is compressed
 - Compression applied to [Header + Key + Value] as a unit
-- Supports Snappy, LZ4, or ZSTD algorithms
+- Supports Snappy, LZ4, or ZSTD algorithms (configured via `compression_algorithm`)
 - Decompression happens on read before parsing header
+- Default is enabled with LZ4 algorithm
 
 #### Bloom Filter Block
 <div class="architecture-diagram">
@@ -229,74 +252,79 @@ typedef struct {
 
 </div>
 
-Stored as second-to-last block (N-2)
+Written after all data blocks (if enabled)
 - Serialized bloom filter data structure
 - Used to quickly determine if a key might exist in the SSTable
 - Avoids unnecessary disk I/O for non-existent keys
 - False positive rate configurable per column family (default 1%)
+- Only written if `enable_bloom_filter = 1` in column family config
+- Loaded third-to-last when reading backwards during SSTable recovery
 
-#### Index Block (SBHA)
+#### Index Block (Succinct Trie)
+
 <div class="architecture-diagram">
 
-![Index Block](../../../assets/img6.png)
+![Architecture Diagram](../../../assets/img12.png)
 
 </div>
 
-Stored as third-to-last block (N-1)
-- Sorted Binary Hash Array (SBHA) mapping keys to block offsets
-- Enables direct block access without scanning
-- Format `[key_hash] -> [file_offset]`
-- Only used if `use_sbha = 1` in column family config
-- If disabled, falls back to linear scan through data blocks
+TidesDB implements a space-efficient succinct trie using LOUDS (Level-Order Unary Degree Sequence) encoding to provide fast key-to-block-offset lookups in SSTables. The data structure consists of five compact arrays that work in concert: a LOUDS bitvector that encodes the tree structure using approximately 2 bits per node, where sequences of 1-bits represent children and 0-bits mark boundaries; a labels array storing the character for each edge in breadth-first order; an edge_child array mapping each edge index to its corresponding child node ID; a terminal bitvector marking which nodes represent complete keys; and a values array holding the actual block offsets for terminal nodes. During lookup, the trie navigates from the root by using rank and select operations on the LOUDS bitvector to locate children, comparing characters in the labels array, and following the edge_child mappings until reaching a terminal node, at which point it returns the corresponding value. The implementation features a disk-streaming builder that maintains O(1) memory usage during construction by writing intermediate data to temporary block manager files, making it capable of building indices for arbitrarily large datasets without memory constraints. This approach achieves 95% space savings compared to pointer-based tries while maintaining O(key_length) lookup time, and the entire structure can be serialized directly into SSTable files for persistent storage, enabling TidesDB to perform direct block access instead of expensive linear scans through data blocks.
 
 #### Metadata Block
 
-Stored as last block (N)
+Always written as the last block in the file
 
 ```
 [Magic is 4 bytes (0x5353544D = "SSTM")]
 [Num Entries is 8 bytes (uint64_t)]
 [Min Key Size is 4 bytes (uint32_t)]
-[Min Key is a variable]
+[Min Key is variable]
 [Max Key Size is 4 bytes (uint32_t)]
-[Max Key is a variable]
+[Max Key is variable]
 ```
 
 **Purpose**
-- Magic number identifies this as a metadata block
-- Min/max keys to optimize key look up
-- Num entries tracks total KV pairs in SSTable
-- Loaded first during SSTable recovery (cursor starts at last block)
+- Magic number (0x5353544D = "SSTM") identifies this as a valid SSTable metadata block
+- Min/max keys enable range-based SSTable filtering during reads
+- Num entries tracks total KV pairs in SSTable (used to know when to stop reading data blocks)
+- **Always loaded first** · during SSTable recovery using `cursor_goto_last()` to read from end of file
 
 #### SSTable Write Process
 
-1. Iterate through memtable in sorted order
-2. **For each KV pair**
-   - Build KV header + key + value
-   - Optionally compress
-   - Write as data block (blocks 0, 1, 2, ...)
-   - Add key to bloom filter
-   - Add key->offset mapping to index
+1. Create SSTable file and initialize bloom filter and succinct trie builder (if enabled)
+2. Iterate through memtable in sorted order using skip list cursor
+3. **For each KV pair**
+   - Build KV header (18 bytes) + key + value
+   - Optionally compress the entire block
+   - Write as data block and record the file offset
+   - Add key to bloom filter (if enabled)
+   - Add key->offset mapping to succinct trie builder (if enabled)
    - Track min/max keys
-3. Serialize and write bloom filter (block N-2)
-4. Serialize and write index (block N-1)
-5. Build and write metadata block (block N)
+4. Build the succinct trie from the builder (if enabled)
+5. Serialize and write bloom filter block (if enabled)
+6. Serialize and write succinct trie index block (if enabled)
+7. Build and write metadata block with magic number, entry count, and min/max keys
 
 #### SSTable Read Process
 
 1. **Load SSTable** (recovery)
    - Open block manager file
-   - Seek to last block (metadata)
-   - Read and parse metadata (min/max keys, entry count)
-   - Read previous block (index)
-   - Read previous block (bloom filter)
+   - Use `cursor_goto_last()` to seek to last block
+   - Read and parse metadata block (validates magic number 0x5353544D)
+   - Extract num_entries, min_key, and max_key from metadata
+   - Use `cursor_prev()` to read previous block (index, if present)
+   - Deserialize succinct trie index (if data is valid)
+   - Use `cursor_prev()` to read previous block (bloom filter, if present)
+   - Deserialize bloom filter (if data is valid)
 
 2. **Lookup Key**
-   - Check bloom filter (quick rejection)
-   - If SBHA enabled a lookup offset in index, read specific block
-   - If SBHA disabled a linear scan through data blocks
-   - Decompress block if needed
-   - Parse KV header and extract value
+   - Check if key is within min/max range (quick rejection)
+   - Check bloom filter if enabled (probabilistic rejection)
+   - If block indexes enabled: query succinct trie for exact block offset
+   - If block indexes disabled: linear scan through data blocks
+   - Read block at offset
+   - Decompress block if compression is enabled
+   - Parse KV header (18 bytes) and extract key/value
    - Check TTL expiration
    - Return value or tombstone marker
 
@@ -325,7 +353,7 @@ WAL files follow the naming pattern `wal_0.log`, `wal_1.log`, `wal_2.log`, etc. 
 
 TidesDB uses a rotating WAL system that works as follows:
 
-Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size reaches `memtable_flush_size`, rotation is triggered. During rotation, a new active memtable (ID 1) is created with `wal_1.log`, while the immutable memtable (ID 0) with `wal_0.log` is queued for flush. The background flush writes memtable (ID 0) to `sstable_0.sst` while `wal_0.log` still exists. Once the flush completes, `wal_0.log` is deleted after the memtable is freed. Multiple memtables can be in the flush queue concurrently, each with its own WAL file.
+Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size reaches `memtable_flush_size`, rotation is triggered. During rotation, a new active memtable (ID 1) is created with `wal_1.log`, while the immutable memtable (ID 0) with `wal_0.log` is added to the immutable memtables queue. A flush task is submitted to the flush thread pool. The background flush thread writes memtable (ID 0) to `sstable_0.sst` while `wal_0.log` still exists. Once the flush completes successfully, the memtable is dequeued from the immutable queue, its reference count drops to zero, and both the memtable and `wal_0.log` are freed/deleted. Multiple memtables can be in the flush queue concurrently, each with its own WAL file and reference count.
 
 #### 4.4.3 WAL Features
 
@@ -350,36 +378,45 @@ To optimize read operations, TidesDB employs Bloom filters--probabilistic data
 structures that quickly determine if a key might exist in an SSTable. By 
 filtering out SSTables that definitely don't contain a key, Bloom filters help 
 avoid unnecessary disk I/O. Each Bloom filter is configurable per column 
-family to balance memory usage against read performance and is stored at block 
-1 within the SSTable, immediately following the min-max key block.
+family to balance memory usage against read performance. The bloom filter is 
+serialized and stored as the second-to-last block in the SSTable file, just 
+before the index block.
 
 ## 5. Data Operations
 ### 5.1 Write Path
 When a key-value pair is written to TidesDB
 
-1. The operation is recorded in the WAL
-2. The key-value pair is inserted into the memtable
-3. If the memtable size exceeds the flush threshold
+1. The operation is recorded in the active memtable's WAL
+2. The key-value pair is inserted into the active memtable's skip list
+3. The memtable size is checked after each write
+4. If the memtable size exceeds the flush threshold (`memtable_flush_size`)
 
-- The column family will block momentarily
-- The memtable is flushed to disk (sorted run) as an SSTable
-- The corresponding WAL is truncated
-- The memtable is cleared for new writes
+- The current memtable becomes immutable and is added to the flush queue
+- A new active memtable is created with a new WAL file
+- The immutable memtable is submitted to the flush thread pool
+- Background threads flush the immutable memtable to an SSTable
+- After successful flush, the WAL file is deleted and the memtable is freed
+- Writes continue immediately to the new active memtable without blocking
 
 
 ### 5.2 Read Path
 When reading a key from TidesDB
 
-1. First, the memtable is checked for the key
-2. If not found, SSTables are checked in reverse chronological order (newest to oldest)
-3. For each SSTable
-
-- The Bloom filter is consulted to determine if the key might exist
-- If the Bloom filter indicates the key might exist, the block index is used to locate the potential block
-- The block is read and searched for the key
-
-
-4. The search stops when the key is found or all SSTables have been checked
+1. First, the active memtable is checked for the key
+2. If not found, immutable memtables in the flush queue are checked (newest to oldest)
+3. If still not found, SSTables are checked in reverse chronological order (newest to oldest)
+4. For each SSTable:
+   - Check if key is within min/max key range (quick rejection)
+   - If within range, check bloom filter (if enabled) to determine if key might exist
+   - If bloom filter indicates possible match (or if disabled):
+     - If block indexes enabled: query succinct trie for exact block offset
+     - If block indexes disabled: linear scan through data blocks
+   - Read the block at the determined offset
+   - Decompress block if compression is enabled
+   - Parse KV header and compare keys
+   - Check TTL expiration and tombstone flag
+5. The search stops when the key is found or all sources have been checked
+6. Return the value or TDB_ERR_NOT_FOUND
 
 ### 5.3 Transactions
 TidesDB provides ACID transaction support with multi-column-family 
@@ -400,23 +437,27 @@ TidesDB implements two distinct compaction strategies
 
 ### 6.1 Parallel Compaction
 
-TidesDB implements parallel compaction using a semaphore-based thread pool to 
+TidesDB implements parallel compaction using semaphore-based thread limiting to 
 reduce SSTable count, remove tombstones, and purge expired TTL entries. The 
 number of concurrent threads is configurable via `compaction_threads` in the 
 column family config (default 4). Compaction pairs SSTables from oldest to 
-newest, with each thread processing one pair, approximately halving the 
-SSTable count per run. When `compaction_threads > 0`, `tidesdb_compact()` 
-automatically uses parallel execution. At least 2 SSTables are required to 
-trigger compaction.
+newest (pairs 0+1, 2+3, 4+5, etc.), with each thread processing one pair. A 
+semaphore limits concurrent threads to the configured maximum. When 
+`compaction_threads >= 2`, `tidesdb_compact()` automatically uses parallel 
+execution. At least 2 SSTables are required to trigger compaction. The process 
+approximately halves the SSTable count per run.
 
 ### 6.2 Background Compaction
 
 Background compaction provides automatic, hands-free SSTable management. 
 Enabled via `enable_background_compaction = 1` in the column family 
 configuration, it automatically triggers when the SSTable count reaches 
-`max_sstables_before_compaction`. A dedicated background thread operates 
-independently without blocking application operations, merging SSTable pairs 
-incrementally throughout the database lifecycle until shutdown.
+`max_sstables_before_compaction`. When a flush completes and the SSTable count 
+exceeds the threshold, a compaction task is submitted to the database-level 
+compaction thread pool. This operates independently without blocking application 
+operations, merging SSTable pairs incrementally throughout the database lifecycle 
+until shutdown. The interval between compaction checks is configurable via 
+`background_compaction_interval` (default 1 second).
 
 ### 6.3 Compaction Mechanics
 
@@ -425,7 +466,7 @@ During compaction, SSTables are paired (typically oldest with second-oldest) and
 ## 7. Performance Optimizations
 ### 7.1 Block Indices
 
-TidesDB employs block indices to optimize read performance. Each SSTable contains a final block with a sorted binary hash array (SBHA), which allows direct access to the block containing a specific key and significantly reduces I/O by avoiding full SSTable scans.
+TidesDB employs block indices to optimize read performance. Each SSTable contains an optional final block with a succinct trie block index, which allows direct access to the block containing a specific key or key prefix and significantly reduces I/O by avoiding full SSTable scans.
 
 ### 7.2 Compression
 
@@ -437,7 +478,7 @@ TidesDB provides two sync modes to balance durability and performance. TDB_SYNC_
 
 ### 7.4 Configurable Parameters
 
-TidesDB allows fine-tuning through various configurable parameters including memtable flush thresholds, skip list configuration (max level and probability), bloom filter usage and false positive rate, compression settings (algorithm selection), compaction trigger thresholds and thread count, sync mode (TDB_SYNC_NONE or TDB_SYNC_FULL), debug logging, SBHA (Sorted Binary Hash Array) usage, and thread pool sizes (flush and compaction).
+TidesDB allows fine-tuning through various configurable parameters including memtable flush thresholds, skip list configuration (max level and probability), bloom filter usage and false positive rate, compression settings (algorithm selection), compaction trigger thresholds and thread count, sync mode (TDB_SYNC_NONE or TDB_SYNC_FULL), debug logging, succinct trie block index usage, and thread pool sizes (flush and compaction).
 
 ### 7.5 Thread Pool Architecture
 
@@ -459,9 +500,18 @@ tidesdb_config_t config = {
 };
 ```
 
+**Thread Pool Implementation**
+
+Each thread pool consists of worker threads that wait on a task queue. When a 
+task is submitted (flush or compaction), it's added to the appropriate queue 
+and a worker thread picks it up. The flush pool handles memtable-to-SSTable 
+flush operations, while the compaction pool handles SSTable merge operations. 
+Worker threads use `queue_dequeue_wait()` to block efficiently when no tasks 
+are available, waking immediately when work arrives.
+
 **Benefits**
 
-One set of threads serves all column families providing resource efficiency, with better thread utilization across workloads. Configuration is simpler since it's set once at the database level, and the system is easily scalable to tune for available CPU cores.
+One set of threads serves all column families providing resource efficiency, with better thread utilization across workloads. Configuration is simpler since it's set once at the database level, and the system is easily scalable to tune for available CPU cores. The queue-based design prevents thread creation overhead and enables graceful shutdown.
 
 **Default values**
 
@@ -493,9 +543,9 @@ to read their own writes before commit.
 
 This concurrency model makes TidesDB particularly well-suited for
 
-- **Read-heavy workloads** Unlimited concurrent readers with no contention
-- **Mixed read/write workloads** Readers never wait for writers to complete
-- **Multi-column-family applications** Different column families can be written to concurrently
+- **Read-heavy workloads** · Unlimited concurrent readers with no contention
+- **Mixed read/write workloads** · Readers never wait for writers to complete
+- **Multi-column-family applications** · Different column families can be written to concurrently
 
 ## 9. Directory Structure and File Organization
 
@@ -556,7 +606,7 @@ This example demonstrates how WAL files are created, rotated, and deleted
 Active Memtable (ID 0) → wal_0.log
 ```
 
-**2. Memtable Fills Up** (size >= `memtable_flush_size`)
+**2. Memtable Fills Up** · (size >= `memtable_flush_size`)
 ```
 Active Memtable (ID 0) → wal_0.log  [FULL - triggers rotation]
 ```
@@ -599,7 +649,7 @@ wal_0.log, wal_1.log  [DELETED means both flushes complete]
 
 ### 9.4 Directory Management
 
-**Creating a column family** creates a new subdirectory
+**Creating a column family** · creates a new subdirectory
 ```c
 tidesdb_create_column_family(db, "my_cf", &cf_config);
 // Creates mydb/my_cf/ directory with
@@ -607,7 +657,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 //   - config.cfc (persisted configuration)
 ```
 
-**Dropping a column family** removes the entire subdirectory
+**Dropping a column family** · removes the entire subdirectory
 ```c
 tidesdb_drop_column_family(db, "my_cf");
 // Deletes mydb/my_cf/ directory and all contents (WALs, SSTables)

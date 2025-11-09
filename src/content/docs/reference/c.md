@@ -162,14 +162,16 @@ tidesdb_column_family_config_t cf_config = {
     .memtable_flush_size = 128 * 1024 * 1024,   /* 128MB */
     .max_sstables_before_compaction = 128,      /* trigger compaction at 128 SSTables (min 2 required) */
     .compaction_threads = 4,                    /* use 4 threads for parallel compaction (0 = single-threaded) */
-    .max_level = 12,                            /* skip list max level */
-    .probability = 0.25f,                       /* skip list probability */
-    .compressed = 1,                            /* enable compression */
-    .compress_algo = COMPRESS_LZ4,              /* use LZ4 */
+    .sl_max_level = 12,                         /* skip list max level */
+    .sl_probability = 0.25f,                    /* skip list probability */
+    .enable_compression = 1,                    /* enable compression */
+    .compression_algorithm = COMPRESS_LZ4,      /* use LZ4 */
+    .enable_bloom_filter = 1,                   /* enable bloom filters */
     .bloom_filter_fp_rate = 0.01,               /* 1% false positive rate */
     .enable_background_compaction = 1,          /* enable background compaction */
     .background_compaction_interval = 1000000,  /* check every 1000000 microseconds (1 second) */
-    .use_sbha = 1,                              /* use sorted binary hash array */
+    .enable_block_indexes = 1,                  /* enable succinct trie block indexes */
+    .max_open_file_handles = 1024,              /* LRU cache for open file handles */
     .sync_mode = TDB_SYNC_FULL,                 /* fsync on every write (most durable) */
     .comparator_name = NULL                     /* NULL = use default "memcmp" */
 };
@@ -254,7 +256,7 @@ if (tidesdb_get_column_family_stats(db, "my_cf", &stats) == 0)
     printf("Total SSTable Size: %zu bytes\n", stats->total_sstable_size);
     printf("Memtable Size: %zu bytes\n", stats->memtable_size);
     printf("Memtable Entries: %d\n", stats->memtable_entries);
-    printf("Compression: %s\n", stats->config.compressed ? "enabled" : "disabled");
+    printf("Compression: %s\n", stats->config.enable_compression ? "enabled" : "disabled");
     printf("Bloom Filter FP Rate: %.4f\n", stats->config.bloom_filter_fp_rate);
     
     free(stats);
@@ -276,8 +278,8 @@ tidesdb_column_family_update_config_t update_config = {
     .memtable_flush_size = 128 * 1024 * 1024,   /* increase to 128MB */
     .max_sstables_before_compaction = 256,      /* trigger at 256 SSTables */
     .compaction_threads = 8,                    /* use 8 threads */
-    .max_level = 16,                            /* for new memtables */
-    .probability = 0.25f,                       /* for new memtables */
+    .sl_max_level = 16,                         /* for new memtables */
+    .sl_probability = 0.25f,                    /* for new memtables */
     .bloom_filter_fp_rate = 0.001,              /* 0.1% FP rate for new SSTables */
     .enable_background_compaction = 1,          /* enable background compaction */
     .background_compaction_interval = 500000    /* check every 500ms */
@@ -293,16 +295,18 @@ if (tidesdb_update_column_family_config(db, "my_cf", &update_config) == 0)
 - `memtable_flush_size` - Affects when new flushes trigger
 - `max_sstables_before_compaction` - Affects compaction trigger threshold
 - `compaction_threads` - Number of parallel compaction threads
-- `max_level` - Skip list level for **new** memtables only
-- `probability` - Skip list probability for **new** memtables only
+- `sl_max_level` - Skip list level for **new** memtables only
+- `sl_probability` - Skip list probability for **new** memtables only
 - `bloom_filter_fp_rate` - False positive rate for **new** SSTables only
 - `enable_background_compaction` - Enable/disable background compaction
 - `background_compaction_interval` - Compaction check interval
 
-**Non-updatable settings** (would corrupt existing data)
-- `compressed` - Cannot change compression on existing SSTables
-- `compress_algo` - Cannot change algorithm on existing SSTables
-- `use_sbha` - Cannot change index structure on existing SSTables
+**Non-updatable settings** · (would corrupt existing data)
+- `enable_compression` - Cannot change compression on existing SSTables
+- `compression_algorithm` - Cannot change algorithm on existing SSTables
+- `enable_block_indexes` - Cannot change index structure on existing SSTables
+- `enable_bloom_filter` - Cannot change bloom filter on existing SSTables
+- `max_open_file_handles` - Cannot change file handle cache size
 - `sync_mode` - Cannot change durability mode on existing WALs
 - `comparator_name` - Cannot change sort order on existing data
 
@@ -526,11 +530,11 @@ tidesdb_txn_free(txn);
 
 ### Iterator Seek Operations
 
-TidesDB provides seek operations that allow you to position an iterator at a specific key or key range without scanning from the beginning.  If you have the SBHA( Sorted Binary Hash Array) enabled for the column family these types of seek operations will be faster.
+TidesDB provides seek operations that allow you to position an iterator at a specific key or key range without scanning from the beginning. If you have block indexes (`enable_block_indexes = 1`) enabled for the column family, these seek operations will be faster as they use succinct trie indexes to locate blocks directly.
 
 #### Seek to Specific Key
 
-**`tidesdb_iter_seek(iter, key, key_size)`** Positions iterator at the first key >= target key
+**`tidesdb_iter_seek(iter, key, key_size)`** · Positions iterator at the first key >= target key
 
 ```c
 tidesdb_txn_t *txn = NULL;
@@ -558,7 +562,7 @@ tidesdb_iter_free(iter);
 tidesdb_txn_free(txn);
 ```
 
-**`tidesdb_iter_seek_for_prev(iter, key, key_size)`** Positions iterator at the last key <= target key
+**`tidesdb_iter_seek_for_prev(iter, key, key_size)`** · Positions iterator at the last key <= target key
 
 ```c
 /* Seek for reverse iteration */
@@ -575,7 +579,7 @@ if (tidesdb_iter_seek_for_prev(iter, (uint8_t *)target, strlen(target)) == 0)
 ```
 
 :::note[Seek Performance Optimizations]
-Seek operations use O(log n) skip list traversal for memtable positioning and (if enabled) SBHA for SSTable block lookups instead of linear scans. Entire SSTables are skipped when the target key falls outside their min/max key range, and results are efficiently merged across the active memtable, immutable memtables, and multiple SSTables. This provides 50-100x performance gains over iterating from the beginning for large datasets.
+Seek operations use O(log n) skip list traversal for memtable positioning and (if enabled) succinct trie block indexes for SSTable block lookups instead of linear scans. Entire SSTables are skipped when the target key falls outside their min/max key range, and bloom filters (if enabled) quickly eliminate SSTables that don't contain the key. Results are efficiently merged across the active memtable, immutable memtables, and multiple SSTables. This provides 50-100x performance gains over iterating from the beginning for large datasets.
 :::
 
 #### Seek Behavior
@@ -645,12 +649,15 @@ tidesdb_register_comparator("reverse", my_reverse_compare);
 /* Use in column family */
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 cf_config.comparator_name = "reverse";
+cf_config.enable_compression = 1;
+cf_config.compression_algorithm = "snappy";
+cf_config.enable_block_indexes = 1;
 tidesdb_create_column_family(db, "sorted_cf", &cf_config);
 ```
 
 :::note[Built-in Comparators]
 - `"memcmp"` - Binary comparison (default)
-- `"string"` - Lexicographic string comparison
+- **[OpenSSL](https://www.openssl.org/)** - SHA-256 cryptographic hashing comparison
 - `"numeric"` - Numeric comparison for uint64_t keys
 :::
 
@@ -673,15 +680,15 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 ```
 
 :::note[Sync Mode Options]
-- **TDB_SYNC_NONE** - No explicit sync, relies on OS page cache (fastest, least durable)
-- **TDB_SYNC_FULL** - Fsync on every write operation (slowest, most durable)
+- **TDB_SYNC_NONE** · No explicit sync, relies on OS page cache (fastest, least durable)
+- **TDB_SYNC_FULL** · Fsync on every write operation (slowest, most durable)
 :::
 
 ## Background Compaction
 
 TidesDB features automatic background compaction with optional parallel execution.
 
-**Automatic background compaction** runs when SSTable count reaches the configured threshold
+**Automatic background compaction** · runs when SSTable count reaches the configured threshold
 
 ```c
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
@@ -699,9 +706,9 @@ The `enable_background_compaction` option enables or disables automatic backgrou
 
 **Parallel Compaction**
 
-Set `compaction_threads > 0` to enable parallel compaction, which uses a semaphore-based thread pool for concurrent SSTable pair merging. Each thread compacts one pair of SSTables independently, and the system automatically limits threads to available CPU cores. Set `compaction_threads = 0` for single-threaded compaction (default 4 threads).
+Set `compaction_threads >= 2` to enable parallel compaction, which uses semaphore-based thread limiting for concurrent SSTable pair merging. Each thread compacts one pair of SSTables independently (pairs 0+1, 2+3, 4+5, etc.), and a semaphore limits concurrent threads to the configured maximum. Set `compaction_threads = 0` or `1` for single-threaded compaction (default 4 threads).
 
-**Manual compaction** can be triggered at any time (requires minimum 2 SSTables):
+**Manual compaction** · can be triggered at any time (requires minimum 2 SSTables)
 
 ```c
 tidesdb_compact(cf);  /* Automatically uses parallel compaction if compaction_threads > 0 */
