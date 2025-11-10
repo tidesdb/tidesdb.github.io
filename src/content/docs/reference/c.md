@@ -486,8 +486,6 @@ while (tidesdb_iter_valid(iter))
     {
         printf("Key: %.*s, Value: %.*s\n", 
                (int)key_size, key, (int)value_size, value);
-        free(key);
-        free(value);
     }
     
     tidesdb_iter_next(iter);
@@ -544,7 +542,6 @@ if (tidesdb_iter_seek(iter, (uint8_t *)target, strlen(target)) == 0)
         size_t key_size = 0;
         tidesdb_iter_key(iter, &key, &key_size);
         printf("Found: %.*s\n", (int)key_size, key);
-        free(key);
     }
 }
 
@@ -604,10 +601,8 @@ while (tidesdb_iter_valid(iter))
     tidesdb_iter_key(iter, &key, &key_size);
     tidesdb_iter_value(iter, &value, &value_size);
     
-    /* Process data from snapshot */
+    /* Process data.. */
     
-    free(key);
-    free(value);
     tidesdb_iter_next(iter);
 }
 
@@ -615,7 +610,7 @@ tidesdb_iter_free(iter);  /* Releases references, triggers cleanup if ref_count 
 ```
 
 :::tip[Benefits]
-Iterators see a consistent snapshot of data from creation time, providing true snapshot isolation. Compaction and iteration proceed independently without blocking each other, while automatic resource management through reference counting eliminates the need for manual cleanup. Multiple iterators and compaction can run simultaneously with safe concurrent access.
+Iterators see a consistent snapshot of data. Compaction and iteration proceed independently without blocking each other, while automatic resource management through reference counting eliminates the need for manual cleanup. Multiple iterators and compaction can run simultaneously with safe concurrent access.
 :::
 
 ## Custom Comparators
