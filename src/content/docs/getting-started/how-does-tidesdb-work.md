@@ -134,6 +134,7 @@ The write process begins by computing the SHA1 checksum of the entire data, dete
 The read process reads the block size (8 bytes) and SHA1 checksum (20 bytes), calculates the inline size, and reads the inline data. It then reads the overflow offset (8 bytes). If the overflow offset is greater than 0, it seeks to the overflow offset and reads the remaining data. The inline and overflow data are concatenated, the SHA1 checksum is verified, and the block is returned if valid.
 
 #### Integrity and Recovery
+
 TidesDB implements multiple layers of data integrity protection. All block 
 reads verify SHA1 checksums to detect corruption, while writes use `pwrite()` 
 for atomic block-level updates. During startup, the system validates the last 
@@ -161,6 +162,7 @@ TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying o
 A write mutex serializes all write operations to prevent corruption, while concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
 
 ### 4.3 SSTables (Sorted String Tables)
+
 SSTables serve as TidesDB's immutable on-disk storage layer. Internally, each 
 SSTable is organized into multiple blocks containing sorted key-value pairs. 
 To accelerate lookups, every SSTable maintains its minimum and maximum keys, 
@@ -242,6 +244,7 @@ typedef struct __attribute__((packed)) {
 - Default is enabled with LZ4 algorithm
 
 #### Bloom Filter Block
+
 <div class="architecture-diagram">
 
 ![Bloom Filter](../../../assets/img7.png)
@@ -370,6 +373,7 @@ All committed transactions that were written to WAL are recovered. Uncommitted t
 SSTables are discovered by reading the column family directory, where directory order is filesystem-dependent and non-deterministic. SSTables are sorted by ID after loading to ensure correct read semantics, guaranteeing newest-to-oldest ordering for the read path (which searches from the end of the array backwards). Without sorting, stale data could be returned if newer SSTables load before older ones.
 
 ## 5. Data Operations
+
 ### 5.1 Write Path
 When a key-value pair is written to TidesDB
 
@@ -387,6 +391,7 @@ When a key-value pair is written to TidesDB
 
 
 ### 5.2 Read Path
+
 When reading a key from TidesDB
 
 1. First, the active memtable is checked for the key
@@ -406,6 +411,7 @@ When reading a key from TidesDB
 6. Return the value or TDB_ERR_NOT_FOUND
 
 ### 5.3 Transactions
+
 TidesDB provides ACID transaction support with multi-column-family 
 capabilities. Transactions are initiated through `tidesdb_txn_begin()` for 
 writes or `tidesdb_txn_begin_read()` for read-only operations, with a single 
@@ -420,7 +426,17 @@ return codes (0 for success, -1 for error) rather than complex error
 structures.
 
 ### 6. Compaction Policy
+
 TidesDB implements two distinct compaction techniques
+
+
+<div class="architecture-diagram">
+
+>
+
+![Compaction](../../../assets/img13.png)
+
+</div>
 
 ### 6.1 Parallel Compaction
 
@@ -442,7 +458,7 @@ configuration, it automatically triggers when the SSTable count reaches
 `max_sstables_before_compaction`. When a flush completes and the SSTable count 
 exceeds the threshold, a compaction task is submitted to the database-level 
 compaction thread pool. This operates independently without blocking application 
-operations, merging SSTable pairs incrementally throughout the database lifecycle 
+operations, merging SSTable pairs throughout the database lifecycle 
 until shutdown. The interval between compaction checks is configurable via 
 `background_compaction_interval` (default 1 second).
 
@@ -562,6 +578,7 @@ mydb/
 ### 9.2 File Naming Conventions
 
 #### Write-Ahead Log (WAL) Files
+
 Write-Ahead Log (WAL) files follow the naming convention `wal_<memtable_id>.log` 
 (e.g., `wal_0.log`, `wal_1.log`) and provide durability by recording all 
 writes before they're applied to the memtable. Each memtable has its own 
@@ -575,6 +592,7 @@ complete before shutdown, the WAL is automatically recovered on the next
 database restart, replaying operations to restore consistency.
 
 #### SSTable Files
+
 SSTable files follow the naming convention `sstable_<sstable_id>.sst` (e.g., 
 `sstable_0.sst`, `sstable_1.sst`) and provide persistent storage for flushed 
 memtables. An SSTable is created when a memtable exceeds the 
@@ -698,4 +716,4 @@ TidesDB uses simple integer return codes for error handling. A return value of `
 For a complete list of error codes and their meanings, see the [Error Codes Reference](../../reference/error-codes).
 
 ## 11. Memory Management
-If a key value pair exceeds `TDB_MEMORY_PERCENTAGE` which is 60% of the available memory on your system TidesDB will throw a `TDB_ERR_MEMORY_LIMIT` error. This is to prevent the system from running out of memory or haulting.
+If a key value pair exceeds `TDB_MEMORY_PERCENTAGE` which is set to 60% of the available memory on your system TidesDB will throw a `TDB_ERR_MEMORY_LIMIT` error. This is to prevent the system from running out of memory or haulting.  TidesDB on start up will populate `available_memory` and `total_memory` internally which are members of the `tidesdb_t` struct.  
