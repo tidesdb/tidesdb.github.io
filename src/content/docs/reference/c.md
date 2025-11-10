@@ -744,9 +744,8 @@ Flush threads are usually I/O bound, so 2-4 is sufficient. Compaction threads ca
 
 TidesDB features a configurable LRU (Least Recently Used) cache for open file handles to limit system resources while maintaining performance.
 
-:::note[How It Works]
 The cache stores open file descriptors for SSTables to avoid repeated open/close operations. It uses an LRU eviction policy where least recently used files are closed when the cache is full. The cache is configurable per column family via the `max_open_file_handles` setting, and can be disabled by setting it to `0` (files opened/closed on each access). The default is 1024 open file handles.
-:::
+
 
 **Configuration Example**
 
@@ -780,19 +779,19 @@ ulimit -n 4096
 
 ## Concurrency Model
 
-TidesDB is designed for high concurrency with minimal blocking.
+TidesDB is designed for high read concurrency with minimal blocking.
 
-:::note[Reader-Writer Locks]
+### Readers and Writer 
 Each column family has a reader-writer lock that allows multiple readers to read concurrently with no blocking between them. Writers don't block readers, so readers can access data while writes are in progress. However, writers block other writers, allowing only one writer per column family at a time.
-:::
 
-:::caution[Transaction Isolation]
+
+### Transaction Isolation
 Read transactions (`tidesdb_txn_begin_read`) acquire read locks and see a consistent snapshot via copy-on-write. Write transactions (`tidesdb_txn_begin`) acquire write locks on commit. The isolation level is Read Committed, meaning changes are not visible to other transactions until commit. Writers are serialized per column family to ensure atomicity.
-:::
 
-:::tip[Optimal Use Cases]
+
+### Optimal Use Cases
 Read-heavy workloads benefit from unlimited concurrent readers with no contention. Mixed read/write workloads perform well since readers never wait for writers to complete. Multi-column-family applications can write to different column families concurrently.
-:::
+
 
 **Concurrent Operations Example**
 ```c
