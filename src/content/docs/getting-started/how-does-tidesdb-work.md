@@ -464,6 +464,12 @@ until shutdown. The interval between compaction checks is configurable via
 
 ### 6.3 Compaction Mechanics
 
+<div class="architecture-diagram">
+
+![Compaction](../../../assets/img14.png)
+
+</div>
+
 During compaction, SSTables are paired (typically oldest with second-oldest) and merged into new SSTables. For each key, only the newest version is retained, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge. If a merge is interrupted, the system will clean up after on restart without causing corruption.
 
 ## 7. Performance Optimizations
