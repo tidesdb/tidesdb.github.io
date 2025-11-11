@@ -350,6 +350,12 @@ WAL files follow the naming pattern `wal_0.log`, `wal_1.log`, `wal_2.log`, etc. 
 
 #### 4.4.2 WAL Rotation Process
 
+<div class="architecture-diagram">
+
+   ![WAL Rotation Process](../../../assets/img15.png)
+
+</div>
+
 TidesDB uses a rotating WAL system that works as follows:
 
 Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size reaches `memtable_flush_size`, rotation is triggered. During rotation, a new active memtable (ID 1) is created with `wal_1.log`, while the immutable memtable (ID 0) with `wal_0.log` is added to the immutable memtables queue. A flush task is submitted to the flush thread pool. The background flush thread writes memtable (ID 0) to `sstable_0.sst` while `wal_0.log` still exists. Once the flush completes successfully, the memtable is dequeued from the immutable queue, its reference count drops to zero, and both the memtable and `wal_0.log` are freed/deleted. Multiple memtables can be in the flush queue concurrently, each with its own WAL file and reference count.
