@@ -154,7 +154,7 @@ export default defineConfig({
 				{
 					label: 'Reference',
 					items: [
-						{ label: 'Building TidesDB', slug: 'reference/building' },
+						{ label: 'Building & Benchmarking', slug: 'reference/building' },
 						{ label: 'C API Reference', slug: 'reference/c' },
 					],
 				},
