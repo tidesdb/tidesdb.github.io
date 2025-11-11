@@ -636,7 +636,7 @@ tidesdb_register_comparator("reverse", my_reverse_compare);
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 cf_config.comparator_name = "reverse";
 cf_config.enable_compression = 1;
-cf_config.compression_algorithm = "snappy";
+cf_config.compression_algorithm = COMPRESS_SNAPPY;  
 cf_config.enable_block_indexes = 1;
 tidesdb_create_column_family(db, "sorted_cf", &cf_config);
 ```
@@ -787,7 +787,7 @@ Each column family has a reader-writer lock that allows multiple readers to read
 
 
 ### Transaction Isolation
-Read transactions (`tidesdb_txn_begin_read`) acquire read locks and see a consistent snapshot via copy-on-write. Write transactions (`tidesdb_txn_begin`) acquire write locks on commit. The isolation level is Read Committed, meaning changes are not visible to other transactions until commit. Writers are serialized per column family to ensure atomicity.
+Read transactions (`tidesdb_txn_begin_read`) acquire read locks. **Point reads** (`tidesdb_txn_get`) use **READ COMMITTED** isolation, seeing the latest committed data. **Iterators** (`tidesdb_iter_new`) use **snapshot isolation**, seeing a consistent point-in-time view via reference counting on SSTables and copy-on-write on memtables. Write transactions (`tidesdb_txn_begin`) acquire write locks on commit. Changes are not visible to other transactions until commit. Writers are serialized per column family to ensure atomicity.
 
 
 ### Optimal Use Cases
