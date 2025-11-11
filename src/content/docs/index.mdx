@@ -58,7 +58,7 @@ import VersionBadge from '../../components/VersionBadge.astro';
 		Support for Snappy, LZ4, and ZSTD compression algorithms. Configure per column family for optimal storage efficiency.
 	</Card>
 	<Card title="Background Or Manual Compaction" icon="random" style="--card-index: 4">
-		Reduces SSTable count and removes tombstones without blocking operations within column families.
+		Reduces SSTable count and removes expired and deleted keys without blocking operations within column families.
 	</Card>
 	<Card title="Cross-Platform" icon="laptop" style="--card-index: 5">
 		Native support for 32-bit and 64-bit Linux, macOS, and Windows with platform abstraction layer for consistent behavior.
