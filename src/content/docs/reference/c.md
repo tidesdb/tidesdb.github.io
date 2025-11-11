@@ -170,8 +170,8 @@ tidesdb_column_family_config_t cf_config = {
     .enable_block_indexes = 1,                  /* enable succinct trie block indexes */
     .max_open_file_handles = 1024,              /* LRU cache for open file handles */
     .sync_mode = TDB_SYNC_FULL,                 /* fsync on every write (most durable) */
-    .comparator_name = NULL                     /* NULL = use default "memcmp" */
-    .block_manager_cache = 32 * 1024 * 1024,    /* 32MB LRU block cache for column family block managers */
+    .comparator_name = {0},                     /* empty = use default "memcmp" */
+    .block_manager_cache = 32 * 1024 * 1024     /* 32MB LRU block cache for column family block managers */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -186,7 +186,8 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 tidesdb_register_comparator("reverse", my_reverse_compare);
 
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
-cf_config.comparator_name = "reverse";  /* use registered comparator */
+strncpy(cf_config.comparator_name, "reverse", TDB_MAX_COMPARATOR_NAME - 1);  
+cf_config.comparator_name[TDB_MAX_COMPARATOR_NAME - 1] = '\0';
 
 if (tidesdb_create_column_family(db, "sorted_cf", &cf_config) != 0)
 {
@@ -634,9 +635,10 @@ tidesdb_register_comparator("reverse", my_reverse_compare);
 
 /* Use in column family */
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
-cf_config.comparator_name = "reverse";
+strncpy(cf_config.comparator_name, "reverse", TDB_MAX_COMPARATOR_NAME - 1);
+cf_config.comparator_name[TDB_MAX_COMPARATOR_NAME - 1] = '\0';
 cf_config.enable_compression = 1;
-cf_config.compression_algorithm = COMPRESS_SNAPPY;  
+cf_config.compression_algorithm = COMPRESS_SNAPPY; 
 cf_config.enable_block_indexes = 1;
 tidesdb_create_column_family(db, "sorted_cf", &cf_config);
 ```
