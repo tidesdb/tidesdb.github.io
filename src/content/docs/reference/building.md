@@ -1,6 +1,6 @@
 ---
-title: Building TidesDB
-description: How to build TidesDB.
+title: Building & Benchmarking TidesDB
+description: How to build and benchmark TidesDB.
 ---
 
 :::tip[Latest Version]
