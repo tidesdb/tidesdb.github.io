@@ -161,6 +161,10 @@ TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying o
 
 A write mutex serializes all write operations to prevent corruption, while concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
 
+#### LRU Block Cache
+If `block_manager_cache_size` is set to a positive value in bytes in column family configuration the block manager will cache most recently used blocks in an LRU cache.
+
+
 ### 4.3 SSTables (Sorted String Tables)
 
 SSTables serve as TidesDB's immutable on-disk storage layer. Internally, each 
@@ -449,7 +453,7 @@ TidesDB implements two distinct compaction techniques
 TidesDB implements parallel compaction using semaphore-based thread limiting to 
 reduce SSTable count, remove tombstones, and purge expired TTL entries. The 
 number of concurrent threads is configurable via `compaction_threads` in the 
-column family config (default 4). Compaction pairs SSTables from oldest to 
+column family config (default 2). Compaction pairs SSTables from oldest to 
 newest (pairs 0+1, 2+3, 4+5, etc.), with each thread processing one pair. A 
 semaphore limits concurrent threads to the configured maximum. When 
 `compaction_threads >= 2`, `tidesdb_compact()` automatically uses parallel 
@@ -586,6 +590,8 @@ mydb/
     ├── config.cfc
     └── wal_0.log
 ```
+
+.cfc files are in INI format and contain the column family configuration.
 
 ### 9.2 File Naming Conventions
 

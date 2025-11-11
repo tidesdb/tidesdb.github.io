@@ -171,6 +171,7 @@ tidesdb_column_family_config_t cf_config = {
     .max_open_file_handles = 1024,              /* LRU cache for open file handles */
     .sync_mode = TDB_SYNC_FULL,                 /* fsync on every write (most durable) */
     .comparator_name = NULL                     /* NULL = use default "memcmp" */
+    .block_manager_cache = 32 * 1024 * 1024,    /* 32MB LRU block cache for column family block managers */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
