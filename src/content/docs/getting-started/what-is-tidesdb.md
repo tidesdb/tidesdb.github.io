@@ -3,7 +3,7 @@ title: What is TidesDB?
 description: A high level description of what TidesDB is.
 ---
 
-TidesDB is a fast and efficient embedded key-value storage engine library written in C. Built on a log-structured merge-tree (LSM-tree) architecture, it provides a foundational library for building database systems or can be used directly as a standalone key-value or column store.
+TidesDB is a fast, light-weight and efficient embeddable key-value storage engine library written in C. Built on a log-structured merge-tree (LSM-tree) architecture, it provides a foundational library for building database systems or can be used directly as a standalone key-value or column store.
 
 ## Key Characteristics
 
@@ -14,7 +14,7 @@ reads through bloom filters, block indices, and compaction.
 
 ## Core Features
 
-- ACID transactions that are atomic, consistent, isolated, and durable. Point reads use READ COMMITTED isolation (see latest committed data), while iterators use snapshot isolation (consistent point-in-time view via reference counting). Transactions support multiple operations across column families. Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers.
+- ACID transactions that are atomic, consistent, isolated, and durable. Transactions support multiple operations across column families. Point reads use READ COMMITTED isolation (see latest committed data), while iterators use snapshot isolation (consistent point-in-time view via reference counting). Writers are serialized per column family to ensure atomicity, while copy-on-write (COW) provides consistency for concurrent readers.
 - Writers don't block readers. Readers never block other readers. Background operations will not affect active transactions.
 - Isolated key-value stores. Each column family has its own configuration, memtables, sstables, and write ahead logs.
 - Bidirectional iterators that allow you to iterate forward and backward over key-value pairs with heap-based merge-sort across memtable and sstables. Effective seek operations with O(log n) skip list positioning and succinct trie block index positioning (if enabled) in sstables. Reference counting prevents premature deletion during iteration.
@@ -24,21 +24,16 @@ reads through bloom filters, block indices, and compaction.
 - Optional compression via Snappy, LZ4, or ZSTD for sstables and WAL entries. Configurable per column family.
 - Optional TTL (time-to-live) for key-value pairs. Expired entries automatically skipped during reads.
 - Optional custom comparators. You can register custom key comparison functions. Built-in comparators include memcmp, string, numeric.
+- You can enable column families to utilize block caching (most recent blocks).
 - Two sync modes NONE (fastest), FULL (most durable, slowest).
 - Per-column-family configuration includes memtable size, compaction settings, compression, bloom filters, sync mode, and more.
 - Clean, easy-to-use C API. Returns 0 on success, -n on error.
-- Cross-platform support for Linux, macOS, and Windows with platform abstraction layer.
+- Cross-platform support for 32bit and 64bit Linux, macOS, and Windows with platform abstraction layer.
+- Optional succinct trie block indexes for fast sstable lookups. Provides direct key-to-block offset mapping without full sstable scans. Uses LOUDS (Level-Order Unary Degree Sequence) representation for memory-efficient compressed storage with O(1) navigation operations. Significantly reduces memory footprint compared to traditional hash-based indexes while maintaining fast lookup performance.
 - Efficient deletion through tombstone markers. Removed during compactions.
 - Configurable LRU cache for open file handles. Limits system resources while maintaining performance. Set `max_open_file_handles` to control cache size (0 = disabled).
 - Storage engine thread pools for background flush and compaction with configurable thread counts.
-- Optional succinct trie block indexes for fast sstable lookups. Provides direct key-to-block offset mapping without full sstable scans. Uses LOUDS (Level-Order Unary Degree Sequence) representation for memory-efficient compressed storage with O(1) navigation operations. Significantly reduces memory footprint compared to traditional hash-based indexes while maintaining fast lookup performance.
-
-
 
 ## Community
 
 Join the [TidesDB Discord Community](https://discord.gg/tWEmjR66cy) to ask questions, work on development, and discuss the future of TidesDB.
-
-## Cross-Platform Support
-
-TidesDB supports 32-bit and 64-bit Linux, macOS, and Windows with a platform abstraction layer for consistent behavior across operating systems. 
