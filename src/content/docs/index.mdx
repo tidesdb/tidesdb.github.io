@@ -43,7 +43,7 @@ import VersionBadge from '../../components/VersionBadge.astro';
 
 <CardGrid stagger>
 	<Card title="ACID Transactions" icon="approve-check" style="--card-index: 0">
-		Atomic, consistent, isolated (read committed), and durable. Transactions support multiple operations across column families. Writers are serialized per column family ensuring atomicity, while COW provides consistency for concurrent readers within a column family.
+		ACID transactions with multi-column-family support. Point reads use READ COMMITTED isolation (latest committed data), iterators use snapshot isolation (consistent view via reference counting). Writers serialize per column family for atomicity; copy-on-write ensures reader consistency.
 	</Card>
 	<Card title="Concurrent" icon="rocket" style="--card-index: 1">
 		Column family readers don't block readers or writer and vice versa.
