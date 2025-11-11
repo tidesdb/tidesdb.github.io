@@ -162,7 +162,51 @@ TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying o
 A write mutex serializes all write operations to prevent corruption, while concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
 
 #### LRU Block Cache
-If `block_manager_cache_size` is set to a positive value in bytes in column family configuration the block manager will cache most recently used blocks in an LRU cache.
+
+TidesDB implements an optional LRU (Least Recently Used) block cache at the block manager level to reduce disk I/O for frequently accessed data blocks. This cache is configurable per column family via the `block_manager_cache_size` setting.
+
+**Cache Architecture**
+
+The block cache uses a hash table combined with a doubly-linked list for O(1) lookups and evictions. Each cached block is identified by a unique key derived from its file offset (e.g., "12345" for offset 12345). The hash table provides fast key-based lookups using xxHash for distribution, while the doubly-linked list maintains access order (most recent at head, least recent at tail). An eviction callback is registered for each cached block to update cache size tracking when blocks are evicted.
+
+**Cache Operations**
+
+**Block Write** · After writing a block to disk, if cache space is available (current_size + block_size <= max_size), a copy of the block is added to the cache with the file offset as the key. If the cache is full, the LRU eviction policy automatically removes the least recently used block to make space. The cache size is tracked in bytes, with each block contributing its data size to the total.
+
+**Block Read** · Before reading from disk, the cache is checked using the block offset as the key. On cache hit, a copy of the cached block is returned immediately (no disk I/O). On cache miss, the block is read from disk, and if space permits, it's added to the cache for future reads. Every cache access moves the block to the head of the LRU list (marking it as most recently used).
+
+**Cache Eviction** · When the cache reaches `block_manager_cache_size`, the least recently used block (tail of LRU list) is automatically evicted. The eviction callback decrements `current_size` by the evicted block's size and frees the block's memory. This ensures the cache never exceeds the configured memory limit.
+
+**Thread Safety**
+
+All cache operations are protected by a mutex, ensuring safe concurrent access. Multiple readers can check the cache simultaneously (mutex-protected), and cache updates during writes are serialized. The LRU list is updated atomically during access to maintain correct ordering.
+
+**Configuration Example**
+
+```c
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+cf_config.block_manager_cache_size = 32 * 1024 * 1024;  /* 32MB cache */
+tidesdb_create_column_family(db, "my_cf", &cf_config);
+```
+
+**Performance Benefits**
+
+- **Reduced I/O** · Hot blocks (frequently accessed) stay in memory, eliminating disk reads
+- **Faster Reads** · Cache hits provide sub-microsecond access vs milliseconds for disk I/O
+- **Compaction Efficiency** · During compaction, recently written blocks are cached, speeding up merge operations
+- **Iterator Performance** · Sequential scans benefit from cached blocks in the read path
+
+**Cache Sizing Guidelines**
+
+- **Small datasets** (<100MB) · Set cache to 10-20% of dataset size
+- **Large datasets** (>1GB) · Set cache to 5-10% or based on working set size
+- **Read-heavy workloads** · Larger cache (50-100MB+) provides better hit rates
+- **Write-heavy workloads** · Smaller cache (10-20MB) since data is less frequently re-read
+- **Disable caching** · Set `block_manager_cache_size = 0` to disable (no memory overhead)
+
+**Monitoring Cache Effectiveness**
+
+While TidesDB doesn't expose cache hit/miss metrics directly, you can infer effectiveness by monitoring I/O patterns (fewer disk reads indicate good cache performance) and adjusting cache size based on workload (increase if reads are slow, decrease if memory is constrained).
 
 
 ### 4.3 SSTables (Sorted String Tables)
@@ -426,8 +470,11 @@ TidesDB provides ACID transaction support with multi-column-family
 capabilities. Transactions are initiated through `tidesdb_txn_begin()` for 
 writes or `tidesdb_txn_begin_read()` for read-only operations, with a single 
 transaction capable of operating atomically across multiple column families. 
-The system implements read committed isolation, where read transactions see a 
-consistent snapshot via copy-on-write without blocking writers. Write 
+The system implements **READ COMMITTED** isolation for point reads 
+(`tidesdb_txn_get`), where reads see the latest committed data, and **snapshot 
+isolation** for iterators (`tidesdb_iter_new`), where iterators see a 
+consistent point-in-time view via reference counting on SSTables and 
+copy-on-write on memtables. Read transactions don't block writers. Write 
 transactions acquire exclusive locks per column family only during commit, 
 ensuring atomicity--all operations succeed together or automatically rollback 
 on failure. Transactions support read-your-own-writes semantics, allowing 
@@ -550,13 +597,17 @@ write transaction per column family at a time to ensure data consistency.
 
 ### 8.2 Transaction Isolation
 
-TidesDB implements read committed isolation with read-your-own-writes 
-semantics. Read transactions acquire read locks and see a consistent snapshot 
-of committed data through copy-on-write, ensuring they never observe 
-uncommitted changes from other transactions. Write transactions acquire write 
-locks only during commit to ensure atomic updates. Within a single 
-transaction, uncommitted changes are immediately visible, allowing operations 
-to read their own writes before commit.
+TidesDB implements **READ COMMITTED** isolation for point reads and **snapshot 
+isolation** for iterators, both with read-your-own-writes semantics. Point 
+reads (`tidesdb_txn_get`) see the latest committed data from all sources 
+(active memtable, immutable memtables, SSTables). Iterators 
+(`tidesdb_iter_new`) acquire references on SSTables and see a consistent 
+point-in-time snapshot, unaffected by concurrent compaction or writes. Read 
+transactions use copy-on-write and never observe uncommitted changes from 
+other transactions. Write transactions acquire write locks only during commit 
+to ensure atomic updates. Within a single transaction, uncommitted changes are 
+immediately visible, allowing operations to read their own writes before 
+commit.
 
 ### 8.3 Optimal Use Cases
 
@@ -734,4 +785,4 @@ TidesDB uses simple integer return codes for error handling. A return value of `
 For a complete list of error codes and their meanings, see the [Error Codes Reference](../../reference/error-codes).
 
 ## 11. Memory Management
-If a key value pair exceeds `TDB_MEMORY_PERCENTAGE` which is set to 60% of the available memory on your system TidesDB will throw a `TDB_ERR_MEMORY_LIMIT` error. This is to prevent the system from running out of memory or haulting.  TidesDB on start up will populate `available_memory` and `total_memory` internally which are members of the `tidesdb_t` struct.  
+TidesDB validates key-value pair sizes to prevent out-of-memory conditions. If a key-value pair exceeds `TDB_MEMORY_PERCENTAGE` (60% of available system memory), TidesDB returns a `TDB_ERR_MEMORY_LIMIT` error. However, a minimum threshold of `TDB_MIN_KEY_VALUE_SIZE` (1MB) is enforced, ensuring that even on systems with low available memory, key-value pairs up to 1MB are always allowed. This prevents premature errors on 32-bit systems or memory-constrained environments. On startup, TidesDB populates `available_memory` and `total_memory` internally, which are members of the `tidesdb_t` struct, and uses these values to calculate the maximum allowed key-value size as `max(available_memory * 0.6, 1MB)`.  
