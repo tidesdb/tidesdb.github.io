@@ -231,6 +231,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_ENABLE_BLOCK_INDEXES` | Enable block indexes | 1 |
 | `BENCH_SYNC_MODE` | Sync mode | TDB_SYNC_NONE |
 | `BENCH_COMPARATOR_NAME` | Key comparator | "memcmp" |
+| `BENCH_COLUMN_FAMILY_BLOCK_CACHE` | Enable block caching for column family block managers | 32*1024*1024 (32MB) |
 
 ### Key Distribution Patterns
 
