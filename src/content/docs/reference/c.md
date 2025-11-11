@@ -636,7 +636,7 @@ tidesdb_register_comparator("reverse", my_reverse_compare);
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 cf_config.comparator_name = "reverse";
 cf_config.enable_compression = 1;
-cf_config.compression_algorithm = COMPRESS_SNAPPY;  /* Use enum constant, not string */
+cf_config.compression_algorithm = COMPRESS_SNAPPY;  
 cf_config.enable_block_indexes = 1;
 tidesdb_create_column_family(db, "sorted_cf", &cf_config);
 ```
