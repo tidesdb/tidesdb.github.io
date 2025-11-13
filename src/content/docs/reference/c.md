@@ -627,8 +627,8 @@ tidesdb_create_column_family(db, "sorted_cf", &cf_config);
 
 :::note[Built-in Comparators]
 - `"memcmp"` - Binary comparison (default)
-- **[OpenSSL](https://www.openssl.org/)** - SHA-256 cryptographic hashing comparison
-- `"numeric"` - Numeric comparison for uint64_t keys
+- `"string"` - String comparison
+- `"numeric"` - Numeric comparison for  uint8_t* keys
 :::
 
 
