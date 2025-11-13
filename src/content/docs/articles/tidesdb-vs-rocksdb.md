@@ -53,7 +53,7 @@ Test parameters
 
 **Sequential Keys (1M operations)**
 ```bash
-./bench -e tidesdb -c -w write -p seq -o 1000000
+./benchtool -e tidesdb -c -w write -p seq -o 1000000
 ```
 
 <canvas id="singleThreadWriteSeqChart" width="400" height="200"></canvas>
@@ -108,7 +108,7 @@ In sequential write tests, TidesDB achieves 660K operations per second compared 
 
 **Random Keys (1M operations)**
 ```bash
-./bench -e tidesdb -c -w write -p random -o 1000000
+./benchtool -e tidesdb -c -w write -p random -o 1000000
 ```
 
 <canvas id="singleThreadWriteRandomChart" width="400" height="200"></canvas>
@@ -167,7 +167,7 @@ TidesDB demonstrates **31% higher write throughput** than RocksDB in single-thre
 
 **Random Keys (1M operations)**
 ```bash
-./bench -e tidesdb -c -w mixed -p random -o 1000000
+./benchtool -e tidesdb -c -w mixed -p random -o 1000000
 ```
 
 <canvas id="mixedWorkloadChart" width="400" height="200"></canvas>
@@ -276,7 +276,7 @@ Latency percentiles reveal TidesDB's consistency advantages. Write P50 latency i
 
 **2 Threads (1M operations)**
 ```bash
-./bench -e tidesdb -c -w write -t 2 -o 1000000
+./benchtool -e tidesdb -c -w write -t 2 -o 1000000
 ```
 
 <canvas id="multiThread2Chart" width="400" height="200"></canvas>
@@ -331,7 +331,7 @@ TidesDB achieves 882K ops/sec versus RocksDB's 393K ops/sec (2.24x faster) with 
 
 **4 Threads (1M operations)**
 ```bash
-./bench -e tidesdb -c -w write -t 4 -o 1000000
+./benchtool -e tidesdb -c -w write -t 4 -o 1000000
 ```
 
 <canvas id="multiThread4Chart" width="400" height="200"></canvas>
@@ -386,7 +386,7 @@ TidesDB reaches 970K ops/sec versus RocksDB's 634K ops/sec (1.53x faster) with a
 
 **8 Threads (1M operations)**
 ```bash
-./bench -e tidesdb -c -w write -t 8 -o 1000000
+./benchtool -e tidesdb -c -w write -t 8 -o 1000000
 ```
 
 <canvas id="multiThread8Chart" width="400" height="200"></canvas>
@@ -512,7 +512,7 @@ TidesDB shows excellent multi-threaded scaling, with peak throughput at 4 thread
 
 **Random Keys (1M operations)**
 ```bash
-./bench -e tidesdb -c -w mixed -t 4 -o 1000000
+./benchtool -e tidesdb -c -w mixed -t 4 -o 1000000
 ```
 
 <canvas id="mixed4ThreadChart" width="400" height="200"></canvas>
@@ -621,7 +621,7 @@ With 4 threads, TidesDB maintains strong advantages: **1.53x faster writes**, **
 
 **Mixed Workload, 4 Threads (500K operations)**
 ```bash
-./bench -e tidesdb -c -w mixed -p zipfian -o 500000 -t 4
+./benchtool -e tidesdb -c -w mixed -p zipfian -o 500000 -t 4
 ```
 
 <canvas id="zipfianChart" width="400" height="200"></canvas>
@@ -680,7 +680,7 @@ Zipfian distribution simulates real-world hot key scenarios (80/20 rule). RocksD
 
 **Mixed Workload, 4 Threads (500K operations)**
 ```bash
-./bench -e tidesdb -c -w mixed -p timestamp -o 500000 -t 4
+./benchtool -e tidesdb -c -w mixed -p timestamp -o 500000 -t 4
 ```
 
 <canvas id="timestampChart" width="400" height="200"></canvas>
@@ -739,7 +739,7 @@ Timestamp-based keys (time-series workload) show TidesDB's strong performance: *
 
 ### Single-threaded Delete (1M operations)
 ```bash
-./bench -e tidesdb -c -w delete -p random -o 1000000
+./benchtool -e tidesdb -c -w delete -p random -o 1000000
 ```
 
 <canvas id="deleteSingleThreadChart" width="400" height="200"></canvas>
@@ -794,7 +794,7 @@ TidesDB achieves 579K delete ops/sec versus RocksDB's 516K ops/sec (1.12x faster
 
 ### Multi-threaded Delete - 4 Threads (1M operations)
 ```bash
-./bench -e tidesdb -c -w delete -p random -o 1000000 -t 4
+./benchtool -e tidesdb -c -w delete -p random -o 1000000 -t 4
 ```
 
 <canvas id="delete4ThreadChart" width="400" height="200"></canvas>
@@ -849,7 +849,7 @@ With 4 threads, TidesDB reaches 738K delete ops/sec versus RocksDB's 701K ops/se
 
 ### Hot Key Deletion - Zipfian Pattern (500K operations, 4 threads)
 ```bash
-./bench -e tidesdb -c -w delete -p zipfian -o 500000 -t 4
+./benchtool -e tidesdb -c -w delete -p zipfian -o 500000 -t 4
 ```
 
 <canvas id="deleteZipfianChart" width="400" height="200"></canvas>
@@ -910,7 +910,7 @@ Deletion performance shows TidesDB with modest advantages in random deletion pat
 
 **Mixed Workload, 4 Threads (500K operations)**
 ```bash
-./bench -e tidesdb -c -w mixed -v 1024 -o 500000 -t 4
+./benchtool -e tidesdb -c -w mixed -v 1024 -o 500000 -t 4
 ```
 
 <canvas id="largeValueChart" width="400" height="200"></canvas>
@@ -969,7 +969,7 @@ With 1KB values, TidesDB shows **2.34x faster writes** but RocksDB has **3.35x f
 
 **Mixed Workload, 4 Threads (1M operations)**
 ```bash
-./bench -e tidesdb -c -w mixed -k 8 -v 32 -o 1000000 -t 4
+./benchtool -e tidesdb -c -w mixed -k 8 -v 32 -o 1000000 -t 4
 ```
 
 <canvas id="smallValueChart" width="400" height="200"></canvas>
@@ -1028,7 +1028,7 @@ Small, cache-friendly data shows TidesDB's strong performance: **1.60x faster wr
 
 **5M Operations, 8 Threads**
 ```bash
-./bench -e tidesdb -c -w write -o 5000000 -t 8
+./benchtool -e tidesdb -c -w write -o 5000000 -t 8
 ```
 
 <canvas id="stressTestChart" width="400" height="200"></canvas>
@@ -1087,7 +1087,7 @@ Under sustained heavy load (5M operations), TidesDB maintains **77% higher throu
 
 ### Batch Write Performance (4 threads, 1M operations)
 ```bash
-./bench -e tidesdb -c -w write -o 1000000 -t 4 -b [10|100|1000]
+./benchtool -e tidesdb -c -w write -o 1000000 -t 4 -b [10|100|1000]
 ```
 
 <canvas id="batchWriteChart" width="400" height="200"></canvas>
@@ -1152,7 +1152,7 @@ Batch write performance shows TidesDB maintaining consistent advantages across a
 
 ### Batch Delete Performance (4 threads, 1M operations)
 ```bash
-./bench -e tidesdb -c -w delete -o 1000000 -t 4 -b [1|10|100|1000]
+./benchtool -e tidesdb -c -w delete -o 1000000 -t 4 -b [1|10|100|1000]
 ```
 
 <canvas id="batchDeleteChart" width="400" height="200"></canvas>
@@ -1217,7 +1217,7 @@ Batch delete performance shows both databases maintaining stable performance acr
 
 ### Batch Mixed Workload (4 threads, 1M operations)
 ```bash
-./bench -e tidesdb -c -w mixed -o 1000000 -t 4 -b [100|1000]
+./benchtool -e tidesdb -c -w mixed -o 1000000 -t 4 -b [100|1000]
 ```
 
 <canvas id="batchMixedChart" width="400" height="200"></canvas>
