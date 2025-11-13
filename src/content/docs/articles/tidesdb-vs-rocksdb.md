@@ -1,9 +1,12 @@
 ---
-title: "TidesDB vs RocksDB"
+title: "TidesDB vs RocksDB: Which Storage Engine is Faster?"
 description: "Comprehensive performance benchmarks comparing TidesDB and RocksDB storage engines."
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<p>Date: 2025-11-13</p>
+<p>Updated: 2025-11-13</p>
 
 This article presents comprehensive performance benchmarks comparing TidesDB and RocksDB, two LSM-tree based storage engines. Both are designed for write-heavy workloads, but they differ significantly in architecture, complexity, and performance characteristics.
 
@@ -23,16 +26,19 @@ All benchmarks are conducted using a custom pluggable benchmarking tool that pro
 - GCC with -O3 optimization
 - GNOME 44.3
 
+## Benchtool
+The benchtool is a custom pluggable benchmarking tool that provides fair, apples-to-apples comparisons between storage engines, you can find the repo here: [benchtool](https://github.com/tidesdb/benchtool). The benchtool is used to conduct all benchmarks in this article.
+
 
 ## Benchmark Methodology
 
-The benchmark tool measures:
+The benchmark tool measures
 - Throughput in operations per second (ops/sec)
 - Latency metrics including average, P50, P95, P99, minimum, and maximum values in microseconds
 - Iteration speed for full database scan performance
 - Total duration for workload completion
 
-Test parameters:
+Test parameters
 - Operations ranging from 500,000 to 5,000,000 depending on the test
 - Key sizes of 8-16 bytes
 - Value sizes from 32 to 1024 bytes
@@ -728,6 +734,175 @@ TidesDB achieves 1.04M PUT ops/sec versus RocksDB's 458K ops/sec (2.28x faster) 
 
 Timestamp-based keys (time-series workload) show TidesDB's strongest performance: **2.28x faster writes** and **2.07x faster reads**. This pattern is ideal for TidesDB's sequential write optimization.
 
+## Deletion Performance
+
+### Single-threaded Delete (1M operations)
+```bash
+./bench -e tidesdb -c -w delete -p random -o 1000000
+```
+
+<canvas id="deleteSingleThreadChart" width="400" height="200"></canvas>
+<script>
+setTimeout(() => {
+  const ctx = document.getElementById('deleteSingleThreadChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)'],
+      datasets: [{
+        label: 'TidesDB',
+        data: [595.888, 1.61, 3.00],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+      }, {
+        label: 'RocksDB',
+        data: [520.158, 1.92, 3.00],
+        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Single-Threaded Delete Performance'
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Value (varies by metric)'
+          }
+        }
+      }
+    }
+  });
+}, 1300);
+</script>
+
+TidesDB achieves 596K delete ops/sec versus RocksDB's 520K ops/sec (1.15x faster) with average latency of 1.61μs versus 1.92μs. P99 latency is comparable at 3μs for both engines. Single-threaded deletion shows modest advantages for TidesDB with consistent low-latency performance.
+
+### Multi-threaded Delete - 4 Threads (1M operations)
+```bash
+./bench -e tidesdb -c -w delete -p random -o 1000000 -t 4
+```
+
+<canvas id="delete4ThreadChart" width="400" height="200"></canvas>
+<script>
+setTimeout(() => {
+  const ctx = document.getElementById('delete4ThreadChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)'],
+      datasets: [{
+        label: 'TidesDB',
+        data: [699.026, 5.60, 16.00],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+      }, {
+        label: 'RocksDB',
+        data: [547.911, 7.30, 18.00],
+        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: '4 Threads Delete Performance'
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Value (varies by metric)'
+          }
+        }
+      }
+    }
+  });
+}, 1400);
+</script>
+
+With 4 threads, TidesDB reaches 699K delete ops/sec versus RocksDB's 548K ops/sec (1.28x faster) with average latency of 5.60μs versus 7.30μs (1.30x faster). P99 latency shows 16μs versus 18μs (1.13x better). Multi-threaded deletion demonstrates TidesDB's improved concurrency characteristics.
+
+### Hot Key Deletion - Zipfian Pattern (500K operations, 4 threads)
+```bash
+./bench -e tidesdb -c -w delete -p zipfian -o 500000 -t 4
+```
+
+<canvas id="deleteZipfianChart" width="400" height="200"></canvas>
+<script>
+setTimeout(() => {
+  const ctx = document.getElementById('deleteZipfianChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)'],
+      datasets: [{
+        label: 'TidesDB',
+        data: [299.425, 12.95, 48.00],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+      }, {
+        label: 'RocksDB',
+        data: [455.056, 8.79, 32.00],
+        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Hot Key Deletion (Zipfian Pattern)'
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Value (varies by metric)'
+          }
+        }
+      }
+    }
+  });
+}, 1500);
+</script>
+
+Zipfian deletion reveals an interesting pattern. RocksDB achieves 455K delete ops/sec versus TidesDB's 299K ops/sec (1.52x faster for RocksDB) with average latency of 8.79μs versus TidesDB's 12.95μs. P99 latency shows RocksDB at 32μs versus TidesDB's 48μs (1.5x better for RocksDB). Hot key deletion patterns favor RocksDB's more sophisticated caching and compaction strategies, particularly when repeatedly deleting from a concentrated key space.
+
+Deletion performance shows TidesDB with advantages in random deletion patterns (1.15-1.28x faster) but RocksDB performs better with hot key patterns (1.52x faster). This suggests TidesDB excels at uniform deletion workloads while RocksDB's multi-level architecture handles concentrated deletion patterns more efficiently.
+
 ## Value Size Tests
 
 ### Large Values (1KB)
@@ -907,6 +1082,195 @@ The stress test with 5 million operations across 8 threads reveals TidesDB's sus
 
 Under sustained heavy load (5M operations), TidesDB maintains **34% higher throughput** and completes **1.84 seconds faster**. The max latency advantage (**14.56x better**: 2.2ms vs 32.6ms) demonstrates superior tail latency under stress. P99 latency is **2.79x better** (19μs vs 53μs), showing more predictable performance.
 
+## Batch Operations Performance
+
+### Batch Write Performance (4 threads, 1M operations)
+```bash
+./bench -e tidesdb -c -w write -o 1000000 -t 4 -b [10|100|1000]
+```
+
+<canvas id="batchWriteChart" width="400" height="200"></canvas>
+<script>
+setTimeout(() => {
+  const ctx = document.getElementById('batchWriteChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Batch 1', 'Batch 10', 'Batch 100', 'Batch 1000'],
+      datasets: [{
+        label: 'TidesDB Throughput (K ops/sec)',
+        data: [898, 756, 736, 738],
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.1
+      }, {
+        label: 'RocksDB Throughput (K ops/sec)',
+        data: [478, 506, 513, 533],
+        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Batch Write Performance Scaling'
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Throughput (K ops/sec)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Batch Size'
+          }
+        }
+      }
+    }
+  });
+}, 1600);
+</script>
+
+Batch write performance shows TidesDB maintaining consistent advantages across all batch sizes. With batch size 1 (no batching), TidesDB achieves 898K ops/sec versus RocksDB's 478K ops/sec (1.88x faster). Batch size 10 shows 756K ops/sec versus 506K ops/sec (1.49x faster), batch size 100 reaches 736K ops/sec versus 513K ops/sec (1.43x faster), and batch size 1000 achieves 738K ops/sec versus 533K ops/sec (1.38x faster). Interestingly, TidesDB's throughput decreases slightly with larger batches while RocksDB's increases, suggesting TidesDB's single-operation path is already highly optimized.
+
+### Batch Delete Performance (4 threads, 1M operations)
+```bash
+./bench -e tidesdb -c -w delete -o 1000000 -t 4 -b [1|10|100|1000]
+```
+
+<canvas id="batchDeleteChart" width="400" height="200"></canvas>
+<script>
+setTimeout(() => {
+  const ctx = document.getElementById('batchDeleteChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Batch 1', 'Batch 10', 'Batch 100', 'Batch 1000'],
+      datasets: [{
+        label: 'TidesDB Throughput (K ops/sec)',
+        data: [699, 608, 589, 552],
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.1
+      }, {
+        label: 'RocksDB Throughput (K ops/sec)',
+        data: [548, 547, 543, 560],
+        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Batch Delete Performance Scaling'
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Throughput (K ops/sec)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Batch Size'
+          }
+        }
+      }
+    }
+  });
+}, 1700);
+</script>
+
+Batch delete performance reveals different scaling characteristics. TidesDB starts at 699K ops/sec with batch size 1 (1.28x faster than RocksDB's 548K ops/sec) but throughput decreases with larger batches: 608K ops/sec at batch 10 (1.11x faster), 589K ops/sec at batch 100 (1.08x faster), and 552K ops/sec at batch 1000 (0.99x, essentially equal). RocksDB maintains relatively stable performance across batch sizes. This suggests TidesDB's deletion path is optimized for individual operations while RocksDB benefits from batching optimizations.
+
+### Batch Mixed Workload (4 threads, 1M operations)
+```bash
+./bench -e tidesdb -c -w mixed -o 1000000 -t 4 -b [100|1000]
+```
+
+<canvas id="batchMixedChart" width="400" height="200"></canvas>
+<script>
+setTimeout(() => {
+  const ctx = document.getElementById('batchMixedChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['PUT (batch 100)', 'GET (batch 100)', 'PUT (batch 1000)', 'GET (batch 1000)'],
+      datasets: [{
+        label: 'TidesDB (K ops/sec)',
+        data: [702, 1652, 726, 1708],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+      }, {
+        label: 'RocksDB (K ops/sec)',
+        data: [513, 1833, 519, 2048],
+        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Batch Mixed Workload Performance'
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Throughput (K ops/sec)'
+          }
+        }
+      }
+    }
+  });
+}, 1800);
+</script>
+
+Batch mixed workload shows TidesDB with 702K PUT ops/sec versus RocksDB's 513K ops/sec (1.37x faster) at batch 100, but RocksDB achieves 1.83M GET ops/sec versus TidesDB's 1.65M ops/sec (1.11x faster for RocksDB). At batch 1000, TidesDB reaches 726K PUT ops/sec versus 519K ops/sec (1.40x faster), while RocksDB's GET performance increases to 2.05M ops/sec versus TidesDB's 1.71M ops/sec (1.20x faster for RocksDB). TidesDB maintains write advantages while RocksDB shows better read scaling with larger batches.
+
+Batch operations reveal that TidesDB's single-operation code path is highly optimized, showing diminishing returns from batching. Write operations maintain 1.38-1.49x advantages across batch sizes, while delete operations show advantages only at smaller batch sizes. RocksDB benefits more from batching, particularly for read operations, suggesting its architecture is designed to amortize overhead across batched operations.
+
 ## Performance Summary
 
 ### Key Findings
@@ -917,9 +1281,13 @@ TidesDB delivers exceptional read performance ranging from 1.19x to 4.77x faster
 
 Tail latency performance is where TidesDB truly excels. P99 and maximum latencies are consistently 1.5x to 14x lower than RocksDB, with the stress test showing a remarkable 14.56x advantage in maximum latency. This predictability stems from TidesDB's simpler architecture and lower variance in operation timing, making it ideal for latency-sensitive applications where consistent response times matter more than peak throughput. The database also shows excellent concurrency characteristics with strong scaling from 1 to 8 threads, particularly impressive at the 2-4 thread range where many applications operate.
 
+Deletion performance favors TidesDB in uniform random patterns, showing 1.15x to 1.28x advantages in single and multi-threaded scenarios. The highly optimized single-operation code path means TidesDB performs best without batching, achieving 898K ops/sec for unbatched writes (1.88x faster than RocksDB). While batch operations show diminishing returns for TidesDB, it maintains write advantages of 1.38-1.49x across all batch sizes, demonstrating that the engine's core write path is already exceptionally efficient.
+
 ### RocksDB Strengths
 
 RocksDB demonstrates its maturity in specific scenarios, most notably with large value reads where its sophisticated multi-level caching provides a 2.09x performance advantage over TidesDB when handling 1KB values. This makes RocksDB a strong choice for applications storing larger objects like images, documents, or serialized data structures where read performance on large values is critical.
+
+Hot key deletion patterns reveal another RocksDB strength, achieving 1.52x faster throughput (455K vs 299K ops/sec) when repeatedly deleting from concentrated key spaces. The multi-level architecture and sophisticated compaction strategies handle Zipfian deletion patterns more efficiently than TidesDB's simpler two-tier design. Additionally, RocksDB shows better scaling with batch operations, particularly for reads where throughput increases from 1.83M to 2.05M ops/sec as batch size grows from 100 to 1000, demonstrating architecture designed to amortize overhead across batched operations.
 
 Beyond raw performance, RocksDB offers a mature ecosystem with extensive production battle-testing across companies like Facebook, LinkedIn, and Netflix. The wealth of tuning options, monitoring tools, and community knowledge makes it easier to optimize for specific workloads. Advanced features like column families, transactions, and backup utilities provide capabilities that may be essential for certain applications, though they come at the cost of increased complexity.
 
@@ -929,14 +1297,20 @@ Beyond raw performance, RocksDB offers a mature ecosystem with extensive product
 |----------|-------------------|---------------|
 | Single-threaded writes | 1.47x - 1.86x | 1.86x (random) |
 | Single-threaded reads | 4.77x | 4.77x (mixed) |
+| Single-threaded deletes | 1.15x | 1.15x |
 | Multi-threaded writes (2T) | 2.93x | 2.93x |
 | Multi-threaded writes (4T) | 2.26x | 2.26x |
 | Multi-threaded writes (8T) | 1.52x | 1.52x |
+| Multi-threaded deletes (4T) | 1.28x | 1.28x |
 | Mixed workload (4T) | 2.06x writes, 1.32x reads | 2.06x |
 | Zipfian (hot keys) | 1.35x - 1.37x | 1.37x |
+| Zipfian deletes | 0.66x (RocksDB faster) | 1.52x (RocksDB) |
 | Timestamp pattern | 2.28x writes, 2.07x reads | 2.28x |
 | Small values (8B/32B) | 2.52x writes, 1.19x reads | 2.52x |
 | Large values (1KB) | 1.92x writes, 0.48x reads | 1.92x writes |
+| Batch writes (size 1-1000) | 1.38x - 1.88x | 1.88x (no batch) |
+| Batch deletes (size 1-1000) | 1.28x - 0.99x | 1.28x (no batch) |
+| Batch mixed (size 100-1000) | 1.37x writes, 0.83x reads | 1.40x writes |
 | High concurrency (5M ops) | 1.34x | 1.34x |
 | Iteration speed | 1.77x - 3.27x | 3.27x |
 
@@ -946,8 +1320,13 @@ Beyond raw performance, RocksDB offers a mature ecosystem with extensive product
 |--------|---------|---------|------------|
 | Single-thread write (avg) | 1.57 μs | ~3.30 μs | **2.10x better** |
 | Single-thread read (avg) | 0.27 μs | ~1.61 μs | **5.96x better** |
+| Single-thread delete (avg) | 1.61 μs | ~1.92 μs | **1.19x better** |
 | 4-thread write (avg) | 3.71 μs | ~8.93 μs | **2.41x better** |
 | 4-thread read (avg) | 2.25 μs | ~2.78 μs | **1.24x better** |
+| 4-thread delete (avg) | 5.60 μs | ~7.30 μs | **1.30x better** |
+| Zipfian delete (avg) | 12.95 μs | ~8.79 μs | **1.47x worse** |
+| Batch write (avg, size 100) | 5.07 μs | ~7.80 μs | **1.54x better** |
+| Batch delete (avg, size 100) | 6.63 μs | ~7.36 μs | **1.11x better** |
 | Stress test P99 | 19 μs | ~53 μs | **2.79x better** |
 | Stress test max | 2,237 μs | ~32,560 μs | **14.56x better** |
 
@@ -955,8 +1334,10 @@ Beyond raw performance, RocksDB offers a mature ecosystem with extensive product
 
 TidesDB consistently outperforms RocksDB across most workloads, with particularly strong advantages in read-heavy scenarios (1.2-4.8x faster), write throughput (1.5-2.9x faster), and full database scans (1.8-3.3x faster). Tail latency performance shows the most dramatic improvements, ranging from 1.5x to 14.6x better, which translates directly to more predictable application behavior under load. Small data workloads benefit from 2.5x faster writes, while multi-threaded performance at 2-4 threads shows 2.3-2.9x advantages, the sweet spot for many server applications.
 
-RocksDB maintains a competitive edge in one specific scenario: large value reads (1KB+) where its sophisticated multi-level caching provides a 2.09x advantage. This makes RocksDB worth considering for applications that primarily read large objects and can tolerate higher write latencies and more variable tail latencies.
+Deletion performance reveals nuanced characteristics: TidesDB excels at uniform random deletions (1.15-1.28x faster) but RocksDB handles hot key deletion patterns more efficiently (1.52x faster). Batch operations demonstrate that TidesDB's single-operation code path is already highly optimized, achieving best performance without batching (1.88x faster for unbatched writes). While RocksDB benefits more from batching, particularly for reads, TidesDB maintains write advantages of 1.38-1.49x across all batch sizes.
 
-For applications prioritizing raw performance, simplicity, read speed, write speed, or predictable latency, TidesDB is the clear choice. Its simpler two-tier LSM architecture delivers superior performance in most real-world scenarios while maintaining a dramatically smaller codebase (~10K lines versus RocksDB's ~300K lines), making it easier to understand, debug, and maintain. The 2.93x advantage at 2 threads and 4.77x read advantage in mixed workloads make it particularly compelling for modern multi-core systems running typical database workloads.
+RocksDB maintains competitive edges in specific scenarios: large value reads (1KB+) where sophisticated multi-level caching provides a 2.09x advantage, hot key deletions (1.52x faster), and batched read operations where throughput scales better with increasing batch sizes. These strengths make RocksDB worth considering for applications with concentrated access patterns, large object storage, or workloads that can leverage batching.
 
-Applications handling primarily large values (>1KB) in read-heavy patterns, or those requiring RocksDB's mature ecosystem and extensive tooling, should consider RocksDB despite the performance trade-offs. The choice ultimately depends on whether your workload aligns with RocksDB's strengths or whether TidesDB's broader performance advantages and simplicity better serve your needs.
+For applications prioritizing raw performance, simplicity, read speed, write speed, or predictable latency, TidesDB is the clear choice. Its simpler two-tier LSM architecture delivers superior performance in most real-world scenarios while maintaining a dramatically smaller codebase (~10K lines versus RocksDB's ~300K lines), making it easier to understand, debug, and maintain. The 2.93x advantage at 2 threads, 4.77x read advantage in mixed workloads, and exceptional single-operation performance make it particularly compelling for modern multi-core systems running typical database workloads with uniform access patterns.
+
+Applications with concentrated key access patterns (hot keys), primarily large values (>1KB) in read-heavy scenarios, heavy use of batch operations, or those requiring RocksDB's mature ecosystem and extensive tooling, should consider RocksDB despite the performance trade-offs in other areas. The choice ultimately depends on whether your workload aligns with RocksDB's architectural strengths or whether TidesDB's broader performance advantages and simplicity better serve your needs.

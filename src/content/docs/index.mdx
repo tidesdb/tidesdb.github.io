@@ -43,13 +43,13 @@ import VersionBadge from '../../components/VersionBadge.astro';
 
 <CardGrid stagger>
 	<Card title="ACID Transactions" icon="approve-check" style="--card-index: 0">
-		ACID transactions with multi-column-family support. Point reads use READ COMMITTED isolation (latest committed data), iterators use snapshot isolation (consistent view via reference counting). Writers serialize per column family for atomicity; copy-on-write ensures reader consistency.
+		ACID transactions that are atomic, consistent, isolated, and durable across multiple column families. 
 	</Card>
 	<Card title="Concurrent" icon="rocket" style="--card-index: 1">
 		Column family readers don't block readers or writer and vice versa.
 	</Card>
 	<Card title="LSM-Tree Architecture" icon="setting" style="--card-index: 2">
-		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance through bloom filters and block indices.
+		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance.
 	</Card>
 </CardGrid>
 

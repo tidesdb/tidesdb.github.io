@@ -164,7 +164,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
-						{ label: 'TidesDB vs RocksDB', slug: 'articles/tidesdb-vs-rocksdb' },
+						{ label: 'TidesDB vs RocksDB: Which Storage Engine is Faster?', slug: 'articles/tidesdb-vs-rocksdb' },
 					],
 				},
 				{
