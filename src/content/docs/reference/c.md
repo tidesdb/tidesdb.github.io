@@ -51,7 +51,7 @@ TidesDB provides detailed error codes for production use.
 ### Example Error Handling
 
 ```c
-int result = tidesdb_txn_put(txn, "my_cf", key, key_size, value, value_size, -1);
+int result = tidesdb_txn_put(txn, key, key_size, value, value_size, -1);
 if (result != TDB_SUCCESS)
 {
     switch (result)
@@ -168,10 +168,9 @@ tidesdb_column_family_config_t cf_config = {
     .enable_background_compaction = 1,          /* enable background compaction */
     .background_compaction_interval = 1000000,  /* check every 1000000 microseconds (1 second) */
     .enable_block_indexes = 1,                  /* enable succinct trie block indexes */
-    .max_open_file_handles = 1024,              /* LRU cache for open file handles */
     .sync_mode = TDB_SYNC_FULL,                 /* fsync on every write (most durable) */
     .comparator_name = {0},                     /* empty = use default "memcmp" */
-    .block_manager_cache = 32 * 1024 * 1024     /* 32MB LRU block cache for column family block managers */
+    .block_manager_cache_size = 32 * 1024 * 1024  /* 32MB LRU block cache for column family block managers */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -182,7 +181,6 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 
 **Using custom comparator**
 ```c
-/* Register custom comparator first (see examples/custom_comparator.c) */
 tidesdb_register_comparator("reverse", my_reverse_compare);
 
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
@@ -276,9 +274,11 @@ tidesdb_column_family_update_config_t update_config = {
     .compaction_threads = 8,                    /* use 8 threads */
     .sl_max_level = 16,                         /* for new memtables */
     .sl_probability = 0.25f,                    /* for new memtables */
+    .enable_bloom_filter = 1,                   /* enable bloom filters */
     .bloom_filter_fp_rate = 0.001,              /* 0.1% FP rate for new SSTables */
     .enable_background_compaction = 1,          /* enable background compaction */
-    .background_compaction_interval = 500000    /* check every 500ms */
+    .background_compaction_interval = 500000,   /* check every 500ms */
+    .block_manager_cache_size = 32 * 1024 * 1024  /* 32MB block cache */
 };
 
 if (tidesdb_update_column_family_config(db, "my_cf", &update_config) == 0)
@@ -293,9 +293,11 @@ if (tidesdb_update_column_family_config(db, "my_cf", &update_config) == 0)
 - `compaction_threads` - Number of parallel compaction threads
 - `sl_max_level` - Skip list level for **new** memtables only
 - `sl_probability` - Skip list probability for **new** memtables only
+- `enable_bloom_filter` - Enable/disable bloom filters for **new** SSTables
 - `bloom_filter_fp_rate` - False positive rate for **new** SSTables only
 - `enable_background_compaction` - Enable/disable background compaction
-- `background_compaction_interval` - Compaction check interval
+- `background_compaction_interval` - Compaction check interval (microseconds)
+- `block_manager_cache_size` - LRU block cache size in bytes
 
 **Non-updatable settings** · (would corrupt existing data)
 - `enable_compression` - Cannot change compression on existing SSTables
@@ -329,8 +331,12 @@ All operations in TidesDB are done through transactions for ACID guarantees per 
 ### Basic Transaction
 
 ```c
+/* Get column family pointer first */
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-if (tidesdb_txn_begin(db, &txn) != 0)
+if (tidesdb_txn_begin(db, cf, &txn) != 0)
 {
     return -1;
 }
@@ -338,7 +344,7 @@ if (tidesdb_txn_begin(db, &txn) != 0)
 const uint8_t *key = (uint8_t *)"mykey";
 const uint8_t *value = (uint8_t *)"myvalue";
 
-if (tidesdb_txn_put(txn, "my_cf", key, 5, value, 7, -1) != 0)
+if (tidesdb_txn_put(txn, key, 5, value, 7, -1) != 0)
 {
     tidesdb_txn_free(txn);
     return -1;
@@ -356,8 +362,11 @@ tidesdb_txn_free(txn);
 ### With TTL (Time-to-Live)
 
 ```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin(db, &txn);
+tidesdb_txn_begin(db, cf, &txn);
 
 const uint8_t *key = (uint8_t *)"temp_key";
 const uint8_t *value = (uint8_t *)"temp_value";
@@ -366,7 +375,7 @@ const uint8_t *value = (uint8_t *)"temp_value";
 time_t ttl = time(NULL) + 60;  /* Expires 60 seconds from now */
 
 /* Use -1 for no expiration */
-tidesdb_txn_put(txn, "my_cf", key, 8, value, 10, ttl);
+tidesdb_txn_put(txn, key, 8, value, 10, ttl);
 tidesdb_txn_commit(txn);
 tidesdb_txn_free(txn);
 ```
@@ -390,14 +399,17 @@ time_t ttl = 1730592000;  /* Specific Unix timestamp */
 ### Getting a Key-Value Pair
 
 ```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin_read(db, &txn);  /* Read-only transaction */
+tidesdb_txn_begin_read(db, cf, &txn);  /* Read-only transaction */
 
 const uint8_t *key = (uint8_t *)"mykey";
 uint8_t *value = NULL;
 size_t value_size = 0;
 
-if (tidesdb_txn_get(txn, "my_cf", key, 5, &value, &value_size) == 0)
+if (tidesdb_txn_get(txn, key, 5, &value, &value_size) == 0)
 {
     /* Use value */
     printf("Value: %.*s\n", (int)value_size, value);
@@ -410,11 +422,14 @@ tidesdb_txn_free(txn);
 ### Deleting a Key-Value Pair
 
 ```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin(db, &txn);
+tidesdb_txn_begin(db, cf, &txn);
 
 const uint8_t *key = (uint8_t *)"mykey";
-tidesdb_txn_delete(txn, "my_cf", key, 5);
+tidesdb_txn_delete(txn, key, 5);
 
 tidesdb_txn_commit(txn);
 tidesdb_txn_free(txn);
@@ -423,13 +438,16 @@ tidesdb_txn_free(txn);
 ### Multi-Operation Transaction
 
 ```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin(db, &txn);
+tidesdb_txn_begin(db, cf, &txn);
 
 /* Multiple operations in one transaction */
-tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
-tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
-tidesdb_txn_delete(txn, "my_cf", (uint8_t *)"old_key", 7);
+tidesdb_txn_put(txn, (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
+tidesdb_txn_put(txn, (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
+tidesdb_txn_delete(txn, (uint8_t *)"old_key", 7);
 
 /* Commit atomically -- all or nothing */
 if (tidesdb_txn_commit(txn) != 0)
@@ -445,10 +463,13 @@ tidesdb_txn_free(txn);
 ### Transaction Rollback
 
 ```c
-tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin(db, &txn);
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
 
-tidesdb_txn_put(txn, "my_cf", (uint8_t *)"key", 3, (uint8_t *)"value", 5, -1);
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, cf, &txn);
+
+tidesdb_txn_put(txn, (uint8_t *)"key", 3, (uint8_t *)"value", 5, -1);
 
 /* Decide to rollback instead of commit */
 tidesdb_txn_rollback(txn);
@@ -463,11 +484,14 @@ Iterators provide efficient forward and backward traversal over key-value pairs.
 ### Forward Iteration
 
 ```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin_read(db, &txn);
+tidesdb_txn_begin_read(db, cf, &txn);
 
 tidesdb_iter_t *iter = NULL;
-if (tidesdb_iter_new(txn, "my_cf", &iter) != 0)
+if (tidesdb_iter_new(txn, &iter) != 0)
 {
     tidesdb_txn_free(txn);
     return -1;
@@ -500,11 +524,14 @@ tidesdb_txn_free(txn);
 ### Backward Iteration
 
 ```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin_read(db, &txn);
+tidesdb_txn_begin_read(db, cf, &txn);
 
 tidesdb_iter_t *iter = NULL;
-tidesdb_iter_new(txn, "my_cf", &iter);
+tidesdb_iter_new(txn, &iter);
 
 tidesdb_iter_seek_to_last(iter);
 
@@ -527,11 +554,14 @@ TidesDB provides seek operations that allow you to position an iterator at a spe
 **`tidesdb_iter_seek(iter, key, key_size)`** · Positions iterator at the first key >= target key
 
 ```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
 tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin_read(db, &txn);
+tidesdb_txn_begin_read(db, cf, &txn);
 
 tidesdb_iter_t *iter = NULL;
-tidesdb_iter_new(txn, "my_cf", &iter);
+tidesdb_iter_new(txn, &iter);
 
 /* Seek to specific key */
 const char *target = "user:1000";
@@ -567,54 +597,6 @@ if (tidesdb_iter_seek_for_prev(iter, (uint8_t *)target, strlen(target)) == 0)
 }
 ```
 
-:::note[Seek Performance Optimizations]
-Seek operations use O(log n) skip list traversal for memtable positioning and (if enabled) succinct trie block indexes for SSTable block lookups instead of linear scans. Entire SSTables are skipped when the target key falls outside their min/max key range, and bloom filters (if enabled) quickly eliminate SSTables that don't contain the key. Results are efficiently merged across the active memtable, immutable memtables, and multiple SSTables. This provides 50-100x performance gains over iterating from the beginning for large datasets.
-:::
-
-#### Seek Behavior
-
-When an exact match is found, the iterator positions at that key. For forward seeks without a match, the iterator positions at the next key greater than the target, while backward seeks position at the previous key less than the target. If no suitable key exists, the iterator becomes invalid. Seek operations automatically skip expired TTL entries and tombstones, and search across all sources including the active memtable, immutable memtables, and all SSTables.
-
-### Iterator Reference Counting and Compaction Safety
-
-TidesDB uses atomic reference counting to ensure safe concurrent access between iterators and compaction.
-
-:::note[How Reference Counting Works]
-When an iterator is created, it automatically acquires references on all active SSTables, preventing them from being deleted. Compaction uses copy-on-write semantics, creating new merged SSTables and immediately replacing old ones in the active array, while old SSTables remain in memory for active iterators. This allows compaction to complete immediately without waiting for iterators to finish, ensuring high throughput. When an iterator is freed, it releases its references, and SSTables with zero references are automatically deleted from both file and memory. Iterators use a min-heap for forward iteration or max-heap for backward iteration to efficiently merge-sort entries from multiple sources.
-:::
-
-**How it works**
-
-Iterator creation acquires references on all SSTables (increments `ref_count`), then compaction creates new merged SSTables and swaps them into the active array. Compaction releases its reference on old SSTables (decrements `ref_count`), but old SSTables remain accessible to active iterators (ref_count > 0). When an iterator is freed, it releases references (decrements `ref_count`), and when `ref_count` drops to 0, the SSTable file is deleted and memory is freed.
-
-```c
-tidesdb_iter_t *iter = NULL;
-tidesdb_iter_new(txn, "my_cf", &iter);  /* Acquires references on SSTables */
-tidesdb_iter_seek_to_first(iter);
-
-/* Compaction can occur here -- new SSTables replace old ones */
-/* But iterator still has valid references to old SSTables */
-
-while (tidesdb_iter_valid(iter))
-{
-    uint8_t *key = NULL, *value = NULL;
-    size_t key_size = 0, value_size = 0;
-    
-    tidesdb_iter_key(iter, &key, &key_size);
-    tidesdb_iter_value(iter, &value, &value_size);
-    
-    /* Process data.. */
-    
-    tidesdb_iter_next(iter);
-}
-
-tidesdb_iter_free(iter);  /* Releases references, triggers cleanup if ref_count == 0 */
-```
-
-:::tip[Benefits]
-Iterators see a consistent snapshot of data. Compaction and iteration proceed independently without blocking each other, while automatic resource management through reference counting eliminates the need for manual cleanup. Multiple iterators and compaction can run simultaneously with safe concurrent access.
-:::
-
 ## Custom Comparators
 
 Register custom key comparison functions for specialized sorting.
@@ -649,7 +631,6 @@ tidesdb_create_column_family(db, "sorted_cf", &cf_config);
 - `"numeric"` - Numeric comparison for uint64_t keys
 :::
 
-See `examples/custom_comparator.c` for more examples.
 
 ## Sync Modes
 
@@ -672,147 +653,52 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 - **TDB_SYNC_FULL** · Fsync on every write operation (slowest, most durable)
 :::
 
-## Background Compaction
+## Compaction
 
-TidesDB features automatic background compaction with optional parallel execution.
-
-**Automatic background compaction** · runs when SSTable count reaches the configured threshold
-
+**Manual compaction**
 ```c
-tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
-cf_config.enable_background_compaction = 1;       /* Enable background compaction */
-cf_config.max_sstables_before_compaction = 128;   /* Trigger at 128 SSTables (default) */
-cf_config.compaction_threads = 4;                 /* Use 4 threads for parallel compaction */
-
-tidesdb_create_column_family(db, "my_cf", &cf_config);
-/* Background thread automatically compacts when threshold is reached */
+tidesdb_compact(cf);  /* Compact SSTables (requires minimum 2 SSTables) */
 ```
 
-:::note[Configuration Options]
-The `enable_background_compaction` option enables or disables automatic background compaction (default: enabled). The `background_compaction_interval` sets the interval in microseconds between compaction checks (default: 1000000 = 1 second). The `max_sstables_before_compaction` sets the SSTable count threshold to trigger compaction (default: 128, minimum: 2). The `compaction_threads` option specifies the number of threads for parallel compaction (default: 4, set to 0 for single-threaded).
-:::
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on background compaction and parallel compaction.
 
-**Parallel Compaction**
-
-Set `compaction_threads >= 2` to enable parallel compaction, which uses semaphore-based thread limiting for concurrent SSTable pair merging. Each thread compacts one pair of SSTables independently (pairs 0+1, 2+3, 4+5, etc.), and a semaphore limits concurrent threads to the configured maximum. Set `compaction_threads = 0` or `1` for single-threaded compaction (default 4 threads).
-
-**Manual compaction** · can be triggered at any time (requires minimum 2 SSTables)
-
-```c
-tidesdb_compact(cf);  /* Automatically uses parallel compaction if compaction_threads > 0 */
-```
-
-:::tip[Benefits]
-Compaction removes tombstones and expired TTL entries, merges duplicate keys (keeping the latest version), and reduces SSTable count. Background compaction runs in a separate thread without blocking operations, while parallel compaction significantly speeds up large compactions. Manual compaction requires a minimum of 2 SSTables to merge.
-:::
-
-## Thread Pool Architecture
-
-TidesDB uses shared thread pools at the database level for flush and compaction operations.
-
-:::note[Design]
-All column families share the same flush and compaction thread pools, which are configured once at the database level when opening the database. Flush and compaction tasks are submitted to these pools, and operations are asynchronous and don't block application threads.
-:::
+## Thread Pools
 
 **Configuration**
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 4,      /* 4 threads for flush operations */
-    .num_compaction_threads = 8  /* 8 threads for compaction operations */
+    .num_flush_threads = 4,      /* 4 threads for flush operations (default: 2) */
+    .num_compaction_threads = 8  /* 8 threads for compaction (default: 2) */
 };
 
 tidesdb_t *db = NULL;
 tidesdb_open(&config, &db);
 ```
 
-**Default values**
-- `num_flush_threads` - Default is 2
-- `num_compaction_threads` - Default is 2
-- Set to `0` to use defaults
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and tuning.
 
-**How it works**
-
-The flush pool handles memtable flush operations across all column families, while the compaction pool handles compaction operations. When a memtable needs flushing or compaction is triggered, a task is submitted to the appropriate pool. Pool workers pick up tasks and execute them asynchronously, allowing multiple column families to flush or compact simultaneously using the shared resources.
-
-:::tip[Benefits]
-One set of threads serves all column families, providing resource efficiency and better utilization as threads are shared across workloads. Configuration is simpler since it's set once at the database level, and the system is easily scalable to match your hardware (e.g., CPU core count).
+:::note
+`max_open_file_handles` is a **database-level** configuration, not a column family configuration. It's set in `tidesdb_config_t` when opening the database.
 :::
 
-:::caution[Tuning Guidelines]
-Flush threads are usually I/O bound, so 2-4 is sufficient. Compaction threads can be higher (4-16) for CPU-intensive workloads. Consider the total thread count as flush + compaction + application threads, and don't exceed available CPU cores significantly.
-:::
-
-## LRU File Handle Cache
-
-TidesDB features a configurable LRU (Least Recently Used) cache for open file handles to limit system resources while maintaining performance.
-
-The cache stores open file descriptors for SSTables to avoid repeated open/close operations. It uses an LRU eviction policy where least recently used files are closed when the cache is full. The cache is configurable per column family via the `max_open_file_handles` setting, and can be disabled by setting it to `0` (files opened/closed on each access). The default is 1024 open file handles.
-
-
-**Configuration Example**
-
+**Configuration**
 ```c
-tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .max_open_file_handles = 2048  /* Default: 1024 */
+};
 
-/* Set maximum open file handles */
-cf_config.max_open_file_handles = 2048;  /* Cache up to 2048 open files */
-
-/* Or disable caching entirely */
-cf_config.max_open_file_handles = 0;  /* No caching - open/close on each access */
-
-tidesdb_create_column_family(db, "my_cf", &cf_config);
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
 ```
 
-:::tip[Performance Considerations]
-Higher cache sizes provide better performance for read-heavy workloads with many SSTables, while lower cache sizes reduce system resource usage (file descriptors). Disabling the cache (0) provides maximum resource conservation but results in slower repeated reads. Monitor system `ulimit -n` to ensure sufficient file descriptor limits.
-:::
+## Concurrency
 
-:::caution[System Limits]
-Ensure your system's file descriptor limit is sufficient for your workload. Check with `ulimit -n` on Unix systems. Increase if needed
-```bash
-# Temporary (current session)
-ulimit -n 4096
+- **Point reads** (`tidesdb_txn_get`) use **READ COMMITTED** isolation
+- **Iterators** (`tidesdb_iter_new`) use **snapshot isolation**
+- Lock-free reads with RCU memory management
+- Multiple readers can execute concurrently without blocking
+- Writers are serialized per column family
 
-# Permanent (add to /etc/security/limits.conf)
-* soft nofile 4096
-* hard nofile 8192
-```
-:::
-
-## Concurrency Model
-
-TidesDB is designed for high read concurrency with minimal blocking.
-
-### Readers and Writer 
-Each column family has a reader-writer lock that allows multiple readers to read concurrently with no blocking between them. Writers don't block readers, so readers can access data while writes are in progress. However, writers block other writers, allowing only one writer per column family at a time.
-
-
-### Transaction Isolation
-Read transactions (`tidesdb_txn_begin_read`) acquire read locks. **Point reads** (`tidesdb_txn_get`) use **READ COMMITTED** isolation, seeing the latest committed data. **Iterators** (`tidesdb_iter_new`) use **snapshot isolation**, seeing a consistent point-in-time view via reference counting on SSTables and copy-on-write on memtables. Write transactions (`tidesdb_txn_begin`) acquire write locks on commit. Changes are not visible to other transactions until commit. Writers are serialized per column family to ensure atomicity.
-
-
-### Optimal Use Cases
-Read-heavy workloads benefit from unlimited concurrent readers with no contention. Mixed read/write workloads perform well since readers never wait for writers to complete. Multi-column-family applications can write to different column families concurrently.
-
-
-**Concurrent Operations Example**
-```c
-/* Thread 1 Reading */
-tidesdb_txn_t *read_txn;
-tidesdb_txn_begin_read(db, &read_txn);
-tidesdb_txn_get(read_txn, "my_cf", key, key_size, &value, &value_size);
-/* Can read while Thread 2 is writing */
-
-/* Thread 2 Writing */
-tidesdb_txn_t *write_txn;
-tidesdb_txn_begin(db, &write_txn);
-tidesdb_txn_put(write_txn, "my_cf", key, key_size, value, value_size, -1);
-tidesdb_txn_commit(write_txn);  /* Briefly blocks other writers only */
-
-/* Thread 3 Reading different CF */
-tidesdb_txn_t *other_txn;
-tidesdb_txn_begin_read(db, &other_txn);
-tidesdb_txn_get(other_txn, "other_cf", key, key_size, &value, &value_size);
-/* No blocking -- different column family */
-```
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#8-concurrency-and-thread-safety) for detailed concurrency model and thread safety information.
