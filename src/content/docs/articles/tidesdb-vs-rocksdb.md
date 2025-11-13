@@ -36,7 +36,7 @@ Bloom filters, block indexes, block cache `64mb`, memtable flush size `64mb`, an
 The benchmark tool measures
 - Throughput in operations per second (ops/sec)
 - Latency metrics including average, P50, P95, P99, minimum, and maximum values in microseconds
-- Iteration speed for full database scan performance
+- Iteration speed for full storage engine scan performance
 - Total duration for workload completion
 
 Test parameters
@@ -437,7 +437,7 @@ setTimeout(() => {
 }, 800);
 </script>
 
-TidesDB achieves 967K ops/sec versus RocksDB's 925K ops/sec (1.05x faster) with average latency of 8.27μs versus 8.65μs (comparable). P99 latency shows 20μs versus 16μs, and iteration reaches 5.7M ops/sec. At 8 threads, both databases show strong performance with RocksDB closing the gap.
+TidesDB achieves 967K ops/sec versus RocksDB's 925K ops/sec (1.05x faster) with average latency of 8.27μs versus 8.65μs (comparable). P99 latency shows 20μs versus 16μs, and iteration reaches 5.7M ops/sec. At 8 threads, both storage engines show strong performance with RocksDB closing the gap.
 
 **Scaling Efficiency**
 
@@ -506,7 +506,7 @@ setTimeout(() => {
 | 4       | 1.46x | 1.26x | **1.53x** |
 | 8       | 1.46x | 1.83x | **1.05x** |
 
-TidesDB shows excellent multi-threaded scaling, with peak throughput at 4 threads (970K ops/sec). The **2.24x advantage at 2 threads** is particularly impressive, suggesting lower synchronization overhead. RocksDB shows **negative scaling at 2 threads** (0.78x), indicating higher lock contention. At 8 threads, RocksDB scales well to 925K ops/sec while TidesDB maintains 967K ops/sec, with both databases showing strong high-concurrency performance.
+TidesDB shows excellent multi-threaded scaling, with peak throughput at 4 threads (970K ops/sec). The **2.24x advantage at 2 threads** is particularly impressive, suggesting lower synchronization overhead. RocksDB shows **negative scaling at 2 threads** (0.78x), indicating higher lock contention. At 8 threads, RocksDB scales well to 925K ops/sec while TidesDB maintains 967K ops/sec, with both storage engines showing strong high-concurrency performance.
 
 ### Mixed Workload - 4 Threads
 
@@ -845,7 +845,7 @@ setTimeout(() => {
 }, 1400);
 </script>
 
-With 4 threads, TidesDB reaches 738K delete ops/sec versus RocksDB's 701K ops/sec (1.05x faster) with average latency of 5.42μs versus 5.71μs (1.05x faster). P99 latency shows 15μs versus 13μs (comparable). Multi-threaded deletion shows both databases performing well with minimal difference.
+With 4 threads, TidesDB reaches 738K delete ops/sec versus RocksDB's 701K ops/sec (1.05x faster) with average latency of 5.42μs versus 5.71μs (1.05x faster). P99 latency shows 15μs versus 13μs (comparable). Multi-threaded deletion shows both storage engines performing well with minimal difference.
 
 ### Hot Key Deletion - Zipfian Pattern (500K operations, 4 threads)
 ```bash
@@ -1213,7 +1213,7 @@ setTimeout(() => {
 }, 1700);
 </script>
 
-Batch delete performance shows both databases maintaining stable performance across batch sizes. TidesDB starts at 738K ops/sec with batch size 1 (1.05x faster than RocksDB's 701K ops/sec) and maintains 708-736K ops/sec across all batch sizes. RocksDB shows 701-726K ops/sec across batch sizes. Both databases demonstrate well-optimized deletion paths with minimal variance across batching strategies.
+Batch delete performance shows both storage engines maintaining stable performance across batch sizes. TidesDB starts at 738K ops/sec with batch size 1 (1.05x faster than RocksDB's 701K ops/sec) and maintains 708-736K ops/sec across all batch sizes. RocksDB shows 701-726K ops/sec across batch sizes. Both storage engines demonstrate well-optimized deletion paths with minimal variance across batching strategies.
 
 ### Batch Mixed Workload (4 threads, 1M operations)
 ```bash
@@ -1270,7 +1270,7 @@ setTimeout(() => {
 
 Batch mixed workload shows TidesDB with 991K PUT ops/sec versus RocksDB's 652K ops/sec (1.52x faster) at batch 100, and 1.72M GET ops/sec versus RocksDB's 1.50M ops/sec (1.15x faster). At batch 1000, TidesDB reaches 985K PUT ops/sec versus 660K ops/sec (1.49x faster), with 1.69M GET ops/sec versus RocksDB's 1.61M ops/sec (1.05x faster). TidesDB maintains advantages in both reads and writes across batch sizes.
 
-Batch operations show TidesDB maintaining consistent advantages across all batch sizes. Write operations maintain 1.45-1.53x advantages, delete operations show 1.01-1.05x advantages, and mixed workloads demonstrate 1.05-1.52x advantages for both reads and writes. Both databases show stable performance across batching strategies, indicating well-optimized code paths.
+Batch operations show TidesDB maintaining consistent advantages across all batch sizes. Write operations maintain 1.45-1.53x advantages, delete operations show 1.01-1.05x advantages, and mixed workloads demonstrate 1.05-1.52x advantages for both reads and writes. Both storage engines show stable performance across batching strategies, indicating well-optimized code paths.
 
 ## Performance Summary
 
@@ -1278,9 +1278,9 @@ Batch operations show TidesDB maintaining consistent advantages across all batch
 
 ### TidesDB Strengths
 
-TidesDB delivers exceptional read performance ranging from 1.14x to 5.67x faster than RocksDB, with the most dramatic advantage appearing in single-threaded mixed workloads (5.67x). Write performance shows consistent advantages of 1.31x to 2.24x across all test scenarios, with the largest gains appearing in multi-threaded workloads at 2 threads (2.24x). Full database scans demonstrate superior iteration speed of 8.7-15.5M ops/sec, making TidesDB particularly well-suited for analytics and batch processing workloads.
+TidesDB delivers exceptional read performance ranging from 1.14x to 5.67x faster than RocksDB, with the most dramatic advantage appearing in single-threaded mixed workloads (5.67x). Write performance shows consistent advantages of 1.31x to 2.24x across all test scenarios, with the largest gains appearing in multi-threaded workloads at 2 threads (2.24x). Full storage engines scans demonstrate superior iteration speed of 8.7-15.5M ops/sec, making TidesDB particularly well-suited for analytics and batch processing workloads.
 
-Tail latency performance is where TidesDB truly excels. P99 and maximum latencies are consistently 1.5x to 18x lower than RocksDB, with the stress test showing a remarkable 18.05x advantage in maximum latency (2.5ms vs 44.2ms). This predictability stems from TidesDB's simpler architecture and lower variance in operation timing, making it ideal for latency-sensitive applications where consistent response times matter more than peak throughput. The database also shows excellent concurrency characteristics with strong scaling from 1 to 8 threads, particularly impressive at the 2 thread range where many applications operate.
+Tail latency performance is where TidesDB truly excels. P99 and maximum latencies are consistently 1.5x to 18x lower than RocksDB, with the stress test showing a remarkable 18.05x advantage in maximum latency (2.5ms vs 44.2ms). This predictability stems from TidesDB's simpler architecture and lower variance in operation timing, making it ideal for latency-sensitive applications where consistent response times matter more than peak throughput. The storage engine also shows excellent concurrency characteristics with strong scaling from 1 to 8 threads, particularly impressive at the 2 thread range where many applications operate.
 
 Deletion performance favors TidesDB in uniform random patterns, showing 1.05x to 1.12x advantages in single and multi-threaded scenarios. Batch operations demonstrate stable performance across all batch sizes, with write operations maintaining 1.45-1.53x advantages, delete operations showing 1.01-1.05x advantages, and mixed workloads maintaining 1.05-1.52x advantages for both reads and writes, demonstrating well-optimized code paths throughout.
 
@@ -1331,12 +1331,12 @@ Beyond raw performance, RocksDB offers a mature ecosystem with extensive product
 
 ## Conclusion
 
-TidesDB consistently outperforms RocksDB across most workloads, with particularly strong advantages in read-heavy scenarios (1.14-5.67x faster), write throughput (1.31-2.24x faster), and full database scans (8.7-15.5M ops/sec). Tail latency performance shows the most dramatic improvements, ranging from 1.5x to 18x better, which translates directly to more predictable application behavior under load. The stress test demonstrates exceptional tail latency with an 18.05x advantage in maximum latency (2.5ms vs 44.2ms), while multi-threaded performance at 2 threads shows 2.24x advantages, the sweet spot for many server applications.
+TidesDB consistently outperforms RocksDB across most workloads, with particularly strong advantages in read-heavy scenarios (1.14-5.67x faster), write throughput (1.31-2.24x faster), and full storage engine scans (8.7-15.5M ops/sec). Tail latency performance shows the most dramatic improvements, ranging from 1.5x to 18x better, which translates directly to more predictable application behavior under load. The stress test demonstrates exceptional tail latency with an 18.05x advantage in maximum latency (2.5ms vs 44.2ms), while multi-threaded performance at 2 threads shows 2.24x advantages, the sweet spot for many server applications.
 
-Deletion performance reveals nuanced characteristics: TidesDB excels at uniform random deletions (1.05-1.12x faster) but RocksDB handles hot key deletion patterns significantly more efficiently (2.03x faster). Batch operations demonstrate stable performance across all batch sizes for both databases, with TidesDB maintaining write advantages of 1.45-1.53x, delete advantages of 1.01-1.05x, and mixed workload advantages of 1.05-1.52x for both reads and writes.
+Deletion performance reveals nuanced characteristics: TidesDB excels at uniform random deletions (1.05-1.12x faster) but RocksDB handles hot key deletion patterns significantly more efficiently (2.03x faster). Batch operations demonstrate stable performance across all batch sizes for both storage engines, with TidesDB maintaining write advantages of 1.45-1.53x, delete advantages of 1.01-1.05x, and mixed workload advantages of 1.05-1.52x for both reads and writes.
 
 RocksDB maintains competitive edges in specific scenarios: large value reads (1KB+) where sophisticated multi-level caching provides a 3.35x advantage (1.25M vs 372K ops/sec), hot key patterns showing 1.16x faster writes and 2.03x faster deletions in Zipfian distributions. These strengths make RocksDB worth considering for applications with concentrated access patterns or large object storage where read performance on large values is critical.
 
-For applications prioritizing raw performance, simplicity, read speed, write speed, or predictable latency, TidesDB is the clear choice. Its simpler two-tier LSM architecture delivers superior performance in most real-world scenarios while maintaining a dramatically smaller codebase (~27K lines versus RocksDB's ~300K lines), making it easier to understand, debug, and maintain. The 2.24x advantage at 2 threads, 5.67x read advantage in mixed workloads, and exceptional tail latency performance make it particularly compelling for modern multi-core systems running typical database workloads with uniform access patterns.
+For applications prioritizing raw performance, simplicity, read speed, write speed, or predictable latency, TidesDB is the clear choice. Its simpler two-tier LSM architecture delivers superior performance in most real-world scenarios while maintaining a dramatically smaller codebase (~27K lines versus RocksDB's ~300K lines), making it easier to understand, debug, and maintain. The 2.24x advantage at 2 threads, 5.67x read advantage in mixed workloads, and exceptional tail latency performance make it particularly compelling for modern multi-core systems running typical storage engine workloads with uniform access patterns.
 
 Applications with concentrated key access patterns (hot keys), primarily large values (>1KB) in read-heavy scenarios, or those requiring RocksDB's mature ecosystem and extensive tooling, should consider RocksDB despite the performance trade-offs in other areas. The choice ultimately depends on whether your workload aligns with RocksDB's architectural strengths or whether TidesDB's broader performance advantages and simplicity better serve your needs.
