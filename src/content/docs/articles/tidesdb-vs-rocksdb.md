@@ -31,7 +31,7 @@ We do reccomend you benchmark your own use case to determine which storage engin
 ## Benchtool
 The benchtool is a custom pluggable benchmarking tool that provides fair, apples-to-apples comparisons between storage engines, you can find the repo here: [benchtool](https://github.com/tidesdb/benchtool). The benchtool is used to conduct all benchmarks in this article.
 
-Bloom filters, block indexes, block cache `64mb`, memtable flush size `64mb`, and sync mode `none` are enabled for all benchmarks.
+Bloom filters, block indexes, block cache `64mb`, memtable flush size `64mb`, and sync mode `none` are enabled for configured for both engines.
 
 ## Benchmark Methodology
 
