@@ -22,7 +22,6 @@ TidesDB requires the following libraries for compression and cryptographic opera
 - **[Snappy](https://github.com/google/snappy)** - Fast compression/decompression
 - **[LZ4](https://github.com/lz4/lz4)** - Extremely fast compression
 - **[Zstandard](https://github.com/facebook/zstd)** - High compression ratio
-- **[OpenSSL](https://www.openssl.org/)** - SHA-256 cryptographic hashing
 
 ## Installing Dependencies
 
@@ -31,16 +30,16 @@ TidesDB requires the following libraries for compression and cryptographic opera
 # Install all dependencies
 sudo apt update
 sudo apt install -y cmake build-essential \
-    libzstd-dev liblz4-dev libsnappy-dev libssl-dev
+    libzstd-dev liblz4-dev libsnappy-dev
 ```
 
 **Other Linux Distributions**
 ```bash
 # Fedora/RHEL/CentOS
-sudo dnf install cmake gcc libzstd-devel lz4-devel snappy-devel openssl-devel
+sudo dnf install cmake gcc libzstd-devel lz4-devel snappy-devel
 
 # Arch Linux
-sudo pacman -S cmake gcc zstd lz4 snappy openssl
+sudo pacman -S cmake gcc zstd lz4 snappy
 ```
 
 ### macOS
@@ -49,7 +48,7 @@ sudo pacman -S cmake gcc zstd lz4 snappy openssl
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install dependencies
-brew install cmake zstd lz4 snappy openssl
+brew install cmake zstd lz4 snappy
 ```
 
 ### Windows
@@ -62,10 +61,10 @@ cd vcpkg
 .\bootstrap-vcpkg.bat
 
 # Install dependencies
-.\vcpkg install zstd:x64-windows lz4:x64-windows snappy:x64-windows openssl:x64-windows
+.\vcpkg install zstd:x64-windows lz4:x64-windows snappy:x64-windows 
 
 # For 32-bit builds
-.\vcpkg install zstd:x86-windows lz4:x86-windows snappy:x86-windows openssl:x86-windows
+.\vcpkg install zstd:x86-windows lz4:x86-windows snappy:x86-windows
 ```
 
 ## Building

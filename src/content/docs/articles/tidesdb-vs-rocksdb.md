@@ -267,7 +267,7 @@ setTimeout(() => {
 }, 400);
 </script>
 
-TidesDB excels in mixed workloads with **48% faster writes** and **4.77x faster reads**. Read latency is sub-microsecond (0.27 μs avg), demonstrating TidesDB's lock-free read architecture. The P50 read latency of 0.00 μs indicates most reads complete in under 1 microsecond.
+Latency percentiles reveal TidesDB's consistency advantages. Write P50 latency is 2μs versus RocksDB's 3μs, with P99 at 4μs versus 7μs (1.75x better). Read latencies are exceptional: P50 of 0μs versus RocksDB's 1μs, P95 of 1μs versus 3μs (3x better), and P99 of 1μs versus 6μs (6x better). The P50 read latency of 0μs indicates most reads complete in under 1 microsecond, demonstrating TidesDB's lock-free read architecture.
 
 ## Multi-Threaded Scalability
 
@@ -438,7 +438,7 @@ setTimeout(() => {
 
 TidesDB achieves 1.02M ops/sec versus RocksDB's 673K ops/sec (1.52x faster) with average latency of 7.51μs versus 11.89μs (1.58x faster). P99 latency shows 19μs versus 18μs (similar), and iteration reaches 5.9M ops/sec versus 6.3M ops/sec (0.93x, slightly slower).
 
-**Scaling Efficiency:**
+**Scaling Efficiency**
 
 <canvas id="scalingEfficiencyChart" width="400" height="250"></canvas>
 <script>
@@ -1023,7 +1023,7 @@ Small value testing (8B keys, 32B values) showcases TidesDB's best overall perfo
 
 Small, cache-friendly data shows TidesDB's best write performance: **2.52x faster** with **1.19x faster reads**. This demonstrates TidesDB's efficiency with compact data structures.
 
-## Stress Test: High Concurrency
+## High Concurrency Stress
 
 **5M Operations, 8 Threads**
 ```bash
@@ -1325,8 +1325,6 @@ Beyond raw performance, RocksDB offers a mature ecosystem with extensive product
 | 4-thread read (avg) | 2.25 μs | ~2.78 μs | **1.24x better** |
 | 4-thread delete (avg) | 5.60 μs | ~7.30 μs | **1.30x better** |
 | Zipfian delete (avg) | 12.95 μs | ~8.79 μs | **1.47x worse** |
-| Batch write (avg, size 100) | 5.07 μs | ~7.80 μs | **1.54x better** |
-| Batch delete (avg, size 100) | 6.63 μs | ~7.36 μs | **1.11x better** |
 | Stress test P99 | 19 μs | ~53 μs | **2.79x better** |
 | Stress test max | 2,237 μs | ~32,560 μs | **14.56x better** |
 
