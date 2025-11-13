@@ -111,6 +111,10 @@ Every block manager file (WAL or SSTable) has the following structure
 | 4 | 4 bytes | Block Size | Default block size for this file |
 | 8 | 4 bytes | Padding | Reserved for future use |
 
+:::note Cross-Platform Portability
+All multi-byte integers (block size, padding, block sizes, checksums, overflow offsets, KV header fields, and SSTable metadata) use **little-endian encoding** throughout TidesDB. This ensures database files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
+:::
+
 #### Block Format
 
 Each block has the following structure
@@ -428,6 +432,47 @@ All committed transactions that were written to WAL are recovered. Uncommitted t
 **SSTable Recovery Ordering**
 
 SSTables are discovered by reading the column family directory, where directory order is filesystem-dependent and non-deterministic. SSTables are sorted by ID after loading to ensure correct read semantics, guaranteeing newest-to-oldest ordering for the read path (which searches from the end of the array backwards). Without sorting, stale data could be returned if newer SSTables load before older ones.
+
+#### 4.4.5 WAL Recovery Configuration
+
+TidesDB provides two recovery modes that control how `tidesdb_open()` handles WAL recovery, allowing you to balance startup speed against data availability guarantees.
+
+**Fast Startup Mode (Default)**
+
+By default, `tidesdb_open()` returns immediately after submitting recovered memtables to the background flush thread pool:
+
+```c
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .wait_for_wal_recovery = 0  /* Default is false */
+};
+```
+
+- Fastest startup time - `tidesdb_open()` returns immediately
+- Recovered WAL data is flushed to SSTables asynchronously in background
+- Queries may temporarily return "key not found" until flushes complete
+- Good for web servers, caching layers, read-heavy workloads, eventual consistency acceptable
+
+**Guaranteed Availability Mode**
+
+When enabled, `tidesdb_open()` blocks until all recovered memtables have been flushed to SSTables
+
+```c
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .wait_for_wal_recovery = 1,           /* Wait for recovery */
+    .wal_recovery_poll_interval_ms = 100  /* Poll every 100ms (default) */
+};
+```
+
+- All recovered data immediately queryable after `tidesdb_open()` returns
+- Blocks until flush queue is empty and stable (checked twice with delay)
+- Slower startup proportional to WAL size and number of recovered memtables
+- Good for Financial systems, audit logs, healthcare records, strict consistency requirements
+
+**Implementation Details**
+
+The recovery wait mechanism uses a stability check to ensure flushes have truly completed. The immutable memtable queue must be empty for two consecutive polling intervals before recovery is considered complete. This prevents race conditions where a memtable is temporarily dequeued but not yet submitted to the flush pool.
 
 ## 5. Data Operations
 
