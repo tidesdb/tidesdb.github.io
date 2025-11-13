@@ -10,9 +10,7 @@ description: "Comprehensive performance benchmarks comparing TidesDB and RocksDB
 
 This article presents comprehensive performance benchmarks comparing TidesDB and RocksDB, two LSM-tree based storage engines. Both are designed for write-heavy workloads, but they differ significantly in architecture, complexity, and performance characteristics.
 
-All benchmarks are conducted using a custom pluggable benchmarking tool that provides fair, apples-to-apples comparisons between storage engines.
-
-We do reccomend you benchmark your own use case to determine which storage engine is best for your needs!
+We do recommend you benchmark your own use case to determine which storage engine is best for your needs!
 
 ## Test Environment
 
