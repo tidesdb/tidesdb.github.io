@@ -80,9 +80,11 @@ if (result != TDB_SUCCESS)
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .enable_debug_logging = 0,  /* Optional enable debug logging */
-    .num_flush_threads = 2,     /* Optional flush thread pool size (default is 2) */
-    .num_compaction_threads = 2 /* Optional compaction thread pool size (default is 2) */
+    .enable_debug_logging = 0,         /* Optional enable debug logging */
+    .num_flush_threads = 2,            /* Optional flush thread pool size (default is 2) */
+    .num_compaction_threads = 2,       /* Optional compaction thread pool size (default is 2) */
+    .wait_for_wal_recovery = 0,        /* Optional wait for WAL recovery flushes (default: 0 = fast startup) */
+    .wal_recovery_poll_interval_ms = 100  /* Optional polling interval for WAL recovery (default: 100ms) */
 };
 
 tidesdb_t *db = NULL;

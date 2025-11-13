@@ -31,6 +31,7 @@ reads through bloom filters, block indices, and compaction.
 - Two sync modes: TDB_SYNC_NONE for maximum performance (OS-managed flushing) and TDB_SYNC_FULL for maximum durability (fsync on every write).
 - Cross-platform support for Linux, macOS, and Windows on both 32-bit and 64-bit architectures with platform abstraction layer.
 - Clean C API that returns 0 on success and negative error codes on failure for straightforward error handling.
+- Full file portability with little-endian serialization throughout—database files can be copied between any platform (x86, ARM, RISC-V) and architecture (32-bit, 64-bit, little-endian, big-endian) without conversion.
 
 ## Community
 

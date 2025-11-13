@@ -46,7 +46,7 @@ import VersionBadge from '../../components/VersionBadge.astro';
 		ACID transactions that are atomic, consistent, isolated, and durable across multiple column families. 
 	</Card>
 	<Card title="Concurrent" icon="rocket" style="--card-index: 1">
-		Column family readers don't block readers or writer and vice versa.
+		Readers don't block readers or writers within a column family, and writers don't block readers.
 	</Card>
 	<Card title="LSM-Tree Architecture" icon="setting" style="--card-index: 2">
 		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance.
@@ -58,7 +58,7 @@ import VersionBadge from '../../components/VersionBadge.astro';
 		Support for Snappy, LZ4, and ZSTD compression algorithms. Configure per column family for optimal storage efficiency.
 	</Card>
 	<Card title="Background Or Manual Compaction" icon="random" style="--card-index: 4">
-		Reduces SSTable count and removes expired and deleted keys without blocking operations within column families.
+		Reduces SSTable count and removes expired/deleted keys without blocking column family operations.
 	</Card>
 	<Card title="Cross-Platform" icon="laptop" style="--card-index: 5">
 		Native support for 32-bit and 64-bit Linux, macOS, and Windows with platform abstraction layer for consistent behavior.
