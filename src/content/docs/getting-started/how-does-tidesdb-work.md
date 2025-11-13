@@ -48,7 +48,7 @@ A distinctive aspect of TidesDB is its organization around column families. Each
 - Operates as an independent key-value store
 - Has its own dedicated memtable and set of SSTables
 - Can be configured with different parameters for flush thresholds, compression settings, etc.
-- Uses read-write locks to allow concurrent reads but single-writer access
+- Uses reader-writer locks (`pthread_rwlock_t`) to allow concurrent reads while ensuring single-writer access during commits
 
 This design allows for domain-specific optimization and isolation between different types of data stored in the same database.
 
@@ -60,19 +60,25 @@ This design allows for domain-specific optimization and isolation between differ
 
 </div>
 
-The memtable is the first landing point for all column family write operations. TidesDB implements the memtable structure as a pair in which includes a COW (Copy-On-Write) skip list, using atomic operations and reference counting for concurrent read access and a WAL (Write-Ahead Log) for recovery. 
-Readers acquire references to the memtable before accessing it, while writers 
-acquire an exclusive lock on the column family. Each column family can 
-register a custom key comparison function (memcmp, string, numeric, or 
-user-defined) that determines sort order consistently across the entire 
-system--memtable, SSTables, block indexes, and iterators all use the same comparison logic. 
-The skip list's flush write buffer threshold, maximum level and probability parameters are configurable per 
-column family, allowing tuning for specific workloads. When the memtable 
-reaches a configurable size threshold, it becomes immutable and is queued for 
-flushing while a new active memtable is created. The immutable memtable is 
-flushed to disk as an SSTable by a background thread pool, with reference 
-counting ensuring the memtable isn't freed until all readers complete and the 
-flush finishes.
+The memtable is the first landing point for all column family write operations. TidesDB implements the memtable using a lock-free skip list with atomic operations and RCU (Read-Copy-Update) memory management for exceptional read performance. The skip list uses a mark-and-insert update strategy where updates mark old nodes as deleted and insert new nodes atomically, ensuring lock-free consistency without blocking readers.
+
+**Lock-Free Concurrency Model**
+
+Readers never acquire locks, never block, and scale linearly with CPU cores. Writers use a lightweight mutex for single-writer serialization per column family, ensuring write atomicity without complex locking. Readers don't block writers, and writers don't block readers. All read operations use atomic pointer loads with acquire memory ordering for correct synchronization.
+
+**Memory Management Optimizations**
+
+- Skip list nodes are allocated from memory pools (arenas) rather than individual malloc calls, reducing allocation overhead and improving cache locality. Arenas are chained together as they fill up.
+- Keys and values ≤24 bytes are stored directly within the node structure (inline), eliminating pointer indirection and improving performance. Larger keys/values use pointer-based storage.
+- Deleted nodes are retired to an epoch-based RCU list and reclaimed after a grace period (10 epochs), preventing use-after-free while maintaining lock-free reads. Nodes use atomic reference counting for safe memory reclamation.
+
+**Custom Comparators**
+
+Each column family can register a custom key comparison function (memcmp, string, numeric, or user-defined) that determines sort order consistently across the entire system--memtable, SSTables, block indexes, and iterators all use the same comparison logic.
+
+**Configuration and Lifecycle**
+
+The skip list's flush threshold (`memtable_flush_size`), maximum level, and probability parameters are configurable per column family, allowing tuning for specific workloads. When the memtable reaches the size threshold, it becomes immutable and is queued for flushing while a new active memtable is created. The immutable memtable is flushed to disk as an SSTable by a background thread pool, with reference counting ensuring the memtable isn't freed until all readers complete and the flush finishes. Each memtable is paired with a WAL (Write-Ahead Log) for durability and recovery.
 
 ### 4.2 Block Manager Format
 
@@ -101,7 +107,7 @@ Every block manager file (WAL or SSTable) has the following structure
 | Offset | Size | Field | Description |
 |--------|------|-------|-------------|
 | 0 | 3 bytes | Magic | `0x544442` ("TDB" in hex) |
-| 3 | 1 byte | Version | Block manager version (currently 1) |
+| 3 | 1 byte | Version | Block manager version (currently 3) |
 | 4 | 4 bytes | Block Size | Default block size for this file |
 | 8 | 4 bytes | Padding | Reserved for future use |
 
@@ -111,15 +117,15 @@ Each block has the following structure
 
 ```
 [Block Size is 8 bytes (uint64_t)]
-[SHA1 Checksum is 20 bytes]
+[xxHash64 Checksum is 8 bytes]
 [Inline Data is a variable, up to block_size]
 [Overflow Offset is 8 bytes (uint64_t)]
 [Overflow Data is a variable, if size > block_size]
 ```
 
-**Block Header (36 bytes minimum)**
+**Block Header (24 bytes minimum)**
 
-The block header consists of the block size (8 bytes) representing the total size of the data (inline + overflow), an SHA1 checksum (20 bytes) for integrity checking the entire block data, inline data (variable) containing the first portion of data up to `block_size` bytes, and an overflow offset (8 bytes) pointing to overflow data (0 if no overflow).
+The block header consists of the block size (8 bytes) representing the total size of the data (inline + overflow), an xxHash64 checksum (8 bytes) for integrity checking the entire block data, inline data (variable) containing the first portion of data up to `block_size` bytes, and an overflow offset (8 bytes) pointing to overflow data (0 if no overflow).
 
 **Overflow Handling**
 
@@ -127,16 +133,16 @@ If the data size is less than or equal to `block_size` (default 32KB), all data 
 
 #### Block Write Process
 
-The write process begins by computing the SHA1 checksum of the entire data, determining the inline size (minimum of data size and block_size), and calculating the remaining overflow size. The main block buffer is built containing the block size (8 bytes), SHA1 checksum (20 bytes), inline data (up to 32KB), and overflow offset (8 bytes, initially 0). The main block is written atomically using `pwrite()`. If overflow exists, the overflow data is written at the end of the file and the overflow offset in the main block is updated. Finally, fsync is optionally performed based on the sync mode.
+The write process begins by computing the xxHash64 checksum of the entire data, determining the inline size (minimum of data size and block_size), and calculating the remaining overflow size. The main block buffer is built containing the block size (8 bytes), xxHash64 checksum (8 bytes), inline data (up to 32KB), and overflow offset (8 bytes, initially 0). The main block is written atomically using `pwrite()`. If overflow exists, the overflow data is written at the end of the file and the overflow offset in the main block is updated. Finally, fsync is optionally performed based on the sync mode.
 
 #### Block Read Process
 
-The read process reads the block size (8 bytes) and SHA1 checksum (20 bytes), calculates the inline size, and reads the inline data. It then reads the overflow offset (8 bytes). If the overflow offset is greater than 0, it seeks to the overflow offset and reads the remaining data. The inline and overflow data are concatenated, the SHA1 checksum is verified, and the block is returned if valid.
+The read process reads the block size (8 bytes) and xxHash64 checksum (8 bytes), calculates the inline size, and reads the inline data. It then reads the overflow offset (8 bytes). If the overflow offset is greater than 0, it seeks to the overflow offset and reads the remaining data. The inline and overflow data are concatenated, the xxHash64 checksum is verified, and the block is returned if valid.
 
 #### Integrity and Recovery
 
 TidesDB implements multiple layers of data integrity protection. All block 
-reads verify SHA1 checksums to detect corruption, while writes use `pwrite()` 
+reads verify xxHash64 checksums to detect corruption, while writes use `pwrite()` 
 for atomic block-level updates. During startup, the system validates the last 
 block's integrity--if corruption is detected, the file is automatically 
 truncated to the last known-good block. This approach ensures crash safety by 
@@ -159,7 +165,7 @@ TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying o
 
 #### Thread Safety
 
-A write mutex serializes all write operations to prevent corruption, while concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
+Block manager operations use a write mutex to serialize all write operations, preventing corruption. Concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
 
 #### LRU Block Cache
 
@@ -167,19 +173,15 @@ TidesDB implements an optional LRU (Least Recently Used) block cache at the bloc
 
 **Cache Architecture**
 
-The block cache uses a hash table combined with a doubly-linked list for O(1) lookups and evictions. Each cached block is identified by a unique key derived from its file offset (e.g., "12345" for offset 12345). The hash table provides fast key-based lookups using xxHash for distribution, while the doubly-linked list maintains access order (most recent at head, least recent at tail). An eviction callback is registered for each cached block to update cache size tracking when blocks are evicted.
+The block cache uses a hash table combined with a doubly-linked list for O(1) lookups and evictions. Each cached block is identified by a unique key derived from its file offset (e.g., "12345" for offset 12345). The hash table provides fast key-based lookups using xxHash for distribution, while the doubly-linked list maintains access order (most recent at head, least recent at tail). An eviction callback is registered for each cached block to update cache size tracking when blocks are evicted. All cache operations are protected by a mutex, ensuring safe concurrent access.
 
 **Cache Operations**
 
-**Block Write** · After writing a block to disk, if cache space is available (current_size + block_size <= max_size), a copy of the block is added to the cache with the file offset as the key. If the cache is full, the LRU eviction policy automatically removes the least recently used block to make space. The cache size is tracked in bytes, with each block contributing its data size to the total.
+After writing a block to disk, if cache space is available (current_size + block_size <= max_size), a copy of the block is added to the cache with the file offset as the key. If the cache is full, the LRU eviction policy automatically removes the least recently used block to make space. The cache size is tracked in bytes, with each block contributing its data size to the total.
 
-**Block Read** · Before reading from disk, the cache is checked using the block offset as the key. On cache hit, a copy of the cached block is returned immediately (no disk I/O). On cache miss, the block is read from disk, and if space permits, it's added to the cache for future reads. Every cache access moves the block to the head of the LRU list (marking it as most recently used).
+Before reading from disk, the cache is checked using the block offset as the key. On cache hit, a copy of the cached block is returned immediately (no disk I/O). On cache miss, the block is read from disk, and if space permits, it's added to the cache for future reads. Every cache access moves the block to the head of the LRU list (marking it as most recently used).
 
-**Cache Eviction** · When the cache reaches `block_manager_cache_size`, the least recently used block (tail of LRU list) is automatically evicted. The eviction callback decrements `current_size` by the evicted block's size and frees the block's memory. This ensures the cache never exceeds the configured memory limit.
-
-**Thread Safety**
-
-All cache operations are protected by a mutex, ensuring safe concurrent access. Multiple readers can check the cache simultaneously (mutex-protected), and cache updates during writes are serialized. The LRU list is updated atomically during access to maintain correct ordering.
+When the cache reaches `block_manager_cache_size`, the least recently used block (tail of LRU list) is automatically evicted. The eviction callback decrements `current_size` by the evicted block's size and frees the block's memory. This ensures the cache never exceeds the configured memory limit.
 
 **Configuration Example**
 
@@ -191,18 +193,18 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 
 **Performance Benefits**
 
-- **Reduced I/O** · Hot blocks (frequently accessed) stay in memory, eliminating disk reads
-- **Faster Reads** · Cache hits provide sub-microsecond access vs milliseconds for disk I/O
-- **Compaction Efficiency** · During compaction, recently written blocks are cached, speeding up merge operations
-- **Iterator Performance** · Sequential scans benefit from cached blocks in the read path
+- Hot blocks (frequently accessed) stay in memory, eliminating disk reads
+- Cache hits provide sub-microsecond access vs milliseconds for disk I/O
+- During compaction, recently written blocks are cached, speeding up merge operations
+- Sequential scans benefit from cached blocks in the read path
 
 **Cache Sizing Guidelines**
 
-- **Small datasets** (<100MB) · Set cache to 10-20% of dataset size
-- **Large datasets** (>1GB) · Set cache to 5-10% or based on working set size
-- **Read-heavy workloads** · Larger cache (50-100MB+) provides better hit rates
-- **Write-heavy workloads** · Smaller cache (10-20MB) since data is less frequently re-read
-- **Disable caching** · Set `block_manager_cache_size = 0` to disable (no memory overhead)
+- Small datasets (<100MB): Set cache to 10-20% of dataset size
+- Large datasets (>1GB): Set cache to 5-10% or based on working set size
+- Read-heavy workloads: Larger cache (50-100MB+) provides better hit rates
+- Write-heavy workloads: Smaller cache (10-20MB) since data is less frequently re-read
+- Disable caching: Set `block_manager_cache_size = 0` to disable (no memory overhead)
 
 **Monitoring Cache Effectiveness**
 
@@ -254,10 +256,10 @@ SSTables use the block manager format with sequential block ordering:
 ```
 
 **Block Order (from first to last)**
-1. **Data Blocks** · Key-value pairs in sorted order (sequential blocks starting at 0)
-2. **Bloom Filter Block** (optional) · Only written if `enable_bloom_filter = 1`
-3. **Index Block** (optional) · Only written if `enable_block_indexes = 1`
-4. **Metadata Block** (required) · Always the last block in the file
+1. Data Blocks: Key-value pairs in sorted order (sequential blocks starting at 0)
+2. Bloom Filter Block (optional): Only written if `enable_bloom_filter = 1`
+3. Index Block (optional): Only written if `enable_block_indexes = 1`
+4. Metadata Block (required): Always the last block in the file
 
 :::note
 The exact block positions of bloom filter and index depend on how many KV pairs exist and which features are enabled. During SSTable loading, the system reads backwards from the end: metadata (last), then index (if present), then bloom filter (if present).
@@ -315,7 +317,7 @@ Written after all data blocks (if enabled)
 
 </div>
 
-TidesDB implements a space-efficient succinct trie using LOUDS (Level-Order Unary Degree Sequence) encoding to provide fast key-to-block-offset lookups in SSTables. The data structure consists of five compact arrays that work in concert: a LOUDS bitvector that encodes the tree structure using approximately 2 bits per node, where sequences of 1-bits represent children and 0-bits mark boundaries; a labels array storing the character for each edge in breadth-first order; an edge_child array mapping each edge index to its corresponding child node ID; a terminal bitvector marking which nodes represent complete keys; and a values array holding the actual block offsets for terminal nodes. During lookup, the trie navigates from the root by using rank and select operations on the LOUDS bitvector to locate children, comparing characters in the labels array, and following the edge_child mappings until reaching a terminal node, at which point it returns the corresponding value. The implementation features a disk-streaming builder that maintains O(1) memory usage during construction by writing intermediate data to temporary block manager files, making it capable of building indices for arbitrarily large datasets without memory constraints. This approach achieves 95% space savings compared to pointer-based tries while maintaining O(key_length) lookup time, and the entire structure can be serialized directly into SSTable files for persistent storage, enabling TidesDB to perform direct block access instead of expensive linear scans through data blocks.
+TidesDB implements a space-efficient succinct trie using LOUDS (Level-Order Unary Degree Sequence) encoding to provide fast key-to-block-number lookups in SSTables. The data structure consists of five compact arrays that work in concert: a LOUDS bitvector that encodes the tree structure using approximately 2 bits per node, where sequences of 1-bits represent children and 0-bits mark boundaries; a labels array storing the character for each edge in breadth-first order; an edge_child array mapping each edge index to its corresponding child node ID; a terminal bitvector marking which nodes represent complete keys; and a values array holding the actual block numbers (0-indexed sequential positions) for terminal nodes. During lookup, the trie navigates from the root by using rank and select operations on the LOUDS bitvector to locate children, comparing characters in the labels array, and following the edge_child mappings until reaching a terminal node, at which point it returns the corresponding block number. The implementation features a disk-streaming builder that maintains O(1) memory usage during construction by writing intermediate data to temporary block manager files, making it capable of building indices for arbitrarily large datasets without memory constraints. This approach achieves 95% space savings compared to pointer-based tries while maintaining O(key_length) lookup time, and the entire structure can be serialized directly into SSTable files for persistent storage, enabling TidesDB to perform direct block access (by advancing the cursor to the returned block number) instead of expensive linear scans through data blocks.
 
 #### Metadata Block
 
@@ -334,7 +336,7 @@ Always written as the last block in the file
 - Magic number (0x5353544D = "SSTM") identifies this as a valid SSTable metadata block
 - Min/max keys enable range-based SSTable filtering during reads
 - Num entries tracks total KV pairs in SSTable (used to know when to stop reading data blocks)
-- **Always loaded first** · during SSTable recovery using `cursor_goto_last()` to read from end of file
+- Always loaded first during SSTable recovery using `cursor_goto_last()` to read from end of file
 
 #### SSTable Write Process
 
@@ -343,9 +345,9 @@ Always written as the last block in the file
 3. **For each KV pair**
    - Build KV header (18 bytes) + key + value
    - Optionally compress the entire block
-   - Write as data block and record the file offset
+   - Write as data block and record the block number (0-indexed sequential counter)
    - Add key to bloom filter (if enabled)
-   - Add key->offset mapping to succinct trie builder (if enabled)
+   - Add key->block_number mapping to succinct trie builder (if enabled)
    - Track min/max keys
 4. Build the succinct trie from the builder (if enabled)
 5. Serialize and write bloom filter block (if enabled)
@@ -367,9 +369,10 @@ Always written as the last block in the file
 2. **Lookup Key**
    - Check if key is within min/max range (quick rejection)
    - Check bloom filter if enabled (probabilistic rejection)
-   - If block indexes enabled: query succinct trie for exact block offset
+   - If block indexes enabled: query succinct trie for block number (0-indexed)
+     - Position cursor at first block, then advance to target block number
+     - Read block at that position
    - If block indexes disabled: linear scan through data blocks
-   - Read block at offset
    - Decompress block if compression is enabled
    - Parse KV header (18 bytes) and extract key/value
    - Check TTL expiration
@@ -446,23 +449,15 @@ When a key-value pair is written to TidesDB
 
 ### 5.2 Read Path
 
-When reading a key from TidesDB
+When reading a key from TidesDB:
 
-1. First, the active memtable is checked for the key
-2. If not found, immutable memtables in the flush queue are checked (newest to oldest)
-3. If still not found, SSTables are checked in reverse chronological order (newest to oldest)
-4. For each SSTable:
-   - Check if key is within min/max key range (quick rejection)
-   - If within range, check bloom filter (if enabled) to determine if key might exist
-   - If bloom filter indicates possible match (or if disabled):
-     - If block indexes enabled: query succinct trie for exact block offset
-     - If block indexes disabled: linear scan through data blocks
-   - Read the block at the determined offset
-   - Decompress block if compression is enabled
-   - Parse KV header and compare keys
-   - Check TTL expiration and tombstone flag
-5. The search stops when the key is found or all sources have been checked
-6. Return the value or TDB_ERR_NOT_FOUND
+1. **Check active memtable** for the key
+2. **Check immutable memtables** in the flush queue (newest to oldest)
+3. **Check SSTables** in reverse chronological order (newest to oldest)
+   - For each SSTable, perform the lookup process described in Section 4.3 (min/max range check, bloom filter, block index or linear scan, decompression, TTL/tombstone validation)
+4. Return the value when found, or `TDB_ERR_NOT_FOUND` if not present in any source
+
+This multi-tier search ensures the most recent version of a key is always retrieved, with newer sources taking precedence over older ones.
 
 ### 5.3 Transactions
 
@@ -473,8 +468,8 @@ transaction capable of operating atomically across multiple column families.
 The system implements **READ COMMITTED** isolation for point reads 
 (`tidesdb_txn_get`), where reads see the latest committed data, and **snapshot 
 isolation** for iterators (`tidesdb_iter_new`), where iterators see a 
-consistent point-in-time view via reference counting on SSTables and 
-copy-on-write on memtables. Read transactions don't block writers. Write 
+consistent point-in-time view via atomic reference counting on both memtables 
+and SSTables. Read transactions don't block writers. Write 
 transactions acquire exclusive locks per column family only during commit, 
 ensuring atomicity--all operations succeed together or automatically rollback 
 on failure. Transactions support read-your-own-writes semantics, allowing 
@@ -585,37 +580,47 @@ The `num_flush_threads` defaults to 2 (TDB_DEFAULT_THREAD_POOL_SIZE) and is I/O 
 
 ## 8. Concurrency and Thread Safety
 
-TidesDB is designed for great concurrency with minimal blocking through a reader-writer lock model.
+TidesDB is designed for exceptional concurrency with lock-free reads and minimal write serialization.
 
-### 8.1 Reader-Writer Locks
+### 8.1 Lock-Free Reads with RCU
 
-Each column family uses a reader-writer lock to enable efficient concurrent 
-access. Multiple readers can access the same column family simultaneously 
-without blocking each other, and read operations can proceed even while writes 
-are in progress. However, writers acquire exclusive access, allowing only one 
-write transaction per column family at a time to ensure data consistency.
+TidesDB's skip list memtables use lock-free reads with RCU (Read-Copy-Update) 
+memory management. Readers never acquire locks, never block, and scale linearly 
+with CPU cores. All read operations use atomic pointer loads with acquire memory 
+ordering for correct synchronization. Writers use a lightweight mutex for 
+single-writer serialization per column family, ensuring write atomicity without 
+complex locking. Readers don't block writers, and writers don't block readers. 
+Deleted nodes are retired to an epoch-based RCU list and reclaimed after a grace 
+period, preventing use-after-free while maintaining lock-free reads.
 
-### 8.2 Transaction Isolation
+### 8.2 Column Family Locks
+
+Each column family uses a reader-writer lock (`pthread_rwlock_t`) for structural 
+operations like flushing and compaction. Multiple read transactions can execute 
+concurrently, while write transactions acquire exclusive access only during commit, 
+allowing only one write transaction per column family at a time to ensure atomicity.
+
+### 8.3 Transaction Isolation
 
 TidesDB implements **READ COMMITTED** isolation for point reads and **snapshot 
 isolation** for iterators, both with read-your-own-writes semantics. Point 
 reads (`tidesdb_txn_get`) see the latest committed data from all sources 
 (active memtable, immutable memtables, SSTables). Iterators 
-(`tidesdb_iter_new`) acquire references on SSTables and see a consistent 
-point-in-time snapshot, unaffected by concurrent compaction or writes. Read 
-transactions use copy-on-write and never observe uncommitted changes from 
-other transactions. Write transactions acquire write locks only during commit 
-to ensure atomic updates. Within a single transaction, uncommitted changes are 
-immediately visible, allowing operations to read their own writes before 
-commit.
+(`tidesdb_iter_new`) acquire atomic references on both memtables and SSTables, 
+creating a consistent point-in-time snapshot unaffected by concurrent 
+compaction or writes. Read transactions use lock-free atomic operations and 
+never observe uncommitted changes from other transactions. Write transactions 
+acquire write locks only during commit to ensure atomic updates. Within a 
+single transaction, uncommitted changes are immediately visible, allowing 
+operations to read their own writes before commit.
 
-### 8.3 Optimal Use Cases
+### 8.4 Optimal Use Cases
 
-This concurrency model makes TidesDB particularly well-suited for
+This concurrency model makes TidesDB particularly well-suited for:
 
-- **Read-heavy workloads** · Unlimited concurrent readers with no contention
-- **Mixed read/write workloads** · Readers never wait for writers to complete
-- **Multi-column-family applications** · Different column families can be written to concurrently
+- Read-heavy workloads with unlimited concurrent readers and no contention
+- Mixed read/write workloads where readers never wait for writers to complete
+- Multi-column-family applications where different column families can be written to concurrently
 
 ## 9. Directory Structure and File Organization
 
@@ -648,17 +653,7 @@ mydb/
 
 #### Write-Ahead Log (WAL) Files
 
-Write-Ahead Log (WAL) files follow the naming convention `wal_<memtable_id>.log` 
-(e.g., `wal_0.log`, `wal_1.log`) and provide durability by recording all 
-writes before they're applied to the memtable. Each memtable has its own 
-dedicated WAL file with a matching ID based on a monotonically increasing 
-counter. WAL files are created when a new memtable is created--either on 
-database open or during memtable rotation--and multiple WAL files can exist 
-simultaneously: one for the active memtable and others for memtables in the 
-flush queue. A WAL file is deleted only after its corresponding memtable is 
-successfully flushed to an SSTable and freed from memory. If a flush doesn't 
-complete before shutdown, the WAL is automatically recovered on the next 
-database restart, replaying operations to restore consistency.
+WAL files follow the naming pattern `wal_<memtable_id>.log` (e.g., `wal_0.log`, `wal_1.log`). Each memtable has its own dedicated WAL file with a matching ID. WAL files are deleted only after the corresponding memtable is successfully flushed to an SSTable. See Section 4.4 for detailed WAL lifecycle and rotation mechanics.
 
 #### SSTable Files
 
@@ -680,7 +675,7 @@ This example demonstrates how WAL files are created, rotated, and deleted
 Active Memtable (ID 0) → wal_0.log
 ```
 
-**2. Memtable Fills Up** · (size >= `memtable_flush_size`)
+**2. Memtable Fills Up** (size >= `memtable_flush_size`)
 ```
 Active Memtable (ID 0) → wal_0.log  [FULL - triggers rotation]
 ```
@@ -723,7 +718,7 @@ wal_0.log, wal_1.log  [DELETED means both flushes complete]
 
 ### 9.4 Directory Management
 
-**Creating a column family** · creates a new subdirectory
+Creating a column family creates a new subdirectory:
 ```c
 tidesdb_create_column_family(db, "my_cf", &cf_config);
 // Creates mydb/my_cf/ directory with
@@ -731,7 +726,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 //   - config.cfc (persisted configuration)
 ```
 
-**Dropping a column family** · removes the entire subdirectory
+Dropping a column family removes the entire subdirectory:
 ```c
 tidesdb_drop_column_family(db, "my_cf");
 // Deletes mydb/my_cf/ directory and all contents (WALs, SSTables)

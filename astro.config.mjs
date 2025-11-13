@@ -12,6 +12,9 @@ export default defineConfig({
 			customCss: [
 				'./src/styles/custom.css',
 			  ],
+			components: {
+				// Allow custom components to be used in content
+			},
 			logo: {
 				light: './src/assets/tidesdb-logo-v0.1.svg',
 				dark: './src/assets/tidesdb-logo-v0.1.svg',
@@ -156,6 +159,12 @@ export default defineConfig({
 					items: [
 						{ label: 'Building & Benchmarking', slug: 'reference/building' },
 						{ label: 'C API Reference', slug: 'reference/c' },
+					],
+				},
+				{
+					label: 'Articles',
+					items: [
+						{ label: 'TidesDB vs RocksDB', slug: 'articles/tidesdb-vs-rocksdb' },
 					],
 				},
 				{

@@ -14,25 +14,23 @@ reads through bloom filters, block indices, and compaction.
 
 ## Core Features
 
-- ACID transactions that are atomic, consistent, isolated, and durable. Transactions support multiple operations across column families. Point reads use READ COMMITTED isolation (see latest committed data), while iterators use snapshot isolation (consistent point-in-time view via reference counting). Writers are serialized per column family to ensure atomicity, while copy-on-write (COW) provides consistency for concurrent readers.
-- Writers don't block readers. Readers never block other readers. Background operations will not affect active transactions.
-- Isolated key-value stores. Each column family has its own configuration, memtables, sstables, and write ahead logs.
-- Bidirectional iterators that allow you to iterate forward and backward over key-value pairs with heap-based merge-sort across memtable and sstables. Effective seek operations with O(log n) skip list positioning and succinct trie block index positioning (if enabled) in sstables. Reference counting prevents premature deletion during iteration.
-- Durability through WAL (write ahead log). Automatic recovery on startup reconstructs memtables from WALs.
-- Optional automatic background compaction when sstable count reaches configured max per column family. You can also trigger manual compactions through the API, parallelized or not.
-- Optional bloom filters to reduce disk reads by checking key existence before reading sstables. Configurable false positive rate.
-- Optional compression via Snappy, LZ4, or ZSTD for sstables and WAL entries. Configurable per column family.
-- Optional TTL (time-to-live) for key-value pairs. Expired entries automatically skipped during reads.
-- Optional custom comparators. You can register custom key comparison functions. Built-in comparators include memcmp, string, numeric.
-- You can enable column families to utilize block caching (most recent blocks).
-- Two sync modes NONE (fastest), FULL (most durable, slowest).
-- Per-column-family configuration includes memtable size, compaction settings, compression, bloom filters, sync mode, and more.
-- Clean, easy-to-use C API. Returns 0 on success, -n on error.
-- Cross-platform support for 32bit and 64bit Linux, macOS, and Windows with platform abstraction layer.
-- Optional succinct trie block indexes for fast sstable lookups. Provides direct key-to-block offset mapping without full sstable scans. Uses LOUDS (Level-Order Unary Degree Sequence) representation for memory-efficient compressed storage with O(1) navigation operations. Significantly reduces memory footprint compared to traditional hash-based indexes while maintaining fast lookup performance.
-- Efficient deletion through tombstone markers. Removed during compactions.
-- Configurable LRU cache for open file handles. Limits system resources while maintaining performance. Set `max_open_file_handles` to control cache size (0 = disabled).
-- Storage engine thread pools for background flush and compaction with configurable thread counts.
+- Lock-free skip list memtables with RCU memory management, epoch-based garbage collection, and atomic operations. Readers never block and scale linearly with CPU cores, while writers use lightweight mutex serialization per column family.
+- ACID transactions that are atomic, consistent, isolated, and durable across multiple column families. Point reads use READ COMMITTED isolation, iterators use snapshot isolation with reference counting.
+- Column families provide isolated key-value stores, each with independent configuration, memtables, SSTables, and write-ahead logs.
+- Bidirectional iterators support forward and backward traversal with heap-based merge-sort across memtables and SSTables. Lock-free iteration with reference counting prevents premature deletion during concurrent operations.
+- Efficient seek operations using O(log n) skip list positioning and optional succinct trie block indexes with LOUDS encoding for direct key-to-block-number mapping in SSTables.
+- Durability through write-ahead log (WAL) with automatic recovery on startup that reconstructs memtables from persisted logs.
+- Automatic background compaction when SSTable count reaches configured threshold, or manual parallel compaction via API. Compaction removes tombstones and expired TTL entries.
+- Optional bloom filters provide probabilistic key existence checks to reduce disk reads. Configurable false positive rate per column family.
+- Optional compression using Snappy, LZ4, or ZSTD for both SSTables and WAL entries. Configurable per column family.
+- TTL (time-to-live) support for key-value pairs with automatic expiration. Expired entries are skipped during reads and removed during compaction.
+- Custom comparators allow registration of user-defined key comparison functions. Built-in comparators include memcmp, string, and numeric.
+- Memory optimizations include arena-based allocation for skip list nodes and inline storage for small keys/values (≤24 bytes) to reduce malloc overhead and pointer indirection.
+- Two-tier caching system with block-level LRU cache for frequently accessed data and configurable file handle cache to limit open file descriptors.
+- Shared thread pools for background flush and compaction operations with configurable thread counts at the database level.
+- Two sync modes: TDB_SYNC_NONE for maximum performance (OS-managed flushing) and TDB_SYNC_FULL for maximum durability (fsync on every write).
+- Cross-platform support for Linux, macOS, and Windows on both 32-bit and 64-bit architectures with platform abstraction layer.
+- Clean C API that returns 0 on success and negative error codes on failure for straightforward error handling.
 
 ## Community
 
