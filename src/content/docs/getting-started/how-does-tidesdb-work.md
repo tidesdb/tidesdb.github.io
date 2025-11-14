@@ -113,7 +113,7 @@ Every block manager file (WAL or SSTable) has the following structure
 | 8 | 4 bytes | Padding | Reserved for future use |
 
 :::note Cross-Platform Portability
-All multi-byte integers (block size, padding, block sizes, checksums, overflow offsets, KV header fields, and SSTable metadata) use **little-endian encoding** throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
+All multi-byte integers (block size, padding, block sizes, checksums, overflow offsets, KV header fields, and SSTable metadata, serialized bloom filters, and serialized block indexes) use **little-endian encoding** throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
 :::
 
 #### Block Format
