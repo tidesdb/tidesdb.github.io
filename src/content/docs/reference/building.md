@@ -210,7 +210,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_DEBUG` | Enable debug logging (0=off, 1=on) | 0 |
 | `BENCH_KEY_PATTERN` | Key distribution pattern | "random" |
 | `BENCH_CF_NAME` | Column family name | "benchmark_cf" |
-| `BENCH_DB_PATH` | Database directory path | "benchmark_db" |
+| `BENCH_DB_PATH` | Directory path | "benchmark_db" |
 
 #### Column Family Configuration
 
@@ -335,7 +335,7 @@ The benchmark displays
 
 ### Notes
 
-- The benchmark creates a temporary database directory that is cleaned up before each run
+- The benchmark creates a temporary storage directory that is cleaned up before each run
 - All operations use transactions for consistency
 - Results may vary based on system resources, disk speed, and configuration
 - For accurate results, run multiple times and average the results

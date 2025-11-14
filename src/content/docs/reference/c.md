@@ -28,7 +28,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_MEMORY` | `-2` | Memory allocation failed |
 | `TDB_ERR_INVALID_ARGS` | `-3` | Invalid arguments passed to function (NULL pointers, invalid sizes, etc.) |
 | `TDB_ERR_IO` | `-4` | I/O operation failed (file read/write error) |
-| `TDB_ERR_NOT_FOUND` | `-5` | Key not found in database |
+| `TDB_ERR_NOT_FOUND` | `-5` | Key not found in column family |
 | `TDB_ERR_EXISTS` | `-6` | Resource already exists (e.g., column family name collision) |
 | `TDB_ERR_CORRUPT` | `-7` | Data corruption detected (checksum failure, invalid format version, truncated data) |
 | `TDB_ERR_LOCK` | `-8` | Lock acquisition failed |
@@ -73,9 +73,9 @@ if (result != TDB_SUCCESS)
 }
 ```
 
-## Database Operations
+## Storage Engine Operations
 
-### Opening a Database
+### Opening TidesDB
 
 ```c
 tidesdb_config_t config = {
@@ -93,7 +93,6 @@ if (tidesdb_open(&config, &db) != 0)
     return -1;
 }
 
-/* Close the database */
 if (tidesdb_close(db) != 0)
 {
     return -1;
@@ -219,7 +218,7 @@ if (cf == NULL)
 
 ### Listing Column Families
 
-Get all column family names in the database.
+Get all column family names in the storage engine instance.
 
 ```c
 char **names = NULL;
@@ -320,10 +319,10 @@ mydb/
 │   └── sstable_1.sst
 ```
 
-On column family creation, the initial config is saved to `config.cfc`. On database restart, the config is loaded from `config.cfc` (if it exists). On config update, changes are immediately saved to `config.cfc`. If the save fails, it returns a `TDB_ERR_IO` error code.
+On column family creation, the initial config is saved to `config.cfc`. On storage engine restart, the config is loaded from `config.cfc` (if it exists). On config update, changes are immediately saved to `config.cfc`. If the save fails, it returns a `TDB_ERR_IO` error code.
 
 :::tip[Important Notes]
-Changes apply immediately to new operations, while existing SSTables and memtables retain their original settings. New memtables use the updated `max_level` and `probability`, and new SSTables use the updated `bloom_filter_fp_rate`. The update operation is thread-safe, using a write lock during the update, and configuration persists across database restarts.
+Changes apply immediately to new operations, while existing SSTables and memtables retain their original settings. New memtables use the updated `max_level` and `probability`, and new SSTables use the updated `bloom_filter_fp_rate`. The update operation is thread-safe, using a write lock during the update, and configuration persists across storage engine restarts.
 :::
 
 ## Transactions
@@ -681,7 +680,7 @@ tidesdb_open(&config, &db);
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and tuning.
 
 :::note
-`max_open_file_handles` is a **database-level** configuration, not a column family configuration. It's set in `tidesdb_config_t` when opening the database.
+`max_open_file_handles` is a **storage-engine-level** configuration, not a column family configuration. It's set in `tidesdb_config_t` when opening the storage engine.
 :::
 
 **Configuration**

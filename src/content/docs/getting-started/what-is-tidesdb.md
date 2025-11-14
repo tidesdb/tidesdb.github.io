@@ -27,11 +27,11 @@ reads through bloom filters, block indices, and compaction.
 - Custom comparators allow registration of user-defined key comparison functions. Built-in comparators include memcmp, string, and numeric.
 - Memory optimizations include arena-based allocation for skip list nodes and inline storage for small keys/values (≤24 bytes) to reduce malloc overhead and pointer indirection.
 - Two-tier caching system with block-level LRU cache for frequently accessed data and configurable file handle cache to limit open file descriptors.
-- Shared thread pools for background flush and compaction operations with configurable thread counts at the database level.
+- Shared thread pools for background flush and compaction operations with configurable thread counts at the storage engine level.
 - Two sync modes: TDB_SYNC_NONE for maximum performance (OS-managed flushing) and TDB_SYNC_FULL for maximum durability (fsync on every write).
 - Cross-platform support for Linux, macOS, and Windows on both 32-bit and 64-bit architectures with platform abstraction layer.
 - Clean C API that returns 0 on success and negative error codes on failure for straightforward error handling.
-- Full file portability with little-endian serialization throughout—database files can be copied between any platform (x86, ARM, RISC-V) and architecture (32-bit, 64-bit, little-endian, big-endian) without conversion.
+- Full file portability with little-endian serialization throughout storage engine files can be copied between any platform (x86, ARM, RISC-V) and architecture (32-bit, 64-bit, little-endian, big-endian) without conversion.
 
 ## Community
 
