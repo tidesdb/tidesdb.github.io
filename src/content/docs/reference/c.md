@@ -266,7 +266,7 @@ if (tidesdb_get_column_family_stats(db, "my_cf", &stats) == 0)
 
 ### Updating Column Family Configuration
 
-Update runtime-safe configuration settings without affecting existing data.
+Update runtime-safe configuration settings without affecting existing data.  If you wan't existing column family configuration you can utilize the stats function to retrieve it.
 
 ```c
 tidesdb_column_family_update_config_t update_config = {
