@@ -227,6 +227,10 @@ html {
 	z-index: 1;
 }
 
+.version-section {
+	z-index: 1000;
+}
+
 .action.primary:hover {
 	background: #1534b8;
 	transform: translateY(-1px);
@@ -248,7 +252,7 @@ html {
 	height: 300px;
 	overflow: hidden;
 	line-height: 0;
-	z-index: 0;
+	z-index: -1;
 	pointer-events: none;
 	opacity: 0.8;
 }
