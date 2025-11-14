@@ -31,6 +31,16 @@ The benchtool is a custom pluggable benchmarking tool that provides fair, apples
 
 Bloom filters, block indexes, block cache `64mb`, memtable flush size `64mb`, and sync mode `none` are configured for both engines.
 
+:::note
+These benchmarks were concluded on a local machine, and not in the most optimal environment.  These benchmarks will be overwritten periodically.  The plan is to conduct our benchmarking on AWS and GCP instances with the following instances:
+- AWS m5d.2xlarge	8
+- GCP n2-standard-8
+
+Both to use optimized flash disk and local SSD.
+
+The Benchtool described above contains the full benchmark runner source code (shell script), and can be found here: [benchtool tidesdb-rocksdb runner](https://github.com/tidesdb/benchtool/blob/master/tidesdb_rocksdb.sh).  You will see it is more extended than what you see here, this article will be extended to include more metric comparisons once run on AWS and GCP.
+::: 
+
 ## Benchmark Methodology
 
 The benchmark tool measures
