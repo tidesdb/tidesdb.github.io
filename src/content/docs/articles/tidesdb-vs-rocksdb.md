@@ -38,7 +38,7 @@ These benchmarks were concluded on a local machine, and not in the most optimal 
 
 Both to use optimized flash disk and local SSD.
 
-The Benchtool described above contains the full benchmark runner source code (shell script), and can be found here: [benchtool tidesdb-rocksdb runner](https://github.com/tidesdb/benchtool/blob/master/tidesdb_rocksdb.sh).  You will see it is more extended than what you see here, this article will be extended to include more metric comparisons once run on AWS and GCP.
+The Benchtool described above contains the full benchmark runner source code (shell script), and can be found here: [benchtool tidesdb-rocksdb runner](https://github.com/tidesdb/benchtool/blob/master/tidesdb_rocksdb.sh).  You will see it is more extended than what you see here, this article will be extended to include more amplification metrics, and resource comparisons once run on AWS and GCP.
 ::: 
 
 ## Benchmark Methodology
