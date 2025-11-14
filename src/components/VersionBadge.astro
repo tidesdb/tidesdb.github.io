@@ -18,16 +18,19 @@ try {
 }
 ---
 
-<a href={releaseUrl} class="version-badge" target="_blank" rel="noopener noreferrer">
+<div class="version-section">
+  <a href={releaseUrl} class="version-badge" target="_blank" rel="noopener noreferrer">
   <span class="version-label">Latest Release</span>
   <span class="version-number">{version}</span>
 </a>
+</div>
 
 <style>
   .version-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+    z-index: 1000;
     padding: 0.5rem 1rem;
     background: linear-gradient(135deg, #193EDC 0%, #1534b8 100%);
     color: white !important;

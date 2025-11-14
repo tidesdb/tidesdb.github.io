@@ -9,10 +9,6 @@ hero:
       link: getting-started/what-is-tidesdb
       icon: right-arrow
       variant: primary
-    - text: View on GitHub
-      link: https://github.com/tidesdb/tidesdb
-      icon: github
-      variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
@@ -42,13 +38,13 @@ import VersionBadge from '../../components/VersionBadge.astro';
 </div>
 
 <CardGrid stagger>
-	<Card title="ACID Transactions" icon="approve-check" style="--card-index: 0">
+	<Card title="ACID Transactions" icon="seti:lock" style="--card-index: 0">
 		ACID transactions that are atomic, consistent, isolated, and durable across multiple column families. 
 	</Card>
 	<Card title="Concurrent" icon="rocket" style="--card-index: 1">
 		Readers don't block readers or writers, and writers don't block readers.  Writes are serialized per column family.
 	</Card>
-	<Card title="LSM-Tree Architecture" icon="setting" style="--card-index: 2">
+	<Card title="LSM-Tree Architecture" icon="seti:db" style="--card-index: 2">
 		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance.
 	</Card>
 </CardGrid>
