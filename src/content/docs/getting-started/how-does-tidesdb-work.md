@@ -112,9 +112,6 @@ Every block manager file (WAL or SSTable) has the following structure
 | 4 | 4 bytes | Block Size | Default block size for this file |
 | 8 | 4 bytes | Padding | Reserved for future use |
 
-:::note Cross-Platform Portability
-All multi-byte integers (block size, padding, block sizes, checksums, overflow offsets, KV header fields, and SSTable metadata, serialized bloom filters, and serialized block indexes) use **little-endian encoding** throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
-:::
 
 #### Block Format
 
@@ -166,7 +163,7 @@ position and block size, with boundary checking methods like `at_first()`,
 
 #### Sync Modes
 
-TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying on the OS page cache. TDB_SYNC_FULL offers the most durability by performing fsync after every block write. The sync mode is configurable per file, allowing WAL and SSTable files to have different modes.
+TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying on the OS page cache. TDB_SYNC_FULL offers the most durability by performing fsync/fdatasync after every block write. The sync mode is configurable per column family and set internally for column family WAL and SSTable files.
 
 #### Thread Safety
 
@@ -444,7 +441,7 @@ By default, `tidesdb_open()` returns immediately after submitting recovered memt
 
 ```c
 tidesdb_config_t config = {
-    .db_path = "./mydb",
+    .db_path = "./tidesdb",
     .wait_for_wal_recovery = 0  /* Default is false */
 };
 ```
@@ -827,3 +824,7 @@ For a complete list of error codes and their meanings, see the [Error Codes Refe
 
 ## 11. Memory Management
 TidesDB validates key-value pair sizes to prevent out-of-memory conditions. If a key-value pair exceeds `TDB_MEMORY_PERCENTAGE` (60% of available system memory), TidesDB returns a `TDB_ERR_MEMORY_LIMIT` error. However, a minimum threshold of `TDB_MIN_KEY_VALUE_SIZE` (1MB) is enforced, ensuring that even on systems with low available memory, key-value pairs up to 1MB are always allowed. This prevents premature errors on 32-bit systems or memory-constrained environments. On startup, TidesDB populates `available_memory` and `total_memory` internally, which are members of the `tidesdb_t` struct, and uses these values to calculate the maximum allowed key-value size as `max(available_memory * 0.6, 1MB)`.  
+
+## 12. Cross-Platform Portability
+
+All multi-byte integers use little-endian encoding throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
