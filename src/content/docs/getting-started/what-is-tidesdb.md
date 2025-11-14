@@ -14,7 +14,7 @@ reads through bloom filters, block indices, and compaction.
 
 ## Core Features
 
-- Lock-free skip list memtables with RCU memory management, epoch-based garbage collection, and atomic operations. Readers never block and scale linearly with CPU cores, while writers use lightweight mutex serialization per column family.
+- Memtables utilizes lock-free skip list with RCU memory management, epoch-based garbage collection, and atomic operations. Readers never block and scale linearly with CPU cores, while writers use lightweight mutex serialization per column family.
 - ACID transactions that are atomic, consistent, isolated, and durable across multiple column families. Point reads use READ COMMITTED isolation, iterators use snapshot isolation with reference counting.
 - Column families provide isolated key-value stores, each with independent configuration, memtables, SSTables, and write-ahead logs.
 - Bidirectional iterators support forward and backward traversal with heap-based merge-sort across memtables and SSTables. Lock-free iteration with reference counting prevents premature deletion during concurrent operations.
