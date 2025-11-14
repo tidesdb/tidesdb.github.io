@@ -51,7 +51,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						name: 'keywords',
-						content: 'tidesdb, database, key-value store, lsm-tree, storage engine, embedded database, c library, nosql, acid transactions, high performance database, column family, write-ahead log, bloom filter, data compression, cross-platform database, database library, key value database, fast database, embeddable storage, database engine, persistent storage, in-memory database, disk storage, concurrent database, transactional database, open source database'
+						content: 'tidesdb, database, key-value store, lsm-tree, storage engine, embeddable database, c library, nosql, acid transactions, high performance database, column family, write-ahead log, bloom filter, data compression, cross-platform database, database library, key value database, fast database, embeddable storage, database engine, persistent storage, in-memory database, disk storage, concurrent database, transactional database, open source database'
 					}
 				},
 				{

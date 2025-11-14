@@ -48,7 +48,7 @@ A distinctive aspect of TidesDB is its organization around column families. Each
 - Operates as an independent key-value store
 - Has its own dedicated memtable and set of SSTables
 - Can be configured with different parameters for flush thresholds, compression settings, etc.
-- Uses reader-writer locks (`pthread_rwlock_t`) to allow concurrent reads while ensuring single-writer access during commits
+- Uses reader-writer locks to allow concurrent reads while ensuring single-writer access during commits
 
 This design allows for domain-specific optimization and isolation between different types of data stored in the same storage engine instance.
 
@@ -74,11 +74,12 @@ Readers never acquire locks, never block, and scale linearly with CPU cores. Wri
 
 **Custom Comparators**
 
-Each column family can register a custom key comparison function (memcmp, string, numeric, or user-defined) that determines sort order consistently across the entire system--memtable, SSTables, block indexes, and iterators all use the same comparison logic.
+Each column family can register a custom key comparison function (memcmp, string, numeric, or user-defined) that determines sort order consistently across the entire system--memtable, SSTables, block indexes, and iterators all use the same comparison logic.  Once a comparator is registered, it cannot be changed for the duration of the column family's lifecycle.
 
 **Configuration and Lifecycle**
 
-The skip list's flush threshold (`memtable_flush_size`), maximum level, and probability parameters are configurable per column family, allowing tuning for specific workloads. When the memtable reaches the size threshold, it becomes immutable and is queued for flushing while a new active memtable is created. The immutable memtable is flushed to disk as an SSTable by a background thread pool, with reference counting ensuring the memtable isn't freed until all readers complete and the flush finishes. Each memtable is paired with a WAL (Write-Ahead Log) for durability and recovery.
+The skip list's flush threshold (`memtable_flush_size`), maximum level, and probability parameters are configurable per column family. When the memtable reaches the size threshold, it becomes immutable and is queued for flushing while a new active memtable is created. The immutable memtable is flushed to disk as an SSTable by a background thread pool, with reference counting ensuring the memtable isn't freed until all readers complete and the flush finishes. Each memtable is paired with a WAL (Write-Ahead Log) for durability and recovery. When a memtable is in the flush queue and immutable it is still accessible for reading. Because the memtable has a WAL associated with it,you will see a WAL file (i.e., wal_4.log) file until the flush is complete. If a crash occurs the memtable's WAL is replayed and immutable state is recovered and requeued for flush.
+
 
 ### 4.2 Block Manager Format
 
@@ -111,9 +112,6 @@ Every block manager file (WAL or SSTable) has the following structure
 | 4 | 4 bytes | Block Size | Default block size for this file |
 | 8 | 4 bytes | Padding | Reserved for future use |
 
-:::note Cross-Platform Portability
-All multi-byte integers (block size, padding, block sizes, checksums, overflow offsets, KV header fields, and SSTable metadata) use **little-endian encoding** throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
-:::
 
 #### Block Format
 
@@ -165,7 +163,7 @@ position and block size, with boundary checking methods like `at_first()`,
 
 #### Sync Modes
 
-TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying on the OS page cache. TDB_SYNC_FULL offers the most durability by performing fsync after every block write. The sync mode is configurable per file, allowing WAL and SSTable files to have different modes.
+TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying on the OS page cache. TDB_SYNC_FULL offers the most durability by performing fsync/fdatasync after every block write. The sync mode is configurable per column family and set internally for column family WAL and SSTable files.
 
 #### Thread Safety
 
@@ -443,7 +441,7 @@ By default, `tidesdb_open()` returns immediately after submitting recovered memt
 
 ```c
 tidesdb_config_t config = {
-    .db_path = "./mydb",
+    .db_path = "./tidesdb",
     .wait_for_wal_recovery = 0  /* Default is false */
 };
 ```
@@ -826,3 +824,7 @@ For a complete list of error codes and their meanings, see the [Error Codes Refe
 
 ## 11. Memory Management
 TidesDB validates key-value pair sizes to prevent out-of-memory conditions. If a key-value pair exceeds `TDB_MEMORY_PERCENTAGE` (60% of available system memory), TidesDB returns a `TDB_ERR_MEMORY_LIMIT` error. However, a minimum threshold of `TDB_MIN_KEY_VALUE_SIZE` (1MB) is enforced, ensuring that even on systems with low available memory, key-value pairs up to 1MB are always allowed. This prevents premature errors on 32-bit systems or memory-constrained environments. On startup, TidesDB populates `available_memory` and `total_memory` internally, which are members of the `tidesdb_t` struct, and uses these values to calculate the maximum allowed key-value size as `max(available_memory * 0.6, 1MB)`.  
+
+## 12. Cross-Platform Portability
+
+All multi-byte integers use little-endian encoding throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.

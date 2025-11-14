@@ -143,8 +143,7 @@ MSVC requires Visual Studio 2019 16.8 or later for C11 atomics support (`/experi
 
 ## Default Configuration Values
 
-These constants define default values for column family configuration
-
+TidesDB uses sensible defaults optimized for general-purpose workloads. These constants define the initial configuration when creating column families without custom settings.
 ```c
 #define TDB_DEFAULT_MEMTABLE_FLUSH_SIZE            (64 * 1024 * 1024)
 #define TDB_DEFAULT_MAX_SSTABLES                   128
@@ -155,6 +154,8 @@ These constants define default values for column family configuration
 #define TDB_DEFAULT_SKIPLIST_PROBABILITY           0.25
 #define TDB_DEFAULT_BLOOM_FILTER_FP_RATE           0.01
 #define TDB_DEFAULT_THREAD_POOL_SIZE               2
+#define TDB_DEFAULT_WAL_RECOVERY_POLL_INTERVAL_MS  100
+#define TDB_DEFAULT_WAIT_FOR_WAL_RECOVERY          0
 ```
 
 ## Testing
