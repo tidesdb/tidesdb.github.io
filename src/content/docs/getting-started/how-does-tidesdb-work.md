@@ -48,7 +48,7 @@ A distinctive aspect of TidesDB is its organization around column families. Each
 - Operates as an independent key-value store
 - Has its own dedicated memtable and set of SSTables
 - Can be configured with different parameters for flush thresholds, compression settings, etc.
-- Uses reader-writer locks (`pthread_rwlock_t`) to allow concurrent reads while ensuring single-writer access during commits
+- Uses reader-writer locks to allow concurrent reads while ensuring single-writer access during commits
 
 This design allows for domain-specific optimization and isolation between different types of data stored in the same storage engine instance.
 
@@ -74,11 +74,12 @@ Readers never acquire locks, never block, and scale linearly with CPU cores. Wri
 
 **Custom Comparators**
 
-Each column family can register a custom key comparison function (memcmp, string, numeric, or user-defined) that determines sort order consistently across the entire system--memtable, SSTables, block indexes, and iterators all use the same comparison logic.
+Each column family can register a custom key comparison function (memcmp, string, numeric, or user-defined) that determines sort order consistently across the entire system--memtable, SSTables, block indexes, and iterators all use the same comparison logic.  Once a comparator is registered, it cannot be changed for the duration of the column family's lifecycle.
 
 **Configuration and Lifecycle**
 
-The skip list's flush threshold (`memtable_flush_size`), maximum level, and probability parameters are configurable per column family, allowing tuning for specific workloads. When the memtable reaches the size threshold, it becomes immutable and is queued for flushing while a new active memtable is created. The immutable memtable is flushed to disk as an SSTable by a background thread pool, with reference counting ensuring the memtable isn't freed until all readers complete and the flush finishes. Each memtable is paired with a WAL (Write-Ahead Log) for durability and recovery.
+The skip list's flush threshold (`memtable_flush_size`), maximum level, and probability parameters are configurable per column family. When the memtable reaches the size threshold, it becomes immutable and is queued for flushing while a new active memtable is created. The immutable memtable is flushed to disk as an SSTable by a background thread pool, with reference counting ensuring the memtable isn't freed until all readers complete and the flush finishes. Each memtable is paired with a WAL (Write-Ahead Log) for durability and recovery. When a memtable is in the flush queue and immutable it is still accessible for reading. Because the memtable has a WAL associated with it,you will see a WAL file (i.e., wal_4.log) file until the flush is complete. If a crash occurs the memtable's WAL is replayed and immutable state is recovered and requeued for flush.
+
 
 ### 4.2 Block Manager Format
 
