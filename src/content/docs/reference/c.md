@@ -270,16 +270,17 @@ Update runtime-safe configuration settings without affecting existing data.
 
 ```c
 tidesdb_column_family_update_config_t update_config = {
-    .memtable_flush_size = 128 * 1024 * 1024,   /* increase to 128MB */
-    .max_sstables_before_compaction = 256,      /* trigger at 256 SSTables */
-    .compaction_threads = 8,                    /* use 8 threads */
-    .sl_max_level = 16,                         /* for new memtables */
-    .sl_probability = 0.25f,                    /* for new memtables */
-    .enable_bloom_filter = 1,                   /* enable bloom filters */
-    .bloom_filter_fp_rate = 0.001,              /* 0.1% FP rate for new SSTables */
-    .enable_background_compaction = 1,          /* enable background compaction */
-    .background_compaction_interval = 500000,   /* check every 500ms */
+    .memtable_flush_size = 128 * 1024 * 1024,     /* increase to 128MB */
+    .max_sstables_before_compaction = 256,        /* trigger at 256 SSTables */
+    .compaction_threads = 8,                      /* use 8 threads */
+    .sl_max_level = 16,                           /* for new memtables */
+    .sl_probability = 0.25f,                      /* for new memtables */
+    .enable_bloom_filter = 1,                     /* enable bloom filters */
+    .bloom_filter_fp_rate = 0.001,                /* 0.1% FP rate for new SSTables */
+    .enable_background_compaction = 1,            /* enable background compaction */
+    .background_compaction_interval = 500000,     /* check every 500ms */
     .block_manager_cache_size = 32 * 1024 * 1024  /* 32MB block cache */
+    .sync_mode = TDB_SYNC_FULL,                   /* fsync on every write (most durable) */
 };
 
 if (tidesdb_update_column_family_config(db, "my_cf", &update_config) == 0)
