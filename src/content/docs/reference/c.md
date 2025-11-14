@@ -218,7 +218,7 @@ if (cf == NULL)
 
 ### Listing Column Families
 
-Get all column family names in the storage engine instance.
+Get all column family names on the TidesDB instance.
 
 ```c
 char **names = NULL;
@@ -320,10 +320,10 @@ mydb/
 │   └── sstable_1.sst
 ```
 
-On column family creation, the initial config is saved to `config.cfc`. On storage engine restart, the config is loaded from `config.cfc` (if it exists). On config update, changes are immediately saved to `config.cfc`. If the save fails, it returns a `TDB_ERR_IO` error code.
+On column family creation, the initial config is saved to `config.cfc`. On TidesDB restart, the config is loaded from `config.cfc` (if it exists). On config update, changes are immediately saved to `config.cfc`. If the save fails, it returns a `TDB_ERR_IO` error code.
 
 :::tip[Important Notes]
-Changes apply immediately to new operations, while existing SSTables and memtables retain their original settings. New memtables use the updated `max_level` and `probability`, and new SSTables use the updated `bloom_filter_fp_rate`. The update operation is thread-safe, using a write lock during the update, and configuration persists across storage engine restarts.
+Changes apply immediately to new operations, while existing SSTables and memtables retain their original settings. New memtables use the updated `max_level` and `probability`, and new SSTables use the updated `bloom_filter_fp_rate`. The update operation is thread-safe, using a write lock during the update, and configuration persists across restarts.
 :::
 
 ## Transactions
@@ -681,7 +681,7 @@ tidesdb_open(&config, &db);
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and tuning.
 
 :::note
-`max_open_file_handles` is a **storage-engine-level** configuration, not a column family configuration. It's set in `tidesdb_config_t` when opening the storage engine.
+`max_open_file_handles` is a **storage-engine-level** configuration, not a column family configuration. It's set in `tidesdb_config_t` when opening TidesDB.
 :::
 
 **Configuration**
