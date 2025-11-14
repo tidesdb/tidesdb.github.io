@@ -50,7 +50,7 @@ A distinctive aspect of TidesDB is its organization around column families. Each
 - Can be configured with different parameters for flush thresholds, compression settings, etc.
 - Uses reader-writer locks to allow concurrent reads while ensuring single-writer access during commits
 
-This design allows for domain-specific optimization and isolation between different types of data stored in the same storage engine instance.
+This design allows for domain-specific optimization and isolation between different types of data stored in the same TidesDB instance.
 
 ## 4. Core Components and Mechanisms
 ### 4.1 Memtable
@@ -415,11 +415,11 @@ Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size r
 
 #### 4.4.3 WAL Features
 
-All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable. WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD. Each column family maintains its own independent WAL files, and automatic recovery on engine startup reconstructs memtables from WALs.
+All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable. WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD through column family configuration. Each column family maintains its own independent WAL files, and automatic recovery on startup reconstructs memtables from WALs.
 
 #### 4.4.4 Recovery Process
 
-On engine startup, TidesDB automatically recovers from WAL files:
+On startup, TidesDB automatically recovers from WAL files:
 
 The system scans the column family directory for `wal_*.log` files and sorts them by ID (oldest to newest). It then replays each WAL file into a new memtable, reconstructing the in-memory state from persisted WAL entries before continuing normal operation with the recovered data.
 
@@ -589,11 +589,11 @@ TidesDB allows fine-tuning through various configurable parameters including mem
 For efficient resource management, TidesDB employs shared thread pools at the 
 storage engine level. Rather than maintaining separate pools per column family, all 
 column families share common flush and compaction thread pools configured 
-during engine initialization. Operations are submitted as tasks to these 
+during the TidesDB instance initialization. Operations are submitted as tasks to these 
 pools, enabling non-blocking execution--application threads can continue 
 processing while flush and compaction work proceeds in the background. This 
 architecture minimizes resource overhead and provides consistent, predictable 
-performance across the entire storage engine.
+performance across the entire storage engine instance.
 
 **Configuration**
 ```c
@@ -827,4 +827,4 @@ TidesDB validates key-value pair sizes to prevent out-of-memory conditions. If a
 
 ## 12. Cross-Platform Portability
 
-All multi-byte integers use little-endian encoding throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
+All multi-byte integers use little-endian encoding throughout TidesDB. This ensures files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
