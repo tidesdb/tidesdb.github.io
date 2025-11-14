@@ -50,7 +50,7 @@ A distinctive aspect of TidesDB is its organization around column families. Each
 - Can be configured with different parameters for flush thresholds, compression settings, etc.
 - Uses reader-writer locks (`pthread_rwlock_t`) to allow concurrent reads while ensuring single-writer access during commits
 
-This design allows for domain-specific optimization and isolation between different types of data stored in the same database.
+This design allows for domain-specific optimization and isolation between different types of data stored in the same storage engine instance.
 
 ## 4. Core Components and Mechanisms
 ### 4.1 Memtable
@@ -112,7 +112,7 @@ Every block manager file (WAL or SSTable) has the following structure
 | 8 | 4 bytes | Padding | Reserved for future use |
 
 :::note Cross-Platform Portability
-All multi-byte integers (block size, padding, block sizes, checksums, overflow offsets, KV header fields, and SSTable metadata) use **little-endian encoding** throughout TidesDB. This ensures database files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
+All multi-byte integers (block size, padding, block sizes, checksums, overflow offsets, KV header fields, and SSTable metadata) use **little-endian encoding** throughout TidesDB. This ensures engine files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
 :::
 
 #### Block Format
@@ -237,7 +237,7 @@ compaction (which may delete SSTables) and reads (which may still be accessing t
 
 **Block Manager Caching**
 
-The underlying block manager file handles are cached in a database-level LRU cache 
+The underlying block manager file handles are cached in a storage-engine-level LRU cache 
 with a configurable capacity (`max_open_file_handles`). When an SSTable is opened, 
 its block manager is added to the cache. If the cache is full, the least recently 
 used block manager is automatically closed. This prevents file descriptor exhaustion 
@@ -382,7 +382,7 @@ Always written as the last block in the file
    - Check TTL expiration
    - Return value or tombstone marker
 
-SSTables are read from storage engine level LRU.
+SSTables are read from engine level LRU.
 <div class="architecture-diagram">
 
 ![LRU](../../../assets/img8.png)
@@ -417,11 +417,11 @@ Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size r
 
 #### 4.4.3 WAL Features
 
-All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable. WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD. Each column family maintains its own independent WAL files, and automatic recovery on database startup reconstructs memtables from WALs.
+All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable. WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD. Each column family maintains its own independent WAL files, and automatic recovery on engine startup reconstructs memtables from WALs.
 
 #### 4.4.4 Recovery Process
 
-On database startup, TidesDB automatically recovers from WAL files:
+On engine startup, TidesDB automatically recovers from WAL files:
 
 The system scans the column family directory for `wal_*.log` files and sorts them by ID (oldest to newest). It then replays each WAL file into a new memtable, reconstructing the in-memory state from persisted WAL entries before continuing normal operation with the recovered data.
 
@@ -553,9 +553,9 @@ Background compaction provides automatic, hands-free SSTable management.
 Enabled via `enable_background_compaction = 1` in the column family 
 configuration, it automatically triggers when the SSTable count reaches 
 `max_sstables_before_compaction`. When a flush completes and the SSTable count 
-exceeds the threshold, a compaction task is submitted to the database-level 
+exceeds the threshold, a compaction task is submitted to the engine-level 
 compaction thread pool. This operates independently without blocking application 
-operations, merging SSTable pairs throughout the database lifecycle 
+operations, merging SSTable pairs throughout the storage engine lifecycle 
 until shutdown. The interval between compaction checks is configurable via 
 `background_compaction_interval` (default 1 second).
 
@@ -589,13 +589,13 @@ TidesDB allows fine-tuning through various configurable parameters including mem
 ### 7.5 Thread Pool Architecture
 
 For efficient resource management, TidesDB employs shared thread pools at the 
-database level. Rather than maintaining separate pools per column family, all 
+storage engine level. Rather than maintaining separate pools per column family, all 
 column families share common flush and compaction thread pools configured 
-during database initialization. Operations are submitted as tasks to these 
+during engine initialization. Operations are submitted as tasks to these 
 pools, enabling non-blocking execution--application threads can continue 
 processing while flush and compaction work proceeds in the background. This 
 architecture minimizes resource overhead and provides consistent, predictable 
-performance across the entire database.
+performance across the entire storage engine.
 
 **Configuration**
 ```c
@@ -617,7 +617,7 @@ are available, waking immediately when work arrives.
 
 **Benefits**
 
-One set of threads serves all column families providing resource efficiency, with better thread utilization across workloads. Configuration is simpler since it's set once at the database level, and the system is easily scalable to tune for available CPU cores. The queue-based design prevents thread creation overhead and enables graceful shutdown.
+One set of threads serves all column families providing resource efficiency, with better thread utilization across workloads. Configuration is simpler since it's set once at the storage engine level, and the system is easily scalable to tune for available CPU cores. The queue-based design prevents thread creation overhead and enables graceful shutdown.
 
 **Default values**
 
@@ -671,9 +671,9 @@ This concurrency model makes TidesDB particularly well-suited for:
 
 TidesDB organizes data on disk with a clear directory hierarchy. Understanding this structure is essential for backup, monitoring, and debugging.
 
-### 9.1 Database Directory Layout
+### 9.1 Directory Layout
 
-Each TidesDB database has a root directory containing subdirectories for each column family
+Each TidesDB instance has a root directory containing subdirectories for each column family
 
 ```
 mydb/
@@ -782,7 +782,7 @@ tidesdb_drop_column_family(db, "my_cf");
 Useful commands for monitoring TidesDB storage
 
 ```bash
-# Check total database size
+# Check total size
 du -sh mydb/
 
 # Check per-column-family size
