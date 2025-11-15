@@ -399,7 +399,7 @@ For durability, TidesDB implements a write-ahead logging mechanism with a rotati
 
 File Format: `wal_<memtable_id>.log`
 
-WAL files follow the naming pattern `wal_0.log`, `wal_1.log`, `wal_2.log`, etc. Each memtable has its own dedicated WAL file, with the WAL ID matching the memtable ID (a monotonically increasing counter). Multiple WAL files can exist simultaneously—one for the active memtable and others for memtables in the flush queue. WAL files are deleted only after the memtable is successfully flushed to an SSTable and freed.
+WAL files follow the naming pattern `wal_0.log`, `wal_1.log`, `wal_2.log`, etc. Each memtable has its own dedicated WAL file, with the WAL ID matching the memtable ID (a monotonically increasing counter). Multiple WAL files can exist simultaneously - one for the active memtable and others for memtables in the flush queue. WAL files are deleted only after the memtable is successfully flushed to an SSTable and freed.
 
 #### 4.4.2 WAL Rotation Process
 
@@ -565,7 +565,17 @@ until shutdown. The interval between compaction checks is configurable via
 
 </div>
 
-During compaction, SSTables are paired (typically oldest with second-oldest) and merged into new SSTables. For each key, only the newest version is retained, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge. If a merge is interrupted, the system will clean up after on restart without causing corruption.
+During compaction, SSTables are paired (typically oldest with second-oldest) and merged into new SSTables. For each key, only the newest version is retained, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge.
+
+#### Atomic Rename Strategy
+
+TidesDB uses a temporary file pattern with atomic rename to ensure crash safety during compaction. When merging two SSTables (e.g., `sstable_0.sst` and `sstable_1.sst`), the new merged SSTable is first written to a temporary file with the `.tmp` extension (e.g., `sstable_2.sst.tmp`). This temporary file is fully written with all data blocks, bloom filter, index, and metadata before any filesystem-level commit occurs. Once the temporary file is complete and all data is flushed to disk, TidesDB performs an atomic `rename()` operation from `sstable_2.sst.tmp` to `sstable_2.sst`. This rename is atomic at the filesystem level on both POSIX and Windows, meaning it either fully succeeds or fully fails with no intermediate state visible to readers.
+
+**Crash Recovery**
+
+If a crash occurs during compaction before the rename, the temporary `.tmp` file is left on disk while the original SSTables remain intact and valid. On the next startup, TidesDB automatically scans the database directory and deletes any `.tmp` files found, cleaning up incomplete compaction attempts. The original SSTables are still present and readable, so no data is lost. If a crash occurs after the rename completes, the new merged SSTable is already committed and the original SSTables are deleted during the normal compaction cleanup phase.
+
+This approach provides several critical guarantees. Readers never see partially written SSTables since the `.tmp` file remains invisible until the atomic rename completes, ensuring crash safety throughout the merge process. The rename operation itself is atomic at the filesystem level, preventing corruption from incomplete writes and guaranteeing that the SSTable either fully exists or doesn't exist at all. Orphaned `.tmp` files from interrupted compactions are automatically cleaned up on startup, requiring no manual intervention. Most importantly, no data is ever lost--the original SSTables remain valid and readable until the merge is fully committed and the new SSTable is atomically visible to readers.
 
 ## 7. Performance Optimizations
 ### 7.1 Block Indices
@@ -827,4 +837,76 @@ TidesDB validates key-value pair sizes to prevent out-of-memory conditions. If a
 
 ## 12. Cross-Platform Portability
 
-All multi-byte integers use little-endian encoding throughout TidesDB. This ensures files are fully portable across all platforms and architectures—files can be copied between x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems without conversion or compatibility issues.
+TidesDB is designed for maximum portability across operating systems, architectures, and compilers. All platform-specific code is isolated in `compat.h`, providing a unified abstraction layer that enables TidesDB to run identically on diverse platforms.
+
+### 12.1 Supported Platforms
+
+TidesDB officially supports and is continuously tested on:
+
+**Operating Systems**
+- Linux (Ubuntu, Debian, RHEL, etc.)
+- macOS (Intel and Apple Silicon)
+- Windows (MSVC and MinGW)
+
+**Architectures**
+- x86 (32-bit)
+- x64 (64-bit)
+- ARM (32-bit and 64-bit)
+- RISC-V (experimental)
+
+**Compilers**
+- GCC (Linux, MinGW)
+- Clang (macOS, Linux)
+- MSVC (Windows)
+
+### 12.2 Platform Abstraction Layer
+
+The `compat.h` header provides cross-platform abstractions for system-specific functionality:
+
+**File System Operations**
+- `PATH_SEPARATOR` Platform-specific path separator (`\` on Windows, `/` on POSIX)
+- `mkdir()` Unified directory creation (handles different signatures on Windows vs POSIX)
+- `pread()`/`pwrite()` Atomic positioned I/O (implemented via OVERLAPPED on Windows)
+- `fsync()`/`fdatasync()` Data synchronization (uses `FlushFileBuffers()` on Windows)
+
+**Threading Primitives**
+- `pthread_*` POSIX threads (native on Linux/macOS, pthreads-win32 on MSVC, native on MinGW)
+- `sem_t` Semaphores (native POSIX on Linux, `dispatch_semaphore_t` on macOS, Windows semaphores on MSVC/MinGW)
+- Atomic operations: C11 `stdatomic.h` on modern compilers, Windows Interlocked functions on older MSVC
+
+**Time Functions**
+- `clock_gettime()` High-resolution time (implemented via `GetSystemTimeAsFileTime()` on Windows)
+- `tdb_localtime()` Thread-safe time conversion (handles `localtime_r` vs `localtime_s` parameter order differences)
+
+**String and Memory**
+- `tdb_strdup()` String duplication (`_strdup` on MSVC, `strdup` on POSIX)
+- `SIZE_MAX` Maximum size_t value (fallback `((size_t)-1)` for older compilers)
+
+**Compiler-Specific Optimizations**
+- `PREFETCH_READ()`/`PREFETCH_WRITE()` CPU cache prefetch hints (`__builtin_prefetch` on GCC/Clang, `_mm_prefetch` on MSVC)
+- `ATOMIC_ALIGN(n)` Atomic variable alignment (`__declspec(align(n))` on MSVC, `__attribute__((aligned(n)))` on GCC/Clang)
+- `UNUSED` Unused variable attribute for static functions
+
+### 12.3 Endianness and File Portability
+
+All multi-byte integers use explicit little-endian encoding throughout TidesDB via `encode_uint32_le()`, `encode_uint64_le()`, `encode_int64_le()`, and corresponding decode functions. These functions perform bit-shifting and masking to ensure consistent byte order regardless of the host architecture's native endianness. This guarantees that database files are fully portable-files created on a big-endian ARM system can be copied to a little-endian x86 system and read without any conversion or compatibility issues. The same database files work identically across x86, ARM, RISC-V, 32-bit, 64-bit, little-endian, and big-endian systems.
+
+### 12.4 Continuous Integration Testing
+
+TidesDB uses GitHub Actions to continuously test all supported platforms on every commit
+
+- Linux x64 and x86 · Native builds with GCC
+- macOS x64 and x86 · Native builds with Clang (Intel and Rosetta 2)
+- Windows MSVC x64 and x86 · Native builds with Microsoft Visual C++
+- Windows MinGW x64 and x86 · Cross-platform builds with GCC on Windows
+
+Additionally, a portability test creates a database on Linux x64 and verifies it can be read correctly on all other platforms (Windows MSVC/MinGW x86/x64, macOS x86/x64, Linux x86), ensuring true cross-platform file compatibility.
+
+### 12.5 Build System
+
+TidesDB uses CMake for cross-platform builds with platform-specific dependency management:
+
+- Linux/macOS · System package managers (apt, brew) for compression libraries (zstd, lz4, snappy)
+- Windows · vcpkg for dependency management with automatic binary caching
+
+This unified build system ensures consistent compilation across all platforms with minimal manual configuration.
