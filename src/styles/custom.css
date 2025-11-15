@@ -9,6 +9,7 @@ body {
 	font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+
 a, a:visited {
 	color: var(--sl-color-accent);
 	text-decoration: none;
@@ -308,8 +309,6 @@ input[type="search"]:focus, input[type="text"]:focus {
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 150' preserveAspectRatio='none'%3E%3Cpath d='M0,5 Q250,30 500,5 T1000,5 T1200,5 L1200,110 Q950,145 700,110 T200,110 T0,110 Z' fill='%23193EDC' fill-opacity='1'/%3E%3C/svg%3E");
 }
 
-/* Fade effect removed - waves look better without the gradient line */
-
 @keyframes wave-1-animation {
 	0% {
 		transform: translateX(0);
@@ -536,7 +535,6 @@ input[type="select"]:focus, select:focus {
 	color: #535307!important;
 }
 
-
 .starlight-aside--note .starlight-aside__title {
 	color: #535307!important;
 }
@@ -606,9 +604,6 @@ input[type="select"]:focus, select:focus {
 	border-bottom: none;
 }
 
-
-
-/* when screen gets to small, hide the sidebar */
 @media (max-width: 768px) {
 .pagination-links {
 	display: inline-flex;
