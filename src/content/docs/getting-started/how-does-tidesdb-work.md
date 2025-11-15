@@ -904,9 +904,11 @@ Additionally, a portability test creates a database on Linux x64 and verifies it
 
 ### 12.5 Build System
 
-TidesDB uses CMake for cross-platform builds with platform-specific dependency management:
-
+TidesDB uses CMake for cross-platform builds with platform-specific dependency management.
 - Linux/macOS · System package managers (apt, brew) for compression libraries (zstd, lz4, snappy)
-- Windows · vcpkg for dependency management with automatic binary caching
+- Windows · vcpkg for dependency management
 
-This unified build system ensures consistent compilation across all platforms with minimal manual configuration.
+### 13. Testing and Quality Assurance
+
+TidesDB maintains rigorous quality standards through comprehensive testing. The test suite includes over 200 individual test cases covering all components—block manager, skip list, bloom filters, succinct tries, LRU cache, queue, compression, and end-to-end database operations. Tests run on every commit across 8 platform configurations (Linux/macOS/Windows × x86/x64 × GCC/Clang/MSVC/MinGW) with Address Sanitizer and Undefined Behavior Sanitizer enabled on Linux and macOS to detect memory errors and race conditions. The suite validates functional correctness (CRUD operations, transactions, iterators, compaction), concurrency safety (lock-free reads, parallel compaction, no deadlocks), crash recovery (WAL replay, corruption detection, reference counting), and edge cases (NULL pointers, zero-length keys, overflow blocks, corrupted data). A dedicated portability test creates a database on Linux x64 and verifies it reads correctly on all other platforms, ensuring true cross-platform file compatibility. This testing strategy achieves near 100% coverage of critical paths including memtable operations, SSTable management, WAL recovery, compaction, and transaction semantics, ensuring TidesDB highly reliable and correct.
+
