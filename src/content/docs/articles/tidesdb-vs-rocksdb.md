@@ -1,6 +1,6 @@
 ---
 title: "TidesDB vs RocksDB: Performance Benchmarks"
-description: "Comprehensive performance benchmarks comparing TidesDB v4.0.0 and RocksDB storage engines."
+description: "Comprehensive performance benchmarks comparing TidesDB and RocksDB storage engines."
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
