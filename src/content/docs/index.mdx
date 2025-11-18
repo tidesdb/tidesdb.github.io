@@ -39,10 +39,10 @@ import VersionBadge from '../../components/VersionBadge.astro';
 
 <CardGrid stagger>
 	<Card title="ACID Transactions" icon="seti:lock" style="--card-index: 0">
-		ACID transactions that are atomic, consistent, isolated, and durable across multiple column families. 
+		ACID transactions with read-committed isolation: writes are atomic and durable via write-ahead logging, reads always see the latest committed data with read-your-own-writes semantics. Concurrent writes use last-write-wins conflict resolution through atomic CAS operations.
 	</Card>
 	<Card title="Concurrent" icon="rocket" style="--card-index: 1">
-		Readers don't block readers or writers, and writers don't block readers.  Writes are serialized per column family.
+		Lock-free concurrency with non-blocking writes and readers.  Linear scalability with CPU cores.
 	</Card>
 	<Card title="LSM-Tree Architecture" icon="seti:db" style="--card-index: 2">
 		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance.

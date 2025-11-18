@@ -171,7 +171,7 @@ tidesdb_column_family_config_t cf_config = {
     .enable_block_indexes = 1,                  /* enable succinct trie block indexes */
     .sync_mode = TDB_SYNC_FULL,                 /* fsync on every write (most durable) */
     .comparator_name = {0},                     /* empty = use default "memcmp" */
-    .block_manager_cache_size = 32 * 1024 * 1024  /* 32MB LRU block cache for column family block managers */
+    .block_manager_cache_size = 32 * 1024 * 1024  /* 32MB FIFO block cache for column family block managers */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -299,7 +299,7 @@ if (tidesdb_update_column_family_config(db, "my_cf", &update_config) == 0)
 - `bloom_filter_fp_rate` - False positive rate for **new** SSTables only
 - `enable_background_compaction` - Enable/disable background compaction
 - `background_compaction_interval` - Compaction check interval (microseconds)
-- `block_manager_cache_size` - LRU block cache size in bytes
+- `block_manager_cache_size` - FIFO block cache size in bytes
 
 **Non-updatable settings** · (would corrupt existing data)
 - `enable_compression` - Cannot change compression on existing SSTables
@@ -699,8 +699,9 @@ tidesdb_open(&config, &db);
 
 - **Point reads** (`tidesdb_txn_get`) use **READ COMMITTED** isolation
 - **Iterators** (`tidesdb_iter_new`) use **snapshot isolation**
-- Lock-free reads with RCU memory management
-- Multiple readers can execute concurrently without blocking
-- Writers are serialized per column family
+- Lock-free reads and writes using atomic CAS operations
+- Multiple readers and writers can execute concurrently without blocking
+- Transaction commits are lock-free - multiple transactions can commit concurrently
+- Flush and compaction operations use mutexes for coordination only
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#8-concurrency-and-thread-safety) for detailed concurrency model and thread safety information.

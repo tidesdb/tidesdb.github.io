@@ -31,7 +31,7 @@ This structure allows for efficient writes by initially storing data in memory a
 ### 3.1 Overview
 TidesDB uses a two-tiered storage architecture: a memory level that stores 
 recently written key-value pairs in sorted order using a skip list data 
-structure which is associated with a write ahead log (WAL) that stores commited transactions, and a disk level containing multiple SSTables with an effective append only block layout. When reading data, 
+structure which is associated with a write ahead log (WAL) that stores committed transactions, and a disk level containing multiple SSTables with an effective append only block layout. When reading data, 
 newer tables take precedence over older ones, ensuring the most recent 
 version of a key is always retrieved.
 
@@ -48,7 +48,7 @@ A distinctive aspect of TidesDB is its organization around column families. Each
 - Operates as an independent key-value store
 - Has its own dedicated memtable and set of SSTables
 - Can be configured with different parameters for flush thresholds, compression settings, etc.
-- Uses reader-writer locks to allow concurrent reads while ensuring single-writer access during commits
+- Uses mutexes for flush and compaction coordination while skip list operations remain lock-free
 
 This design allows for domain-specific optimization and isolation between different types of data stored in the same TidesDB instance.
 
@@ -60,17 +60,21 @@ This design allows for domain-specific optimization and isolation between differ
 
 </div>
 
-The memtable is the first landing point for all column family write operations. TidesDB implements the memtable using a lock-free skip list with atomic operations and RCU (Read-Copy-Update) memory management for exceptional read performance. The skip list uses a mark-and-insert update strategy where updates mark old nodes as deleted and insert new nodes atomically, ensuring lock-free consistency without blocking readers.
+The memtable is the first landing point for all column family write operations. TidesDB implements the memtable using a lock-free skip list with atomic operations and a versioning strategy for exceptional read performance. When a key is updated, a new version is prepended to the version list for that key, but reads always return the newest version (head of the list), implementing **last-write-wins** semantics. This allows concurrent reads and writes without blocking.
 
 **Lock-Free Concurrency Model**
 
-Readers never acquire locks, never block, and scale linearly with CPU cores. Writers use a lightweight mutex for single-writer serialization per column family, ensuring write atomicity without complex locking. Readers don't block writers, and writers don't block readers. All read operations use atomic pointer loads with acquire memory ordering for correct synchronization.
+Readers never acquire locks, never block, and scale linearly with CPU cores. Writers perform lock-free atomic operations on the skip list structure using CAS (Compare-And-Swap) instructions. Readers don't block writers, and writers don't block readers. All read operations use atomic pointer loads with acquire memory ordering for correct synchronization. Flush and compaction operations use dedicated mutexes (`flush_lock` and `compaction_lock`) to serialize structural changes without blocking skip list operations.
 
-**Memory Management Optimizations**
+**Memory Management**
 
-- Skip list nodes are allocated from memory pools (arenas) rather than individual malloc calls, reducing allocation overhead and improving cache locality. Arenas are chained together as they fill up.
-- Keys and values ≤24 bytes are stored directly within the node structure (inline), eliminating pointer indirection and improving performance. Larger keys/values use pointer-based storage.
-- Deleted nodes are retired to an epoch-based RCU list and reclaimed after a grace period (10 epochs), preventing use-after-free while maintaining lock-free reads. Nodes use atomic reference counting for safe memory reclamation.
+- Skip list nodes are allocated individually using `malloc()` for each node
+- Keys are always allocated separately and stored as pointers in nodes
+- Values are allocated separately and stored in version structures
+- Each key can have multiple versions linked in a list, with the newest version at the head
+- Reads always return the newest version (last-write-wins semantics)
+- Nodes are freed only when the entire skip list is destroyed (via `skip_list_free` or `skip_list_clear`)
+- Memtables use atomic reference counting to prevent premature freeing during concurrent access
 
 **Custom Comparators**
 
@@ -108,7 +112,7 @@ Every block manager file (WAL or SSTable) has the following structure
 | Offset | Size | Field | Description |
 |--------|------|-------|-------------|
 | 0 | 3 bytes | Magic | `0x544442` ("TDB" in hex) |
-| 3 | 1 byte | Version | Block manager version (currently 3) |
+| 3 | 1 byte | Version | Block manager version (currently 4) |
 | 4 | 4 bytes | Block Size | Default block size for this file |
 | 8 | 4 bytes | Padding | Reserved for future use |
 
@@ -169,21 +173,21 @@ TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying o
 
 Block manager operations use a write mutex to serialize all write operations, preventing corruption. Concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
 
-#### LRU Block Cache
+#### FIFO Block Cache
 
-TidesDB implements an optional LRU (Least Recently Used) block cache at the block manager level to reduce disk I/O for frequently accessed data blocks. This cache is configurable per column family via the `block_manager_cache_size` setting.
+TidesDB implements an optional FIFO (First-In-First-Out) block cache at the block manager level to reduce disk I/O for frequently accessed data blocks. This cache is configurable per column family via the `block_manager_cache_size` setting.
 
 **Cache Architecture**
 
-The block cache uses a hash table combined with a doubly-linked list for O(1) lookups and evictions. Each cached block is identified by a unique key derived from its file offset (e.g., "12345" for offset 12345). The hash table provides fast key-based lookups using xxHash for distribution, while the doubly-linked list maintains access order (most recent at head, least recent at tail). An eviction callback is registered for each cached block to update cache size tracking when blocks are evicted. All cache operations are protected by a mutex, ensuring safe concurrent access.
+The block cache uses a hash table combined with a FIFO queue for O(1) lookups and evictions. Each cached block is identified by a unique key derived from its file offset (e.g., "12345" for offset 12345). The hash table provides fast key-based lookups using xxHash for distribution, while the FIFO queue maintains insertion order (oldest at head, newest at tail). An eviction callback is registered for each cached block to update cache size tracking when blocks are evicted. All cache operations are protected by a mutex, ensuring safe concurrent access.
 
 **Cache Operations**
 
-After writing a block to disk, if cache space is available (current_size + block_size <= max_size), a copy of the block is added to the cache with the file offset as the key. If the cache is full, the LRU eviction policy automatically removes the least recently used block to make space. The cache size is tracked in bytes, with each block contributing its data size to the total.
+After writing a block to disk, if cache space is available (current_size + block_size <= max_size), a copy of the block is added to the cache with the file offset as the key. If the cache is full, the FIFO eviction policy automatically removes the oldest block (first inserted) to make space. The cache size is tracked in bytes, with each block contributing its data size to the total.
 
-Before reading from disk, the cache is checked using the block offset as the key. On cache hit, a copy of the cached block is returned immediately (no disk I/O). On cache miss, the block is read from disk, and if space permits, it's added to the cache for future reads. Every cache access moves the block to the head of the LRU list (marking it as most recently used).
+Before reading from disk, the cache is checked using the block offset as the key. On cache hit, a copy of the cached block is returned immediately (no disk I/O). On cache miss, the block is read from disk, and if space permits, it's added to the cache for future reads. Unlike LRU, FIFO does not reorder blocks on access - the insertion order is preserved.
 
-When the cache reaches `block_manager_cache_size`, the least recently used block (tail of LRU list) is automatically evicted. The eviction callback decrements `current_size` by the evicted block's size and frees the block's memory. This ensures the cache never exceeds the configured memory limit.
+When the cache reaches `block_manager_cache_size`, the oldest block (head of FIFO queue) is automatically evicted. The eviction callback decrements `current_size` by the evicted block's size and frees the block's memory. This ensures the cache never exceeds the configured memory limit.
 
 **Configuration Example**
 
@@ -235,10 +239,10 @@ compaction (which may delete SSTables) and reads (which may still be accessing t
 
 **Block Manager Caching**
 
-The underlying block manager file handles are cached in a storage-engine-level LRU cache 
+The underlying block manager file handles are cached in a storage-engine-level FIFO cache 
 with a configurable capacity (`max_open_file_handles`). When an SSTable is opened, 
-its block manager is added to the cache. If the cache is full, the least recently 
-used block manager is automatically closed. This prevents file descriptor exhaustion 
+its block manager is added to the cache. If the cache is full, the oldest 
+block manager (first opened) is automatically closed. This prevents file descriptor exhaustion 
 while maintaining good performance for frequently accessed SSTables.
 
 #### SSTable Block Layout
@@ -272,19 +276,20 @@ The exact block positions of bloom filter and index depend on how many KV pairs 
 Each data block contains a single key-value pair
 
 ```
-[KV Header is 18 bytes (packed)]
+[KV Header is 26 bytes (packed)]
 [Key is variable]
 [Value is variable]
 ```
 
-**KV Pair Header (18 bytes, packed)**
+**KV Pair Header (26 bytes, packed)**
 ```c
 typedef struct __attribute__((packed)) {
-    uint8_t version;        // Format version (currently 1)
+    uint8_t version;        // Format version (currently 4)
     uint8_t flags;          // TDB_KV_FLAG_TOMBSTONE (0x01) for deletes
     uint32_t key_size;      // Key size in bytes
     uint32_t value_size;    // Value size in bytes
     int64_t ttl;            // Unix timestamp for expiration (0 = no expiration)
+    uint64_t seq;           // Sequence number for ordering and MVCC
 } tidesdb_kv_pair_header_t;
 ```
 
@@ -345,7 +350,7 @@ Always written as the last block in the file
 1. Create SSTable file and initialize bloom filter and succinct trie builder (if enabled)
 2. Iterate through memtable in sorted order using skip list cursor
 3. **For each KV pair**
-   - Build KV header (18 bytes) + key + value
+   - Build KV header (26 bytes) + key + value
    - Optionally compress the entire block
    - Write as data block and record the block number (0-indexed sequential counter)
    - Add key to bloom filter (if enabled)
@@ -376,14 +381,14 @@ Always written as the last block in the file
      - Read block at that position
    - If block indexes disabled: linear scan through data blocks
    - Decompress block if compression is enabled
-   - Parse KV header (18 bytes) and extract key/value
+   - Parse KV header (26 bytes) and extract key/value
    - Check TTL expiration
    - Return value or tombstone marker
 
-SSTables are read from engine level LRU.
+SSTables are read from engine level FIFO cache.
 <div class="architecture-diagram">
 
-![LRU](../../../assets/img8.png)
+![FIFO Cache](../../../assets/img8.png)
 
 </div>
 
@@ -413,9 +418,21 @@ TidesDB uses a rotating WAL system that works as follows:
 
 Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size reaches `memtable_flush_size`, rotation is triggered. During rotation, a new active memtable (ID 1) is created with `wal_1.log`, while the immutable memtable (ID 0) with `wal_0.log` is added to the immutable memtables queue. A flush task is submitted to the flush thread pool. The background flush thread writes memtable (ID 0) to `sstable_0.sst` while `wal_0.log` still exists. Once the flush completes successfully, the memtable is dequeued from the immutable queue, its reference count drops to zero, and both the memtable and `wal_0.log` are freed/deleted. Multiple memtables can be in the flush queue concurrently, each with its own WAL file and reference count.
 
-#### 4.4.3 WAL Features
+#### 4.4.3 WAL Features and Sequence Numbers
 
-All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable. WAL entries can be optionally compressed using Snappy, LZ4, or ZSTD through column family configuration. Each column family maintains its own independent WAL files, and automatic recovery on startup reconstructs memtables from WALs.
+All writes (including deletes/tombstones) are first recorded in the WAL before being applied to the memtable. Each column family maintains its own independent WAL files, and automatic recovery on startup reconstructs memtables from WALs. WAL entries are stored **uncompressed** for fast writes and recovery.
+
+**Sequence Numbers for Ordering**
+
+Each WAL entry is assigned a monotonically increasing sequence number via `atomic_fetch_add(&cf->next_wal_seq, 1)`. This provides lock-free ordering guarantees:
+
+- Multiple transactions can commit concurrently without locks
+- Each operation gets a unique sequence number atomically
+- Sequence numbers ensure deterministic ordering even with concurrent writes
+- During WAL recovery, entries are sorted by sequence number before replay
+- This guarantees last-write-wins consistency is preserved across crashes
+
+The sequence number is stored in the 26-byte KV header (8 bytes at offset 18) and used during recovery to replay operations in the correct order, ensuring the memtable state matches the commit order regardless of how WAL entries were physically written to disk.
 
 #### 4.4.4 Recovery Process
 
@@ -425,7 +442,15 @@ The system scans the column family directory for `wal_*.log` files and sorts the
 
 **What Gets Recovered**
 
-All committed transactions that were written to WAL are recovered. Uncommitted transactions are discarded (as they're not in the WAL), along with memtables that were being flushed when the crash occurred.
+All committed transactions that were written to WAL are recovered. During recovery:
+
+1. WAL entries are read from disk
+2. Entries are collected with their sequence numbers
+3. Entries are **sorted by sequence number** (insertion sort)
+4. Entries are replayed in sequence order into the memtable
+5. This ensures last-write-wins consistency is preserved
+
+Uncommitted transactions are discarded (as they're not in the WAL). The sequence number sorting ensures that even if concurrent writes caused WAL entries to be physically written out of order, they are replayed in the correct logical order.
 
 **SSTable Recovery Ordering**
 
@@ -475,19 +500,21 @@ The recovery wait mechanism uses a stability check to ensure flushes have truly 
 ## 5. Data Operations
 
 ### 5.1 Write Path
-When a key-value pair is written to TidesDB
+When a key-value pair is written to TidesDB (via `tidesdb_txn_commit()`):
 
-1. The operation is recorded in the active memtable's WAL
-2. The key-value pair is inserted into the active memtable's skip list
-3. The memtable size is checked after each write
-4. If the memtable size exceeds the flush threshold (`memtable_flush_size`)
-
-- The current memtable becomes immutable and is added to the flush queue
-- A new active memtable is created with a new WAL file
-- The immutable memtable is submitted to the flush thread pool
-- Background threads flush the immutable memtable to an SSTable
-- After successful flush, the WAL file is deleted and the memtable is freed
-- Writes continue immediately to the new active memtable without blocking
+1. **Acquire active memtable** - Lock-free CAS retry loop to safely acquire a reference to the current active memtable
+2. **Assign sequence number** - Atomically increment the WAL sequence counter via `atomic_fetch_add()`
+3. **Write to WAL** - Record the operation in the active memtable's WAL using lock-free block manager write
+4. **Write to skip list** - Insert the key-value pair into the skip list using lock-free atomic CAS operations
+5. **Check flush threshold** - If memtable size exceeds `memtable_flush_size`, attempt to acquire `flush_lock` via `trylock`
+6. **Trigger rotation** (if lock acquired and size still exceeds threshold):
+   - Create a new active memtable with a new WAL file
+   - Atomically swap the active memtable pointer
+   - Add the immutable memtable to the flush queue
+   - Submit flush task to the flush thread pool
+   - Release `flush_lock`
+7. **Background flush** - Flush thread writes immutable memtable to SSTable, then deletes WAL and frees memtable
+8. **Concurrent writes** - Multiple transactions can write concurrently without blocking (lock-free)
 
 
 ### 5.2 Read Path
@@ -504,21 +531,31 @@ This multi-tier search ensures the most recent version of a key is always retrie
 
 ### 5.3 Transactions
 
-TidesDB provides ACID transaction support with multi-column-family 
-capabilities. Transactions are initiated through `tidesdb_txn_begin()` for 
-writes or `tidesdb_txn_begin_read()` for read-only operations, with a single 
-transaction capable of operating atomically across multiple column families. 
-The system implements **READ COMMITTED** isolation for point reads 
-(`tidesdb_txn_get`), where reads see the latest committed data, and **snapshot 
-isolation** for iterators (`tidesdb_iter_new`), where iterators see a 
-consistent point-in-time view via atomic reference counting on both memtables 
-and SSTables. Read transactions don't block writers. Write 
-transactions acquire exclusive locks per column family only during commit, 
-ensuring atomicity--all operations succeed together or automatically rollback 
-on failure. Transactions support read-your-own-writes semantics, allowing 
-uncommitted changes to be read before commit. The API uses simple integer 
-return codes (0 for success, -1 for error) rather than complex error 
-structures.
+TidesDB provides transaction support with multi-column-family capabilities. 
+Transactions are initiated through `tidesdb_txn_begin()` for writes or 
+`tidesdb_txn_begin_read()` for read-only operations, with a single transaction 
+capable of operating across multiple column families. The system implements 
+**READ COMMITTED** isolation for point reads (`tidesdb_txn_get`), where reads 
+see the latest committed data, and **snapshot isolation** for iterators 
+(`tidesdb_iter_new`), where iterators see a consistent point-in-time view via 
+atomic reference counting on both memtables and SSTables.
+
+**Lock-Free Write Path**
+
+Write transactions use a completely lock-free commit path with atomic operations:
+
+1. Transaction operations are buffered in memory during `tidesdb_txn_put()` and `tidesdb_txn_delete()`
+2. On `tidesdb_txn_commit()`, each operation is written to WAL and skip list using lock-free atomic CAS
+3. Sequence numbers are assigned atomically via `atomic_fetch_add()` for ordering
+4. Memtable references are acquired using lock-free CAS retry loops
+5. No locks are held during commit - multiple transactions can commit concurrently
+
+**Isolation Guarantees**
+
+Read transactions don't block writers and writers don't block readers. Transactions 
+support read-your-own-writes semantics, allowing uncommitted changes to be read 
+before commit. The API uses simple integer return codes (0 for success, negative 
+for errors) rather than complex error structures.
 
 ### 6. Compaction Policy
 
@@ -526,8 +563,6 @@ TidesDB implements two distinct compaction techniques
 
 
 <div class="architecture-diagram">
-
->
 
 ![Compaction](../../../assets/img13.png)
 
@@ -584,7 +619,7 @@ TidesDB employs block indices to optimize read performance. Each SSTable contain
 
 ### 7.2 Compression
 
-TidesDB supports multiple compression algorithms: Snappy emphasizes speed over compression ratio, LZ4 provides a balanced approach with good speed and reasonable compression, and ZSTD offers a higher compression ratio at the cost of some performance. Compression can be applied to both SSTable entries and WAL entries.
+TidesDB supports multiple compression algorithms for SSTable data: Snappy emphasizes speed over compression ratio, LZ4 provides a balanced approach with good speed and reasonable compression, and ZSTD offers a higher compression ratio at the cost of some performance. Compression is applied only to SSTable entries (data blocks) to reduce disk usage and I/O. WAL entries remain uncompressed for fast writes and recovery.
 
 ### 7.3 Sync Modes
 
@@ -633,25 +668,29 @@ The `num_flush_threads` defaults to 2 (TDB_DEFAULT_THREAD_POOL_SIZE) and is I/O 
 
 ## 8. Concurrency and Thread Safety
 
-TidesDB is designed for exceptional concurrency with lock-free reads and minimal write serialization.
+TidesDB is designed for exceptional concurrency with lock-free skip list operations and mutex-based coordination for structural changes.
 
-### 8.1 Lock-Free Reads with RCU
+### 8.1 Lock-Free Skip List Operations
 
-TidesDB's skip list memtables use lock-free reads with RCU (Read-Copy-Update) 
-memory management. Readers never acquire locks, never block, and scale linearly 
-with CPU cores. All read operations use atomic pointer loads with acquire memory 
-ordering for correct synchronization. Writers use a lightweight mutex for 
-single-writer serialization per column family, ensuring write atomicity without 
-complex locking. Readers don't block writers, and writers don't block readers. 
-Deleted nodes are retired to an epoch-based RCU list and reclaimed after a grace 
-period, preventing use-after-free while maintaining lock-free reads.
+TidesDB's skip list memtables use lock-free operations with atomic CAS instructions 
+and a versioning strategy with last-write-wins semantics. Readers never acquire locks, 
+never block, and scale linearly with CPU cores. All read operations use atomic pointer 
+loads with acquire memory ordering for correct synchronization. Writers perform lock-free 
+atomic operations on the skip list structure using Compare-And-Swap (CAS) instructions. 
+Readers don't block writers, and writers don't block readers. Nodes are only freed when 
+the entire skip list is destroyed, preventing use-after-free during concurrent access.
 
-### 8.2 Column Family Locks
+### 8.2 Column Family Coordination
 
-Each column family uses a reader-writer lock (`pthread_rwlock_t`) for structural 
-operations like flushing and compaction. Multiple read transactions can execute 
-concurrently, while write transactions acquire exclusive access only during commit, 
-allowing only one write transaction per column family at a time to ensure atomicity.
+Each column family uses dedicated mutexes for coordinating structural operations:
+
+- `flush_lock` - Serializes memtable rotation and flush queue operations
+- `compaction_lock` - Serializes SSTable array modifications during compaction
+- `cf_lock` - Reader-writer lock for column family lifecycle operations (create/drop)
+
+These mutexes coordinate structural changes without blocking lock-free skip list 
+operations. Multiple threads can read and write to the skip list concurrently while 
+flush and compaction operations safely modify the underlying storage structures.
 
 ### 8.3 Transaction Isolation
 
@@ -661,11 +700,16 @@ reads (`tidesdb_txn_get`) see the latest committed data from all sources
 (active memtable, immutable memtables, SSTables). Iterators 
 (`tidesdb_iter_new`) acquire atomic references on both memtables and SSTables, 
 creating a consistent point-in-time snapshot unaffected by concurrent 
-compaction or writes. Read transactions use lock-free atomic operations and 
-never observe uncommitted changes from other transactions. Write transactions 
-acquire write locks only during commit to ensure atomic updates. Within a 
-single transaction, uncommitted changes are immediately visible, allowing 
-operations to read their own writes before commit.
+compaction or writes.
+
+**Lock-Free Transaction Commits**
+
+Both read and write transactions use lock-free atomic operations throughout their 
+lifecycle. Write transactions do NOT acquire locks during commit - instead, they 
+use atomic CAS operations to safely write to WAL and skip list. Multiple write 
+transactions can commit concurrently without blocking each other. Within a single 
+transaction, uncommitted changes are immediately visible (read-your-own-writes), 
+allowing operations to read their own writes before commit.
 
 ### 8.4 Optimal Use Cases
 
@@ -910,5 +954,5 @@ TidesDB uses CMake for cross-platform builds with platform-specific dependency m
 
 ### 13. Testing and Quality Assurance
 
-TidesDB maintains rigorous quality standards through comprehensive testing. The test suite includes over 200 individual test cases covering all components - block manager, skip list, bloom filters, succinct tries, LRU cache, queue, compression, and end-to-end database operations. Tests run on every commit across 8 platform configurations (Linux/macOS/Windows × x86/x64 × GCC/Clang/MSVC/MinGW) with Address Sanitizer and Undefined Behavior Sanitizer enabled on Linux and macOS to detect memory errors and race conditions. The suite validates functional correctness (CRUD operations, transactions, iterators, compaction), concurrency safety (lock-free reads, parallel compaction, no deadlocks), crash recovery (WAL replay, corruption detection, reference counting), and edge cases (NULL pointers, zero-length keys, overflow blocks, corrupted data). A dedicated portability test creates a database on Linux x64 and verifies it reads correctly on all other platforms, ensuring true cross-platform file compatibility. This testing strategy achieves near 100% coverage of critical paths including memtable operations, SSTable management, WAL recovery, compaction, and transaction semantics, ensuring TidesDB is highly reliable and correct.
+TidesDB maintains rigorous quality standards through comprehensive testing. The test suite includes over 200 individual test cases covering all components - block manager, skip list, bloom filters, succinct tries, FIFO cache, queue, compression, and end-to-end database operations. Tests run on every commit across 8 platform configurations (Linux/macOS/Windows × x86/x64 × GCC/Clang/MSVC/MinGW) with Address Sanitizer and Undefined Behavior Sanitizer enabled on Linux and macOS to detect memory errors and race conditions. The suite validates functional correctness (CRUD operations, transactions, iterators, compaction), concurrency safety (lock-free reads and writes, parallel compaction, no deadlocks), crash recovery (WAL replay, corruption detection, reference counting), and edge cases (NULL pointers, zero-length keys, overflow blocks, corrupted data). A dedicated portability test creates a database on Linux x64 and verifies it reads correctly on all other platforms, ensuring true cross-platform file compatibility. This testing strategy achieves near 100% coverage of critical paths including memtable operations, SSTable management, WAL recovery, compaction, and transaction semantics, ensuring TidesDB is highly reliable and correct.
 
