@@ -590,9 +590,9 @@ Compaction operations execute asynchronously through the engine-level compaction
 
 Each compaction task is protected by a per-column-family compaction lock (`compaction_lock`) that serializes merge operations within a single column family while allowing concurrent compaction across different column families. The lock is acquired using `pthread_mutex_trylock()`, enabling the system to skip redundant compaction attempts when a merge is already in progress. This non-blocking approach prevents queue buildup and resource exhaustion during periods of high write activity, while ensuring that compaction makes forward progress whenever resources are available. The `l0_compaction_threshold` parameter is configurable per column family (default 4 SSTables), allowing tuning based on workload characteristics: lower values (2-3) trigger more frequent compaction with lower read amplification, while higher values (8-16) reduce write amplification at the cost of more L0 SSTables to search during reads.
 
-### 6.3 Compaction Mechanics
+### 6.7 Compaction Mechanics Summary
 
-During compaction, SSTables are paired (typically oldest with second-oldest) and merged into new SSTables. For each key, only the newest version is retained, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge.
+During compaction, SSTables are merged using the strategies described above (full preemptive, dividing, or partitioned merge). For each key, only the newest version is retained based on sequence numbers, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge completes, with atomic rename operations ensuring crash safety.
 
 ## 7. Performance Optimizations
 ### 7.1 Block Indices
@@ -870,7 +870,7 @@ done
 
 **Disk Space Monitoring**
 
-Monitor WAL file count, which is typically 1-3 per column family (1 active + 1-2 in flush queue). Many WAL files (>5) may indicate a flush backlog, slow I/O, or configuration issue. Monitor SSTable count as it triggers compaction at `max_sstables_before_compaction`. Set appropriate `memtable_flush_size` based on write patterns and flush speed.
+Monitor WAL file count, which is typically 1-3 per column family (1 active + 1-2 in flush queue). Many WAL files (>5) may indicate a flush backlog, slow I/O, or configuration issue. Monitor L0 SSTable count as it triggers compaction at `l0_compaction_threshold` (default 4). Set appropriate `write_buffer_size` based on write patterns and flush speed.
 
 **Backup Strategy**
 ```bash
@@ -884,7 +884,7 @@ tar -czf mydb_backup.tar.gz mydb/
 
 **Performance Tuning**
 
-Larger `memtable_flush_size` results in fewer, larger SSTables with less compaction, while smaller `memtable_flush_size` creates more, smaller SSTables with more compaction. Adjust `max_sstables_before_compaction` based on your read/write ratio, and use `enable_background_compaction` for automatic maintenance.
+Larger `write_buffer_size` results in fewer, larger SSTables with less compaction, while smaller `write_buffer_size` creates more, smaller SSTables with more compaction. Adjust `l0_compaction_threshold` based on your read/write ratio: lower values (2-3) trigger more frequent compaction with lower read amplification, while higher values (8-16) reduce write amplification at the cost of more L0 SSTables to search during reads.
 
 ## 10. Error Handling
 
