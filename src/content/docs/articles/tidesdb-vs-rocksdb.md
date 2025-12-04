@@ -737,7 +737,7 @@ The decision between TidesDB and RocksDB ultimately depends on your application'
 **Choose TidesDB v5.0.0 when:**
 - **Write-heavy workloads** are your primary concern (1.17x-1.92x faster writes)
 - **Large value storage** (4KB+) is common in your application (1.92x faster writes, 2.86x better space efficiency)
-- **Simpler codebase** (~27,000 lines vs 300,000) is important for understanding, debugging, and maintenance
+- **Simpler codebase** (~57,000 lines vs 300,000) is important for understanding, debugging, and maintenance
 - **Write latency consistency** matters (4.60-6.78μs average, predictable P99 latencies)
 - **Delete operations** are frequent (1.28x faster with better tail latency)
 - **Space efficiency** is acceptable at 1.29x-2.11x larger databases (or smaller for large values)
