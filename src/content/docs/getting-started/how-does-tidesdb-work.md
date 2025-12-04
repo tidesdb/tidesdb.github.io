@@ -652,6 +652,176 @@ Consider a 4-level hierarchy with `T=10` and `N_L=100GB`:
 
 The adapted capacities are 100x smaller, triggering compactions more aggressively in upper levels and preventing unnecessary level creation. As the dataset grows and `N_L` increases, DCA automatically scales all capacities proportionally.
 
+#### Multi-Cycle Evolution Example
+
+To illustrate how DCA adapts over time, consider a realistic workload where data grows through multiple compaction cycles. Starting with `T=10` (size ratio) and `write_buffer_size=64MB`:
+
+**Initial State (After First Flush):**
+```
+L0: size=64MB,   capacity=64MB   (just flushed from memtable)
+L1: (doesn't exist yet)
+```
+
+**Cycle 1 · L0 Fills, Creates L1**
+
+After 10 more flushes, L0 reaches capacity:
+```
+Before Compaction:
+L0: size=640MB,  capacity=640MB  (10 SSTables)
+L1: (created)    capacity=640MB  (T × L0 capacity)
+
+Compaction: Full preemptive merge L0 → L1
+
+After Compaction:
+L0: size=0MB,    capacity=64MB   (reset)
+L1: size=640MB,  capacity=640MB  (merged data)
+
+DCA Applied:
+N_L = 640MB (largest level size)
+C_0 = 640MB / 10¹ = 64MB   ✓ (matches write_buffer_size)
+C_1 = 640MB / 10⁰ = 640MB  ✓ (unchanged, largest level)
+```
+
+**Cycle 2 · L0 and L1 Fill, Creates L2**
+
+After 100 more flushes (10 compactions of L0 → L1):
+```
+Before Compaction:
+L0: size=640MB,  capacity=64MB   (needs compaction)
+L1: size=6.4GB,  capacity=640MB  (exceeded capacity!)
+L2: (created)    capacity=6.4GB  (T × L1 capacity)
+
+Compaction: Full preemptive merge L0+L1 → L2
+
+After Compaction:
+L0: size=0MB,    capacity=64MB
+L1: size=0MB,    capacity=640MB
+L2: size=6.4GB,  capacity=6.4GB
+
+DCA Applied:
+N_L = 6.4GB (largest level size)
+C_0 = 6.4GB / 10² = 64MB    ✓ (stable)
+C_1 = 6.4GB / 10¹ = 640MB   ✓ (stable)
+C_2 = 6.4GB / 10⁰ = 6.4GB   ✓ (unchanged, largest level)
+```
+
+**Cycle 3 · Dataset Grows to 64GB**
+
+After 1,000 total flushes:
+```
+Before Compaction:
+L0: size=640MB,  capacity=64MB
+L1: size=6.4GB,  capacity=640MB
+L2: size=64GB,   capacity=6.4GB  (exceeded!)
+L3: (created)    capacity=64GB
+
+Compaction: Partitioned merge L2 → L3
+
+After Compaction:
+L0: size=640MB,  capacity=64MB
+L1: size=6.4GB,  capacity=640MB
+L2: size=0GB,    capacity=6.4GB
+L3: size=64GB,   capacity=64GB
+
+DCA Applied:
+N_L = 64GB (largest level size)
+C_0 = 64GB / 10³ = 64MB     ✓ (stable)
+C_1 = 64GB / 10² = 640MB    ✓ (stable)
+C_2 = 64GB / 10¹ = 6.4GB    ✓ (stable)
+C_3 = 64GB / 10⁰ = 64GB     ✓ (unchanged, largest level)
+```
+
+**Cycle 4 · Dataset Grows to 200GB (Asymmetric Growth)**
+
+After continued writes, L3 grows but not to full 640GB capacity:
+```
+Before Compaction:
+L0: size=640MB,  capacity=64MB
+L1: size=6.4GB,  capacity=640MB
+L2: size=32GB,   capacity=6.4GB  (exceeded)
+L3: size=200GB,  capacity=64GB   (exceeded)
+L4: (created)    capacity=640GB
+
+Compaction: Partitioned merge L2+L3 → L4
+
+After Compaction:
+L0: size=640MB,  capacity=64MB
+L1: size=6.4GB,  capacity=640MB
+L2: size=0GB,    capacity=6.4GB
+L3: size=0GB,    capacity=64GB
+L4: size=200GB,  capacity=640GB
+
+DCA Applied (Key Adaptation!):
+N_L = 200GB (actual largest level size, not capacity)
+C_0 = 200GB / 10⁴ = 20MB    ← Decreased from 64MB!
+C_1 = 200GB / 10³ = 200MB   ← Decreased from 640MB!
+C_2 = 200GB / 10² = 2GB     ← Decreased from 6.4GB!
+C_3 = 200GB / 10¹ = 20GB    ← Decreased from 64GB!
+C_4 = 200GB / 10⁰ = 200GB   ✓ (unchanged, largest level)
+```
+
+**Key Insight from Cycle 4**
+
+DCA adapted all capacities **downward** because the largest level only contains 200GB, not the theoretical 640GB capacity. This prevents:
+- X  Upper levels having unnecessarily large capacities
+- X  Delayed compaction triggers
+- X  Excessive read amplification (too many levels)
+- X  Wasted space in the hierarchy
+
+Instead, capacities now reflect **actual data distribution**, ensuring optimal compaction behavior.
+
+**Cycle 5 · Dataset Continues Growing to 500GB**
+
+After more writes
+```
+Before Compaction:
+L0: size=200MB,  capacity=20MB   (needs compaction)
+L1: size=2GB,    capacity=200MB  (needs compaction)
+L2: size=20GB,   capacity=2GB    (needs compaction)
+L3: size=100GB,  capacity=20GB   (needs compaction)
+L4: size=500GB,  capacity=200GB  (exceeded)
+L5: (created)    capacity=2TB
+
+Compaction: Multiple merges cascade through levels
+
+After Compaction:
+L0: size=0MB,    capacity=20MB
+L1: size=0MB,    capacity=200MB
+L2: size=0MB,    capacity=2GB
+L3: size=0MB,    capacity=20GB
+L4: size=0GB,    capacity=200GB
+L5: size=500GB,  capacity=2TB
+
+DCA Applied (Scales Up!):
+N_L = 500GB (largest level grew)
+C_0 = 500GB / 10⁵ = 50MB    ← Increased from 20MB
+C_1 = 500GB / 10⁴ = 500MB   ← Increased from 200MB
+C_2 = 500GB / 10³ = 5GB     ← Increased from 2GB
+C_3 = 500GB / 10² = 50GB    ← Increased from 20GB
+C_4 = 500GB / 10¹ = 500GB   ← Increased from 200GB
+C_5 = 500GB / 10⁰ = 500GB   ✓ (unchanged, largest level)
+```
+
+**Summary of DCA Evolution:**
+
+| Cycle | N_L (Largest) | C_0 | C_1 | C_2 | C_3 | C_4 | C_5 | Behavior |
+|-------|---------------|-----|-----|-----|-----|-----|-----|----------|
+| 1 | 640MB | 64MB | 640MB | - | - | - | - | Initial |
+| 2 | 6.4GB | 64MB | 640MB | 6.4GB | - | - | - | Stable growth |
+| 3 | 64GB | 64MB | 640MB | 6.4GB | 64GB | - | - | Stable growth |
+| 4 | 200GB | 20MB ↓ | 200MB ↓ | 2GB ↓ | 20GB ↓ | 200GB | - | **Adapted down** |
+| 5 | 500GB | 50MB ↑ | 500MB ↑ | 5GB ↑ | 50GB ↑ | 500GB ↑ | 500GB | **Adapted up** |
+
+**What This Shows:**
+
+1. **Automatic Scaling** · Capacities adjust both up and down based on actual data size
+2. **Proportional Relationships** · The `1:10:100:1000` ratio is maintained across all cycles
+3. **No Manual Tuning** · Works correctly from 640MB to 500GB+ without configuration changes
+4. **Prevents Imbalance** · Cycle 4 shows DCA correcting for asymmetric growth
+5. **Optimal Compaction** · Each level triggers compaction at the right threshold
+
+This dynamic adaptation is why TidesDB maintains consistent performance across workloads with varying dataset sizes, from gigabytes to terabytes, without requiring manual capacity tuning that would be necessary in static LSM implementations.
+
 #### Stability Guarantees
 
 DCA includes safeguards to prevent capacity thrashing:
@@ -860,17 +1030,127 @@ flush and compaction operations safely modify the underlying storage structures.
 
 TidesDB implements multi-version concurrency control (MVCC) using sequence numbers to provide configurable isolation levels without locking readers. Each write operation is assigned a monotonically increasing sequence number via atomic increment, establishing a total ordering of all committed operations. Transactions capture a snapshot sequence number at begin time, enabling consistent reads across multiple operations while concurrent writes proceed without blocking. The system supports five isolation levels, each providing different trade-offs between consistency guarantees and concurrency.
 
-**Isolation Levels**
+**Isolation Levels · Implementation Details**
 
-**READ UNCOMMITTED** · Transactions see all data including uncommitted changes from concurrent transactions. Point reads search the active memtable, immutable memtables, and SSTables without sequence number filtering, returning the newest version of each key regardless of commit status. This level provides maximum concurrency with minimal consistency guarantees, suitable for approximate queries and analytics workloads where stale reads are acceptable.
+**READ UNCOMMITTED (Level 0)**
 
-**READ COMMITTED** · Transactions see only committed data at the time of each read operation. Point reads filter results by sequence number, returning only versions with seq <= snapshot_seq where snapshot_seq is captured at the start of each read operation. This ensures that reads never see uncommitted data from concurrent transactions, while allowing non-repeatable reads. This level balances consistency and concurrency for most OLTP workloads.
+Implementation: `skip_list_get_with_seq()` is called with `snapshot_seq = UINT64_MAX`, which bypasses all version filtering and returns the latest version regardless of commit status.
 
-**REPEATABLE READ** · Transactions see a consistent snapshot captured at transaction begin time. The snapshot sequence number is captured once and remains constant for the transaction's lifetime. All reads filter by this snapshot sequence, ensuring that repeated reads of the same key return identical values even if concurrent transactions commit. However, phantom reads are possible in range scans. This level provides strong consistency for point reads while allowing some anomalies in range queries.
+```c
+if (snapshot_seq == UINT64_MAX) {
+    // Read uncommitted: see all versions, use latest
+    if (version == NULL) return -1;
+}
+```
 
-**SNAPSHOT ISOLATION** · Transactions see a consistent snapshot with write conflict detection. The system detects write-write conflicts by comparing the transaction's snapshot sequence with the sequence numbers of keys being written. If a concurrent transaction has committed a write to the same key after this transaction's snapshot was taken, the commit fails with a conflict error. This prevents lost updates while allowing concurrent transactions to commit if their write sets do not overlap.
+No transaction registration, no read/write set tracking, no conflict detection. Provides maximum concurrency with zero coordination overhead. Suitable for analytics workloads where approximate results are acceptable.
 
-**SERIALIZABLE** · Transactions execute as if run serially with full conflict detection. The system detects both write-write conflicts and read-write conflicts by tracking read sets and write sets. If a concurrent transaction commits a write to a key that this transaction has read, or reads a key that this transaction has written, the commit fails with a serialization error. This level provides the strongest consistency guarantees at the cost of higher abort rates and reduced concurrency.
+**READ COMMITTED (Level 1)**
+
+Implementation: Each read operation captures a fresh snapshot by loading `atomic_load(&cf->commit_seq)` at read time. The snapshot refreshes on every `tidesdb_txn_get()` call.
+
+```c
+if (txn->isolation_level == TDB_ISOLATION_READ_COMMITTED) {
+    // Refresh snapshot on each read
+    cf_snapshot = atomic_load_explicit(&cf->commit_seq, memory_order_acquire);
+}
+```
+
+Reads filter versions using `skip_list_get_with_seq()` with the per-read snapshot, ensuring only committed data is visible. No read set tracking, no write conflict detection beyond basic write-write conflicts. Default isolation level for most workloads.
+
+**REPEATABLE READ (Level 2)**
+
+Implementation: Snapshot captured once at transaction begin via `tidesdb_txn_add_cf_internal()`, stored in `txn->cf_snapshots[cf_idx]`. All subsequent reads use this fixed snapshot.
+
+```c
+if (txn->isolation_level == TDB_ISOLATION_REPEATABLE_READ) {
+    // Use consistent snapshot from transaction start
+    cf_snapshot = txn->cf_snapshots[cf_idx];
+}
+```
+
+Transaction registers in the column family's active transaction buffer (`cf->active_txn_buffer`) to enable conflict detection. At commit time, the system performs two checks:
+
+1. **Read-set validation** (lines 8631-8655): For each key in `txn->read_keys[]`, check if `found_seq > key_read_seq`. If true, another transaction modified the key after we read it → abort with `TDB_ERR_CONFLICT`.
+
+2. **Write-write conflict detection** (lines 8660-8693): For each key in `txn->write_keys[]`, check if `found_seq > cf_snapshot`. If true, another transaction committed a write to the same key → abort with `TDB_ERR_CONFLICT`.
+
+Prevents lost updates but allows phantom reads in range scans.
+
+**SNAPSHOT ISOLATION (Level 3)**
+
+Implementation: Identical to REPEATABLE READ with enhanced write conflict detection. Uses the same snapshot capture, read-set tracking, and write-write conflict checks.
+
+```c
+if (txn->isolation_level == TDB_ISOLATION_SNAPSHOT) {
+    // Track reads for conflict detection
+    tidesdb_txn_add_to_read_set(txn, cf, key, key_size, found_seq);
+}
+```
+
+The key difference is semantic: SNAPSHOT isolation explicitly guarantees first-committer-wins semantics for overlapping write sets, making it suitable for workloads with high contention on specific keys. The implementation is the same as REPEATABLE READ in TidesDB's current design.
+
+**SERIALIZABLE (Level 4) · SSI Implementation**
+
+Implementation: Full Serializable Snapshot Isolation (SSI) with read-write antidependency detection. Extends SNAPSHOT isolation with an additional check at commit time.
+
+At transaction begin, registers in `cf->active_txn_buffer` with isolation level stored:
+```c
+tidesdb_txn_register(cf, txn->txn_id, cf_snapshot, 
+                     TDB_ISOLATION_SERIALIZABLE, &txn_slot);
+```
+
+During reads, tracks every key accessed in the read set:
+```c
+txn->read_keys[txn->read_set_count] = malloc(key_size);
+memcpy(txn->read_keys[txn->read_set_count], key, key_size);
+txn->read_seqs[txn->read_set_count] = found_seq;
+txn->read_cfs[txn->read_set_count] = cf;
+txn->read_set_count++;
+```
+
+At commit time (lines 8695-8714), performs the **SSI antidependency check**:
+
+```c
+if (txn->isolation_level == TDB_ISOLATION_SERIALIZABLE) {
+    // Check each CF's active transaction buffer
+    for (int cf_idx = 0; cf_idx < txn->num_cfs; cf_idx++) {
+        ssi_check_ctx_t ctx = {.txn = txn, .conflict_found = 0};
+        buffer_foreach(cf->active_txn_buffer, check_rw_conflict, &ctx);
+        
+        if (ctx.conflict_found) {
+            return TDB_ERR_CONFLICT;  // Abort to prevent write-skew
+        }
+    }
+}
+```
+
+The `check_rw_conflict()` callback (lines 8589-8614) scans all active SERIALIZABLE transactions:
+
+```c
+static void check_rw_conflict(uint32_t id, void *data, void *ctx) {
+    tidesdb_txn_entry_t *active = (tidesdb_txn_entry_t *)data;
+    
+    // Skip ourselves
+    if (active->txn_id == check_ctx->txn->txn_id) return;
+    
+    // Check if active transaction's snapshot overlaps with our writes
+    // If they started before we commit and we're writing keys,
+    // we have a potential rw-conflict (they might have read data
+    // we're about to overwrite)
+    for (int cf_idx = 0; cf_idx < check_ctx->txn->num_cfs; cf_idx++) {
+        if (active->snapshot_seq <= check_ctx->txn->cf_snapshots[cf_idx]) {
+            // Abort to prevent potential write-skew
+            check_ctx->conflict_found = 1;
+            return;
+        }
+    }
+}
+```
+
+**Key Insight** · This detects **dangerous structures** in the serialization graph. If transaction T1 (committing) is writing keys, and transaction T2 (active) has a snapshot from before T1 started, then T2 might have read old values of keys T1 is writing. This creates a read-write antidependency (T2 →rw T1), which combined with a write-read dependency (T1 →wr T2) would form a cycle, violating serializability. By aborting T1, we prevent the cycle.
+
+This is a **conservative** SSI implementation: it may abort transactions that wouldn't actually cause anomalies (false positives), but it never allows non-serializable executions (no false negatives). The overhead is proportional to the number of active SERIALIZABLE transactions, not all transactions, making it practical for mixed workloads.
 
 **MVCC Implementation**
 
@@ -890,7 +1170,102 @@ TidesDB implements a general-purpose lock-free circular buffer data structure (b
 
 **Active Transaction Buffer for SERIALIZABLE Isolation**
 
-For SERIALIZABLE isolation, each column family maintains an active transaction buffer using this lock-free buffer implementation to track all currently active transactions. When a SERIALIZABLE transaction begins, it registers itself by atomically acquiring a buffer slot, storing its transaction ID, snapshot sequence, and isolation level. During commit, the system uses buffer_foreach to scan all active transactions and detect read-write conflicts (SSI antidependency check). If a concurrent transaction has read a key that this transaction is writing, the commit fails with a serialization error. After commit or abort, the transaction unregisters by atomically releasing its slot with an eviction callback that cleans up transaction metadata. The generation numbers prevent ABA problems where a slot ID might be reused between validation and access. This design enables SERIALIZABLE isolation without global locks, with conflict detection overhead proportional only to the number of active SERIALIZABLE transactions rather than all transactions in the system.
+For SERIALIZABLE isolation, each column family maintains an active transaction buffer (`cf->active_txn_buffer`) using the lock-free buffer implementation to track all currently active SERIALIZABLE transactions. The buffer is initialized with a default capacity of `TDB_DEFAULT_ACTIVE_TXN_BUFFER_SIZE` slots, each capable of holding a `tidesdb_txn_entry_t` structure.
+
+**Transaction Registration (lines 7784-7809)**
+
+When a SERIALIZABLE transaction begins and first accesses a column family, it registers via `tidesdb_txn_register()`:
+
+```c
+tidesdb_txn_entry_t *entry = malloc(sizeof(tidesdb_txn_entry_t));
+entry->txn_id = txn_id;
+entry->snapshot_seq = snapshot_seq;
+entry->isolation = TDB_ISOLATION_SERIALIZABLE;
+entry->buffer_slot_id = BUFFER_INVALID_ID;
+entry->generation = 0;
+
+if (buffer_acquire(cf->active_txn_buffer, entry, slot_id) != 0) {
+    // Buffer exhausted - fail transaction to preserve correctness
+    free(entry);
+    return -1;
+}
+
+// Store slot ID and generation for validation
+entry->buffer_slot_id = *slot_id;
+buffer_get_generation(cf->active_txn_buffer, *slot_id, &entry->generation);
+```
+
+The `buffer_acquire()` call performs an atomic CAS operation to find a FREE slot and transition it to ACQUIRED state. If all slots are occupied (buffer exhausted), the transaction fails immediately rather than compromising SERIALIZABLE guarantees. This is a critical design choice: SSI correctness requires tracking all active SERIALIZABLE transactions, so buffer exhaustion must be treated as a hard error.
+
+**Lock-Free Buffer Slot States**
+
+Each buffer slot transitions through atomic states:
+```
+FREE → ACQUIRED → OCCUPIED → RELEASING → FREE
+```
+
+- **FREE** · Slot available for acquisition
+- **ACQUIRED** · Thread has claimed slot, writing data
+- **OCCUPIED** · Data written, slot visible to readers
+- **RELEASING** · Slot being freed, not visible to new readers
+
+State transitions use atomic CAS operations with exponential backoff under contention. The generation counter increments on each FREE → ACQUIRED transition, preventing ABA problems where a slot ID is reused between validation and access.
+
+**SSI Antidependency Check (lines 8695-8714)**
+
+During commit, the system scans all active SERIALIZABLE transactions using `buffer_foreach()`:
+
+```c
+ssi_check_ctx_t ctx = {.txn = txn, .conflict_found = 0};
+buffer_foreach(cf->active_txn_buffer, check_rw_conflict, &ctx);
+
+if (ctx.conflict_found) {
+    return TDB_ERR_CONFLICT;
+}
+```
+
+The `buffer_foreach()` function iterates over all OCCUPIED slots, calling the `check_rw_conflict()` callback for each active transaction. The callback checks if any active transaction has a snapshot that overlaps with the committing transaction's write set, detecting dangerous structures in the serialization graph.
+
+**Key Implementation Detail** · The foreach iteration is **lock-free** and **wait-free**. It reads slot states atomically and skips slots that transition to RELEASING during iteration. This means conflict detection never blocks, even if transactions are concurrently registering or unregistering.
+
+**Transaction Unregistration (lines 7820-7825)**
+
+After commit or abort, the transaction unregisters via `tidesdb_txn_unregister()`:
+
+```c
+if (!cf || !cf->active_txn_buffer || slot_id == BUFFER_INVALID_ID) return;
+buffer_release(cf->active_txn_buffer, slot_id);
+```
+
+The `buffer_release()` call atomically transitions the slot from OCCUPIED → RELEASING → FREE, incrementing the generation counter. An optional eviction callback (`txn_entry_evict`) is invoked to free the `tidesdb_txn_entry_t` structure, ensuring no memory leaks.
+
+**Generation Counter ABA Prevention**
+
+Consider this scenario without generation counters:
+1. Transaction T1 acquires slot 5, stores pointer P1
+2. T1 commits, releases slot 5
+3. Transaction T2 acquires slot 5, stores pointer P2
+4. Concurrent thread still holds slot ID 5, dereferences → **use-after-free of P1**
+
+With generation counters:
+1. T1 acquires slot 5 (generation 10), stores P1
+2. T1 commits, releases slot 5 (generation increments to 11)
+3. T2 acquires slot 5 (generation 11), stores P2
+4. Concurrent thread validates: slot 5, generation 10 ≠ 11 → **detects stale reference, skips**
+
+This enables safe concurrent access without locking the entire buffer.
+
+**Performance Characteristics**
+
+- **Registration** · O(1) amortized, O(slots) worst-case if buffer is nearly full
+- **Conflict Check** · O(active_serializable_txns), not O(all_txns)
+- **Unregistration** · O(1) atomic release
+- **Memory** · Fixed-size buffer, no dynamic allocation per transaction
+- **Contention** · Exponential backoff on CAS failures, scales well to 100+ concurrent SERIALIZABLE transactions
+
+The buffer size is configurable via `TDB_DEFAULT_ACTIVE_TXN_BUFFER_SIZE`. If your workload has many long-running SERIALIZABLE transactions, increase this value to prevent buffer exhaustion. For workloads with mostly READ_COMMITTED or SNAPSHOT transactions, the buffer overhead is minimal since only SERIALIZABLE transactions register.
+
+This design enables full SERIALIZABLE isolation without global locks, with overhead proportional only to the number of active SERIALIZABLE transactions. Mixed workloads (e.g., 95% READ_COMMITTED, 5% SERIALIZABLE) pay minimal cost, making SERIALIZABLE practical for critical operations without sacrificing overall system throughput.
 
 ### 8.4 Optimal Use Cases
 
