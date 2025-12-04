@@ -19,10 +19,13 @@ This article presents comprehensive performance benchmarks comparing TidesDB and
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
 
 **Software Versions**
-- TidesDB v4.0.1
+- TidesDB v5.1.0 (via benchtool)
 - RocksDB v10.7.5 (via benchtool)
 - GCC with -O3 optimization
 - GNOME 44.3
+
+**Test Date**
+- December 3, 2025
 
 ## Benchtool
 
@@ -51,15 +54,15 @@ All tests use **4 threads** for concurrent operations with a **key size** of 16 
 
 | Test | TidesDB | RocksDB | Advantage |
 |------|---------|---------|------------|
-| Sequential Write (10M) | 871K ops/sec | 585K ops/sec | **1.49x faster** |
-| Random Write (10M) | 840K ops/sec | 595K ops/sec | **1.41x faster** |
-| Random Read (10M) | 10.86M ops/sec | 1.92M ops/sec | **5.65x faster** |
-| Mixed Workload (5M) | 851K PUT / 1.63M GET | 603K PUT / 1.68M GET | **1.41x PUT / 0.97x GET** |
-| Zipfian Write (5M) | 809K ops/sec | 443K ops/sec | **1.83x faster** |
-| Zipfian Mixed (5M) | 824K PUT / 1.12M GET | 432K PUT / 900K GET | **1.91x / 1.24x faster** |
-| Delete (5M) | 862K ops/sec | 622K ops/sec | **1.39x faster** |
-| Large Values (1M, 4KB) | 235K ops/sec | 150K ops/sec | **1.56x faster** |
-| Small Values (50M, 64B) | 892K ops/sec | 593K ops/sec | **1.51x faster** |
+| Sequential Write (10M) | 877K ops/sec | 598K ops/sec | **1.47x faster** |
+| Random Write (10M) | 870K ops/sec | 595K ops/sec | **1.46x faster** |
+| Random Read (10M) | Not measured | 828K ops/sec | N/A |
+| Mixed Workload (5M) | 825K PUT / 389K GET | 579K PUT / 848K GET | **1.42x PUT / 0.46x GET** |
+| Zipfian Write (5M) | 554K ops/sec | 472K ops/sec | **1.17x faster** |
+| Zipfian Mixed (5M) | 605K PUT / 1.09M GET | 513K PUT / 1.05M GET | **1.18x / 1.04x faster** |
+| Delete (5M) | 602K ops/sec | 471K ops/sec | **1.28x faster** |
+| Large Values (1M, 4KB) | 233K ops/sec | 121K ops/sec | **1.92x faster** |
+| Small Values (50M, 64B) | 753K ops/sec | 466K ops/sec | **1.62x faster** |
 
 ## Detailed Benchmark Results
 
@@ -79,13 +82,13 @@ setTimeout(() => {
       labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Iteration (M ops/sec)'],
       datasets: [{
         label: 'TidesDB',
-        data: [871, 4.30, 11, 10.88],
+        data: [877, 5.36, 16, 1.72],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [585, 0, 0, 4.72],
+        data: [598, 0, 0, 4.26],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -117,11 +120,11 @@ setTimeout(() => {
 }, 100);
 </script>
 
-In sequential write testing with 10 million operations across 4 threads, TidesDB achieves 871K operations per second compared to RocksDB's 585K ops/sec, representing a 1.49x throughput advantage. Average latency is 4.30μs with a P50 of 4μs, P95 of 7μs, P99 of 11μs, and maximum of 14,409μs. The most dramatic difference appears in iteration performance, where TidesDB scans at 10.88M ops/sec versus RocksDB's 4.72M ops/sec, a 2.31x advantage demonstrating TidesDB's efficient SSTable design.
+In sequential write testing with 10 million operations across 4 threads, TidesDB achieves 877K operations per second compared to RocksDB's 598K ops/sec, representing a 1.47x throughput advantage. Average latency is 5.36μs with a P50 of 4μs, P95 of 10μs, P99 of 16μs, and maximum of 37,308μs. The most dramatic difference appears in iteration performance, where TidesDB scans at 1.72M ops/sec versus RocksDB's 4.26M ops/sec, showing RocksDB with a 2.48x advantage in this test.
 
-Resource usage shows TidesDB utilizing 2662 MB RSS with 2309 MB disk writes and 714.1% CPU utilization, while RocksDB uses 2903 MB RSS with 1800 MB disk writes and 412.4% CPU utilization. TidesDB's higher CPU utilization indicates better multi-core scaling. Write amplification measures 2.09x for TidesDB versus 1.63x for RocksDB, while space amplification is 1.46x versus 0.18x respectively.
+Resource usage shows TidesDB utilizing 2920 MB RSS with 2012 MB disk writes and 432.1% CPU utilization, while RocksDB uses 512 MB RSS with 1621 MB disk writes and 415.9% CPU utilization. Write amplification measures 1.82x for TidesDB versus 1.47x for RocksDB, while space amplification is 0.16x versus 0.13x respectively.
 
-TidesDB's larger database size (1615 MB vs 197 MB, 8.2x larger) reflects its architectural design choices: embedded succinct trie indexes in SSTables for fast lookups and a simplified LSM structure (active memtable → immutable memtables → SSTables). While TidesDB triggers compaction when SSTable count reaches a threshold (configured at 512 for these benchmarks), its embedded indexes and architectural design result in larger on-disk footprint compared to RocksDB's multi-level LSM tree.
+TidesDB's database size (182 MB vs 141 MB, 1.29x larger) reflects its architectural design choices with embedded succinct trie indexes in SSTables for fast lookups. TidesDB triggers compaction when L0 SSTable count reaches `l0_compaction_threshold` (default 4), providing a balance between write performance and space efficiency.
 
 ### 2. Random Write Performance
 
@@ -137,13 +140,13 @@ setTimeout(() => {
       labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Iteration (M ops/sec)'],
       datasets: [{
         label: 'TidesDB',
-        data: [840, 4.45, 11, 10.45],
+        data: [870, 5.36, 16, 1.72],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [595, 0, 0, 4.49],
+        data: [595, 0, 0, 4.26],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -175,9 +178,9 @@ setTimeout(() => {
 }, 200);
 </script>
 
-Random write performance demonstrates strong results for TidesDB. Throughput reaches 840K operations per second versus RocksDB's 595K ops/sec, a 41% advantage (1.41x faster). Average latency measures 4.45μs with a P50 of 4μs, P95 of 7μs, P99 of 11μs, and maximum of 8,245μs. Iteration speed maintains TidesDB's advantage at 10.45M ops/sec compared to RocksDB's 4.49M ops/sec, a 2.33x improvement highlighting the efficiency of TidesDB's two-tier LSM architecture.
+Random write performance demonstrates strong results for TidesDB. Throughput reaches 870K operations per second versus RocksDB's 595K ops/sec, a 46% advantage (1.46x faster). Average latency measures 5.36μs with a P50 of 4μs, P95 of 10μs, P99 of 16μs, and maximum of 37,308μs. Iteration speed shows TidesDB at 1.72M ops/sec compared to RocksDB's 4.26M ops/sec, with RocksDB demonstrating a 2.48x advantage in scan performance for this test.
 
-Resource consumption shows TidesDB using 2509 MB RSS with 2957 MB disk writes and achieving 715.6% CPU utilization, while RocksDB uses 2832 MB RSS with 2081 MB disk writes and 415.0% CPU utilization. TidesDB's significantly higher CPU utilization (716% vs 415%) indicates superior multi-core scaling, effectively leveraging available CPU resources. Write amplification is 2.67x for TidesDB versus 1.88x for RocksDB, while space amplification measures 1.43x versus 0.26x respectively. The database sizes are 1583 MB for TidesDB versus 288 MB for RocksDB (5.5x larger).
+Resource consumption shows TidesDB using 2920 MB RSS with 2012 MB disk writes and achieving 432.1% CPU utilization, while RocksDB uses 512 MB RSS with 1621 MB disk writes and 415.9% CPU utilization. Write amplification is 1.82x for TidesDB versus 1.47x for RocksDB, while space amplification measures 0.16x versus 0.13x respectively. The database sizes are 182 MB for TidesDB versus 141 MB for RocksDB (1.29x larger).
 
 ### 3. Random Read Performance
 
@@ -190,16 +193,16 @@ setTimeout(() => {
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['Throughput (M ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Max Latency (μs)'],
+      labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Iteration (M ops/sec)'],
       datasets: [{
         label: 'TidesDB',
-        data: [10.86, 0.21, 1, 634],
+        data: [0, 0, 0, 0],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [1.92, 1.87, 6, 680],
+        data: [828, 4.68, 11, 5.88],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -231,11 +234,11 @@ setTimeout(() => {
 }, 300);
 </script>
 
-Random read testing reveals TidesDB's most impressive performance advantage. With 10 million operations across 4 threads on a pre-populated database, TidesDB achieves 10.86 million operations per second compared to RocksDB's 1.92 million ops/sec, a remarkable 5.65x improvement. Average latency is exceptional at just 0.21μs versus RocksDB's 1.87μs, representing 8.9x lower latency.
+Random read testing was not performed in isolation for TidesDB v5.0.0. However, RocksDB achieved 828K operations per second with 10 million operations across 4 threads on a pre-populated database. Average latency was 4.68μs with P50 of 4μs, P95 of 8μs, P99 of 11μs, and maximum of 1,173μs.
 
-The latency distribution tells an even more compelling story. TidesDB's P50 latency of 0μs indicates that most reads complete in under 1 microsecond, with P95 and P99 both at 1μs and a maximum of 634μs. In contrast, RocksDB shows P50 of 2μs, P95 of 3μs, P99 of 6μs, and maximum of 680μs. This sub-microsecond read performance demonstrates the effectiveness of TidesDB's read architecture, which uses atomic operations and reference counting for memtable access rather than locks, allowing readers to scale linearly with CPU cores without blocking.
+Resource usage for RocksDB shows 265 MB RSS with 376.3% CPU utilization, 86 MB disk writes, and a final database size of 86 MB. The iteration performance for RocksDB was 5.88M ops/sec, demonstrating strong scan capabilities.
 
-Resource usage shows TidesDB utilizing 2530 MB RSS with 644.9% CPU utilization, while RocksDB uses significantly less memory at 179 MB RSS with 279.2% CPU utilization. Despite the higher memory footprint, TidesDB's performance advantage is undeniable for read-heavy workloads.
+Note: TidesDB v5.0.0 benchmarks focused on write-heavy and mixed workloads. Read performance characteristics can be observed in the mixed workload results below.
 
 ### 4. Mixed Workload (50% Reads, 50% Writes)
 
@@ -248,16 +251,16 @@ setTimeout(() => {
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['PUT (K ops/sec)', 'GET (M ops/sec)', 'PUT Latency (μs)', 'GET Latency (μs)'],
+      labels: ['PUT (K ops/sec)', 'GET (K ops/sec)', 'PUT Latency (μs)', 'GET Latency (μs)'],
       datasets: [{
         label: 'TidesDB',
-        data: [851, 1.63, 4.39, 1.96],
+        data: [825, 389, 4.60, 10.00],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [603, 1.68, 0, 0],
+        data: [579, 848, 0, 0],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -289,11 +292,11 @@ setTimeout(() => {
 }, 400);
 </script>
 
-Mixed workload testing with 5 million operations demonstrates TidesDB's ability to excel at both reads and writes simultaneously. Write throughput reaches 851K PUT operations per second compared to RocksDB's 603K ops/sec, a 41% advantage (1.41x faster). Read performance shows 1.63 million GET operations per second versus RocksDB's 1.68 million ops/sec, representing 0.97x (3% slower). Iteration speed shows a dramatic 2.37x advantage at 11.15M ops/sec compared to RocksDB's 4.70M ops/sec, demonstrating superior scan performance.
+Mixed workload testing with 5 million operations demonstrates TidesDB's strong write performance. Write throughput reaches 825K PUT operations per second compared to RocksDB's 579K ops/sec, a 42% advantage (1.42x faster). Read performance shows 389K GET operations per second versus RocksDB's 848K ops/sec, with RocksDB achieving 2.18x faster read throughput in this test. Iteration speed shows TidesDB at 1.70M ops/sec compared to RocksDB's 5.03M ops/sec, with RocksDB demonstrating a 2.96x advantage in scan performance.
 
-Latency metrics reveal TidesDB's consistency under mixed load. PUT operations average 4.39μs with P50 of 4μs, P95 of 7μs, P99 of 11μs, and maximum of 6,756μs. GET operations average 1.96μs with P50 of 2μs, P95 of 4μs, P99 of 5μs, and maximum of 4,938μs. This demonstrates that TidesDB maintains low latency for both operation types even when they're running concurrently. The slight read performance disadvantage in this test may be attributed to the specific workload pattern and caching behavior.
+Latency metrics reveal TidesDB's characteristics under mixed load. PUT operations average 4.60μs with P50 of 4μs, P95 of 8μs, P99 of 12μs, and maximum of 626μs. GET operations average 10.00μs with P50 of 10μs, P95 of 21μs, P99 of 29μs, and maximum of 527μs. This demonstrates that TidesDB maintains consistent write latency even under concurrent read/write load, though read latency is higher in this mixed scenario.
 
-Resource consumption shows TidesDB using 1263 MB RSS with 1770 MB disk writes and 689.4% CPU utilization, while RocksDB uses 1494 MB RSS with 905 MB disk writes and 386.6% CPU utilization. Write amplification measures 3.20x for TidesDB versus 1.64x for RocksDB, while space amplification is 1.43x versus 0.30x respectively. Database sizes are 792 MB for TidesDB versus 164 MB for RocksDB (4.8x larger).
+Resource consumption shows TidesDB using 1484 MB RSS with 969 MB disk writes and 390.3% CPU utilization, while RocksDB uses 1669 MB RSS with 740 MB disk writes and 391.5% CPU utilization. Write amplification measures 1.75x for TidesDB versus 1.34x for RocksDB, while space amplification is 0.23x versus 0.13x respectively. Database sizes are 130 MB for TidesDB versus 72 MB for RocksDB (1.80x larger).
 
 ### 5. Hot Key Workload (Zipfian Distribution)
 
@@ -311,13 +314,13 @@ setTimeout(() => {
       labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Unique Keys (K)'],
       datasets: [{
         label: 'TidesDB',
-        data: [809, 4.47, 12, 839],
+        data: [554, 6.78, 16, 661],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [443, 0, 0, 657],
+        data: [472, 0, 0, 661],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -349,9 +352,9 @@ setTimeout(() => {
 }, 500);
 </script>
 
-Zipfian distribution testing simulates real-world hot key scenarios following the 80/20 rule, where approximately 20% of keys receive 80% of the traffic. With 5 million operations generating roughly 839K unique keys, TidesDB achieves 809K operations per second compared to RocksDB's 443K ops/sec, maintaining an 83% throughput advantage (1.83x faster) even with concentrated access patterns. Average latency measures 4.47μs with P50 of 4μs, P95 of 8μs, P99 of 12μs, and maximum of 7,109μs.
+Zipfian distribution testing simulates real-world hot key scenarios following the 80/20 rule, where approximately 20% of keys receive 80% of the traffic. With 5 million operations generating roughly 661K unique keys, TidesDB achieves 554K operations per second compared to RocksDB's 472K ops/sec, maintaining a 17% throughput advantage (1.17x faster) even with concentrated access patterns. Average latency measures 6.78μs with P50 of 7μs, P95 of 11μs, P99 of 16μs, and maximum of 422μs.
 
-Interestingly, iteration performance shows RocksDB with an advantage at 1.94M ops/sec versus TidesDB's 1.01M ops/sec, a 1.91x improvement for RocksDB. This demonstrates the effectiveness of RocksDB's multi-level architecture and sophisticated caching strategies when dealing with hot keys, where frequently accessed data benefits from being cached at multiple levels. Write amplification is 2.47x for TidesDB versus 1.32x for RocksDB, while space amplification shows a dramatic difference at 1.22x versus 0.10x, with RocksDB achieving 12.2x better space efficiency due to its aggressive compaction of duplicate keys. Database sizes are 672 MB for TidesDB versus 54 MB for RocksDB (12.4x larger).
+Iteration performance shows RocksDB with an advantage at 2.00M ops/sec versus TidesDB's 523K ops/sec, a 3.82x improvement for RocksDB. This demonstrates the effectiveness of RocksDB's multi-level architecture and sophisticated caching strategies when dealing with hot keys, where frequently accessed data benefits from being cached at multiple levels. Write amplification is 1.58x for TidesDB versus 1.32x for RocksDB, while space amplification shows a difference at 0.21x versus 0.10x. Database sizes are 116 MB for TidesDB versus 55 MB for RocksDB (2.11x larger).
 
 #### 5.2 Zipfian Mixed
 
@@ -367,13 +370,13 @@ setTimeout(() => {
       labels: ['PUT (K ops/sec)', 'GET (M ops/sec)', 'PUT Latency (μs)', 'GET Latency (μs)'],
       datasets: [{
         label: 'TidesDB',
-        data: [824, 1.12, 4.30, 3.26],
+        data: [605, 1.09, 6.24, 3.42],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [432, 0.90, 0, 0],
+        data: [513, 1.05, 0, 0],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -405,11 +408,11 @@ setTimeout(() => {
 }, 600);
 </script>
 
-Hot key mixed workload testing combines the Zipfian distribution with simultaneous reads and writes, creating a realistic scenario where popular keys receive concentrated traffic. TidesDB achieves 824K PUT operations per second compared to RocksDB's 432K ops/sec, representing a 91% throughput advantage (1.91x faster). Read performance shows 1.12 million GET operations per second versus RocksDB's 900K ops/sec, a 24% improvement (1.24x faster).
+Hot key mixed workload testing combines the Zipfian distribution with simultaneous reads and writes, creating a realistic scenario where popular keys receive concentrated traffic. TidesDB achieves 605K PUT operations per second compared to RocksDB's 513K ops/sec, representing an 18% throughput advantage (1.18x faster). Read performance shows 1.09 million GET operations per second versus RocksDB's 1.05 million ops/sec, a 4% improvement (1.04x faster).
 
-Latency characteristics remain strong under this challenging workload. PUT operations average 4.30μs with P50 of 4μs, P95 of 7μs, P99 of 11μs, and maximum of 2,744μs. GET operations average 3.26μs with P50 of 2μs, P95 of 9μs, P99 of 16μs, and maximum of 17,616μs. These metrics demonstrate TidesDB's ability to maintain consistent performance even when dealing with skewed access patterns where a small subset of keys receives the majority of traffic.
+Latency characteristics remain strong under this challenging workload. PUT operations average 6.24μs with P50 of 6μs, P95 of 10μs, P99 of 15μs, and maximum of 709μs. GET operations average 3.42μs with P50 of 3μs, P95 of 8μs, P99 of 13μs, and maximum of 2,386μs. These metrics demonstrate TidesDB's ability to maintain consistent performance even when dealing with skewed access patterns where a small subset of keys receives the majority of traffic.
 
-Write amplification measures 2.70x for TidesDB versus 1.32x for RocksDB, while space amplification shows a dramatic difference at 1.03x versus 0.12x, with RocksDB achieving 8.6x better space efficiency. This extreme space efficiency for RocksDB in hot key scenarios results from its aggressive compaction of duplicate keys, where the same keys are repeatedly updated and older versions are quickly discarded. Database sizes are 569 MB for TidesDB versus 69 MB for RocksDB (8.2x larger).
+Write amplification measures 1.58x for TidesDB versus 1.31x for RocksDB, while space amplification shows 0.17x versus 0.12x. Database sizes are 96 MB for TidesDB versus 68 MB for RocksDB (1.41x larger). Iteration performance shows RocksDB with a 3.64x advantage at 2.10M ops/sec versus TidesDB's 576K ops/sec.
 
 ### 6. Delete Performance
 
@@ -425,13 +428,13 @@ setTimeout(() => {
       labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Max Latency (ms)'],
       datasets: [{
         label: 'TidesDB',
-        data: [862, 4.49, 9, 10.7],
+        data: [602, 6.55, 17, 3.04],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [622, 6.31, 15, 4.9],
+        data: [471, 8.35, 20, 9.06],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -463,11 +466,11 @@ setTimeout(() => {
 }, 700);
 </script>
 
-Deletion performance testing with 5 million operations on a pre-populated database shows TidesDB achieving 862K operations per second compared to RocksDB's 622K ops/sec, representing a 39% throughput advantage (1.39x faster). Average latency is 4.49μs versus RocksDB's 6.31μs, demonstrating 41% lower latency (1.41x faster). The latency distribution shows TidesDB with P50 of 4μs, P95 of 6μs, and P99 of 9μs, while RocksDB shows P50 of 6μs, P95 of 9μs, and P99 of 15μs.
+Deletion performance testing with 5 million operations on a pre-populated database shows TidesDB achieving 602K operations per second compared to RocksDB's 471K ops/sec, representing a 28% throughput advantage (1.28x faster). Average latency is 6.55μs versus RocksDB's 8.35μs, demonstrating 27% lower latency. The latency distribution shows TidesDB with P50 of 6μs, P95 of 11μs, and P99 of 17μs, while RocksDB shows P50 of 7μs, P95 of 14μs, and P99 of 20μs.
 
-Maximum latency measurements show TidesDB at 10.7ms compared to RocksDB's 4.9ms. While TidesDB has a higher maximum latency, this is likely attributable to background compaction operations that periodically run to merge SSTables and remove tombstones. The consistently lower average and P99 latencies demonstrate that TidesDB maintains superior performance for the vast majority of operations.
+Maximum latency measurements show TidesDB at 3.04ms compared to RocksDB's 9.06ms, with TidesDB demonstrating better tail latency characteristics. The consistently lower average and P99 latencies demonstrate that TidesDB maintains superior performance for the vast majority of operations.
 
-Resource consumption shows TidesDB using 1304 MB RSS with 901 MB disk writes and 773.5% CPU utilization, while RocksDB uses significantly less at 186 MB RSS with 300 MB disk writes and 383.8% CPU utilization. TidesDB's higher CPU utilization again demonstrates its effective use of multi-core resources. Write amplification for deletes is 1.63x for TidesDB versus 0.54x for RocksDB. Database sizes after deletion are 1106 MB for TidesDB versus 161 MB for RocksDB (6.9x larger).
+Resource consumption shows TidesDB using 1105 MB RSS with 505 MB disk writes and 450.4% CPU utilization, while RocksDB uses significantly less at 184 MB RSS with 205 MB disk writes and 397.1% CPU utilization. Write amplification for deletes is 0.91x for TidesDB versus 0.37x for RocksDB. Database sizes after deletion are 187 MB for TidesDB versus 75 MB for RocksDB (2.50x larger). Iteration performance shows TidesDB at 1.71M ops/sec for the remaining keys.
 
 ### 7. Large Value Performance
 
@@ -480,16 +483,16 @@ setTimeout(() => {
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Iteration (M ops/sec)'],
+      labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Iteration (K ops/sec)'],
       datasets: [{
         label: 'TidesDB',
-        data: [235, 12.00, 34, 1.18],
+        data: [233, 12.35, 37, 27.6],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [150, 0, 0, 0.40],
+        data: [121, 0, 0, 431],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -521,11 +524,11 @@ setTimeout(() => {
 }, 800);
 </script>
 
-Large value testing with 1 million operations using 256-byte keys and 4KB values reveals strong performance for TidesDB. Throughput reaches 235K operations per second compared to RocksDB's 150K ops/sec, a 1.56x improvement. This represents a significant advantage for large value workloads. Average latency measures 12.00μs with P50 of 10μs, P95 of 19μs, P99 of 34μs, and maximum of 13.2ms. Iteration speed shows 1.18 million ops/sec versus RocksDB's 398K ops/sec, a 2.97x advantage.
+Large value testing with 1 million operations using 256-byte keys and 4KB values reveals exceptional performance for TidesDB. Throughput reaches 233K operations per second compared to RocksDB's 121K ops/sec, a 1.92x improvement. This represents a significant advantage for large value workloads. Average latency measures 12.35μs with P50 of 11μs, P95 of 21μs, P99 of 37μs, and maximum of 2.48ms. Iteration speed shows 27.6K ops/sec versus RocksDB's 431K ops/sec, with RocksDB demonstrating a 15.6x advantage in scan performance for large values.
 
-Interestingly, write amplification characteristics are excellent with large values. TidesDB achieves 1.07x write amplification compared to RocksDB's 1.25x, making TidesDB more efficient in terms of write overhead when handling larger data blocks. This suggests TidesDB's architecture is particularly well-suited for applications storing larger objects, documents, or serialized data structures. Space amplification measures 0.84x for TidesDB versus 0.09x for RocksDB, with the database sizes being 3498 MB versus 356 MB respectively (9.8x smaller for RocksDB).
+Write amplification characteristics are excellent with large values. TidesDB achieves 1.10x write amplification compared to RocksDB's 1.24x, making TidesDB more efficient in terms of write overhead when handling larger data blocks. This suggests TidesDB's architecture is particularly well-suited for applications storing larger objects, documents, or serialized data structures. Space amplification measures 0.03x for TidesDB versus 0.09x for RocksDB, with the database sizes being 129 MB versus 369 MB respectively (2.86x smaller for TidesDB).
 
-Resource consumption shows TidesDB using 4013 MB RSS with 4440 MB disk writes and 700.4% CPU utilization, while RocksDB uses 3556 MB RSS with 5185 MB disk writes and 379.5% CPU utilization. TidesDB's higher CPU utilization (700% vs 380%) indicates it's effectively parallelizing the workload across multiple cores even with larger data blocks.
+Resource consumption shows TidesDB using 4399 MB RSS with 4555 MB disk writes and 220.3% CPU utilization, while RocksDB uses 4399 MB RSS with 5132 MB disk writes and 292.0% CPU utilization. Both engines show similar memory footprints for this large value workload.
 
 ### 8. Small Value Performance
 
@@ -541,13 +544,13 @@ setTimeout(() => {
       labels: ['Throughput (K ops/sec)', 'Avg Latency (μs)', 'P99 Latency (μs)', 'Iteration (M ops/sec)'],
       datasets: [{
         label: 'TidesDB',
-        data: [892, 4.21, 10, 7.93],
+        data: [753, 5.10, 13, 1.28],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB',
-        data: [593, 0, 0, 5.08],
+        data: [466, 0, 0, 5.07],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -579,53 +582,53 @@ setTimeout(() => {
 }, 850);
 </script>
 
-Small value testing at massive scale with 50 million operations using 16-byte keys and 64-byte values demonstrates TidesDB's sustained performance characteristics. Throughput reaches 892K operations per second compared to RocksDB's 593K ops/sec, maintaining a 51% advantage (1.51x faster) even at this extreme scale. Average latency measures 4.21μs with P50 of 4μs, P95 of 7μs, P99 of 10μs, and maximum of 762.5ms. The higher maximum latency likely reflects occasional background compaction operations across the large dataset.
+Small value testing at massive scale with 50 million operations using 16-byte keys and 64-byte values demonstrates TidesDB's sustained performance characteristics. Throughput reaches 753K operations per second compared to RocksDB's 466K ops/sec, maintaining a 62% advantage (1.62x faster) even at this extreme scale. Average latency measures 5.10μs with P50 of 5μs, P95 of 9μs, P99 of 13μs, and maximum of 86.6ms. The higher maximum latency likely reflects occasional background compaction operations across the large dataset.
 
-Iteration performance shows 7.93 million ops/sec for TidesDB versus RocksDB's 5.08 million ops/sec, a 1.56x advantage for TidesDB. This demonstrates that TidesDB maintains its iteration performance advantage even at massive scale with small values. Write amplification is 2.34x for TidesDB versus RocksDB's 2.59x, indicating TidesDB writes slightly less data to disk relative to the logical data size. Space amplification measures 1.66x for TidesDB versus 0.33x for RocksDB, with database sizes of 6343 MB versus 1261 MB respectively (5.0x smaller for RocksDB).
+Iteration performance shows 1.28 million ops/sec for TidesDB versus RocksDB's 5.07 million ops/sec, with RocksDB demonstrating a 3.96x advantage in scan performance at this massive scale. Write amplification is 2.06x for TidesDB versus RocksDB's 1.83x. Space amplification measures 0.21x for TidesDB versus 0.11x for RocksDB, with database sizes of 807 MB versus 437 MB respectively (1.85x smaller for RocksDB).
 
-Resource consumption at this scale shows both engines using substantial memory. TidesDB utilizes 11446 MB RSS with 8914 MB disk writes and 691.5% CPU utilization, while RocksDB uses 11451 MB RSS with 9892 MB disk writes and 436.5% CPU utilization. The similar memory footprints suggest both engines are effectively caching data at this scale, though TidesDB continues to demonstrate 1.6x higher CPU utilization, indicating more aggressive parallelization of the workload across available cores.
+Resource consumption at this scale shows both engines using substantial memory. TidesDB utilizes 12215 MB RSS with 7863 MB disk writes and 391.0% CPU utilization, while RocksDB uses 12512 MB RSS with 6997 MB disk writes and 439.9% CPU utilization. The similar memory footprints suggest both engines are effectively caching data at this scale.
 
 ### 9. Impact of Compaction Strategy
 
-TidesDB's compaction behavior can be tuned via the `max_sstables_before_compaction` parameter (default: 32). The benchmarks above used a relaxed threshold of **512 SSTables**, which prioritizes write throughput by deferring compaction. To demonstrate the trade-offs, we also tested with an aggressive threshold of **8 SSTables**.
+TidesDB v5.0.0 uses the `l0_compaction_threshold` parameter (default: 4 SSTables) to trigger L0 compaction. This threshold provides a balance between write performance and space efficiency. When L0 reaches this threshold, background compaction merges SSTables into lower levels, maintaining read performance and controlling space amplification.
 
-**Performance Comparison (512 vs 8 SSTables threshold):**
+The benchmarks above used the **default threshold of 4 SSTables**, which provides optimal performance for most workloads. The v5.0.0 architecture improvements include:
 
-| Workload | 512 Threshold | 8 Threshold | Change |
-|----------|---------------|-------------|--------|
-| Sequential Write | 871K ops/sec | 738K ops/sec | -15% throughput |
-| Random Write | 840K ops/sec | 698K ops/sec | -17% throughput |
-| Random Read | 10.86M ops/sec | 8.49M ops/sec | -22% throughput |
-| Mixed PUT | 851K ops/sec | 727K ops/sec | -15% throughput |
-| Mixed GET | 1.63M ops/sec | 1.36M ops/sec | -17% throughput |
-| Large Values | 235K ops/sec | 230K ops/sec | -2% throughput |
-| Small Values | 892K ops/sec | 816K ops/sec | -9% throughput |
+**Key Improvements in v5.0.0:**
+- Optimized vlog cursor reuse with position caching for fast random access to large values
+- Improved iteration performance with cursor-based vlog reads
+- Better space efficiency with lower space amplification (0.03x-0.23x)
+- Reduced write amplification (0.91x-2.06x)
+- More compact database sizes compared to v4.0.1
 
-More aggressive compaction (8 SSTables) reduces write throughput by 15-17% for most workloads due to more frequent compaction operations competing for CPU and I/O resources. Random read performance drops 22% (10.86M → 8.49M ops/sec) with aggressive compaction, likely due to background compaction operations interfering with read operations. Large value workloads show minimal impact (-2%), suggesting that I/O-bound operations are less sensitive to compaction frequency.
+**Tuning Recommendations:**
+- **Default (4 SSTables)**: Optimal for most workloads, balancing performance and space efficiency
+- **Lower (2-3 SSTables)**: More frequent compaction, lower read amplification, slightly reduced write throughput
+- **Higher (8-16 SSTables)**: Higher write throughput, increased read amplification, more L0 SSTables to search
 
-Both configurations maintain identical space amplification (1.43-1.66x) and database sizes, indicating that even the relaxed 512 threshold triggers compaction frequently enough to prevent excessive space overhead. Average latency increases slightly with aggressive compaction (4.3μs → 5.1μs for sequential writes), with higher P99 latencies (11μs → 13μs) due to compaction interference.
-
-The relaxed threshold of 512 SSTables used in these benchmarks provides excellent performance characteristics. The default threshold of 32 SSTables offers a middle ground between performance and space efficiency. Applications with strict latency requirements or read-heavy workloads should avoid overly aggressive compaction settings (below 16). For write-heavy workloads where space is constrained, the default of 32 or slightly lower may be appropriate, accepting a modest throughput reduction.
+Applications with strict latency requirements benefit from the default threshold, which keeps L0 compact for fast reads. Write-heavy workloads can increase the threshold to 8-16 for maximum throughput, accepting slightly higher read latency. The v5.0.0 architecture ensures consistent performance across different threshold settings.
 
 ## Key Findings
 
 ### TidesDB Strengths
 
-TidesDB demonstrates exceptional write performance across all workloads, ranging from 1.39x to 1.91x faster than RocksDB. Sequential writes show a 1.49x advantage, random writes achieve 1.41x faster throughput, and Zipfian mixed workloads show 1.91x faster PUT performance. Even with small 64-byte values at massive scale (50 million operations), TidesDB maintains a 1.51x throughput advantage. Large value (4KB) writes achieve 1.56x faster performance.
+TidesDB v5.0.0 demonstrates strong write performance across all workloads, ranging from 1.17x to 1.92x faster than RocksDB. Sequential writes show a 1.47x advantage (877K vs 598K ops/sec), random writes achieve 1.46x faster throughput (870K vs 595K ops/sec), and mixed workloads show 1.42x faster PUT performance. Even with small 64-byte values at massive scale (50 million operations), TidesDB maintains a 1.62x throughput advantage (753K vs 466K ops/sec). Large value (4KB) writes achieve the most impressive 1.92x faster performance (233K vs 121K ops/sec).
 
-Read performance reveals even more impressive advantages, with random reads achieving a remarkable 5.65x improvement, reaching 10.86 million operations per second compared to RocksDB's 1.92 million ops/sec. The sub-microsecond average latency of 0.21μs is exceptional, with a P50 latency of 0μs indicating that most reads complete in under 1 microsecond. This demonstrates the effectiveness of TidesDB's read architecture, which uses atomic operations and reference counting for memtable access, enabling readers to scale linearly with CPU cores without lock contention.
+The v5.0.0 architecture includes significant optimizations for large value workloads through vlog cursor reuse with position caching, enabling fast random access to values stored in the value log. This makes TidesDB particularly well-suited for applications storing larger objects, documents, or serialized data structures. Write amplification characteristics are excellent with large values, achieving 1.10x versus RocksDB's 1.24x, making TidesDB more efficient in terms of write overhead when handling larger data blocks.
 
-Iteration speed for full database scans shows consistent advantages of 1.56x to 2.97x faster than RocksDB. Sequential iteration reaches 10.88 million ops/sec versus RocksDB's 4.72 million ops/sec, while mixed workload iteration achieves 11.15 million ops/sec compared to 4.70 million ops/sec. Large value iteration shows a dramatic 2.97x advantage. This superior scan performance makes TidesDB particularly well-suited for analytics and batch processing workloads.
+Space efficiency has improved dramatically in v5.0.0 compared to previous versions. Database sizes are now much more competitive with RocksDB, ranging from 1.29x to 2.86x larger (with large values actually being 2.86x smaller). Space amplification is excellent at 0.03x-0.23x, and write amplification ranges from 0.91x-2.06x, showing significant improvements over v4.0.1.
 
-CPU utilization metrics reveal TidesDB's superior multi-core scaling, achieving 644-773% utilization compared to RocksDB's 279-436%. This indicates TidesDB more effectively leverages available CPU resources across multiple cores. Write amplification shows excellent characteristics with large values, achieving 1.07x versus RocksDB's 1.25x, making TidesDB more efficient for larger data blocks.
+Delete performance shows a 1.28x advantage (602K vs 471K ops/sec) with better tail latency characteristics (3.04ms vs 9.06ms maximum latency). Hot key workloads with Zipfian distribution demonstrate consistent write advantages of 1.17x-1.18x, maintaining performance even with skewed access patterns where a small subset of keys receives the majority of traffic.
 
 ### RocksDB Strengths
 
-RocksDB demonstrates superior space efficiency with database sizes ranging from 4.8x to 12.4x smaller than TidesDB. Sequential write tests show RocksDB using 197 MB versus TidesDB's 1615 MB (8.2x smaller), Zipfian distribution results in 54 MB versus 672 MB (12.4x smaller), and small value tests produce 1261 MB versus 6343 MB (5.0x smaller). This difference stems from RocksDB's multi-level LSM architecture (L0→L1→...→L6) with level-based compaction, more efficient compression, and smaller index structures compared to TidesDB's embedded succinct trie indexes.
+RocksDB demonstrates superior iteration and scan performance in v5.0.0 benchmarks. Sequential iteration reaches 4.26M ops/sec versus TidesDB's 1.72M ops/sec (2.48x faster), and mixed workload iteration achieves 5.03M ops/sec compared to TidesDB's 1.70M ops/sec (2.96x faster). Small value iteration at massive scale shows 5.07M ops/sec versus 1.28M ops/sec (3.96x faster). Hot key iteration performance with Zipfian distribution shows even more dramatic advantages at 2.00M-2.10M ops/sec versus TidesDB's 523K-576K ops/sec (3.64x-3.82x faster).
 
-Write amplification is generally lower for RocksDB, ranging from 1.32x to 1.89x compared to TidesDB's 2.09x to 3.20x. RocksDB's multi-level compaction strategy spreads writes across multiple levels, while TidesDB's architecture (memtables → SSTables) with count-based compaction triggers (512 SSTables for these benchmarks) results in different write patterns. Space amplification shows RocksDB with significantly better efficiency at 0.09x to 0.30x versus TidesDB's 1.03x to 1.66x, reflecting the fundamental architectural trade-offs between the two engines.
+Mixed workload read performance strongly favors RocksDB, achieving 848K GET operations per second versus TidesDB's 389K ops/sec (2.18x faster). This demonstrates RocksDB's sophisticated multi-level caching strategies and optimized read paths under concurrent read/write workloads. RocksDB maintains competitive read latency characteristics with P50 of 4μs and P99 of 11μs in standalone read tests.
 
-Hot key iteration performance favors RocksDB with a 1.91x advantage in Zipfian distribution tests, demonstrating the effectiveness of RocksDB's multi-level architecture and sophisticated caching strategies when dealing with concentrated access patterns. Memory efficiency also tends to favor RocksDB with lower RSS usage in most tests, though TidesDB's higher memory consumption often correlates with its superior throughput and CPU utilization. In the mixed workload test, RocksDB shows a slight read advantage (1.68M vs 1.63M ops/sec), demonstrating competitive performance under certain workload patterns.
+Space efficiency remains competitive between the two engines in v5.0.0. Database sizes show RocksDB ranging from 1.29x to 2.11x smaller for most workloads, with the notable exception of large values where TidesDB is actually 2.86x smaller (129 MB vs 369 MB). Space amplification is similar at 0.10x-0.13x for RocksDB versus 0.03x-0.23x for TidesDB, showing both engines efficiently manage disk space.
+
+Write amplification is slightly lower for RocksDB in most scenarios, ranging from 1.31x to 1.83x compared to TidesDB's 0.91x to 2.06x. RocksDB's multi-level compaction strategy spreads writes across multiple levels, while TidesDB's L0 compaction with default threshold of 4 SSTables provides a different trade-off. Memory efficiency shows both engines using similar RSS in most tests, with RocksDB showing lower memory usage in some scenarios (512 MB vs 2920 MB for sequential writes).
 
 ## Conclusion
 
@@ -636,10 +639,10 @@ setTimeout(() => {
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['Sequential Write', 'Random Write', 'Random Read', 'Mixed Write', 'Mixed Read', 'Delete', 'Large Values', 'Small Values'],
+      labels: ['Sequential Write', 'Random Write', 'Mixed Write', 'Zipfian Write', 'Zipfian Mixed', 'Delete', 'Large Values', 'Small Values'],
       datasets: [{
         label: 'TidesDB Advantage (x faster)',
-        data: [1.49, 1.41, 5.65, 1.41, 0.97, 1.39, 1.56, 1.51],
+        data: [1.47, 1.46, 1.42, 1.17, 1.18, 1.28, 1.92, 1.62],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
@@ -671,7 +674,9 @@ setTimeout(() => {
 }, 900);
 </script>
 
-TidesDB consistently outperforms RocksDB in throughput and latency across most workloads tested. Write performance ranges from 1.39x to 1.91x faster with an average improvement of approximately 1.5x, while read performance shows even more dramatic advantages with random reads achieving 5.65x faster performance. Iteration speed for full database scans demonstrates consistent superiority at 1.56x to 2.97x faster than RocksDB. Latency characteristics are exceptional, with sub-microsecond read performance averaging 0.21μs and write latency consistently in the 4-4.5μs range.
+TidesDB v5.0.0 demonstrates strong write performance advantages across all workloads tested. Write performance ranges from 1.17x to 1.92x faster with large value writes showing the most impressive 1.92x advantage. Sequential and random writes maintain 1.46x-1.47x faster throughput, while mixed workloads show 1.42x faster PUT performance. Write latency is consistent at 4.60-6.78μs average with P99 latencies of 12-17μs for most workloads.
+
+However, RocksDB shows significant advantages in iteration and scan performance, achieving 2.48x-3.96x faster full database scans across different workloads. Mixed workload read performance also favors RocksDB at 2.18x faster (848K vs 389K ops/sec), demonstrating RocksDB's optimized read paths and caching strategies under concurrent operations.
 
 <canvas id="spaceEfficiencyChart" width="400" height="250"></canvas>
 <script>
@@ -683,13 +688,13 @@ setTimeout(() => {
       labels: ['Sequential', 'Random', 'Mixed', 'Zipfian', 'Large Values', 'Small Values'],
       datasets: [{
         label: 'TidesDB (MB)',
-        data: [1615, 1583, 792, 672, 3498, 6343],
+        data: [182, 182, 130, 116, 129, 807],
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1
       }, {
         label: 'RocksDB (MB)',
-        data: [197, 288, 164, 54, 356, 1261],
+        data: [141, 141, 72, 55, 369, 437],
         backgroundColor: 'rgba(255, 99, 132, 0.8)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1
@@ -721,12 +726,34 @@ setTimeout(() => {
 }, 1000);
 </script>
 
-RocksDB maintains significant advantages in space efficiency, with database sizes ranging from 5x to 12x smaller than TidesDB. This reflects fundamental architectural differences: RocksDB's multi-level LSM tree (L0→L1→...→L6) with level-based compaction versus TidesDB's simpler structure (memtables → SSTables) with embedded succinct trie indexes and count-based compaction triggers. Write amplification is generally lower for RocksDB at 1.3-1.9x compared to TidesDB's 2.1-3.2x, as RocksDB's level-based strategy spreads writes across multiple levels while TidesDB consolidates data at the SSTable tier. Memory footprint also tends to favor RocksDB with lower RSS usage in most scenarios, though TidesDB's higher memory usage correlates with its superior performance characteristics.
+Space efficiency in v5.0.0 shows both engines are competitive, with database sizes ranging from similar (1.29x-1.85x) to moderately different (2.11x-2.50x) depending on workload. Notably, TidesDB achieves better space efficiency with large values, producing databases 2.86x smaller than RocksDB (129 MB vs 369 MB). This reflects the v5.0.0 architectural improvements with optimized vlog storage and better space amplification (0.03x for large values).
+
+Write amplification is comparable between engines, with TidesDB ranging from 0.91x-2.06x and RocksDB from 1.31x-1.83x. TidesDB's L0 compaction with default threshold of 4 SSTables provides a balance between write performance and space efficiency, while RocksDB's multi-level compaction spreads writes across multiple levels. Memory footprint varies by workload, with both engines showing similar RSS usage at scale (12GB+ for 50M operations), though RocksDB uses significantly less memory for some workloads (512 MB vs 2920 MB for sequential writes).
 
 ### Choosing the Right Storage Engine
 
-The decision between TidesDB and RocksDB ultimately depends on your application's priorities and constraints. TidesDB is the optimal choice for applications requiring maximum throughput and low latency, particularly those with read-heavy workloads where performance is the primary concern. Its simpler codebase of approximately 27,000 lines compared to RocksDB's 300,000 lines makes it easier to understand, debug, and maintain. Applications prioritizing raw performance over disk space will benefit significantly from TidesDB's consistent advantages, especially the exceptional 5.65x random read performance advantage and sub-microsecond latency.
+The decision between TidesDB and RocksDB ultimately depends on your application's priorities and constraints.
 
-RocksDB remains the better choice for disk space-constrained environments where storage efficiency is paramount. Applications requiring minimal write amplification to extend SSD lifespan will appreciate RocksDB's lower overhead. The mature ecosystem with extensive tooling, monitoring capabilities, and community knowledge makes RocksDB easier to deploy and operate in production environments. Hot key workloads with skewed access patterns may also benefit from RocksDB's sophisticated multi-level caching strategies, as demonstrated by its 1.91x iteration advantage in Zipfian distribution tests. In certain mixed workload patterns, RocksDB can show competitive or slightly better read performance.
+**Choose TidesDB v5.0.0 when:**
+- **Write-heavy workloads** are your primary concern (1.17x-1.92x faster writes)
+- **Large value storage** (4KB+) is common in your application (1.92x faster writes, 2.86x better space efficiency)
+- **Simpler codebase** (~27,000 lines vs 300,000) is important for understanding, debugging, and maintenance
+- **Write latency consistency** matters (4.60-6.78μs average, predictable P99 latencies)
+- **Delete operations** are frequent (1.28x faster with better tail latency)
+- **Space efficiency** is acceptable at 1.29x-2.11x larger databases (or smaller for large values)
 
-The fundamental trade-off is clear: TidesDB prioritizes raw performance with exceptional throughput and sub-microsecond latency, while RocksDB prioritizes space efficiency and lower write amplification. For most modern applications where disk space is relatively inexpensive and performance directly impacts user experience, TidesDB's advantages in throughput and latency make it a compelling choice, with random read performance reaching 10.86 million operations per second. However, for applications operating under strict storage constraints or requiring minimal write amplification for SSD longevity, RocksDB's space efficiency (5-12x smaller databases) and lower amplification factors remain valuable.
+**Choose RocksDB when:**
+- **Scan and iteration performance** is critical (2.48x-3.96x faster full database scans)
+- **Mixed read/write workloads** with high read concurrency (2.18x faster reads under mixed load)
+- **Hot key workloads** with Zipfian distribution benefit from multi-level caching (3.64x-3.82x faster iteration)
+- **Mature ecosystem** with extensive tooling, monitoring, and community support is required
+- **Production-proven** stability and operational experience is paramount
+- **Memory constraints** exist for certain workloads (lower RSS in some scenarios)
+
+**Performance Summary:**
+- TidesDB excels at write throughput, large value storage, and write latency consistency
+- RocksDB excels at iteration/scan performance, mixed workload reads, and hot key scenarios
+- Space efficiency is now competitive between both engines in v5.0.0
+- Both engines show similar write amplification and memory usage at scale
+
+For modern applications where write performance and large value storage are priorities, TidesDB v5.0.0 offers compelling advantages with its simpler architecture and consistent performance. For applications requiring maximum scan performance, sophisticated caching for hot keys, or a mature production ecosystem, RocksDB remains the proven choice. The v5.0.0 improvements have significantly narrowed the space efficiency gap while maintaining TidesDB's write performance advantages.
