@@ -166,7 +166,8 @@ tidesdb_column_family_config_t cf_config = {
     .comparator_name = {0},                     /* Empty = use default "memcmp" */
     .klog_block_size = 4096,                    /* Klog block size (default: 4096) */
     .vlog_block_size = 4096,                    /* Vlog block size (default: 4096) */
-    .value_threshold = 1024                     /* Values > 1KB go to vlog (default: 1024) */
+    .value_threshold = 1024,                    /* Values > 1KB go to vlog (default: 1024) */
+    .l0_compaction_threshold = 4                /* Trigger compaction when L0 has 4 SSTables (default: 4) */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
