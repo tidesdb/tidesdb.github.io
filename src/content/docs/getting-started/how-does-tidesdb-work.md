@@ -22,35 +22,37 @@ This structure allows for efficient writes by initially storing data in memory a
 
 ## 3. TidesDB Architecture
 
-<div class="architecture-diagram">
-
-![Architecture Diagram](../../../assets/img11.png)
-
-</div>
-
 ### 3.1 Overview
-TidesDB uses a two-tiered storage architecture: a memory level that stores 
-recently written key-value pairs in sorted order using a skip list data 
-structure which is associated with a write ahead log (WAL) that stores committed transactions, and a disk level containing multiple SSTables with an effective append only block layout. When reading data, 
-newer tables take precedence over older ones, ensuring the most recent 
-version of a key is always retrieved.
 
-This design choice differs from other implementations like RocksDB and LevelDB, which use a multi-level approach with specific level-based compaction policies.
+TidesDB implements a Log-Structured Merge-tree storage engine with a multi-level architecture designed for high-throughput concurrent operations. The system organizes data through a hierarchical structure consisting of volatile memory components, persistent write-ahead logs, and tiered immutable disk storage, with all operations coordinated through lock-free atomic primitives and carefully synchronized background worker threads.
+
+At the storage engine level, TidesDB maintains a central database instance (`tidesdb_t`) that coordinates multiple independent column families, each functioning as an isolated key-value namespace with dedicated storage structures and configurable operational parameters. The database instance manages shared infrastructure including engine-level thread pools for flush and compaction operations, a global SSTable structure cache implemented as a lock-free LRU eviction policy, an optional global block cache for decompressed klog and vlog blocks, and recovery synchronization primitives that ensure crash-safe initialization. Column families are organized in a dynamically resizable array protected by a reader-writer lock (`cf_list_lock`), enabling concurrent read access to the column family list while serializing structural modifications during column family creation and deletion operations.
+
+Each column family (`tidesdb_column_family_t`) maintains its own independent LSM-tree structure consisting of three primary storage tiers. The memory tier contains an active memtable implemented as a lock-free skip list with atomic reference counting, paired with a dedicated write-ahead log (WAL) file for durability. When the active memtable reaches a configurable size threshold, it transitions to an immutable state and is enqueued in the immutable memtables queue while a new active memtable is atomically swapped into place. The disk tier organizes SSTables into multiple levels, with each level maintaining a dynamically sized array of SSTable pointers protected by a reader-writer lock (`levels_lock`). Level 0 contains recently flushed SSTables in arbitrary order, while subsequent levels maintain sorted, non-overlapping key ranges with exponentially increasing capacity determined by a configurable size ratio. This multi-level organization enables efficient range queries and predictable compaction behavior as data ages through the storage hierarchy.
+
+Background operations are coordinated through engine-level thread pools rather than per-column-family threads, providing superior resource utilization and consistent performance characteristics across the entire database instance. The flush thread pool processes memtable-to-SSTable flush operations submitted from any column family, while the compaction thread pool handles SSTable merge operations across all levels. Worker threads in both pools execute a blocking dequeue pattern, waiting efficiently on task queues until work arrives, then processing tasks to completion before returning to the wait state. This architecture decouples application write operations from background I/O, enabling sustained write throughput independent of disk performance while maintaining bounded memory usage through flow control mechanisms.
+
+Crash recovery and initialization follow a strictly ordered sequence designed to prevent race conditions between recovery operations and background worker threads. During database open, the system first creates background worker threads for flush and compaction operations, but these threads immediately block on a recovery condition variable before processing any work. Database recovery then proceeds with exclusive access to all data structures: scanning the database directory for column family subdirectories, reconstructing column family metadata from persisted configuration files, discovering WAL files and SSTables, and loading SSTable metadata (min/max keys, bloom filters, block indices) into memory. For each WAL file discovered, the system replays entries into a new memtable using the skip list's version chain mechanism, then enqueues the recovered memtable as immutable for background flush. After all column families are recovered, the system signals the recovery condition variable, unblocking worker threads to begin processing the queued flush tasks asynchronously. Recovered memtables remain accessible for reads while being flushed in the background, with the immutable memtable queue serving as a searchable tier in the read path. This design guarantees that all persisted data is accessible and all data structures are consistent before background operations commence, ensuring correctness in the presence of crashes, incomplete writes, or corrupted data files.
+
+The read path implements a multi-tier search strategy that prioritizes recent data over historical data, ensuring that the most current version of any key is always retrieved. Queries first examine the active memtable using lock-free atomic operations, then proceed through immutable memtables in the flush queue in reverse chronological order, and finally search SSTables within each level from newest to oldest. SSTable lookups employ multiple optimization techniques including min/max key range filtering to skip irrelevant files, probabilistic bloom filter checks to avoid disk I/O for non-existent keys, and optional succinct trie block indices that enable direct block access without linear scanning. This hierarchical search pattern, combined with atomic reference counting on all data structures, enables lock-free concurrent reads that scale linearly with CPU core count while maintaining strong consistency guarantees and read-your-own-writes semantics within transactions.
 
 ### 3.2 Column Families
-A distinctive aspect of TidesDB is its organization around column families. Each column family
+
+TidesDB organizes data into column families, a design pattern that provides namespace isolation and enables independent configuration of storage and operational parameters for different data domains within a single database instance. Each column family (`tidesdb_column_family_t`) functions as a logically independent LSM-tree with its own complete storage hierarchy, from volatile memory structures through persistent disk storage, while sharing the underlying engine infrastructure for resource efficiency.
+
 <div class="architecture-diagram">
 
 ![Column Families](../../../assets/img3.png)
 
 </div>
 
-- Operates as an independent key-value store
-- Has its own dedicated memtable and set of SSTables
-- Can be configured with different parameters for flush thresholds, compression settings, etc.
-- Uses mutexes for flush and compaction coordination while skip list operations remain lock-free
+A column family maintains complete storage isolation through dedicated data structures at each tier of the LSM hierarchy. The memory tier consists of an atomically-swapped active memtable pointer, a monotonically increasing memtable generation counter for versioning, an active WAL file handle, and a queue of immutable memtables awaiting flush. The disk tier organizes SSTables into a dynamically allocated array of levels, with each level protected by a reader-writer lock that enables concurrent reads while serializing structural modifications during compaction. Sequence number generation occurs independently per column family through atomic increment operations, ensuring that transaction ordering within a column family remains consistent while allowing concurrent operations across different column families to proceed without coordination overhead.
 
-This design allows for domain-specific optimization and isolation between different types of data stored in the same TidesDB instance.
+Configuration parameters are specified per column family at creation time and persisted to disk in INI format within the column family's directory. These parameters control fundamental operational characteristics including memtable flush thresholds that determine memory-to-disk transition points, skip list structural parameters (maximum level and probability) that affect search performance, compression algorithms and settings that balance CPU utilization against storage efficiency, bloom filter configuration including false positive rates, block index enablement for direct block access, and compaction policies including automatic background compaction triggers and thread allocation. Once a column family is created, certain parameters such as the key comparator function become immutable for the lifetime of the column family, ensuring consistent sort order across all storage tiers and preventing data corruption from comparator changes.
+
+Concurrency control within a column family employs a hybrid approach that combines lock-free atomic operations for high-frequency read and write paths with mutex-based coordination for infrequent structural operations. The active memtable skip list uses lock-free Compare-And-Swap (CAS) operations for all insertions and lookups, enabling unlimited concurrent readers and writers without contention. Structural operations that modify the storage hierarchy acquire dedicated mutexes: the flush lock (`flush_lock`) serializes memtable rotation and flush queue modifications, while the compaction lock (`compaction_lock`) serializes SSTable array updates during merge operations. The levels lock (`levels_lock`) implements reader-writer semantics, allowing multiple concurrent readers to traverse the SSTable hierarchy while ensuring exclusive access during level modifications. This design ensures that common-case operations (reads and writes) proceed without blocking while maintaining correctness during structural changes.
+
+Column families enable domain-specific optimization strategies within a single database instance. High-throughput write-heavy workloads can configure large memtable sizes and aggressive compression to maximize write batching and minimize disk I/O. Read-heavy workloads can enable bloom filters and block indices to accelerate lookups at the cost of additional storage overhead. Temporary or cache-like data can disable durability features (TDB_SYNC_NONE) and use minimal compression for maximum performance, while critical persistent data can enable full synchronous writes (TDB_SYNC_FULL) and strong compression for maximum reliability. This flexibility allows applications to co-locate diverse data types with different performance and durability requirements within a single storage engine instance, simplifying operational management while maintaining optimal performance characteristics for each data domain.
 
 ## 4. Core Components and Mechanisms
 ### 4.1 Memtable
@@ -82,17 +84,12 @@ Each column family can register a custom key comparison function (memcmp, string
 
 **Configuration and Lifecycle**
 
-The skip list's flush threshold (`memtable_flush_size`), maximum level, and probability parameters are configurable per column family. When the memtable reaches the size threshold, it becomes immutable and is queued for flushing while a new active memtable is created. The immutable memtable is flushed to disk as an SSTable by a background thread pool, with reference counting ensuring the memtable isn't freed until all readers complete and the flush finishes. Each memtable is paired with a WAL (Write-Ahead Log) for durability and recovery. When a memtable is in the flush queue and immutable it is still accessible for reading. Because the memtable has a WAL associated with it,you will see a WAL file (i.e., wal_4.log) file until the flush is complete. If a crash occurs the memtable's WAL is replayed and immutable state is recovered and requeued for flush.
+The skip list's flush threshold (`write_buffer_size`), maximum level, and probability parameters are configurable per column family. When the memtable reaches the size threshold, it becomes immutable and is queued for flushing while a new active memtable is created. The immutable memtable is flushed to disk as an SSTable (klog and vlog files) by a background thread pool, with reference counting ensuring the memtable isn't freed until all readers complete and the flush finishes. Each memtable is paired with a WAL (Write-Ahead Log) for durability and recovery. When a memtable is in the flush queue and immutable it is still accessible for reading. Because the memtable has a WAL associated with it, you will see a WAL file (e.g., wal_4.log) until the flush is complete. If a crash occurs, the memtable's WAL is replayed using skip list version chains to reconstruct the memtable state, then the recovered memtable is enqueued as immutable for background flush.
 
 
 ### 4.2 Block Manager Format
 
 The block manager is TidesDB's low-level storage abstraction that manages both WAL files and SSTable files. All persistent data is stored using the block manager format.
-<div class="architecture-diagram">
-
-![Block Manager](../../../assets/img5.png)
-
-</div>
 
 #### File Structure
 
@@ -112,7 +109,7 @@ Every block manager file (WAL or SSTable) has the following structure
 | Offset | Size | Field | Description |
 |--------|------|-------|-------------|
 | 0 | 3 bytes | Magic | `0x544442` ("TDB" in hex) |
-| 3 | 1 byte | Version | Block manager version (currently 4) |
+| 3 | 1 byte | Version | Block manager version |
 | 4 | 4 bytes | Block Size | Default block size for this file |
 | 8 | 4 bytes | Padding | Reserved for future use |
 
@@ -173,28 +170,34 @@ TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying o
 
 Block manager operations use a write mutex to serialize all write operations, preventing corruption. Concurrent reads are supported with multiple readers able to read simultaneously using `pread()`. All writes use `pwrite()` for atomic operations.
 
-#### FIFO Block Cache
+#### Lock-Free LRU Block Cache
 
-TidesDB implements an optional FIFO (First-In-First-Out) block cache at the block manager level to reduce disk I/O for frequently accessed data blocks. This cache is configurable per column family via the `block_manager_cache_size` setting.
+TidesDB implements an optional lock-free LRU (Least Recently Used) block cache at the engine level to reduce disk I/O for frequently accessed data blocks. This cache is **global and shared across all column families**, configured via the `block_cache_size` setting in the database configuration. The shared design enables efficient memory utilization and cross-CF cache hits when the same blocks are accessed by different column families.
 
 **Cache Architecture**
 
-The block cache uses a hash table combined with a FIFO queue for O(1) lookups and evictions. Each cached block is identified by a unique key derived from its file offset (e.g., "12345" for offset 12345). The hash table provides fast key-based lookups using xxHash for distribution, while the FIFO queue maintains insertion order (oldest at head, newest at tail). An eviction callback is registered for each cached block to update cache size tracking when blocks are evicted. All cache operations are protected by a mutex, ensuring safe concurrent access.
+The block cache uses a lock-free hash table with atomic operations for concurrent access without mutexes. Each cache entry includes the decompressed block data, size, and atomic access timestamp for LRU ordering. The cache maintains an atomic size counter tracking total cached bytes and enforces a maximum size limit through atomic compare-and-swap operations. Cache keys are composite identifiers combining column family name, SSTable ID, block type (klog/vlog), and file offset, enabling fine-grained caching across the entire database while preventing collisions between different CFs.
 
 **Cache Operations**
 
-After writing a block to disk, if cache space is available (current_size + block_size <= max_size), a copy of the block is added to the cache with the file offset as the key. If the cache is full, the FIFO eviction policy automatically removes the oldest block (first inserted) to make space. The cache size is tracked in bytes, with each block contributing its data size to the total.
+After reading a block from disk and decompressing it, the system attempts to add it to the cache using atomic operations. If cache space is available, the block is inserted with an atomic timestamp marking the access time. If the cache is full, the LRU eviction policy scans entries to find the least recently used block (oldest timestamp) and atomically removes it to make space. All cache operations use atomic CAS to prevent race conditions during concurrent access from multiple column families.
 
-Before reading from disk, the cache is checked using the block offset as the key. On cache hit, a copy of the cached block is returned immediately (no disk I/O). On cache miss, the block is read from disk, and if space permits, it's added to the cache for future reads. Unlike LRU, FIFO does not reorder blocks on access - the insertion order is preserved.
+Before reading from disk, the cache is checked using the composite key. On cache hit, the block's access timestamp is atomically updated to mark it as recently used, and a copy of the cached block is returned immediately (no disk I/O). On cache miss, the block is read from disk, decompressed, and added to the cache if space permits. The LRU policy ensures frequently accessed blocks remain in cache while cold data is automatically evicted, with the global cache naturally prioritizing hot data across all column families.
 
-When the cache reaches `block_manager_cache_size`, the oldest block (head of FIFO queue) is automatically evicted. The eviction callback decrements `current_size` by the evicted block's size and frees the block's memory. This ensures the cache never exceeds the configured memory limit.
+When the cache reaches `block_cache_size`, the LRU eviction algorithm scans entries to find candidates with the oldest access timestamps. The eviction callback atomically decrements the size counter and frees the block's memory. This lock-free design enables concurrent cache access from multiple threads and column families without contention, maximizing throughput for read-heavy workloads.
 
 **Configuration Example**
 
 ```c
-tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
-cf_config.block_manager_cache_size = 32 * 1024 * 1024;  /* 32MB cache */
-tidesdb_create_column_family(db, "my_cf", &cf_config);
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .block_cache_size = 64 * 1024 * 1024,  /* 64MB global cache shared across all CFs */
+    .max_open_sstables = 100,
+    .num_flush_threads = 4,
+    .num_compaction_threads = 8
+};
+tidesdb_t *db;
+tidesdb_open(&db, &config);
 ```
 
 **Performance Benefits**
@@ -206,11 +209,12 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 
 **Cache Sizing Guidelines**
 
-- Small datasets (<100MB): Set cache to 10-20% of dataset size
+- Small datasets (<100MB): Set cache to 10-20% of total dataset size across all CFs
 - Large datasets (>1GB): Set cache to 5-10% or based on working set size
-- Read-heavy workloads: Larger cache (50-100MB+) provides better hit rates
-- Write-heavy workloads: Smaller cache (10-20MB) since data is less frequently re-read
-- Disable caching: Set `block_manager_cache_size = 0` to disable (no memory overhead)
+- Read-heavy workloads: Larger cache (64-256MB+) provides better hit rates
+- Write-heavy workloads: Smaller cache (16-32MB) since data is less frequently re-read
+- Multi-CF workloads: Size based on combined working set of all active CFs
+- Disable caching: Set `block_cache_size = 0` to disable (no memory overhead)
 
 **Monitoring Cache Effectiveness**
 
@@ -219,86 +223,105 @@ While TidesDB doesn't expose cache hit/miss metrics directly, you can infer effe
 
 ### 4.3 SSTables (Sorted String Tables)
 
-SSTables serve as TidesDB's immutable on-disk storage layer. Internally, each 
-SSTable is organized into multiple blocks containing sorted key-value pairs. 
-To accelerate lookups, every SSTable maintains its minimum and maximum keys, 
-allowing the system to quickly determine if a key might exist within it. 
-Optional succinct trie indices provide direct access to specific blocks, 
-eliminating the need to scan entire files. The immutable nature of SSTables--once 
-written, they are never modified, only merged or deleted--ensures data consistency 
-and enables lock-free concurrent reads.
+SSTables serve as TidesDB's immutable on-disk storage layer, implementing a key-value separation architecture where keys and values are stored in distinct files. Each SSTable consists of two block manager files: a klog (key log) containing sorted keys with metadata and small inline values, and a vlog (value log) containing large values referenced by offset from the klog. This separation enables efficient key-only operations such as bloom filter construction, block index building, and range scans without loading large values into memory. The immutable nature of SSTables--once written, they are never modified, only merged or deleted--ensures data consistency and enables lock-free concurrent reads.
+
+**File Naming and Level Organization**
+
+SSTable files follow the naming convention `L<level>_<id>.klog` and `L<level>_<id>.vlog`, where level indicates the LSM tree level (1-based in filenames, 0-based in array indexing) and id is a monotonically increasing counter per column family. For example, `L1_0.klog` and `L1_0.vlog` represent the first SSTable at level 1, stored in `levels[0]` of the in-memory array. During recovery, the system parses the level number from filenames and maps `L<N>` files to `levels[N-1]`, ensuring correct placement in the LSM hierarchy. This naming scheme enables efficient level-based compaction and provides clear visibility into the storage organization on disk.
 
 **Reference Counting and Lifecycle**
 
-SSTables use atomic reference counting to manage their lifecycle safely. When an 
-SSTable is accessed (by a read operation, iterator, or compaction), its reference 
-count is incremented. When the operation completes, the reference is released. 
-Only when the reference count reaches zero is the SSTable actually freed from 
-memory. This prevents use-after-free bugs during concurrent operations like 
-compaction (which may delete SSTables) and reads (which may still be accessing them).
+SSTables use atomic reference counting to manage their lifecycle safely. When an SSTable is accessed (by a read operation, iterator, or compaction), its reference count is incremented via `tidesdb_sstable_ref`. When the operation completes, the reference is released via `tidesdb_sstable_unref`. Only when the reference count reaches zero is the SSTable actually freed from memory and its file handles closed. This prevents use-after-free bugs during concurrent operations like compaction (which may delete SSTables) and reads (which may still be accessing them). The reference counting mechanism integrates with the SSTable cache, ensuring that cached SSTables remain valid while in use.
 
-**Block Manager Caching**
+**SSTable Caching**
 
-The underlying block manager file handles are cached in a storage-engine-level FIFO cache 
-with a configurable capacity (`max_open_file_handles`). When an SSTable is opened, 
-its block manager is added to the cache. If the cache is full, the oldest 
-block manager (first opened) is automatically closed. This prevents file descriptor exhaustion 
-while maintaining good performance for frequently accessed SSTables.
+The storage engine maintains an LRU (Least Recently Used) cache of SSTable structures at the engine level, configured via `max_open_sstables` (default 100). When an SSTable is accessed, the system first checks the cache using a composite key of `<cf_name>:<sstable_id>`. On cache hit, the cached SSTable structure is returned with its reference count incremented. On cache miss, the SSTable is loaded from disk (opening both klog and vlog block managers), added to the cache, and returned. When the cache reaches capacity, the least recently used SSTable is evicted, triggering closure of its block manager file handles. This caching strategy prevents file descriptor exhaustion while maintaining good performance for frequently accessed SSTables, with the LRU policy ensuring hot data remains in memory.
 
 #### SSTable Block Layout
 
-SSTables use the block manager format with sequential block ordering:
+SSTables use the block manager format with key-value separation across two files:
 
+**Klog File (L<level>_<id>.klog) - Keys and Metadata**
 ```
 [File Header - 12 bytes Block Manager Header]
-[Block 0: KV Pair 1]
-[Block 1: KV Pair 2]
-[Block 2: KV Pair 3]
+[Block 0: Klog Block with N entries]
+[Block 1: Klog Block with M entries]
 ...
-[Block N-1: KV Pair N]
+[Block K: Last Klog Block]
 [Bloom Filter Block] (optional)
 [Index Block] (optional)
 [Metadata Block] (always last)
 ```
 
-**Block Order (from first to last)**
-1. Data Blocks: Key-value pairs in sorted order (sequential blocks starting at 0)
+**Vlog File (L<level>_<id>.vlog) - Large Values**
+```
+[File Header - 12 bytes Block Manager Header]
+[Block 0: Vlog Block with N values]
+[Block 1: Vlog Block with M values]
+...
+[Block V: Last Vlog Block]
+```
+
+**Klog Block Order (from first to last)**
+1. Data Blocks: Klog blocks containing multiple key entries in sorted order, with inline values below threshold or vlog offsets for large values
 2. Bloom Filter Block (optional): Only written if `enable_bloom_filter = 1`
 3. Index Block (optional): Only written if `enable_block_indexes = 1`
-4. Metadata Block (required): Always the last block in the file
+4. Metadata Block (required): Always the last block, contains min/max keys, entry count, and file offsets
 
-:::note
-The exact block positions of bloom filter and index depend on how many KV pairs exist and which features are enabled. During SSTable loading, the system reads backwards from the end: metadata (last), then index (if present), then bloom filter (if present).
-:::
+**Value Threshold and Separation**
 
-#### Data Block Format (KV Pairs)
+Values smaller than or equal to `value_threshold` (default 1KB) are stored inline within klog entries, enabling single-file access for small key-value pairs. Values exceeding the threshold are written to the vlog file, with the klog entry storing only the vlog offset. This separation optimizes for the common case where most values are small while efficiently handling large values without bloating the klog. During recovery, the system reads backwards from the klog end: metadata (last), then index (if present), then bloom filter (if present), establishing the data end offset before loading entries.
 
-Each data block contains a single key-value pair
+#### Klog Block Format
+
+Each klog block contains multiple key entries with a header specifying the count:
 
 ```
-[KV Header is 26 bytes (packed)]
-[Key is variable]
-[Value is variable]
+[Num Entries - 4 bytes (uint32_t)]
+[Block Size - 4 bytes (uint32_t)]
+[Entry 0: Klog Entry Header + Key + Inline Value (if present)]
+[Entry 1: Klog Entry Header + Key + Inline Value (if present)]
+...
+[Entry N-1: Klog Entry Header + Key + Inline Value (if present)]
 ```
 
-**KV Pair Header (26 bytes, packed)**
+**Klog Entry Header (34 bytes, packed)**
 ```c
 typedef struct __attribute__((packed)) {
-    uint8_t version;        // Format version (currently 4)
+    uint8_t version;        // Format version (currently 5)
     uint8_t flags;          // TDB_KV_FLAG_TOMBSTONE (0x01) for deletes
     uint32_t key_size;      // Key size in bytes
-    uint32_t value_size;    // Value size in bytes
+    uint32_t value_size;    // Actual value size in bytes
     int64_t ttl;            // Unix timestamp for expiration (0 = no expiration)
     uint64_t seq;           // Sequence number for ordering and MVCC
-} tidesdb_kv_pair_header_t;
+    uint64_t vlog_offset;   // Offset in vlog file (0 if value is inline)
+} tidesdb_klog_entry_t;
+```
+
+**Entry Layout**
+
+Each entry consists of the 34-byte header, followed by the key data, followed by the value data if inline (when `value_size <= value_threshold` and `vlog_offset == 0`). For large values, only the header and key are stored in the klog, with `vlog_offset` pointing to the value's location in the vlog file. This structure enables efficient key-only scans for operations like bloom filter checks and block index construction without loading large values.
+
+**Vlog Block Format**
+
+Vlog blocks contain multiple values referenced by klog entries:
+
+```
+[Num Values - 4 bytes (uint32_t)]
+[Block Size - 4 bytes (uint32_t)]
+[Value 0 Size - 4 bytes (uint32_t)]
+[Value 0 Data - variable]
+[Value 1 Size - 4 bytes (uint32_t)]
+[Value 1 Data - variable]
+...
 ```
 
 **Compression**
-- If `enable_compression = 1` in column family config, entire block is compressed
-- Compression applied to [Header + Key + Value] as a unit
+- If compression is enabled in column family config, entire klog and vlog blocks are compressed independently
+- Compression applied to the complete block (header + all entries) as a unit
 - Supports Snappy, LZ4, or ZSTD algorithms (configured via `compression_algorithm`)
-- Decompression happens on read before parsing header
-- Default is enabled with LZ4 algorithm
+- Decompression happens on read before parsing block header and entries
+- Default is enabled with LZ4 algorithm for balanced performance
 
 #### Bloom Filter Block
 
@@ -363,32 +386,44 @@ Always written as the last block in the file
 
 #### SSTable Read Process
 
-1. **Load SSTable** (recovery)
-   - Open block manager file
-   - Use `cursor_goto_last()` to seek to last block
+1. **Load SSTable** (recovery or cache miss)
+   - Check engine-level SSTable LRU cache using composite key `<cf_name>:<sstable_id>`
+   - On cache miss: open klog and vlog block manager files
+   - Use `cursor_goto_last()` to seek to last klog block
    - Read and parse metadata block (validates magic number 0x5353544D)
    - Extract num_entries, min_key, and max_key from metadata
    - Use `cursor_prev()` to read previous block (index, if present)
    - Deserialize succinct trie index (if data is valid)
    - Use `cursor_prev()` to read previous block (bloom filter, if present)
    - Deserialize bloom filter (if data is valid)
+   - Store SSTable structure in LRU cache with reference count = 1
 
 2. **Lookup Key**
-   - Check if key is within min/max range (quick rejection)
+   - Acquire SSTable from cache (increment reference count)
+   - Ensure klog and vlog block managers are open
+   - Check if key is within min/max range using configured comparator (quick rejection)
    - Check bloom filter if enabled (probabilistic rejection)
    - If block indexes enabled: query succinct trie for block number (0-indexed)
-     - Position cursor at first block, then advance to target block number
-     - Read block at that position
-   - If block indexes disabled: linear scan through data blocks
-   - Decompress block if compression is enabled
-   - Parse KV header (26 bytes) and extract key/value
-   - Check TTL expiration
-   - Return value or tombstone marker
+     - Position cursor at first klog block, then advance to target block number
+     - Read klog block at that position
+   - If block indexes disabled: linear scan through klog data blocks
+   - Decompress klog block if compression is enabled
+   - Parse klog block header (num_entries, block_size)
+   - Iterate through entries in the block:
+     - Parse klog entry header (34 bytes): version, flags, key_size, value_size, ttl, seq, vlog_offset
+     - Compare entry key with search key using comparator
+     - If match found:
+       - Check TTL expiration (return NOT_FOUND if expired)
+       - Check tombstone flag (return NOT_FOUND if deleted)
+       - If vlog_offset == 0: value is inline in klog, return it
+       - If vlog_offset > 0: read value from vlog file at offset, decompress if needed, return it
+   - Release SSTable reference (decrement reference count)
+   - Return value or TDB_ERR_NOT_FOUND if not present
 
-SSTables are read from engine level FIFO cache.
+SSTables are cached in the engine-level LRU cache, with block managers kept open while the SSTable is cached. When evicted from cache, block managers are closed to prevent file descriptor exhaustion.
 <div class="architecture-diagram">
 
-![FIFO Cache](../../../assets/img8.png)
+![LRU Cache](../../../assets/img8.png)
 
 </div>
 
@@ -408,15 +443,9 @@ WAL files follow the naming pattern `wal_0.log`, `wal_1.log`, `wal_2.log`, etc. 
 
 #### 4.4.2 WAL Rotation Process
 
-<div class="architecture-diagram">
-
-   ![WAL Rotation Process](../../../assets/img15.png)
-
-</div>
-
 TidesDB uses a rotating WAL system that works as follows:
 
-Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size reaches `memtable_flush_size`, rotation is triggered. During rotation, a new active memtable (ID 1) is created with `wal_1.log`, while the immutable memtable (ID 0) with `wal_0.log` is added to the immutable memtables queue. A flush task is submitted to the flush thread pool. The background flush thread writes memtable (ID 0) to `sstable_0.sst` while `wal_0.log` still exists. Once the flush completes successfully, the memtable is dequeued from the immutable queue, its reference count drops to zero, and both the memtable and `wal_0.log` are freed/deleted. Multiple memtables can be in the flush queue concurrently, each with its own WAL file and reference count.
+Initially, the active memtable (ID 0) uses `wal_0.log`. When the memtable size reaches `write_buffer_size`, rotation is triggered. During rotation, a new active memtable (ID 1) is created with `wal_1.log`, while the immutable memtable (ID 0) with `wal_0.log` is added to the immutable memtables queue. A flush task is submitted to the flush thread pool. The background flush thread writes memtable (ID 0) to `L1_0.klog` and `L1_0.vlog` while `wal_0.log` still exists. Once the flush completes successfully, the memtable is dequeued from the immutable queue, its reference count drops to zero, and both the memtable and `wal_0.log` are freed/deleted. Multiple memtables can be in the flush queue concurrently, each with its own WAL file and reference count.
 
 #### 4.4.3 WAL Features and Sequence Numbers
 
@@ -432,7 +461,7 @@ Each WAL entry is assigned a monotonically increasing sequence number via `atomi
 - During WAL recovery, entries are sorted by sequence number before replay
 - This guarantees last-write-wins consistency is preserved across crashes
 
-The sequence number is stored in the 26-byte KV header (8 bytes at offset 18) and used during recovery to replay operations in the correct order, ensuring the memtable state matches the commit order regardless of how WAL entries were physically written to disk.
+The sequence number is stored in the 34-byte klog entry header (8 bytes at offset 18) and used during recovery to replay operations in the correct order, ensuring the memtable state matches the commit order regardless of how WAL entries were physically written to disk.
 
 #### 4.4.4 Recovery Process
 
@@ -444,58 +473,17 @@ The system scans the column family directory for `wal_*.log` files and sorts the
 
 All committed transactions that were written to WAL are recovered. During recovery:
 
-1. WAL entries are read from disk
-2. Entries are collected with their sequence numbers
-3. Entries are **sorted by sequence number** (insertion sort)
-4. Entries are replayed in sequence order into the memtable
+1. WAL entries are read from disk in physical order
+2. Each entry is inserted into the skip list memtable using `skip_list_put_with_seq()` with its sequence number
+3. The skip list maintains version chains for each key, with all versions sorted by sequence number
+4. When multiple versions of the same key exist, the skip list returns the version with the highest sequence number
 5. This ensures last-write-wins consistency is preserved
 
-Uncommitted transactions are discarded (as they're not in the WAL). The sequence number sorting ensures that even if concurrent writes caused WAL entries to be physically written out of order, they are replayed in the correct logical order.
+Uncommitted transactions are discarded (as they're not in the WAL). The skip list's version chain mechanism ensures that even if concurrent writes caused WAL entries to be physically written out of order, the correct logical ordering is maintained through sequence numbers. During reads, the skip list automatically returns the newest version (highest sequence number) for each key.
 
 **SSTable Recovery Ordering**
 
 SSTables are discovered by reading the column family directory, where directory order is filesystem-dependent and non-deterministic. SSTables are sorted by ID after loading to ensure correct read semantics, guaranteeing newest-to-oldest ordering for the read path (which searches from the end of the array backwards). Without sorting, stale data could be returned if newer SSTables load before older ones.
-
-#### 4.4.5 WAL Recovery Configuration
-
-TidesDB provides two recovery modes that control how `tidesdb_open()` handles WAL recovery, allowing you to balance startup speed against data availability guarantees.
-
-**Fast Startup Mode (Default)**
-
-By default, `tidesdb_open()` returns immediately after submitting recovered memtables to the background flush thread pool:
-
-```c
-tidesdb_config_t config = {
-    .db_path = "./tidesdb",
-    .wait_for_wal_recovery = 0  /* Default is false */
-};
-```
-
-- Fastest startup time - `tidesdb_open()` returns immediately
-- Recovered WAL data is flushed to SSTables asynchronously in background
-- Queries may temporarily return "key not found" until flushes complete
-- Good for web servers, caching layers, read-heavy workloads, eventual consistency acceptable
-
-**Guaranteed Availability Mode**
-
-When enabled, `tidesdb_open()` blocks until all recovered memtables have been flushed to SSTables
-
-```c
-tidesdb_config_t config = {
-    .db_path = "./mydb",
-    .wait_for_wal_recovery = 1,           /* Wait for recovery */
-    .wal_recovery_poll_interval_ms = 100  /* Poll every 100ms (default) */
-};
-```
-
-- All recovered data immediately queryable after `tidesdb_open()` returns
-- Blocks until flush queue is empty and stable (checked twice with delay)
-- Slower startup proportional to WAL size and number of recovered memtables
-- Good for Financial systems, audit logs, healthcare records, strict consistency requirements
-
-**Implementation Details**
-
-The recovery wait mechanism uses a stability check to ensure flushes have truly completed. The immutable memtable queue must be empty for two consecutive polling intervals before recovery is considered complete. This prevents race conditions where a memtable is temporarily dequeued but not yet submitted to the flush pool.
 
 ## 5. Data Operations
 
@@ -506,14 +494,14 @@ When a key-value pair is written to TidesDB (via `tidesdb_txn_commit()`):
 2. **Assign sequence number** - Atomically increment the WAL sequence counter via `atomic_fetch_add()`
 3. **Write to WAL** - Record the operation in the active memtable's WAL using lock-free block manager write
 4. **Write to skip list** - Insert the key-value pair into the skip list using lock-free atomic CAS operations
-5. **Check flush threshold** - If memtable size exceeds `memtable_flush_size`, attempt to acquire `flush_lock` via `trylock`
+5. **Check flush threshold** - If memtable size exceeds `write_buffer_size`, attempt to acquire `flush_lock` via `trylock`
 6. **Trigger rotation** (if lock acquired and size still exceeds threshold):
    - Create a new active memtable with a new WAL file
    - Atomically swap the active memtable pointer
    - Add the immutable memtable to the flush queue
    - Submit flush task to the flush thread pool
    - Release `flush_lock`
-7. **Background flush** - Flush thread writes immutable memtable to SSTable, then deletes WAL and frees memtable
+7. **Background flush** - Flush thread writes immutable memtable to klog and vlog files (L<level>_<id>.klog and L<level>_<id>.vlog), then deletes WAL and frees memtable
 8. **Concurrent writes** - Multiple transactions can write concurrently without blocking (lock-free)
 
 
@@ -531,86 +519,80 @@ This multi-tier search ensures the most recent version of a key is always retrie
 
 ### 5.3 Transactions
 
-TidesDB provides transaction support with multi-column-family capabilities. 
-Transactions are initiated through `tidesdb_txn_begin()` for writes or 
-`tidesdb_txn_begin_read()` for read-only operations, with a single transaction 
-capable of operating across multiple column families. The system implements 
-**READ COMMITTED** isolation for point reads (`tidesdb_txn_get`), where reads 
-see the latest committed data, and **snapshot isolation** for iterators 
-(`tidesdb_iter_new`), where iterators see a consistent point-in-time view via 
-atomic reference counting on both memtables and SSTables.
+TidesDB provides transaction support with multi-column-family capabilities and configurable isolation levels. Transactions are initiated through `tidesdb_txn_begin()` or `tidesdb_txn_begin_with_isolation()` for writes, with a single transaction capable of operating across multiple column families. The system implements MVCC (Multi-Version Concurrency Control) with five isolation levels: READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SNAPSHOT ISOLATION, and SERIALIZABLE (see Section 8.3 for detailed semantics). Iterators acquire atomic references on both memtables and SSTables, creating consistent point-in-time snapshots unaffected by concurrent compaction or writes.
+
+**Single-CF vs Multi-CF Transactions**
+
+Transactions involving a single column family use per-CF sequence numbers from `cf->next_wal_seq`, maximizing performance through independent sequencing. Transactions spanning multiple column families use a global sequence number from `db->global_txn_seq` with bit 63 set as a flag (`TDB_MULTI_CF_SEQ_FLAG`), enabling atomic all-or-nothing semantics across column families. The global sequence ensures that multi-CF transactions are either fully applied or fully discarded during recovery, preventing partial application that would violate atomicity.
+
+**Multi-CF Transaction Metadata**
+
+For multi-CF transactions, each participating column family's WAL includes metadata before the first entry: a header containing the number of participant CFs and a checksum, followed by the names of all participating CFs. During recovery, the system scans all WALs to build a transaction tracker, then validates that each multi-CF transaction appears in all expected column families before applying it. This ensures that incomplete transactions (where some CFs committed but others crashed before writing) are discarded, maintaining true atomicity without requiring two-phase commit or coordinator locks.
 
 **Lock-Free Write Path**
 
 Write transactions use a completely lock-free commit path with atomic operations:
 
 1. Transaction operations are buffered in memory during `tidesdb_txn_put()` and `tidesdb_txn_delete()`
-2. On `tidesdb_txn_commit()`, each operation is written to WAL and skip list using lock-free atomic CAS
-3. Sequence numbers are assigned atomically via `atomic_fetch_add()` for ordering
-4. Memtable references are acquired using lock-free CAS retry loops
-5. No locks are held during commit - multiple transactions can commit concurrently
+2. On `tidesdb_txn_commit()`, the system determines if the transaction is single-CF or multi-CF
+3. For single-CF: sequence numbers are assigned per-CF via `atomic_fetch_add(&cf->next_wal_seq, 1)`
+4. For multi-CF: a global sequence is assigned via `atomic_fetch_add(&db->global_txn_seq, 1)` with bit 63 set
+5. Multi-CF metadata (participant CF names and checksum) is serialized before the first entry in each CF's WAL
+6. Each operation is written to its CF's WAL and skip list using lock-free atomic CAS
+7. Memtable references are acquired using lock-free CAS retry loops
+8. No locks are held during commit - multiple transactions can commit concurrently
+
+**Atomicity Guarantees**
+
+Single-CF transactions are atomic by virtue of WAL durability - either the entire transaction is in the WAL or none of it is. Multi-CF transactions achieve atomicity through the recovery validation mechanism: during startup, the system only applies multi-CF transactions that appear in all participating column families. If a crash occurs after some CFs have written but before others complete, the incomplete transaction is detected during recovery and discarded from all CFs. This provides true all-or-nothing semantics without distributed coordination overhead, enabling referential integrity and cross-table consistency for SQL-like workloads.
 
 **Isolation Guarantees**
 
-Read transactions don't block writers and writers don't block readers. Transactions 
-support read-your-own-writes semantics, allowing uncommitted changes to be read 
-before commit. The API uses simple integer return codes (0 for success, negative 
-for errors) rather than complex error structures.
+Read transactions don't block writers and writers don't block readers. Transactions support read-your-own-writes semantics, allowing uncommitted changes to be read before commit. Multi-CF transactions maintain consistent snapshots across all participating column families, with each CF's snapshot captured at transaction begin time. The API uses simple integer return codes (0 for success, negative for errors) rather than complex error structures.
 
-### 6. Compaction Policy
+## 6. Compaction Policies
 
-TidesDB implements two distinct compaction techniques
+TidesDB implements a sophisticated multi-level compaction strategy that balances write amplification, read amplification, and space amplification through adaptive merge operations. The system employs three distinct merge techniques--full preemptive merge, dividing merge, and partitioned merge--selected dynamically based on level capacities and current storage state. This approach differs fundamentally from traditional leveled compaction schemes by using capacity-based decision criteria rather than fixed level boundaries, enabling more efficient resource utilization and predictable performance characteristics across diverse workload patterns.
 
+### 6.1 Multi-Level Architecture and Capacity Management
 
-<div class="architecture-diagram">
+The compaction system organizes SSTables into a hierarchy of levels numbered from 0 to N-1, where each level maintains a capacity constraint that grows exponentially with level number. Level 0 serves as the landing zone for newly flushed memtables and contains SSTables in arbitrary chronological order without key range constraints. Subsequent levels (1 through N-1) maintain sorted, non-overlapping key ranges within each level, enabling efficient binary search during read operations. Level capacity is calculated as `base_capacity * (size_ratio ^ level_number)`, where `base_capacity` defaults to the memtable flush threshold and `size_ratio` (typically 10) determines the exponential growth rate. This geometric progression ensures that each level can accommodate all data from previous levels while maintaining bounded space amplification.
 
-![Compaction](../../../assets/img13.png)
+When Level 0 reaches capacity, the system dynamically creates Level 1 if it doesn't exist, triggering the first compaction operation. As data ages through the hierarchy, levels are added on-demand when lower levels reach capacity, with the maximum number of levels determined by total dataset size and configured capacity parameters. The system tracks both current size (sum of all SSTable sizes in bytes) and capacity (maximum allowed size) for each level, using these metrics to make compaction decisions. A level is considered full when `current_size >= capacity`, triggering merge operations that consolidate data into higher levels while removing obsolete versions, tombstones, and expired TTL entries.
 
-</div>
+### 6.2 Dividing Level and Merge Strategy Selection
 
-### 6.1 Parallel Compaction
+Compaction decisions are governed by a dividing level X, calculated as `X = num_levels - 1 - dividing_level_offset`, where `dividing_level_offset` (default 1) controls the aggressiveness of compaction. The dividing level partitions the storage hierarchy into two regions: levels 0 through X-1 contain recently written data subject to frequent merges, while levels X+1 through N-1 contain stable historical data that undergoes less frequent consolidation. This partitioning strategy balances write amplification (cost of rewriting data during compaction) against read amplification (number of levels to search during queries) by concentrating merge activity in the upper levels where data turnover is highest.
 
-TidesDB implements parallel compaction using semaphore-based thread limiting to 
-reduce SSTable count, remove tombstones, and purge expired TTL entries. The 
-number of concurrent threads is configurable via `compaction_threads` in the 
-column family config (default 2). Compaction pairs SSTables from oldest to 
-newest (pairs 0+1, 2+3, 4+5, etc.), with each thread processing one pair. A 
-semaphore limits concurrent threads to the configured maximum. When 
-`compaction_threads >= 2`, `tidesdb_compact()` automatically uses parallel 
-execution. At least 2 SSTables are required to trigger compaction. The process 
-approximately halves the SSTable count per run.
+The system evaluates three potential merge strategies on each compaction trigger, selecting the most appropriate based on cumulative level sizes and available capacities. For each candidate level q from 1 to X, the algorithm calculates cumulative size as the sum of all data in levels 0 through q, then checks whether level q's capacity can accommodate this merged data. The smallest level q where `capacity_q >= cumulative_size(0...q)` becomes the target level for a full preemptive merge. If no such level exists below X, the system performs a dividing merge at level X. After the primary merge completes, the algorithm evaluates whether levels X+1 through N-1 require partitioned merges to maintain capacity constraints and key range organization in the lower hierarchy.
 
-### 6.2 Background Compaction
+### 6.3 Full Preemptive Merge
 
-Background compaction provides automatic, hands-free SSTable management. 
-Enabled via `enable_background_compaction = 1` in the column family 
-configuration, it automatically triggers when the SSTable count reaches 
-`max_sstables_before_compaction`. When a flush completes and the SSTable count 
-exceeds the threshold, a compaction task is submitted to the engine-level 
-compaction thread pool. This operates independently without blocking application 
-operations, merging SSTable pairs throughout the storage engine lifecycle 
-until shutdown. The interval between compaction checks is configurable via 
-`background_compaction_interval` (default 1 second).
+Full preemptive merge consolidates all data from levels 0 through q into level q, where q < X. This operation is selected when an upper level has sufficient capacity to absorb all data from levels above it, enabling aggressive consolidation that reduces the number of levels requiring search during read operations. The merge process creates a multi-way merge iterator that simultaneously scans all SSTables in the source levels, producing a sorted stream of key-value pairs with duplicates resolved by selecting the newest version based on sequence numbers. Tombstones and expired TTL entries are purged during the merge, reclaiming storage space and improving read performance by eliminating obsolete data from the storage hierarchy.
+
+The output of a full preemptive merge consists of one or more new SSTables written to the target level q, with each output SSTable sized to match the configured SSTable size target. Source SSTables from levels 0 through q are deleted atomically after the merge completes successfully, using temporary file naming and atomic rename operations to ensure crash safety. This merge strategy provides optimal read performance by minimizing the number of levels containing data, at the cost of higher write amplification since data is rewritten multiple times as it moves through the hierarchy. The strategy is most effective for workloads with high update rates and frequent key overwrites, where aggressive consolidation quickly eliminates obsolete versions.
+
+### 6.4 Dividing Merge
+
+Dividing merge operates at level X, consolidating all data from levels 0 through X into level X. This operation is selected when no upper level has sufficient capacity for a full preemptive merge, indicating that data must be pushed deeper into the hierarchy. The merge algorithm follows the same multi-way merge pattern as full preemptive merge, creating sorted output SSTables while purging tombstones and expired entries. However, dividing merge plays a critical role in the overall compaction strategy by serving as the primary mechanism for moving data from the frequently-modified upper levels into the stable lower levels.
+
+After a dividing merge completes, the system recalculates level statistics and evaluates whether additional levels must be created to accommodate the merged data. If level X reaches capacity after the merge, a new level X+1 is created with capacity calculated as `capacity_X * size_ratio`, providing space for future compactions. This dynamic level creation ensures that the storage hierarchy grows organically with dataset size, maintaining bounded space amplification while avoiding premature level creation that would waste memory and increase read amplification. The dividing merge strategy balances write amplification and read amplification by concentrating merge activity at a single level rather than rewriting data through every level in the hierarchy.
+
+### 6.5 Partitioned Merge
+
+Partitioned merge operates on levels X+1 through N-1, consolidating data within individual levels to maintain key range organization and capacity constraints in the lower hierarchy. This operation is triggered when a level below the dividing level exceeds its capacity, indicating that data must be reorganized to maintain the sorted, non-overlapping key range invariant. Unlike full preemptive and dividing merges which consolidate multiple levels, partitioned merge operates within a single level, selecting overlapping SSTables and merging them into new SSTables with optimized key range boundaries.
+
+The partitioned merge algorithm identifies a subset of SSTables within the target level whose key ranges overlap, creating a merge iterator over this subset while leaving non-overlapping SSTables untouched. This selective approach minimizes write amplification by rewriting only the data that requires reorganization, rather than rewriting the entire level. The merge produces multiple output SSTables (one per partition), each identified by a partition number in the filename. For example, a partitioned merge at level 3 creating three partitions might produce `L3P0_10.klog`, `L3P1_11.klog`, and `L3P2_12.klog` with their corresponding vlog files, where P0, P1, P2 indicate partition numbers and 10, 11, 12 are sequential IDs from the monotonic counter. Each output SSTable maintains non-overlapping key ranges within the level, enabling efficient binary search during read operations. The merge purges tombstones and expired TTL entries, reclaiming storage space while maintaining the sorted key range invariant required for efficient range queries and point lookups in the lower levels of the storage hierarchy.
+
+### 6.6 Background Compaction and Thread Pool Coordination
+
+Compaction operations execute asynchronously through the engine-level compaction thread pool, decoupling merge activity from application write operations and enabling sustained write throughput independent of compaction performance. When enabled via `enable_background_compaction = 1` in the column family configuration, the system automatically submits compaction tasks to the thread pool when the SSTable count in Level 0 reaches `max_sstables_before_compaction`. Background compaction threads execute a blocking dequeue pattern, waiting efficiently on the compaction queue until work arrives, then processing compaction tasks to completion before returning to the wait state.
+
+Each compaction task is protected by a per-column-family compaction lock (`compaction_lock`) that serializes merge operations within a single column family while allowing concurrent compaction across different column families. The lock is acquired using `pthread_mutex_trylock()`, enabling the system to skip redundant compaction attempts when a merge is already in progress. This non-blocking approach prevents queue buildup and resource exhaustion during periods of high write activity, while ensuring that compaction makes forward progress whenever resources are available. The interval between compaction checks is configurable via `background_compaction_interval` (default 1 second), providing tunable responsiveness to changing workload patterns while avoiding excessive CPU utilization from frequent compaction triggers.
 
 ### 6.3 Compaction Mechanics
 
-<div class="architecture-diagram">
-
-![Compaction](../../../assets/img14.png)
-
-</div>
-
 During compaction, SSTables are paired (typically oldest with second-oldest) and merged into new SSTables. For each key, only the newest version is retained, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge.
-
-#### Atomic Rename Strategy
-
-TidesDB uses a temporary file pattern with atomic rename to ensure crash safety during compaction. When merging two SSTables (e.g., `sstable_0.sst` and `sstable_1.sst`), the new merged SSTable is first written to a temporary file with the `.tmp` extension (e.g., `sstable_2.sst.tmp`). This temporary file is fully written with all data blocks, bloom filter, index, and metadata before any filesystem-level commit occurs. Once the temporary file is complete and all data is flushed to disk, TidesDB performs an atomic `rename()` operation from `sstable_2.sst.tmp` to `sstable_2.sst`. This rename is atomic at the filesystem level on both POSIX and Windows, meaning it either fully succeeds or fully fails with no intermediate state visible to readers.
-
-**Crash Recovery**
-
-If a crash occurs during compaction before the rename, the temporary `.tmp` file is left on disk while the original SSTables remain intact and valid. On the next startup, TidesDB automatically scans the database directory and deletes any `.tmp` files found, cleaning up incomplete compaction attempts. The original SSTables are still present and readable, so no data is lost. If a crash occurs after the rename completes, the new merged SSTable is already committed and the original SSTables are deleted during the normal compaction cleanup phase.
-
-This approach provides several critical guarantees. Readers never see partially written SSTables since the `.tmp` file remains invisible until the atomic rename completes, ensuring crash safety throughout the merge process. The rename operation itself is atomic at the filesystem level, preventing corruption from incomplete writes and guaranteeing that the SSTable either fully exists or doesn't exist at all. Orphaned `.tmp` files from interrupted compactions are automatically cleaned up on startup, requiring no manual intervention. Most importantly, no data is ever lost--the original SSTables remain valid and readable until the merge is fully committed and the new SSTable is atomically visible to readers.
 
 ## 7. Performance Optimizations
 ### 7.1 Block Indices
@@ -694,22 +676,39 @@ flush and compaction operations safely modify the underlying storage structures.
 
 ### 8.3 Transaction Isolation
 
-TidesDB implements **READ COMMITTED** isolation for point reads and **snapshot 
-isolation** for iterators, both with read-your-own-writes semantics. Point 
-reads (`tidesdb_txn_get`) see the latest committed data from all sources 
-(active memtable, immutable memtables, SSTables). Iterators 
-(`tidesdb_iter_new`) acquire atomic references on both memtables and SSTables, 
-creating a consistent point-in-time snapshot unaffected by concurrent 
-compaction or writes.
+TidesDB implements multi-version concurrency control (MVCC) using sequence numbers to provide configurable isolation levels without locking readers. Each write operation is assigned a monotonically increasing sequence number via atomic increment, establishing a total ordering of all committed operations. Transactions capture a snapshot sequence number at begin time, enabling consistent reads across multiple operations while concurrent writes proceed without blocking. The system supports five isolation levels, each providing different trade-offs between consistency guarantees and concurrency.
+
+**Isolation Levels**
+
+**READ UNCOMMITTED** - Transactions see all data including uncommitted changes from concurrent transactions. Point reads search the active memtable, immutable memtables, and SSTables without sequence number filtering, returning the newest version of each key regardless of commit status. This level provides maximum concurrency with minimal consistency guarantees, suitable for approximate queries and analytics workloads where stale reads are acceptable.
+
+**READ COMMITTED** - Transactions see only committed data at the time of each read operation. Point reads filter results by sequence number, returning only versions with seq <= snapshot_seq where snapshot_seq is captured at the start of each read operation. This ensures that reads never see uncommitted data from concurrent transactions, while allowing non-repeatable reads. This level balances consistency and concurrency for most OLTP workloads.
+
+**REPEATABLE READ** - Transactions see a consistent snapshot captured at transaction begin time. The snapshot sequence number is captured once and remains constant for the transaction's lifetime. All reads filter by this snapshot sequence, ensuring that repeated reads of the same key return identical values even if concurrent transactions commit. However, phantom reads are possible in range scans. This level provides strong consistency for point reads while allowing some anomalies in range queries.
+
+**SNAPSHOT ISOLATION** - Transactions see a consistent snapshot with write conflict detection. The system detects write-write conflicts by comparing the transaction's snapshot sequence with the sequence numbers of keys being written. If a concurrent transaction has committed a write to the same key after this transaction's snapshot was taken, the commit fails with a conflict error. This prevents lost updates while allowing concurrent transactions to commit if their write sets do not overlap.
+
+**SERIALIZABLE** - Transactions execute as if run serially with full conflict detection. The system detects both write-write conflicts and read-write conflicts by tracking read sets and write sets. If a concurrent transaction commits a write to a key that this transaction has read, or reads a key that this transaction has written, the commit fails with a serialization error. This level provides the strongest consistency guarantees at the cost of higher abort rates and reduced concurrency.
+
+**MVCC Implementation**
+
+Sequence numbers are assigned atomically during WAL writes via atomic_fetch_add, providing lock-free ordering guarantees. Each key-value pair stores its sequence number in the 34-byte klog entry header, enabling efficient filtering during reads. Tombstones are versioned identically to regular writes, ensuring that deletions are visible only to transactions with appropriate snapshot sequences. During compaction, the system retains only the newest version of each key, purging older versions and tombstones to reclaim storage space.
+
+**Read-Your-Own-Writes**
+
+All isolation levels support read-your-own-writes semantics within a single transaction. Uncommitted operations are buffered in the transaction's write set and checked before searching persistent storage. When tidesdb_txn_get is called, the system first scans the transaction's buffered operations in reverse order, returning the buffered value if found. Only if the key is not in the write set does the system search the memtable and SSTables. This ensures that applications can read their own uncommitted changes, enabling dependent operations within a transaction.
 
 **Lock-Free Transaction Commits**
 
-Both read and write transactions use lock-free atomic operations throughout their 
-lifecycle. Write transactions do NOT acquire locks during commit - instead, they 
-use atomic CAS operations to safely write to WAL and skip list. Multiple write 
-transactions can commit concurrently without blocking each other. Within a single 
-transaction, uncommitted changes are immediately visible (read-your-own-writes), 
-allowing operations to read their own writes before commit.
+Write transactions use lock-free atomic operations throughout their lifecycle, enabling unlimited concurrent commits without blocking. During commit, each buffered operation is written to the WAL and skip list using atomic CAS operations, with sequence numbers assigned atomically. Memtable references are acquired using lock-free CAS retry loops, ensuring that memtable rotation does not block transaction commits. Multiple write transactions can commit concurrently to the same column family, with the skip list's lock-free insertion algorithm resolving contention without mutexes. This design enables linear scalability of write throughput with CPU core count.
+
+**Lock-Free Buffer for Transaction Tracking**
+
+TidesDB implements a general-purpose lock-free circular buffer data structure (buffer.h/buffer.c) used for concurrent slot management with atomic operations. Each buffer slot maintains an atomic state (FREE, ACQUIRED, OCCUPIED, RELEASING), atomic generation counter for ABA prevention, and atomic data pointer. Slot acquisition uses atomic CAS with exponential backoff, while release operations atomically transition slots back to FREE state with generation increment. The buffer supports optional eviction callbacks, foreach iteration over occupied slots, and configurable retry parameters for acquisition under contention.
+
+**Active Transaction Buffer for SERIALIZABLE Isolation**
+
+For SERIALIZABLE isolation, each column family maintains an active transaction buffer using this lock-free buffer implementation to track all currently active transactions. When a SERIALIZABLE transaction begins, it registers itself by atomically acquiring a buffer slot, storing its transaction ID, snapshot sequence, and isolation level. During commit, the system uses buffer_foreach to scan all active transactions and detect read-write conflicts (SSI antidependency check). If a concurrent transaction has read a key that this transaction is writing, the commit fails with a serialization error. After commit or abort, the transaction unregisters by atomically releasing its slot with an eviction callback that cleans up transaction metadata. The generation numbers prevent ABA problems where a slot ID might be reused between validation and access. This design enables SERIALIZABLE isolation without global locks, with conflict detection overhead proportional only to the number of active SERIALIZABLE transactions rather than all transactions in the system.
 
 ### 8.4 Optimal Use Cases
 
@@ -725,26 +724,34 @@ TidesDB organizes data on disk with a clear directory hierarchy. Understanding t
 
 ### 9.1 Directory Layout
 
-Each TidesDB instance has a root directory containing subdirectories for each column family
+Each TidesDB instance has a root directory containing subdirectories for each column family:
 
 ```
 mydb/
 ├── my_cf/
 │   ├── config.cfc        
 │   ├── wal_1.log
-│   ├── sstable_0.sst
-│   ├── sstable_1.sst
-│   └── sstable_2.sst
+│   ├── L1_0.klog
+│   ├── L1_0.vlog
+│   ├── L1_1.klog
+│   ├── L1_1.vlog
+│   ├── L2_0.klog
+│   ├── L2_0.vlog
+│   ├── L3P0_2.klog
+│   ├── L3P0_2.vlog
+│   ├── L3P1_3.klog
+│   └── L3P1_3.vlog
 ├── users/
 │   ├── config.cfc
 │   ├── wal_0.log
-│   └── sstable_0.sst
+│   ├── L1_0.klog
+│   └── L1_0.vlog
 └── sessions/
     ├── config.cfc
     └── wal_0.log
 ```
 
-.cfc files are in INI format and contain the column family configuration.
+Configuration files (`.cfc`) are in INI format and contain the column family configuration. SSTable files are organized by level, with `L<level>_<id>.klog` containing keys and metadata, and `L<level>_<id>.vlog` containing large values. The level number in the filename (1-based) indicates the LSM tree level, while the id is a monotonically increasing counter per column family.
 
 ### 9.2 File Naming Conventions
 
@@ -754,14 +761,7 @@ WAL files follow the naming pattern `wal_<memtable_id>.log` (e.g., `wal_0.log`, 
 
 #### SSTable Files
 
-SSTable files follow the naming convention `sstable_<sstable_id>.sst` (e.g., 
-`sstable_0.sst`, `sstable_1.sst`) and provide persistent storage for flushed 
-memtables. An SSTable is created when a memtable exceeds the 
-`memtable_flush_size` threshold, with IDs assigned using a monotonically 
-increasing counter per column family. Each SSTable contains sorted key-value 
-pairs along with bloom filter and index metadata for efficient lookups. During 
-compaction, old SSTables are merged into new consolidated files, and the 
-original SSTables are deleted after the merge completes successfully.
+SSTable files follow the naming convention `L<level>_<id>.klog` and `L<level>_<id>.vlog` for standard SSTables, or `L<level>P<partition>_<id>.klog` and `L<level>P<partition>_<id>.vlog` for partitioned SSTables created during partitioned merge operations. Examples include `L1_0.klog`, `L1_0.vlog` (standard), `L2_1.klog`, `L2_1.vlog` (standard), and `L3P0_5.klog`, `L3P0_5.vlog` (partitioned). The level number (1-based in filenames) indicates the LSM tree level, the optional partition number identifies which partition within a partitioned merge, and the id is a monotonically increasing counter per column family. An SSTable is created when a memtable exceeds the `write_buffer_size` threshold, with the initial flush writing to level 1 (`L1_<id>`). Each klog file contains sorted key entries with bloom filter and index metadata for efficient lookups, while the vlog file contains large values referenced by offset from the klog. During compaction, SSTables from multiple levels are merged into new consolidated files at higher levels, with partitioned merges creating multiple output files per operation (e.g., `L3P0_*`, `L3P1_*`, `L3P2_*`). Original SSTables are deleted after the merge completes successfully. During recovery, the system parses the level and optional partition number from filenames and maps `L<N>` files to `levels[N-1]` in the in-memory array, ensuring correct placement in the LSM hierarchy.
 
 ### 9.3 WAL Rotation and Memtable Lifecycle Example
 
@@ -786,14 +786,14 @@ Immutable Memtable (ID 0) → wal_0.log  [queued for flush]
 **4. Background Flush (Async)**
 ```
 Active Memtable (ID 1) → wal_1.log
-Flushing Memtable (ID 0) → sstable_0.sst  [writing to disk]
+Flushing Memtable (ID 0) → L1_0.klog + L1_0.vlog  [writing to disk]
 wal_0.log  [still exists - flush in progress]
 ```
 
 **5. Flush Complete**
 ```
 Active Memtable (ID 1) → wal_1.log
-sstable_0.sst  [persisted]
+L1_0.klog + L1_0.vlog  [persisted to level 1]
 wal_0.log  [DELETED - memtable freed after flush]
 ```
 
@@ -801,15 +801,15 @@ wal_0.log  [DELETED - memtable freed after flush]
 ```
 New Active Memtable (ID 2) → wal_2.log  [new active]
 Immutable Memtable (ID 1) → wal_1.log  [queued for flush]
-Flushing Memtable (ID 0) → sstable_0.sst  [still flushing]
+Flushing Memtable (ID 0) → L1_0.klog + L1_0.vlog  [still flushing]
 wal_0.log  [still exists - flush not complete]
 ```
 
 **7. After All Flushes Complete**
 ```
 Active Memtable (ID 2) → wal_2.log
-SSTable sstable_0.sst
-SSTable sstable_1.sst
+SSTable L1_0.klog + L1_0.vlog
+SSTable L1_1.klog + L1_1.vlog
 wal_0.log, wal_1.log  [DELETED means both flushes complete]
 ```
 
@@ -831,7 +831,7 @@ tidesdb_drop_column_family(db, "my_cf");
 
 ### 9.5 Monitoring Disk Usage
 
-Useful commands for monitoring TidesDB storage
+Useful commands for monitoring TidesDB storage:
 
 ```bash
 # Check total size
@@ -843,11 +843,27 @@ du -sh mydb/*/
 # Count WAL files (should be 1-2 per CF normally)
 find mydb/ -name "wal_*.log" | wc -l
 
-# Count SSTable files
-find mydb/ -name "sstable_*.sst" | wc -l
+# Count SSTable klog files (each SSTable has both .klog and .vlog)
+find mydb/ -name "*.klog" | wc -l
 
-# List largest SSTables
-find mydb/ -name "sstable_*.sst" -exec ls -lh {} \; | sort -k5 -hr | head -10
+# Count SSTables by level (includes both standard and partitioned)
+find mydb/ -name "L1*.klog" | wc -l  # Level 1 (all)
+find mydb/ -name "L2*.klog" | wc -l  # Level 2 (all)
+
+# Count only partitioned SSTables
+find mydb/ -name "*P*.klog" | wc -l
+
+# List largest klog files
+find mydb/ -name "*.klog" -exec ls -lh {} \; | sort -k5 -hr | head -10
+
+# List largest vlog files
+find mydb/ -name "*.vlog" -exec ls -lh {} \; | sort -k5 -hr | head -10
+
+# Show SSTable distribution across levels
+for level in 1 2 3 4 5; do
+  count=$(find mydb/ -name "L${level}_*.klog" | wc -l)
+  echo "Level $level: $count SSTables"
+done
 ```
 
 ### 9.6 Best Practices
@@ -909,6 +925,7 @@ The `compat.h` header provides cross-platform abstractions for system-specific f
 
 **File System Operations**
 - `PATH_SEPARATOR` Platform-specific path separator (`\` on Windows, `/` on POSIX)
+- Path parsing functions handle both separators for true cross-platform portability, enabling databases created on Linux to be read on Windows and vice versa
 - `mkdir()` Unified directory creation (handles different signatures on Windows vs POSIX)
 - `pread()`/`pwrite()` Atomic positioned I/O (implemented via OVERLAPPED on Windows)
 - `fsync()`/`fdatasync()` Data synchronization (uses `FlushFileBuffers()` on Windows)
@@ -951,8 +968,4 @@ Additionally, a portability test creates a database on Linux x64 and verifies it
 TidesDB uses CMake for cross-platform builds with platform-specific dependency management.
 - Linux/macOS · System package managers (apt, brew) for compression libraries (zstd, lz4, snappy)
 - Windows · vcpkg for dependency management
-
-### 13. Testing and Quality Assurance
-
-TidesDB maintains rigorous quality standards through comprehensive testing. The test suite includes over 200 individual test cases covering all components - block manager, skip list, bloom filters, succinct tries, FIFO cache, queue, compression, and end-to-end database operations. Tests run on every commit across 8 platform configurations (Linux/macOS/Windows × x86/x64 × GCC/Clang/MSVC/MinGW) with Address Sanitizer and Undefined Behavior Sanitizer enabled on Linux and macOS to detect memory errors and race conditions. The suite validates functional correctness (CRUD operations, transactions, iterators, compaction), concurrency safety (lock-free reads and writes, parallel compaction, no deadlocks), crash recovery (WAL replay, corruption detection, reference counting), and edge cases (NULL pointers, zero-length keys, overflow blocks, corrupted data). A dedicated portability test creates a database on Linux x64 and verifies it reads correctly on all other platforms, ensuring true cross-platform file compatibility. This testing strategy achieves near 100% coverage of critical paths including memtable operations, SSTable management, WAL recovery, compaction, and transaction semantics, ensuring TidesDB is highly reliable and correct.
 

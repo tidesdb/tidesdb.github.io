@@ -10,18 +10,19 @@ Check the [latest release](https://github.com/tidesdb/tidesdb/releases/latest) o
 ## Prerequisites
 
 ### Build Tools
-- **CMake** 3.10 or higher
+- **CMake** 3.25 or higher
 - **C Compiler** with C11 support:
   - GCC 7.0+ (Linux/MinGW)
   - Clang 6.0+ (macOS/Linux)
-  - MSVC 2019 16.8+ (Windows)
+  - MSVC 2019 16.8+ (Windows with `/experimental:c11atomics`)
 
 ### Required Dependencies
-TidesDB requires the following libraries for compression and cryptographic operations
+TidesDB requires the following libraries for compression and threading:
 
 - **[Snappy](https://github.com/google/snappy)** - Fast compression/decompression
 - **[LZ4](https://github.com/lz4/lz4)** - Extremely fast compression
 - **[Zstandard](https://github.com/facebook/zstd)** - High compression ratio
+- **pthreads** - POSIX threads (Linux/macOS: built-in, Windows: PThreads4W via vcpkg)
 
 ## Installing Dependencies
 
@@ -61,10 +62,10 @@ cd vcpkg
 .\bootstrap-vcpkg.bat
 
 # Install dependencies
-.\vcpkg install zstd:x64-windows lz4:x64-windows snappy:x64-windows 
+.\vcpkg install zstd:x64-windows lz4:x64-windows snappy:x64-windows pthreads:x64-windows
 
 # For 32-bit builds
-.\vcpkg install zstd:x86-windows lz4:x86-windows snappy:x86-windows
+.\vcpkg install zstd:x86-windows lz4:x86-windows snappy:x86-windows pthreads:x86-windows
 ```
 
 ## Building
@@ -141,23 +142,6 @@ ctest -C Release --verbose
 MSVC requires Visual Studio 2019 16.8 or later for C11 atomics support (`/experimental:c11atomics`). Both Debug and Release builds are fully supported.
 :::
 
-## Default Configuration Values
-
-TidesDB uses sensible defaults optimized for general-purpose workloads. These constants define the initial configuration when creating column families without custom settings.
-```c
-#define TDB_DEFAULT_MEMTABLE_FLUSH_SIZE            (64 * 1024 * 1024)
-#define TDB_DEFAULT_MAX_SSTABLES                   128
-#define TDB_DEFAULT_COMPACTION_THREADS             4
-#define TDB_DEFAULT_BACKGROUND_COMPACTION_INTERVAL 1000000
-#define TDB_DEFAULT_MAX_OPEN_FILE_HANDLES          1024
-#define TDB_DEFAULT_SKIPLIST_LEVELS                12
-#define TDB_DEFAULT_SKIPLIST_PROBABILITY           0.25
-#define TDB_DEFAULT_BLOOM_FILTER_FP_RATE           0.01
-#define TDB_DEFAULT_THREAD_POOL_SIZE               2
-#define TDB_DEFAULT_WAL_RECOVERY_POLL_INTERVAL_MS  100
-#define TDB_DEFAULT_WAIT_FOR_WAL_RECOVERY          0
-```
-
 ## Testing
 
 After building, run the test suite to verify everything works
@@ -203,35 +187,38 @@ All benchmark parameters can be customized at build time using CMake variables
 
 | Variable | Description | Default |
 |----------|-------------|----------|
-| `BENCH_NUM_OPERATIONS` | Number of put/get/delete operations | 10 |
-| `BENCH_NUM_SEEK_OPS` | Number of iterator seek operations | 10 |
+| `BENCH_NUM_OPERATIONS` | Number of put/get/delete operations | 10000000 |
+| `BENCH_NUM_SEEK_OPS` | Number of iterator seek operations | 100 |
 | `BENCH_KEY_SIZE` | Key size in bytes | 16 |
 | `BENCH_VALUE_SIZE` | Value size in bytes | 100 |
 | `BENCH_NUM_THREADS` | Number of concurrent threads | 2 |
-| `BENCH_DEBUG` | Enable debug logging (0=off, 1=on) | 0 |
-| `BENCH_KEY_PATTERN` | Key distribution pattern | "random" |
+| `BENCH_DB_DEBUG` | Enable debug logging (0=off, 1=on) | 1 |
+| `BENCH_KEY_PATTERN` | Key distribution pattern | "sequential" |
 | `BENCH_CF_NAME` | Column family name | "benchmark_cf" |
 | `BENCH_DB_PATH` | Directory path | "benchmark_db" |
+| `BENCH_DB_FLUSH_POOL_THREADS` | Flush thread pool size | 2 |
+| `BENCH_DB_COMPACTION_POOL_THREADS` | Compaction thread pool size | 2 |
 
 #### Column Family Configuration
 
 | Variable | Description | Default |
 |----------|-------------|----------|
-| `BENCH_MEMTABLE_FLUSH_SIZE` | Memtable flush threshold (bytes) | 67108864 (64MB) |
-| `BENCH_MAX_SSTABLES_BEFORE_COMPACTION` | Max SSTables before compaction | 128 |
-| `BENCH_COMPACTION_THREADS` | Number of compaction threads | 4 |
-| `BENCH_SL_MAX_LEVEL` | Skip list max level | 12 |
-| `BENCH_SL_PROBABILITY` | Skip list probability | 0.25 |
+| `BENCH_WRITE_BUFFER_SIZE` | Memtable flush threshold (bytes) | 67108864 (64MB) |
+| `BENCH_LEVEL_RATIO` | Level size multiplier | 10 |
+| `BENCH_DIVIDING_LEVEL_OFFSET` | Compaction dividing level offset | 2 |
+| `BENCH_MAX_LEVELS` | Maximum LSM levels | 7 |
+| `BENCH_SKIP_LIST_MAX_LEVEL` | Skip list max level | 16 |
+| `BENCH_SKIP_LIST_PROBABILITY` | Skip list probability | 0.25 |
 | `BENCH_ENABLE_COMPRESSION` | Enable compression (0=off, 1=on) | 1 |
-| `BENCH_COMPRESSION_ALGORITHM` | Compression algorithm | COMPRESS_LZ4 |
+| `BENCH_COMPRESSION_ALGORITHM` | Compression algorithm | LZ4_COMPRESSION |
 | `BENCH_ENABLE_BLOOM_FILTER` | Enable bloom filter (0=off, 1=on) | 1 |
 | `BENCH_BLOOM_FILTER_FP_RATE` | Bloom filter false positive rate | 0.01 |
-| `BENCH_ENABLE_BACKGROUND_COMPACTION` | Enable background compaction | 1 |
-| `BENCH_BACKGROUND_COMPACTION_INTERVAL` | Compaction interval (μs) | 1000000 |
 | `BENCH_ENABLE_BLOCK_INDEXES` | Enable block indexes | 1 |
+| `BENCH_BLOCK_INDEX_SAMPLING_COUNT` | Index sampling ratio (1 in N keys) | 16 |
 | `BENCH_SYNC_MODE` | Sync mode | TDB_SYNC_NONE |
 | `BENCH_COMPARATOR_NAME` | Key comparator | "memcmp" |
-| `BENCH_COLUMN_FAMILY_BLOCK_CACHE` | Enable block caching for column family block managers | 32*1024*1024 (32MB) |
+| `BENCH_BLOCK_CACHE_SIZE` | Global block cache size (bytes) | 67108864 (64MB) |
+| `BENCH_ISOLATION_LEVEL` | Transaction isolation level | TDB_ISOLATION_READ_COMMITTED |
 
 ### Key Distribution Patterns
 
