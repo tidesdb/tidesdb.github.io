@@ -590,9 +590,79 @@ Compaction operations execute asynchronously through the engine-level compaction
 
 Each compaction task is protected by a per-column-family compaction lock (`compaction_lock`) that serializes merge operations within a single column family while allowing concurrent compaction across different column families. The lock is acquired using `pthread_mutex_trylock()`, enabling the system to skip redundant compaction attempts when a merge is already in progress. This non-blocking approach prevents queue buildup and resource exhaustion during periods of high write activity, while ensuring that compaction makes forward progress whenever resources are available. The `l0_compaction_threshold` parameter is configurable per column family (default 4 SSTables), allowing tuning based on workload characteristics: lower values (2-3) trigger more frequent compaction with lower read amplification, while higher values (8-16) reduce write amplification at the cost of more L0 SSTables to search during reads.
 
-### 6.7 Compaction Mechanics Summary
+### 6.7 Dynamic Capacity Adaptation (DCA)
 
-During compaction, SSTables are merged using the strategies described above (full preemptive, dividing, or partitioned merge). For each key, only the newest version is retained based on sequence numbers, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge completes, with atomic rename operations ensuring crash safety.
+After each compaction operation completes, TidesDB automatically applies Dynamic Capacity Adaptation (DCA) to recalibrate level capacities based on the actual data distribution in the storage hierarchy. This adaptive mechanism ensures that level capacities remain proportional to the actual dataset size, preventing capacity imbalances that could trigger unnecessary compactions or allow levels to grow beyond their intended bounds.
+
+#### The Capacity Recalibration Formula
+
+DCA updates the capacity of each level (except the largest) using the formula:
+
+```
+C_i = N_L / T^(L-i)
+```
+
+Where
+- `C_i` = new capacity for level i
+- `N_L` = current data size at the largest level L
+- `T` = level size ratio (default 10)
+- `L` = total number of levels
+- `i` = level number (0 to L-2)
+
+This formula ensures that level capacities maintain the geometric progression `C_0 : C_1 : C_2 : ... = 1 : T : T² : ...` while anchoring to the actual size of the largest level rather than theoretical maximums.
+
+#### Why DCA Matters
+
+**Problem Without DCA**
+In a static capacity system, if the largest level contains 100GB of data but its capacity is set to 1TB, all upper level capacities would be calculated from that 1TB ceiling. This creates two issues:
+1. Upper levels have unnecessarily large capacities, delaying compaction triggers
+2. More levels than necessary exist in the hierarchy, increasing read amplification
+
+**Solution With DCA**
+By recalibrating capacities based on `N_L` (actual size) rather than `C_L` (theoretical capacity), DCA ensures that:
+- Level capacities reflect real data distribution
+- Compaction triggers fire at appropriate thresholds
+- The hierarchy maintains optimal depth for the current dataset size
+- Space amplification remains bounded even as data grows or shrinks
+
+#### Execution Timing
+
+DCA is invoked at the end of every compaction operation (line 6275 in `tidesdb.c`), after all merge operations complete but before releasing the compaction lock. This timing ensures that:
+- Capacity updates reflect the post-compaction state
+- No concurrent compactions can observe inconsistent capacities
+- The next compaction decision uses accurate capacity information
+
+#### Adaptive Behavior Example
+
+Consider a 4-level hierarchy with `T=10` and `N_L=100GB`:
+
+**Before DCA (static capacities)**
+- L0: 10GB capacity
+- L1: 100GB capacity  
+- L2: 1TB capacity
+- L3: 10TB capacity (but only 100GB actual data)
+
+**After DCA (adaptive capacities)**
+- L0: 100MB capacity (100GB / 10³)
+- L1: 1GB capacity (100GB / 10²)
+- L2: 10GB capacity (100GB / 10¹)
+- L3: 100GB capacity (unchanged, largest level)
+
+The adapted capacities are 100x smaller, triggering compactions more aggressively in upper levels and preventing unnecessary level creation. As the dataset grows and `N_L` increases, DCA automatically scales all capacities proportionally.
+
+#### Stability Guarantees
+
+DCA includes safeguards to prevent capacity thrashing:
+- If the calculated new capacity is zero but the old capacity was non-zero, the old capacity is retained
+- The largest level's capacity is never modified by DCA
+- Capacity updates are atomic (protected by `levels_lock` write lock)
+- DCA only runs when `num_levels >= 2` (no adaptation needed for single-level systems)
+
+This adaptive approach allows TidesDB to maintain optimal compaction behavior across workloads with varying dataset sizes, from gigabytes to terabytes, without manual capacity tuning or configuration changes.
+
+### 6.8 Compaction Mechanics Summary
+
+During compaction, SSTables are merged using the strategies described above (full preemptive, dividing, or partitioned merge). For each key, only the newest version is retained based on sequence numbers, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are deleted after a successful merge completes, with atomic rename operations ensuring crash safety. After each compaction, Dynamic Capacity Adaptation recalibrates level capacities to maintain optimal hierarchy proportions based on actual data distribution.
 
 ## 7. Performance Optimizations
 ### 7.1 Block Indices and Position Caching
