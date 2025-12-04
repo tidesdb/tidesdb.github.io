@@ -614,11 +614,13 @@ This formula ensures that level capacities maintain the geometric progression `C
 #### Why DCA Matters
 
 **Problem Without DCA**
+
 In a static capacity system, if the largest level contains 100GB of data but its capacity is set to 1TB, all upper level capacities would be calculated from that 1TB ceiling. This creates two issues:
 1. Upper levels have unnecessarily large capacities, delaying compaction triggers
 2. More levels than necessary exist in the hierarchy, increasing read amplification
 
 **Solution With DCA**
+
 By recalibrating capacities based on `N_L` (actual size) rather than `C_L` (theoretical capacity), DCA ensures that:
 - Level capacities reflect real data distribution
 - Compaction triggers fire at appropriate thresholds
