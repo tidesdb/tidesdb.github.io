@@ -33,7 +33,7 @@ The benchtool is a custom pluggable benchmarking tool that provides fair, apples
 
 **Configuration (matched for both engines)**
 - Bloom filters are enabled (10 bits per key)
-- Block cache is set to 64MB (HyperClockCache for RocksDB, FIFO for TidesDB)
+- Block cache is set to 64MB (HyperClockCache for RocksDB, LRU Block Cache for TidesDB)
 - Memtable flush size is set to 64MB
 - Sync mode is disabled (maximum performance)
 - Compression using LZ4
