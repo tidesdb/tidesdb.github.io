@@ -594,17 +594,17 @@ TidesDB v5.0.0 uses the `l0_compaction_threshold` parameter (default: 4 SSTables
 
 The benchmarks above used the **default threshold of 4 SSTables**, which provides optimal performance for most workloads. The v5.0.0 architecture improvements include:
 
-**Key Improvements in v5.0.0:**
+**Key Improvements in v5.0.0**
 - Optimized vlog cursor reuse with position caching for fast random access to large values
 - Improved iteration performance with cursor-based vlog reads
 - Better space efficiency with lower space amplification (0.03x-0.23x)
 - Reduced write amplification (0.91x-2.06x)
 - More compact database sizes compared to v4.0.1
 
-**Tuning Recommendations:**
-- **Default (4 SSTables)**: Optimal for most workloads, balancing performance and space efficiency
-- **Lower (2-3 SSTables)**: More frequent compaction, lower read amplification, slightly reduced write throughput
-- **Higher (8-16 SSTables)**: Higher write throughput, increased read amplification, more L0 SSTables to search
+**Tuning Recommendations**
+- Default (4 SSTables) · Optimal for most workloads, balancing performance and space efficiency
+- Lower (2-3 SSTables)** · More frequent compaction, lower read amplification, slightly reduced write throughput
+- Higher (8-16 SSTables) · Higher write throughput, increased read amplification, more L0 SSTables to search
 
 Applications with strict latency requirements benefit from the default threshold, which keeps L0 compact for fast reads. Write-heavy workloads can increase the threshold to 8-16 for maximum throughput, accepting slightly higher read latency. The v5.0.0 architecture ensures consistent performance across different threshold settings.
 
@@ -734,7 +734,7 @@ Write amplification is comparable between engines, with TidesDB ranging from 0.9
 
 The decision between TidesDB and RocksDB ultimately depends on your application's priorities and constraints.
 
-**Choose TidesDB v5.0.0 when:**
+**Choose TidesDB when**
 - **Write-heavy workloads** are your primary concern (1.17x-1.92x faster writes)
 - **Large value storage** (4KB+) is common in your application (1.92x faster writes, 2.86x better space efficiency)
 - **Simpler codebase** (~57,000 lines vs 300,000) is important for understanding, debugging, and maintenance
@@ -742,7 +742,7 @@ The decision between TidesDB and RocksDB ultimately depends on your application'
 - **Delete operations** are frequent (1.28x faster with better tail latency)
 - **Space efficiency** is acceptable at 1.29x-2.11x larger databases (or smaller for large values)
 
-**Choose RocksDB when:**
+**Choose RocksDB when**
 - **Scan and iteration performance** is critical (2.48x-3.96x faster full database scans)
 - **Mixed read/write workloads** with high read concurrency (2.18x faster reads under mixed load)
 - **Hot key workloads** with Zipfian distribution benefit from multi-level caching (3.64x-3.82x faster iteration)
@@ -750,7 +750,7 @@ The decision between TidesDB and RocksDB ultimately depends on your application'
 - **Production-proven** stability and operational experience is paramount
 - **Memory constraints** exist for certain workloads (lower RSS in some scenarios)
 
-**Performance Summary:**
+**Performance Summary**
 - TidesDB excels at write throughput, large value storage, and write latency consistency
 - RocksDB excels at iteration/scan performance, mixed workload reads, and hot key scenarios
 - Space efficiency is now competitive between both engines in v5.0.0
