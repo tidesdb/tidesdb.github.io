@@ -209,12 +209,12 @@ tidesdb_open(&db, &config);
 
 **Cache Sizing Guidelines**
 
-- Small datasets (<100MB): Set cache to 10-20% of total dataset size across all CFs
-- Large datasets (>1GB): Set cache to 5-10% or based on working set size
-- Read-heavy workloads: Larger cache (64-256MB+) provides better hit rates
-- Write-heavy workloads: Smaller cache (16-32MB) since data is less frequently re-read
-- Multi-CF workloads: Size based on combined working set of all active CFs
-- Disable caching: Set `block_cache_size = 0` to disable (no memory overhead)
+- Small datasets (<100MB) · Set cache to 10-20% of total dataset size across all CFs
+- Large datasets (>1GB) · Set cache to 5-10% or based on working set size
+- Read-heavy workloads · Larger cache (64-256MB+) provides better hit rates
+- Write-heavy workloads · Smaller cache (16-32MB) since data is less frequently re-read
+- Multi-CF workloads · Size based on combined working set of all active CFs
+- Disable caching · Set `block_cache_size = 0` to disable (no memory overhead)
 
 **Monitoring Cache Effectiveness**
 
@@ -1071,9 +1071,9 @@ if (txn->isolation_level == TDB_ISOLATION_REPEATABLE_READ) {
 
 Transaction registers in the column family's active transaction buffer (`cf->active_txn_buffer`) to enable conflict detection. At commit time, the system performs two checks:
 
-1. **Read-set validation** (lines 8631-8655): For each key in `txn->read_keys[]`, check if `found_seq > key_read_seq`. If true, another transaction modified the key after we read it → abort with `TDB_ERR_CONFLICT`.
+1. **Read-set validation** (roughly lines 8631-8655 in tidesdb.c): For each key in `txn->read_keys[]`, check if `found_seq > key_read_seq`. If true, another transaction modified the key after we read it → abort with `TDB_ERR_CONFLICT`.
 
-2. **Write-write conflict detection** (lines 8660-8693): For each key in `txn->write_keys[]`, check if `found_seq > cf_snapshot`. If true, another transaction committed a write to the same key → abort with `TDB_ERR_CONFLICT`.
+2. **Write-write conflict detection** (roughly lines 8660-8693 in tidesdb.c): For each key in `txn->write_keys[]`, check if `found_seq > cf_snapshot`. If true, another transaction committed a write to the same key → abort with `TDB_ERR_CONFLICT`.
 
 Prevents lost updates but allows phantom reads in range scans.
 
@@ -1109,7 +1109,7 @@ txn->read_cfs[txn->read_set_count] = cf;
 txn->read_set_count++;
 ```
 
-At commit time (lines 8695-8714), performs the **SSI antidependency check**:
+At commit time (roughly lines 8695-8714 in tidesdb.c), performs the **SSI antidependency check**:
 
 ```c
 if (txn->isolation_level == TDB_ISOLATION_SERIALIZABLE) {
@@ -1125,7 +1125,7 @@ if (txn->isolation_level == TDB_ISOLATION_SERIALIZABLE) {
 }
 ```
 
-The `check_rw_conflict()` callback (lines 8589-8614) scans all active SERIALIZABLE transactions:
+The `check_rw_conflict()` callback (roughly lines 8589-8614 in tidesdb.c) scans all active SERIALIZABLE transactions:
 
 ```c
 static void check_rw_conflict(uint32_t id, void *data, void *ctx) {
@@ -1172,7 +1172,7 @@ TidesDB implements a general-purpose lock-free circular buffer data structure (b
 
 For SERIALIZABLE isolation, each column family maintains an active transaction buffer (`cf->active_txn_buffer`) using the lock-free buffer implementation to track all currently active SERIALIZABLE transactions. The buffer is initialized with a default capacity of `TDB_DEFAULT_ACTIVE_TXN_BUFFER_SIZE` slots, each capable of holding a `tidesdb_txn_entry_t` structure.
 
-**Transaction Registration (lines 7784-7809)**
+**Transaction Registration (roughly lines 7784-7809 in tidesdb.c)**
 
 When a SERIALIZABLE transaction begins and first accesses a column family, it registers via `tidesdb_txn_register()`:
 
@@ -1211,7 +1211,7 @@ FREE → ACQUIRED → OCCUPIED → RELEASING → FREE
 
 State transitions use atomic CAS operations with exponential backoff under contention. The generation counter increments on each FREE → ACQUIRED transition, preventing ABA problems where a slot ID is reused between validation and access.
 
-**SSI Antidependency Check (lines 8695-8714)**
+**SSI Antidependency Check (roughly lines 8695-8714 in tidesdb.c)**
 
 During commit, the system scans all active SERIALIZABLE transactions using `buffer_foreach()`:
 
@@ -1228,7 +1228,7 @@ The `buffer_foreach()` function iterates over all OCCUPIED slots, calling the `c
 
 **Key Implementation Detail** · The foreach iteration is **lock-free** and **wait-free**. It reads slot states atomically and skips slots that transition to RELEASING during iteration. This means conflict detection never blocks, even if transactions are concurrently registering or unregistering.
 
-**Transaction Unregistration (lines 7820-7825)**
+**Transaction Unregistration (roughly lines 7820-7825 in tidesdb.c)**
 
 After commit or abort, the transaction unregisters via `tidesdb_txn_unregister()`:
 
