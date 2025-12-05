@@ -36,7 +36,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_TOO_LARGE` | `-10` | Key or value size exceeds maximum allowed size |
 | `TDB_ERR_MEMORY_LIMIT` | `-11` | Operation would exceed memory limits (safety check to prevent OOM) |
 
-**Error categories:**
+**Error categories**
 - `TDB_ERR_CORRUPTION` indicates data integrity issues requiring immediate attention
 - `TDB_ERR_CONFLICT` indicates transaction conflicts (retry may succeed)
 - `TDB_ERR_MEMORY`, `TDB_ERR_MEMORY_LIMIT`, `TDB_ERR_TOO_LARGE` indicate resource constraints
@@ -162,7 +162,8 @@ tidesdb_column_family_config_t cf_config = {
     .bloom_fpr = 0.01,                          /* 1% false positive rate */
     .enable_block_indexes = 1,                  /* Enable succinct trie block indexes */
     .index_sample_ratio = 16,                   /* Sample 1 in 16 keys for index (default: 16) */
-    .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE or TDB_SYNC_FULL */
+    .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
+    .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
     .comparator_name = {0},                     /* Empty = use default "memcmp" */
     .klog_block_size = 4096,                    /* Klog block size (default: 4096) */
     .vlog_block_size = 4096,                    /* Vlog block size (default: 4096) */
@@ -261,7 +262,7 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 }
 ```
 
-**Statistics include:**
+**Statistics include**
 - Memtable size in bytes
 - Number of LSM levels
 - Per-level SSTable count and total size
@@ -295,7 +296,8 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 - `skip_list_probability` - Skip list probability for **new** memtables
 - `bloom_fpr` - False positive rate for **new** SSTables
 - `index_sample_ratio` - Index sampling ratio for **new** SSTables
-- `sync_mode` - Durability mode (TDB_SYNC_NONE or TDB_SYNC_FULL)
+- `sync_mode` - Durability mode (TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL)
+- `sync_interval_us` - Sync interval in microseconds (only used when sync_mode is TDB_SYNC_INTERVAL)
 
 **Non-updatable settings** (would corrupt existing data):
 - `compression_algorithm` - Cannot change on existing SSTables
@@ -306,7 +308,7 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 - `value_threshold` - Cannot change klog/vlog separation
 - `klog_block_size` / `vlog_block_size` - Cannot change block sizes
 
-**Configuration persistence:**
+**Configuration persistence**
 
 If `persist_to_disk = 1`, changes are saved to `config.cfc` in the column family directory. On restart, the configuration is loaded from this file.
 
@@ -472,6 +474,60 @@ tidesdb_txn_free(txn);
 /* No changes were applied */
 ```
 
+### Savepoints
+
+Savepoints allow partial rollback within a transaction. You can create named savepoints and rollback to them without aborting the entire transaction.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+/* First operation */
+tidesdb_txn_put(txn, cf, (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
+
+/* Create savepoint */
+if (tidesdb_txn_savepoint(txn, "sp1") != 0)
+{
+    tidesdb_txn_rollback(txn);
+    tidesdb_txn_free(txn);
+    return -1;
+}
+
+/* Second operation */
+tidesdb_txn_put(txn, cf, (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
+
+/* Rollback to savepoint - key2 is discarded, key1 remains */
+if (tidesdb_txn_rollback_to_savepoint(txn, "sp1") != 0)
+{
+    tidesdb_txn_rollback(txn);
+    tidesdb_txn_free(txn);
+    return -1;
+}
+
+/* Add different operation after rollback */
+tidesdb_txn_put(txn, cf, (uint8_t *)"key3", 4, (uint8_t *)"value3", 6, -1);
+
+/* Commit transaction - only key1 and key3 are written */
+if (tidesdb_txn_commit(txn) != 0)
+{
+    tidesdb_txn_free(txn);
+    return -1;
+}
+
+tidesdb_txn_free(txn);
+```
+
+**Savepoint behavior**
+- Savepoints capture the transaction state at a specific point
+- Rolling back to a savepoint discards all operations after that savepoint
+- Multiple savepoints can be created with different names
+- Creating a savepoint with an existing name updates that savepoint
+- Savepoints are automatically freed when the transaction commits or rolls back
+- Returns `TDB_ERR_NOT_FOUND` if the savepoint name doesn't exist
+
 ### Multi-Column-Family Transactions
 
 TidesDB supports atomic transactions across multiple column families with true all-or-nothing semantics.
@@ -505,7 +561,7 @@ if (tidesdb_txn_commit(txn) != 0)
 tidesdb_txn_free(txn);
 ```
 
-**Multi-CF guarantees:**
+**Multi-CF guarantees**
 - Either all CFs commit or none do (atomic)
 - Automatically detected when operations span multiple CFs
 - Uses global sequence numbers with high-bit flagging
@@ -551,12 +607,12 @@ if (result == TDB_ERR_CONFLICT)
 tidesdb_txn_free(txn);
 ```
 
-**Isolation level characteristics:**
-- **READ UNCOMMITTED** - Maximum concurrency, minimal consistency
-- **READ COMMITTED** - Balanced for OLTP workloads (default)
-- **REPEATABLE READ** - Strong point read consistency
-- **SNAPSHOT** - Prevents lost updates with write-write conflict detection
-- **SERIALIZABLE** - Strongest guarantees with full SSI, higher abort rates
+**Isolation level characteristics**
+- **READ UNCOMMITTED** · Maximum concurrency, minimal consistency
+- **READ COMMITTED** · Balanced for OLTP workloads (default)
+- **REPEATABLE READ** · Strong point read consistency
+- **SNAPSHOT** · Prevents lost updates with write-write conflict detection
+- **SERIALIZABLE** · Strongest guarantees with full SSI, higher abort rates
 
 ## Iterators
 
@@ -630,21 +686,21 @@ tidesdb_txn_free(txn);
 
 TidesDB provides seek operations that allow you to position an iterator at a specific key or key range without scanning from the beginning.
 
-**How Seek Works:**
+**How Seek Works**
 
 **With Block Indexes Enabled** (`enable_block_indexes = 1`):
 - Uses succinct trie to find the predecessor block (largest indexed key <= target)
 - The trie samples keys at a configurable ratio (default 1:16 via `index_sample_ratio`)
 - Jumps directly to the target block using the block index
 - Scans forward from that block to find the exact key
-- **Performance:** O(log n) block lookup + O(k) entries per block scan
+- **Performance** · O(log n) block lookup + O(k) entries per block scan
 
 **Without Block Indexes** (`enable_block_indexes = 0`):
 - Starts from the first klog block
 - Scans sequentially through all blocks until target is found
-- **Performance:** O(n) blocks × O(k) entries per block
+- **Performance** · O(n) blocks × O(k) entries per block
 
-**Example:** For a 1GB SSTable with 4KB blocks:
+**Example** · For a 1GB SSTable with 4KB blocks:
 - With indexes: ~10 trie lookups + scan 1 block (~100 entries)
 - Without indexes: scan ~250,000 blocks sequentially
 
@@ -706,39 +762,39 @@ TidesDB uses comparators to determine the sort order of keys throughout the enti
 
 TidesDB provides six built-in comparators that are automatically registered on database open:
 
-**`"memcmp"` (default)** - Binary byte-by-byte comparison
+**`"memcmp"` (default)** · Binary byte-by-byte comparison
 - Compares min(key1_size, key2_size) bytes using `memcmp()`
 - If bytes are equal, shorter key sorts first
-- **Use case:** Binary keys, raw byte data, general purpose
+- **Use case** · Binary keys, raw byte data, general purpose
 
-**`"lexicographic"`** - Null-terminated string comparison
+**`"lexicographic"`** · Null-terminated string comparison
 - Uses `strcmp()` for lexicographic ordering
 - Ignores key_size parameters (assumes null-terminated)
-- **Use case:** C strings, text keys
-- **Warning:** Keys must be null-terminated or behavior is undefined
+- **Use case** · C strings, text keys
+- **Warning** · Keys must be null-terminated or behavior is undefined
 
 **`"uint64"`** - Unsigned 64-bit integer comparison
 - Interprets 8-byte keys as uint64_t values
 - Falls back to memcmp if key_size != 8
-- **Use case:** Numeric IDs, timestamps, counters
-- **Example:** `uint64_t id = 1000; tidesdb_txn_put(txn, cf, (uint8_t*)&id, 8, ...)`
+- **Use case** · Numeric IDs, timestamps, counters
+- **Example** · `uint64_t id = 1000; tidesdb_txn_put(txn, cf, (uint8_t*)&id, 8, ...)`
 
-**`"int64"`** - Signed 64-bit integer comparison
+**`"int64"`** · Signed 64-bit integer comparison
 - Interprets 8-byte keys as int64_t values
 - Falls back to memcmp if key_size != 8
-- **Use case:** Signed numeric keys, relative timestamps
-- **Example:** `int64_t offset = -500; tidesdb_txn_put(txn, cf, (uint8_t*)&offset, 8, ...)`
+- **Use case** · Signed numeric keys, relative timestamps
+- **Example** · `int64_t offset = -500; tidesdb_txn_put(txn, cf, (uint8_t*)&offset, 8, ...)`
 
-**`"reverse"`** - Reverse binary comparison
+**`"reverse"`** · Reverse binary comparison
 - Negates the result of memcmp comparator
 - Sorts keys in descending order
-- **Use case:** Reverse chronological order, descending IDs
+- **Use case** · Reverse chronological order, descending IDs
 
-**`"case_insensitive"`** - Case-insensitive ASCII comparison
+**`"case_insensitive"`** · Case-insensitive ASCII comparison
 - Converts A-Z to a-z during comparison
 - Compares min(key1_size, key2_size) bytes
 - If bytes are equal (ignoring case), shorter key sorts first
-- **Use case:** Case-insensitive text keys, usernames, email addresses
+- **Use case** · Case-insensitive text keys, usernames, email addresses
 
 ### Custom Comparator Registration
 
@@ -775,19 +831,19 @@ cf_config.comparator_name[TDB_MAX_COMPARATOR_NAME - 1] = '\0';
 tidesdb_create_column_family(db, "events", &cf_config);
 ```
 
-**Comparator function signature:**
+**Comparator function signature**
 ```c
 int (*comparator_fn)(const uint8_t *key1, size_t key1_size,
                      const uint8_t *key2, size_t key2_size,
                      void *ctx);
 ```
 
-**Return values:**
+**Return values**
 - `< 0` if key1 < key2
 - `0` if key1 == key2
 - `> 0` if key1 > key2
 
-**Important notes:**
+**Important notes**
 - Comparators must be **registered before** creating column families that use them
 - Once set, a comparator **cannot be changed** for a column family
 - The same comparator is used across memtables, SSTables, block indexes, and iterators
@@ -796,13 +852,17 @@ int (*comparator_fn)(const uint8_t *key1, size_t key1_size,
 
 ## Sync Modes
 
-Control durability vs performance tradeoff.
+Control durability vs performance tradeoff with three sync modes.
 
 ```c
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 
 /* TDB_SYNC_NONE - Fastest, least durable (OS handles flushing) */
 cf_config.sync_mode = TDB_SYNC_NONE;
+
+/* TDB_SYNC_INTERVAL - Balanced performance with periodic background syncing */
+cf_config.sync_mode = TDB_SYNC_INTERVAL;
+cf_config.sync_interval_us = 1000000;  /* Sync every 1 second (1,000,000 microseconds) */
 
 /* TDB_SYNC_FULL - Most durable (fsync on every write) */
 cf_config.sync_mode = TDB_SYNC_FULL;
@@ -812,7 +872,48 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 
 :::note[Sync Mode Options]
 - **TDB_SYNC_NONE** · No explicit sync, relies on OS page cache (fastest, least durable)
+  - Best for · Maximum throughput, acceptable data loss on crash
+  - Use case · Caches, temporary data, reproducible workloads
+
+- **TDB_SYNC_INTERVAL** · Periodic background syncing at configurable intervals (balanced)
+  - Best for · Production workloads requiring good performance with bounded data loss
+  - Use case · Most applications, configurable durability window
+  - Features:
+    - Single background sync thread monitors all column families using interval mode
+    - Configurable sync interval via `sync_interval_us` (microseconds)
+    - Structural operations (flush, compaction, WAL rotation) always enforce durability
+    - At most `sync_interval_us` worth of data at risk on crash
+
 - **TDB_SYNC_FULL** · Fsync on every write operation (slowest, most durable)
+  - Best for · Critical data requiring maximum durability
+  - Use case · Financial transactions, audit logs, critical metadata
+  - Note: Structural operations always use fsync regardless of sync mode
+:::
+
+### Sync Interval Examples
+
+```c
+/* Sync every 100ms (good for low-latency requirements) */
+cf_config.sync_mode = TDB_SYNC_INTERVAL;
+cf_config.sync_interval_us = 100000;
+
+/* Sync every 1 second (balanced default) */
+cf_config.sync_mode = TDB_SYNC_INTERVAL;
+cf_config.sync_interval_us = 1000000;
+
+/* Sync every 5 seconds (higher throughput, more data at risk) */
+cf_config.sync_mode = TDB_SYNC_INTERVAL;
+cf_config.sync_interval_us = 5000000;
+```
+
+:::tip[Structural Operations]
+Regardless of sync mode, TidesDB **always** enforces durability for structural operations:
+- Memtable flush to SSTable
+- SSTable compaction and merging
+- WAL rotation
+- Column family metadata updates
+
+This ensures the database structure remains consistent even if user data syncing is delayed.
 :::
 
 ## Compaction

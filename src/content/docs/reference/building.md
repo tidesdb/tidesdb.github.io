@@ -7,6 +7,39 @@ description: How to build and benchmark TidesDB.
 Check the [latest release](https://github.com/tidesdb/tidesdb/releases/latest) on GitHub for the current version.
 :::
 
+## Supported Platforms
+
+TidesDB is tested and supported on the following platforms:
+
+### Operating Systems
+- **Linux** (x86, x64, PowerPC 32-bit)
+- **macOS** (x64, ARM64/Apple Silicon)
+- **Windows** (x86, x64 with MSVC or MinGW)
+- **FreeBSD** 14.0+ (x64)
+- **OpenBSD** 7.4+ (x64)
+- **NetBSD** (x64)
+- **DragonFlyBSD** (x64)
+- **Illumos/OmniOS** (x64)
+- **Solaris** (x64)
+
+### Architectures
+- **x86** (32-bit Intel/AMD)
+- **x64** (64-bit Intel/AMD)
+- **ARM64** (Apple Silicon, ARM v8)
+- **PowerPC** (32-bit, cross-compiled)
+
+### Compilers
+- **GCC** 7.0+ (Linux, MinGW, cross-compilation)
+- **Clang** 6.0+ (macOS, Linux, BSD)
+- **MSVC** 2019 16.8+ (Windows with `/experimental:c11atomics`)
+
+:::note[Platform-Specific Notes]
+- **SunOS/Illumos** · Snappy compression is not available; TidesDB automatically disables it
+- **PowerPC** · Requires `libatomic` for 64-bit atomic operations
+- **32-bit architectures** · Require `libatomic` and multilib support
+- **Windows** · Both MSVC and MinGW are fully supported with vcpkg for dependencies
+:::
+
 ## Prerequisites
 
 ### Build Tools
@@ -19,10 +52,12 @@ Check the [latest release](https://github.com/tidesdb/tidesdb/releases/latest) o
 ### Required Dependencies
 TidesDB requires the following libraries for compression and threading:
 
-- **[Snappy](https://github.com/google/snappy)** - Fast compression/decompression
-- **[LZ4](https://github.com/lz4/lz4)** - Extremely fast compression
-- **[Zstandard](https://github.com/facebook/zstd)** - High compression ratio
-- **pthreads** - POSIX threads (Linux/macOS: built-in, Windows: PThreads4W via vcpkg)
+- **[Snappy](https://github.com/google/snappy)** · Fast compression/decompression (not available on SunOS/Illumos)
+- **[LZ4](https://github.com/lz4/lz4)** · Extremely fast compression
+- **[Zstandard](https://github.com/facebook/zstd)** · High compression ratio
+- **pthreads** · POSIX threads (Linux/macOS/BSD: built-in, Windows: PThreads4W via vcpkg)
+- **libatomic** · Atomic operations library (required for 32-bit architectures like PowerPC)
+- **C++ standard library** · Required by Snappy (automatically linked on Linux)
 
 ## Installing Dependencies
 
@@ -41,16 +76,76 @@ sudo dnf install cmake gcc libzstd-devel lz4-devel snappy-devel
 
 # Arch Linux
 sudo pacman -S cmake gcc zstd lz4 snappy
+
+# 32-bit builds (e.g., x86, PowerPC)
+sudo apt install -y gcc-multilib g++-multilib libatomic1
 ```
 
 ### macOS
+
+TidesDB supports multiple package managers on macOS. By default, CMake will auto-detect Homebrew, but you can use MacPorts, pkgsrc, or Fink instead.
+
+#### Option 1 · Homebrew (Default)
 ```bash
 # Install Homebrew if not already installed
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install dependencies
 brew install cmake zstd lz4 snappy
+
+# Build (Homebrew is auto-detected)
+cmake -S . -B build
+cmake --build build
 ```
+
+#### Option 2 · MacPorts
+```bash
+# Install MacPorts from https://www.macports.org/install.php
+
+# Install dependencies
+sudo port install cmake zstd lz4 snappy
+
+# Build with MacPorts prefix
+cmake -S . -B build -DMACOS_DEPENDENCY_PREFIX=/opt/local -DUSE_HOMEBREW=OFF
+cmake --build build
+```
+
+#### Option 3 · pkgsrc
+```bash
+# Install pkgsrc for macOS
+
+# Install dependencies
+pkgin install cmake zstd lz4 snappy
+
+# Build with pkgsrc prefix
+cmake -S . -B build -DMACOS_DEPENDENCY_PREFIX=/usr/pkg -DUSE_HOMEBREW=OFF
+cmake --build build
+```
+
+#### Option 4 · Fink
+```bash
+# Install Fink from https://www.finkproject.org/
+
+# Install dependencies
+fink install cmake zstd lz4 snappy
+
+# Build with Fink prefix
+cmake -S . -B build -DMACOS_DEPENDENCY_PREFIX=/sw -DUSE_HOMEBREW=OFF
+cmake --build build
+```
+
+:::note[Custom Paths]
+If you have dependencies installed in a custom location, use:
+```bash
+cmake -S . -B build -DMACOS_DEPENDENCY_PREFIX=/your/custom/path -DUSE_HOMEBREW=OFF
+```
+
+Or set `CMAKE_PREFIX_PATH` environment variable:
+```bash
+export CMAKE_PREFIX_PATH=/your/custom/path
+cmake -S . -B build -DUSE_HOMEBREW=OFF
+```
+:::
 
 ### Windows
 
@@ -66,6 +161,87 @@ cd vcpkg
 
 # For 32-bit builds
 .\vcpkg install zstd:x86-windows lz4:x86-windows snappy:x86-windows pthreads:x86-windows
+```
+
+### BSD Variants
+
+TidesDB supports FreeBSD, OpenBSD, NetBSD, and DragonFlyBSD with platform-specific package paths.
+
+#### FreeBSD
+```bash
+# Install dependencies (packages in /usr/local)
+sudo pkg install cmake pkgconf liblz4 zstd snappy
+
+# Build
+cmake -S . -B build
+cmake --build build
+```
+
+#### OpenBSD
+```bash
+# Install dependencies (packages in /usr/local)
+sudo pkg_add cmake gmake lz4 zstd snappy pkgconf
+
+# Build
+cmake -S . -B build
+cmake --build build
+```
+
+#### NetBSD
+```bash
+# Install dependencies (packages in /usr/pkg)
+sudo pkgin install cmake lz4 zstd snappy
+
+# Build
+cmake -S . -B build
+cmake --build build
+```
+
+#### DragonFlyBSD
+```bash
+# Install dependencies (packages in /usr/local)
+sudo pkg install cmake lz4 zstd snappy
+
+# Build
+cmake -S . -B build
+cmake --build build
+```
+
+### Illumos/OmniOS/Solaris
+
+**Note:** Snappy is not available in OmniOS repositories. TidesDB automatically disables Snappy compression on SunOS builds.
+
+```bash
+# Install dependencies (packages in /opt/ooce)
+sudo pkg install cmake lz4 zstd
+
+# Build
+cmake -S . -B build
+cmake --build build
+```
+
+### PowerPC (32-bit)
+
+Cross-compilation for PowerPC requires building dependencies from source.
+
+```bash
+# Install cross-compilation toolchain
+sudo apt install -y crossbuild-essential-powerpc \
+  gcc-powerpc-linux-gnu g++-powerpc-linux-gnu \
+  qemu-user-static
+
+# Build dependencies from source (LZ4, Zstandard, Snappy)
+# See .github/workflows/build_and_test_tidesdb.yml for complete build script
+
+# Configure with PowerPC toolchain
+cmake -S . -B build \
+  -DCMAKE_C_COMPILER=powerpc-linux-gnu-gcc \
+  -DCMAKE_CXX_COMPILER=powerpc-linux-gnu-g++ \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_SYSTEM_PROCESSOR=powerpc
+
+# Build
+cmake --build build
 ```
 
 ## Building
@@ -216,6 +392,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_ENABLE_BLOCK_INDEXES` | Enable block indexes | 1 |
 | `BENCH_BLOCK_INDEX_SAMPLING_COUNT` | Index sampling ratio (1 in N keys) | 16 |
 | `BENCH_SYNC_MODE` | Sync mode | TDB_SYNC_NONE |
+| `BENCH_SYNC_INTERVAL_US` | Sync interval in microseconds (for TDB_SYNC_INTERVAL) | 128000 (128ms) |
 | `BENCH_COMPARATOR_NAME` | Key comparator | "memcmp" |
 | `BENCH_BLOCK_CACHE_SIZE` | Global block cache size (bytes) | 67108864 (64MB) |
 | `BENCH_ISOLATION_LEVEL` | Transaction isolation level | TDB_ISOLATION_READ_COMMITTED |
