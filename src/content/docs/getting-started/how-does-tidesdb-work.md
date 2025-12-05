@@ -48,11 +48,11 @@ TidesDB organizes data into column families, a design pattern that provides name
 
 A column family maintains complete storage isolation through dedicated data structures at each tier of the LSM hierarchy. The memory tier consists of an atomically-swapped active memtable pointer, a monotonically increasing memtable generation counter for versioning, an active WAL file handle, and a queue of immutable memtables awaiting flush. The disk tier organizes SSTables into a dynamically allocated array of levels, with each level protected by a reader-writer lock that enables concurrent reads while serializing structural modifications during compaction. Sequence number generation occurs independently per column family through atomic increment operations, ensuring that transaction ordering within a column family remains consistent while allowing concurrent operations across different column families to proceed without coordination overhead.
 
-Configuration parameters are specified per column family at creation time and persisted to disk in INI format within the column family's directory. These parameters control fundamental operational characteristics including memtable flush thresholds that determine memory-to-disk transition points, skip list structural parameters (maximum level and probability) that affect search performance, compression algorithms and settings that balance CPU utilization against storage efficiency, bloom filter configuration including false positive rates, block index enablement for direct block access, and compaction policies including automatic background compaction triggers and thread allocation. Once a column family is created, certain parameters such as the key comparator function become immutable for the lifetime of the column family, ensuring consistent sort order across all storage tiers and preventing data corruption from comparator changes.
+Configuration parameters are specified per column family at creation time and persisted to disk in INI format within the column family's directory. These parameters control fundamental operational characteristics including memtable flush thresholds that determine memory-to-disk transition points, skip list structural parameters (maximum level and probability) that affect search performance, compression algorithms and settings that balance CPU utilization against storage efficiency, bloom filter configuration including false positive rates, block index enablement for direct block access, sync mode (TDB_SYNC_NONE, TDB_SYNC_INTERVAL, TDB_SYNC_FULL) with configurable sync interval in microseconds for interval mode, and compaction policies including automatic background compaction triggers and thread allocation. Many parameters including sync mode and sync interval can be updated at runtime and persisted back to disk, allowing operational tuning without database restart. Once a column family is created, certain parameters such as the key comparator function become immutable for the lifetime of the column family, ensuring consistent sort order across all storage tiers and preventing data corruption from comparator changes.
 
 Concurrency control within a column family employs a hybrid approach that combines lock-free atomic operations for high-frequency read and write paths with mutex-based coordination for infrequent structural operations. The active memtable skip list uses lock-free Compare-And-Swap (CAS) operations for all insertions and lookups, enabling unlimited concurrent readers and writers without contention. Structural operations that modify the storage hierarchy acquire dedicated mutexes: the flush lock (`flush_lock`) serializes memtable rotation and flush queue modifications, while the compaction lock (`compaction_lock`) serializes SSTable array updates during merge operations. The levels lock (`levels_lock`) implements reader-writer semantics, allowing multiple concurrent readers to traverse the SSTable hierarchy while ensuring exclusive access during level modifications. This design ensures that common-case operations (reads and writes) proceed without blocking while maintaining correctness during structural changes.
 
-Column families enable domain-specific optimization strategies within a single database instance. High-throughput write-heavy workloads can configure large memtable sizes and aggressive compression to maximize write batching and minimize disk I/O. Read-heavy workloads can enable bloom filters and block indices to accelerate lookups at the cost of additional storage overhead. Temporary or cache-like data can disable durability features (TDB_SYNC_NONE) and use minimal compression for maximum performance, while critical persistent data can enable full synchronous writes (TDB_SYNC_FULL) and strong compression for maximum reliability. This flexibility allows applications to co-locate diverse data types with different performance and durability requirements within a single storage engine instance, simplifying operational management while maintaining optimal performance characteristics for each data domain.
+Column families enable domain-specific optimization strategies within a single database instance. High-throughput write-heavy workloads can configure large memtable sizes and aggressive compression to maximize write batching and minimize disk I/O. Read-heavy workloads can enable bloom filters and block indices to accelerate lookups at the cost of additional storage overhead. Temporary or cache-like data can disable durability features (TDB_SYNC_NONE) and use minimal compression for maximum performance, production workloads can use periodic background syncing (TDB_SYNC_INTERVAL) with configurable sync intervals to balance performance and bounded data loss, while critical persistent data can enable full synchronous writes (TDB_SYNC_FULL) and strong compression for maximum reliability. The TDB_SYNC_INTERVAL mode is particularly valuable for production systems, allowing applications to configure acceptable data loss windows (e.g., 1 second) while maintaining high write throughput through a single shared background sync thread that monitors all interval-mode column families. This flexibility allows applications to co-locate diverse data types with different performance and durability requirements within a single storage engine instance, simplifying operational management while maintaining optimal performance characteristics for each data domain.
 
 ## 4. Core Components and Mechanisms
 ### 4.1 Memtable
@@ -164,7 +164,15 @@ position and block size, with boundary checking methods like `at_first()`,
 
 #### Sync Modes
 
-TDB_SYNC_NONE provides the fastest performance with no explicit fsync, relying on the OS page cache. TDB_SYNC_FULL offers the most durability by performing fsync/fdatasync after every block write. The sync mode is configurable per column family and set internally for column family WAL and SSTable files.
+TidesDB provides three sync modes to balance durability and performance:
+
+**TDB_SYNC_NONE** provides the fastest performance with no explicit fsync, relying entirely on the OS page cache for eventual persistence. This mode offers maximum throughput but provides no durability guarantees—data may be lost on crash.
+
+**TDB_SYNC_INTERVAL** offers balanced performance with periodic background syncing. A single background sync thread monitors all column families configured with interval mode, performing fsync at configurable microsecond intervals (e.g., every 1 second). This bounds potential data loss to the sync interval window while maintaining good write throughput. The background thread sleeps between sync cycles and wakes up to fsync all dirty file descriptors for interval-mode column families.
+
+**TDB_SYNC_FULL** offers maximum durability by performing fsync/fdatasync after every block write operation. This guarantees data persistence at the cost of write performance.
+
+Regardless of the configured sync mode, TidesDB always enforces fsync for structural operations (memtable flush, compaction, WAL rotation) to ensure database consistency. The sync mode is configurable per column family and applies to both WAL and SSTable files.
 
 #### Thread Safety
 
@@ -549,6 +557,25 @@ Single-CF transactions are atomic by virtue of WAL durability - either the entir
 **Isolation Guarantees**
 
 Read transactions don't block writers and writers don't block readers. Transactions support read-your-own-writes semantics, allowing uncommitted changes to be read before commit. Multi-CF transactions maintain consistent snapshots across all participating column families, with each CF's snapshot captured at transaction begin time. The API uses simple integer return codes (0 for success, negative for errors) rather than complex error structures.
+
+**Savepoints**
+
+TidesDB supports savepoints for partial rollback within transactions. Savepoints capture the transaction state at a specific point, allowing operations after the savepoint to be discarded without aborting the entire transaction. This enables complex multi-step operations with conditional rollback logic.
+
+Implementation · Savepoints are created via `tidesdb_txn_savepoint(txn, name)` and store a snapshot of the transaction's operation buffer at that point. Each savepoint maintains:
+
+1. **Operation snapshot** · A copy of all transaction operations (`txn->ops`) up to the savepoint
+2. **Column family snapshots** · References to the same CF snapshots as the parent transaction
+3. **Named storage** - Savepoints are stored in `txn->savepoints[]` with corresponding names in `txn->savepoint_names[]`
+
+When `tidesdb_txn_rollback_to_savepoint(txn, name)` is called, the system:
+
+1. Locates the savepoint by name in the transaction's savepoint array
+2. Frees all operations added after the savepoint (from `savepoint->num_ops` to `txn->num_ops`)
+3. Resets `txn->num_ops` to the savepoint's operation count
+4. Removes the savepoint and all savepoints created after it
+
+Savepoints can be updated by creating a new savepoint with the same name, which replaces the previous savepoint. Multiple savepoints can exist simultaneously, enabling nested rollback points. All savepoints are automatically freed when the transaction commits or rolls back. This mechanism is particularly useful for implementing complex business logic with conditional error handling, such as batch operations where individual failures should not abort the entire batch.
 
 ## 6. Compaction Policies
 
@@ -957,11 +984,19 @@ TidesDB supports multiple compression algorithms for SSTable data: Snappy emphas
 
 ### 7.3 Sync Modes
 
-TidesDB provides two sync modes to balance durability and performance. TDB_SYNC_NONE is fastest but least durable, relying on the OS to handle flushing to disk via page cache. TDB_SYNC_FULL is most durable, performing fsync on every write operation. The sync mode can be configured per column family, allowing different durability guarantees for different data types.
+TidesDB provides three sync modes to balance durability and performance:
+
+**TDB_SYNC_NONE** is fastest but least durable, relying entirely on the OS page cache to eventually flush data to disk. No explicit fsync calls are made for user data writes, maximizing throughput at the cost of potential data loss on system crash.
+
+**TDB_SYNC_INTERVAL** provides a balanced approach with periodic background syncing. This mode uses a single database-level background thread that monitors all column families configured with interval mode. The thread sleeps for the configured interval (specified in microseconds via `sync_interval_us`), then wakes up to perform fsync on all dirty file descriptors for interval-mode column families. This bounds potential data loss to at most one sync interval window while maintaining good write performance. For example, with a 1-second interval, at most 1 second of writes could be lost on crash.
+
+**TDB_SYNC_FULL** is most durable, performing fsync/fdatasync after every write operation. This guarantees immediate persistence of all writes but significantly impacts write throughput due to the synchronous nature of fsync.
+
+The sync mode can be configured per column family, allowing different durability guarantees for different data types. Critically, regardless of the configured sync mode, TidesDB always enforces fsync for structural operations including memtable flush to SSTable, SSTable compaction and merging, and WAL rotation. This two-tier durability strategy ensures database structural integrity while allowing flexible durability policies for user data.
 
 ### 7.4 Configurable Parameters
 
-TidesDB allows fine-tuning through various configurable parameters including memtable flush thresholds, skip list configuration (max level and probability), bloom filter usage and false positive rate, compression settings (algorithm selection), compaction trigger thresholds and thread count, sync mode (TDB_SYNC_NONE or TDB_SYNC_FULL), debug logging, succinct trie block index usage, and thread pool sizes (flush and compaction).
+TidesDB allows fine-tuning through various configurable parameters including memtable flush thresholds, skip list configuration (max level and probability), bloom filter usage and false positive rate, compression settings (algorithm selection), compaction trigger thresholds and thread count, sync mode (TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL), sync interval in microseconds (for TDB_SYNC_INTERVAL mode), debug logging, succinct trie block index usage, and thread pool sizes (flush and compaction).
 
 ### 7.5 Thread Pool Architecture
 
