@@ -918,12 +918,47 @@ This ensures the database structure remains consistent even if user data syncing
 
 ## Compaction
 
-**Manual compaction**
+TidesDB performs automatic background compaction when L0 reaches the configured threshold (default: 4 SSTables). However, you can manually trigger compaction for specific scenarios.
+
+### Manual Compaction
+
 ```c
-tidesdb_compact(cf);  /* Compact SSTables (requires minimum 2 SSTables) */
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+/* Trigger compaction manually */
+if (tidesdb_compact(cf) != 0)
+{
+    fprintf(stderr, "Failed to trigger compaction\n");
+    return -1;
+}
 ```
 
-See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on background compaction and parallel compaction.
+**When to use manual compaction**
+
+- **After bulk deletes** · Reclaim disk space by removing tombstones and obsolete versions
+- **After bulk updates** · Consolidate multiple versions of keys into single entries
+- **Before read-heavy workloads** · Optimize read performance by reducing the number of levels to search
+- **During maintenance windows** · Proactively compact during low-traffic periods to avoid compaction during peak load
+- **After TTL expiration** · Remove expired entries to reclaim storage
+- **Space optimization** · Force compaction to reduce space amplification when storage is constrained
+
+**Behavior**
+
+- Enqueues compaction work in the global compaction thread pool
+- Returns immediately (non-blocking) - compaction runs asynchronously in background threads
+- If compaction is already running for the column family, the call succeeds but doesn't queue duplicate work
+- Compaction merges SSTables across levels, removes tombstones, expired TTL entries, and obsolete versions
+- Thread-safe - can be called concurrently from multiple threads
+
+**Performance considerations**
+
+- Manual compaction uses the same thread pool as automatic background compaction
+- Configure thread pool size via `config.num_compaction_threads` (default: 2)
+- Compaction is I/O intensive - avoid triggering during peak write workloads
+- Multiple column families can compact in parallel up to the thread pool limit
+
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on compaction algorithms, merge strategies, and parallel compaction.
 
 ## Thread Pools
 
