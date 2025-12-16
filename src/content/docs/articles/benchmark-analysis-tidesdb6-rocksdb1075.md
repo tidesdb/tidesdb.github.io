@@ -29,6 +29,8 @@ This document presents extensive performance benchmarks comparing **TidesDB** an
 
 You can download the raw benchtool report <a href="/benchmark_results_tdb6_rdb1075_1.txt" download>here</a>
 
+You can find the **benchtool** source code <a href="https://github.com/tidesdb/benchtool" target="_blank">here</a> and run your own benchmarks!
+
 
 ## Executive Summary
 
@@ -420,3 +422,5 @@ The benchmarks demonstrate that TidesDB has evolved beyond a write-optimized mae
 TidesDB's most remarkable achievement is delivering 1.76x faster random reads than RocksDB while maintaining 3.28x faster sequential writes and using 1.9x less storage space. 
 
 The space efficiency alone—with databases 1.2x-6.1x smaller than RocksDB for identical data—represents substantial cost savings in cloud storage scenarios. At scale, this could translate to millions of dollars in reduced storage costs while simultaneously improving performance.
+
+Very excite ;)
