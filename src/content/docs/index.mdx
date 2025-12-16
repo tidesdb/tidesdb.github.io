@@ -44,7 +44,7 @@ import VersionBadge from '../../components/VersionBadge.astro';
 	<Card title="LSM-Tree Architecture" icon="seti:db" style="--card-index: 2">
 		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance.
 	</Card>
-	<Card title="Linear scalability" icon="seti:db" style="--card-index: 3">
+	<Card title="Near Linear Scalability" icon="seti:db" style="--card-index: 3">
 		The engine is designed for maximum scalability within the constraints of ACID guarantees.
 	</Card>
 </CardGrid>
@@ -53,8 +53,8 @@ import VersionBadge from '../../components/VersionBadge.astro';
 	<Card title="Flexible Compression" icon="puzzle" style="--card-index: 3">
 		Support for Snappy, LZ4, and ZSTD compression algorithms. Configure per column family for optimal storage efficiency.
 	</Card>
-	<Card title="Background Or Manual Compaction" icon="random" style="--card-index: 4">
-		Reduces SSTable count and removes expired/deleted keys without blocking column family operations.
+	<Card title="Space efficient" icon="random" style="--card-index: 4">
+		TidesDB is highly optimized for space efficiency comparing to leading engines like RocksDB.
 	</Card>
 	<Card title="Cross-Platform & Portable" icon="laptop" style="--card-index: 5">
 		Native support for 32-bit and 64-bit Linux, macOS, and Windows with platform abstraction layer for consistent behavior.  Storage files are portable across platforms and architectures.
