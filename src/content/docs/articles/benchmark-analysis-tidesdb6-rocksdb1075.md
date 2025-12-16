@@ -27,15 +27,14 @@ This document presents extensive performance benchmarks comparing **TidesDB** an
 - **Key Size** · 16 bytes (unless specified)
 - **Value Size** · 100 bytes (unless specified)
 
-You can download the raw benchtool report <a href="/benchmark_results_tdb6_rdb1075_1.txt" download>Download</a>
+You can download the raw benchtool report <a href="/benchmark_results_tdb6_rdb1075_1.txt" download>here</a>
 
 
 ## Executive Summary
 
 This study presents a comprehensive performance comparison between TidesDB v6.0.0 and RocksDB across multiple workload patterns, batch sizes, and data characteristics. Testing encompasses 10 distinct benchmark categories with varying operational patterns, revealing significant performance differentials that illuminate the architectural trade-offs between these storage engines.
 
-Key findings indicate TidesDB demonstrates superior write throughput (1.32x to 3.28x faster) and substantially better space efficiency across most workloads. Most remarkably, TidesDB now shows competitive read performance, achieving 1.76x faster random reads than RocksDB—a dramatic shift suggesting significant architectural improvements. The results indicate TidesDB has evolved into a more balanced storage engine that excels in both write-heavy and read-intensive scenarios while maintaining exceptional space efficiency.
-
+Key findings indicate TidesDB demonstrates superior write throughput (1.32x to 3.28x faster) and substantially better space efficiency across most workloads. Most remarkably, TidesDB shows competitive read performance, achieving 1.76x faster random reads than RocksDB. 
 ## 1. Sequential Write Performance
 
 Sequential write operations represent an idealized scenario where keys are inserted in order, minimizing internal reorganization overhead.
@@ -54,7 +53,7 @@ Sequential write operations represent an idealized scenario where keys are inser
 
 ### Analysis
 
-TidesDB's performance advantage in sequential writes is extraordinary, achieving more than triple RocksDB's throughput at 6.18M ops/sec versus 1.88M ops/sec. This represents a substantial improvement over previous benchmarks. The 1.9x reduction in database size demonstrates TidesDB's superior space efficiency through aggressive compression or more efficient data structures. 
+TidesDB's performance advantage in sequential writes is extraordinary, achieving more than triple RocksDB's throughput at 6.18M ops/sec versus 1.88M ops/sec.
 
 Write amplification strongly favors TidesDB at 1.08x versus 1.44x—a 25% reduction indicating significantly less internal data movement during compaction and flushing operations. This low write amplification is crucial for SSD longevity and overall I/O efficiency.
 
@@ -99,7 +98,7 @@ Read performance is critical for many database workloads, particularly those inv
 
 ### Analysis
 
-This benchmark reveals a dramatic shift from previous results. TidesDB now demonstrates superior read performance, achieving 2.55M ops/sec versus RocksDB's 1.45M ops/sec—a 76% advantage. This represents a complete reversal from earlier benchmarks where RocksDB held a 5.68x read advantage, suggesting significant architectural improvements in TidesDB's read path.
+TidesDB demonstrates superior read performance, achieving 2.55M ops/sec versus RocksDB's 1.45M ops/sec—a 76% advantage. This represents a complete reversal from earlier benchmarks where RocksDB held a 5.68x read advantage.
 
 The latency characteristics are particularly impressive: TidesDB achieves 3 μs median latency versus RocksDB's 5 μs (1.7x lower), and at the P99 percentile, TidesDB's 5 μs versus RocksDB's 13 μs represents a 2.6x advantage. These microsecond-level latencies indicate highly efficient index structures and cache utilization.
 
@@ -126,7 +125,7 @@ Real-world applications typically exhibit mixed access patterns. This test split
 
 Under mixed workloads, TidesDB demonstrates balanced performance advantages across both operations. The 16% write advantage (2.16M vs 1.87M ops/sec) and 4% read advantage (1.45M vs 1.39M ops/sec) indicate TidesDB has evolved into a well-rounded storage engine without significant trade-offs.
 
-The read latency parity at 5 μs median is particularly noteworthy—TidesDB now matches RocksDB's read latency while maintaining superior write performance. This represents a significant architectural achievement.
+The read latency parity at 5 μs median is particularly noteworthy—TidesDB matches RocksDB's read latency while maintaining superior write performance. 
 
 The 1.8x difference in database size (43.86 MB vs 78.19 MB for identical data) demonstrates TidesDB's exceptional space efficiency, which translates to significant storage cost savings at scale. The 13% lower write amplification (1.09x vs 1.25x) further confirms TidesDB's efficiency advantages.
 
@@ -344,7 +343,7 @@ The benchmark results reveal TidesDB has evolved into a balanced, high-performan
 
 2. **Superior Compression/Space Efficiency** · Database sizes 1.2x-6.1x smaller than RocksDB indicate either superior compression algorithms or highly efficient structural organization. The dramatic space savings in Zipfian workloads (6.1x smaller) suggest excellent update-in-place or deduplication strategies.
 
-3. **Balanced Read/Write Optimization** · Unlike typical LSM-tree implementations that sacrifice read performance for write throughput, TidesDB achieves both excellent write performance (1.5x-3.3x faster) and competitive-to-superior read performance (1.04x-1.80x faster). This suggests architectural innovations beyond traditional LSM-tree designs.
+3. **Balanced Read/Write Optimization** · Unlike typical LSM-tree implementations that sacrifice read performance for write throughput, TidesDB achieves both excellent write performance (1.5x-3.3x faster) and competitive-to-superior read performance (1.04x-1.80x faster). 
 
 4. **Efficient Index Structures** · The 3 μs median read latency with 2.55M ops/sec throughput indicates highly optimized index structures, likely with sophisticated caching layers that accelerate point lookups without sacrificing write performance.
 
@@ -473,7 +472,7 @@ This comprehensive benchmark suite reveals that TidesDB v6.0.0 represents a sign
 
 The benchmarks demonstrate that TidesDB has evolved beyond a write-optimized specialist into a truly balanced, high-performance storage engine. It achieves exceptional write throughput while simultaneously delivering competitive-to-superior read performance—a combination that positions it as a compelling choice for modern applications.
 
-TidesDB's most remarkable achievement is delivering 1.76x faster random reads than RocksDB while maintaining 3.28x faster sequential writes and using 1.9x less storage space. This combination of advantages across multiple dimensions suggests architectural innovations beyond traditional LSM-tree designs.
+TidesDB's most remarkable achievement is delivering 1.76x faster random reads than RocksDB while maintaining 3.28x faster sequential writes and using 1.9x less storage space. 
 
 The space efficiency alone—with databases 1.2x-6.1x smaller than RocksDB for identical data—represents substantial cost savings in cloud storage scenarios. At scale, this could translate to millions of dollars in reduced storage costs while simultaneously improving performance.
 
