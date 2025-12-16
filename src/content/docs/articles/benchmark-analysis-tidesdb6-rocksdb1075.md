@@ -27,7 +27,7 @@ This document presents extensive performance benchmarks comparing **TidesDB** an
 - **Key Size** · 16 bytes (unless specified)
 - **Value Size** · 100 bytes (unless specified)
 
-You can download the raw benchtool report <a href="/benchmark_results_tdb6_rdb1075_1.txt" download>Download My PDF</a>
+You can download the raw benchtool report <a href="/benchmark_results_tdb6_rdb1075_1.txt" download>Download</a>
 
 
 ## Executive Summary
