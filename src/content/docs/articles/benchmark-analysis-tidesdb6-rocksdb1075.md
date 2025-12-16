@@ -46,13 +46,13 @@ Sequential write operations represent an idealized scenario where keys are inser
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Throughput** | 6,175,813 ops/sec | 1,881,405 ops/sec | **TidesDB 3.28x** |
-| **Duration** | 1.619 seconds | 5.315 seconds | **TidesDB 3.28x faster** |
-| **Median Latency** | 966 μs | 2,661 μs | **TidesDB 2.8x lower** |
-| **P99 Latency** | 5,715 μs | 9,195 μs | **TidesDB 1.6x lower** |
-| **Write Amplification** | 1.08x | 1.44x | **TidesDB 25% lower** |
-| **Database Size** | 110.65 MB | 210.00 MB | **TidesDB 1.9x smaller** |
-| **Peak Memory** | 2,483 MB | 2,737 MB | **TidesDB 9% lower** |
+| **Throughput** | 6,175,813 ops/sec | 1,881,405 ops/sec | <span style="color: green;">**TidesDB 3.28x**</span> |
+| **Duration** | 1.619 seconds | 5.315 seconds | <span style="color: green;">**TidesDB 3.28x faster**</span> |
+| **Median Latency** | 966 μs | 2,661 μs | <span style="color: green;">**TidesDB 2.8x lower**</span> |
+| **P99 Latency** | 5,715 μs | 9,195 μs | <span style="color: green;">**TidesDB 1.6x lower**</span> |
+| **Write Amplification** | 1.08x | 1.44x | <span style="color: green;">**TidesDB 25% lower**</span> |
+| **Database Size** | 110.65 MB | 210.00 MB | <span style="color: green;">**TidesDB 1.9x smaller**</span> |
+| **Peak Memory** | 2,483 MB | 2,737 MB | <span style="color: orange;">**TidesDB 9% lower**</span> |
 
 ### Analysis
 
@@ -70,12 +70,12 @@ Random writes stress the storage engine's ability to handle dispersed key insert
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Throughput** | 2,591,250 ops/sec | 1,702,747 ops/sec | **TidesDB 1.52x** |
-| **Duration** | 3.859 seconds | 5.873 seconds | **TidesDB 1.52x faster** |
-| **Median Latency** | 2,831 μs | 4,696 μs | **TidesDB 1.7x lower** |
-| **P99 Latency** | 8,389 μs | 12,071 μs | **TidesDB 1.4x lower** |
-| **Write Amplification** | 1.12x | 1.33x | **TidesDB 16% lower** |
-| **Database Size** | 89.75 MB | 113.17 MB | **TidesDB 1.3x smaller** |
+| **Throughput** | 2,591,250 ops/sec | 1,702,747 ops/sec | <span style="color: green;">**TidesDB 1.52x**</span> |
+| **Duration** | 3.859 seconds | 5.873 seconds | <span style="color: green;">**TidesDB 1.52x faster**</span> |
+| **Median Latency** | 2,831 μs | 4,696 μs | <span style="color: green;">**TidesDB 1.7x lower**</span> |
+| **P99 Latency** | 8,389 μs | 12,071 μs | <span style="color: green;">**TidesDB 1.4x lower**</span> |
+| **Write Amplification** | 1.12x | 1.33x | <span style="color: green;">**TidesDB 16% lower**</span> |
+| **Database Size** | 89.75 MB | 113.17 MB | <span style="color: green;">**TidesDB 1.3x smaller**</span> |
 
 ### Analysis
 
@@ -93,11 +93,11 @@ Read performance is critical for many database workloads, particularly those inv
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Throughput** | 2,554,727 ops/sec | 1,448,474 ops/sec | **TidesDB 1.76x** |
-| **Duration** | 3.914 seconds | 6.904 seconds | **TidesDB 1.76x faster** |
-| **Median Latency** | 3 μs | 5 μs | **TidesDB 1.7x lower** |
-| **P99 Latency** | 5 μs | 13 μs | **TidesDB 2.6x lower** |
-| **Peak Memory** | 1,722 MB | 332 MB | **RocksDB 5.2x lower** |
+| **Throughput** | 2,554,727 ops/sec | 1,448,474 ops/sec | <span style="color: green;">**TidesDB 1.76x**</span> |
+| **Duration** | 3.914 seconds | 6.904 seconds | <span style="color: green;">**TidesDB 1.76x faster**</span> |
+| **Median Latency** | 3 μs | 5 μs | <span style="color: green;">**TidesDB 1.7x lower**</span> |
+| **P99 Latency** | 5 μs | 13 μs | <span style="color: green;">**TidesDB 2.6x lower**</span> |
+| **Peak Memory** | 1,722 MB | 332 MB | <span style="color: red;">**RocksDB 5.2x lower**</span> |
 
 ### Analysis
 
@@ -117,12 +117,12 @@ Real-world applications typically exhibit mixed access patterns. This test split
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Write Throughput** | 2,162,367 ops/sec | 1,865,053 ops/sec | **TidesDB 1.16x** |
-| **Read Throughput** | 1,450,517 ops/sec | 1,391,479 ops/sec | **TidesDB 1.04x** |
-| **Write P50 Latency** | 3,084 μs | 3,917 μs | **TidesDB 1.3x lower** |
-| **Read P50 Latency** | 5 μs | 5 μs | **Tied** |
-| **Write Amplification** | 1.09x | 1.25x | **TidesDB 13% lower** |
-| **Database Size** | 43.86 MB | 78.19 MB | **TidesDB 1.8x smaller** |
+| **Write Throughput** | 2,162,367 ops/sec | 1,865,053 ops/sec | <span style="color: green;">**TidesDB 1.16x**</span> |
+| **Read Throughput** | 1,450,517 ops/sec | 1,391,479 ops/sec | <span style="color: green;">**TidesDB 1.04x**</span> |
+| **Write P50 Latency** | 3,084 μs | 3,917 μs | <span style="color: green;">**TidesDB 1.3x lower**</span> |
+| **Read P50 Latency** | 5 μs | 5 μs | <span style="color: orange;">**Tied**</span> |
+| **Write Amplification** | 1.09x | 1.25x | <span style="color: green;">**TidesDB 13% lower**</span> |
+| **Database Size** | 43.86 MB | 78.19 MB | <span style="color: green;">**TidesDB 1.8x smaller**</span> |
 
 ### Analysis
 
@@ -140,20 +140,20 @@ Many real-world applications exhibit skewed access patterns where certain keys a
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Throughput** | 2,930,965 ops/sec | 1,481,711 ops/sec | **TidesDB 1.98x** |
-| **Duration** | 1.706 seconds | 3.375 seconds | **TidesDB 1.98x faster** |
-| **Median Latency** | 2,421 μs | 3,384 μs | **TidesDB 1.4x lower** |
-| **Database Size** | 10.10 MB | 61.81 MB | **TidesDB 6.1x smaller** |
-| **Unique Keys** | 648,493 | 656,857 | Similar |
+| **Throughput** | 2,930,965 ops/sec | 1,481,711 ops/sec | <span style="color: green;">**TidesDB 1.98x**</span> |
+| **Duration** | 1.706 seconds | 3.375 seconds | <span style="color: green;">**TidesDB 1.98x faster**</span> |
+| **Median Latency** | 2,421 μs | 3,384 μs | <span style="color: green;">**TidesDB 1.4x lower**</span> |
+| **Database Size** | 10.10 MB | 61.81 MB | <span style="color: green;">**TidesDB 6.1x smaller**</span> |
+| **Unique Keys** | 648,493 | 656,857 | <span style="color: orange;">**Similar**</span> |
 
 ### Mixed Zipfian Results
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Write Throughput** | 2,944,365 ops/sec | 1,480,623 ops/sec | **TidesDB 1.99x** |
-| **Read Throughput** | 2,725,468 ops/sec | 1,515,970 ops/sec | **TidesDB 1.80x** |
-| **Read P50 Latency** | 2 μs | 3 μs | **TidesDB 1.5x lower** |
-| **Database Size** | 10.15 MB | 56.25 MB | **TidesDB 5.5x smaller** |
+| **Write Throughput** | 2,944,365 ops/sec | 1,480,623 ops/sec | <span style="color: green;">**TidesDB 1.99x**</span> |
+| **Read Throughput** | 2,725,468 ops/sec | 1,515,970 ops/sec | <span style="color: green;">**TidesDB 1.80x**</span> |
+| **Read P50 Latency** | 2 μs | 3 μs | <span style="color: green;">**TidesDB 1.5x lower**</span> |
+| **Database Size** | 10.15 MB | 56.25 MB | <span style="color: green;">**TidesDB 5.5x smaller**</span> |
 
 ### Analysis
 
@@ -173,11 +173,11 @@ Deletion efficiency impacts applications with high turnover rates, such as cachi
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Throughput** | 3,805,864 ops/sec | 3,466,101 ops/sec | **TidesDB 1.10x** |
-| **Duration** | 1.314 seconds | 1.443 seconds | **TidesDB 1.10x faster** |
-| **Median Latency** | 1,930 μs | 2,357 μs | **TidesDB 1.2x lower** |
-| **Write Amplification** | 0.18x | 0.28x | **TidesDB 36% lower** |
-| **Final Database Size** | 0.00 MB | 63.77 MB | **TidesDB complete** |
+| **Throughput** | 3,805,864 ops/sec | 3,466,101 ops/sec | <span style="color: green;">**TidesDB 1.10x**</span> |
+| **Duration** | 1.314 seconds | 1.443 seconds | <span style="color: green;">**TidesDB 1.10x faster**</span> |
+| **Median Latency** | 1,930 μs | 2,357 μs | <span style="color: green;">**TidesDB 1.2x lower**</span> |
+| **Write Amplification** | 0.18x | 0.28x | <span style="color: green;">**TidesDB 36% lower**</span> |
+| **Final Database Size** | 0.00 MB | 63.77 MB | <span style="color: green;">**TidesDB complete**</span> |
 
 ### Analysis
 
@@ -195,12 +195,12 @@ Many applications store larger values (documents, images, serialized objects). T
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Throughput** | 318,774 ops/sec | 142,718 ops/sec | **TidesDB 2.23x** |
-| **Duration** | 3.137 seconds | 7.006 seconds | **TidesDB 2.23x faster** |
-| **Median Latency** | 22,563 μs | 35,069 μs | **TidesDB 1.6x lower** |
-| **Write Amplification** | 1.05x | 1.21x | **TidesDB 13% lower** |
-| **Database Size** | 302.33 MB | 348.24 MB | **TidesDB 1.2x smaller** |
-| **Peak Memory** | 4,230 MB | 4,241 MB | Similar |
+| **Throughput** | 318,774 ops/sec | 142,718 ops/sec | <span style="color: green;">**TidesDB 2.23x**</span> |
+| **Duration** | 3.137 seconds | 7.006 seconds | <span style="color: green;">**TidesDB 2.23x faster**</span> |
+| **Median Latency** | 22,563 μs | 35,069 μs | <span style="color: green;">**TidesDB 1.6x lower**</span> |
+| **Write Amplification** | 1.05x | 1.21x | <span style="color: green;">**TidesDB 13% lower**</span> |
+| **Database Size** | 302.33 MB | 348.24 MB | <span style="color: green;">**TidesDB 1.2x smaller**</span> |
+| **Peak Memory** | 4,230 MB | 4,241 MB | <span style="color: orange;">**Similar**</span> |
 
 ### Analysis
 
@@ -220,11 +220,11 @@ The converse scenario tests tiny 64-byte values with 16-byte keys—common in ke
 
 | Metric | TidesDB | RocksDB | Advantage |
 |--------|---------|---------|-----------|
-| **Throughput** | 1,470,133 ops/sec | 1,210,920 ops/sec | **TidesDB 1.21x** |
-| **Duration** | 34.011 seconds | 41.285 seconds | **TidesDB 1.21x faster** |
-| **Median Latency** | 4,265 μs | 5,521 μs | **TidesDB 1.3x lower** |
-| **Write Amplification** | 1.24x | 1.50x | **TidesDB 17% lower** |
-| **Database Size** | 520.86 MB | 444.23 MB | **RocksDB 1.2x smaller** |
+| **Throughput** | 1,470,133 ops/sec | 1,210,920 ops/sec | <span style="color: green;">**TidesDB 1.21x**</span> |
+| **Duration** | 34.011 seconds | 41.285 seconds | <span style="color: green;">**TidesDB 1.21x faster**</span> |
+| **Median Latency** | 4,265 μs | 5,521 μs | <span style="color: green;">**TidesDB 1.3x lower**</span> |
+| **Write Amplification** | 1.24x | 1.50x | <span style="color: green;">**TidesDB 17% lower**</span> |
+| **Database Size** | 520.86 MB | 444.23 MB | <span style="color: yellow;">**RocksDB 1.2x smaller**</span> |
 
 ### Analysis
 
@@ -242,11 +242,11 @@ Batch size significantly impacts throughput by amortizing synchronization and I/
 
 | Batch Size | TidesDB Throughput | RocksDB Throughput | TidesDB Advantage |
 |------------|-------------------|-------------------|-------------------|
-| **1** | 1,607,817 ops/sec | 862,733 ops/sec | **1.86x** |
-| **10** | 2,615,187 ops/sec | 1,590,117 ops/sec | **1.64x** |
-| **100** | 2,816,615 ops/sec | 1,998,387 ops/sec | **1.41x** |
-| **1,000** | 2,457,959 ops/sec | 1,863,018 ops/sec | **1.32x** |
-| **10,000** | 658,860 ops/sec | 1,334,696 ops/sec | **0.49x (RocksDB wins)** |
+| **1** | 1,607,817 ops/sec | 862,733 ops/sec | <span style="color: green;">**1.86x**</span> |
+| **10** | 2,615,187 ops/sec | 1,590,117 ops/sec | <span style="color: green;">**1.64x**</span> |
+| **100** | 2,816,615 ops/sec | 1,998,387 ops/sec | <span style="color: orange;">**1.41x**</span> |
+| **1,000** | 2,457,959 ops/sec | 1,863,018 ops/sec | <span style="color: yellow;">**1.32x**</span> |
+| **10,000** | 658,860 ops/sec | 1,334,696 ops/sec | <span style="color: red;">**0.49x (RocksDB wins)**</span> |
 
 ### Analysis
 
@@ -266,11 +266,11 @@ The batch size analysis reveals non-linear performance characteristics with dist
 
 | Batch Size | TidesDB P50 | RocksDB P50 | Pattern |
 |------------|-------------|-------------|---------|
-| 1 | 2 μs | 3 μs | Individual operation latency |
-| 10 | 23 μs | 31 μs | ~10x increase (expected amortization) |
-| 100 | 213 μs | 300 μs | ~100x increase (linear scaling) |
-| 1,000 | 2,725 μs | 4,022 μs | ~1000x increase (linear) |
-| 10,000 | 66,285 μs | 60,819 μs | Non-linear (saturation) |
+| 1 | 2 μs | 3 μs | <span style="color: green;">Individual operation latency</span> |
+| 10 | 23 μs | 31 μs | <span style="color: green;">~10x increase (expected amortization)</span> |
+| 100 | 213 μs | 300 μs | <span style="color: green;">~100x increase (linear scaling)</span> |
+| 1,000 | 2,725 μs | 4,022 μs | <span style="color: orange;">~1000x increase (linear)</span> |
+| 10,000 | 66,285 μs | 60,819 μs | <span style="color: red;">Non-linear (saturation)</span> |
 
 The near-linear relationship between batch size and latency (up to 1,000) confirms expected behavior: larger batches trade latency for throughput. The breakdown at 10,000 suggests internal buffer or lock contention limits, where TidesDB's latency increases disproportionately.
 
@@ -282,9 +282,9 @@ Delete operations show different scaling characteristics than writes, revealing 
 
 | Batch Size | TidesDB Throughput | RocksDB Throughput | TidesDB Advantage |
 |------------|-------------------|-------------------|-------------------|
-| **1** | 2,802,092 ops/sec | 944,562 ops/sec | **2.97x** |
-| **100** | 3,756,625 ops/sec | 2,530,955 ops/sec | **1.48x** |
-| **1,000** | 2,982,304 ops/sec | 3,000,642 ops/sec | **1.00x (tied)** |
+| **1** | 2,802,092 ops/sec | 944,562 ops/sec | <span style="color: green;">**2.97x**</span> |
+| **100** | 3,756,625 ops/sec | 2,530,955 ops/sec | <span style="color: orange;">**1.48x**</span> |
+| **1,000** | 2,982,304 ops/sec | 3,000,642 ops/sec | <span style="color: orange;">**1.00x (tied)**</span> |
 
 ### Analysis
 
@@ -306,35 +306,35 @@ Delete operations exhibit distinct batch size sensitivity patterns:
 
 | Workload Type | Winner | Magnitude | Key Insight |
 |---------------|--------|-----------|-------------|
-| Sequential Write | TidesDB | 3.28x | Exceptional sequential insertion |
-| Random Write | TidesDB | 1.52x | Strong performance under disorder |
-| Random Read | TidesDB | 1.76x | Dramatic architectural improvement |
-| Mixed (50/50) | TidesDB | 1.16x write / 1.04x read | Balanced performance |
-| Zipfian Write | TidesDB | 1.98x | Excellent hot-key handling |
-| Zipfian Mixed | TidesDB | 1.99x write / 1.80x read | Superior cache utilization |
-| Delete | TidesDB | 1.10x | Efficient tombstone management |
-| Large Value | TidesDB | 2.23x | Scales well with size |
-| Small Value | TidesDB | 1.21x | Consistent advantage |
+| Sequential Write | TidesDB | <span style="color: green;">3.28x</span> | Exceptional sequential insertion |
+| Random Write | TidesDB | <span style="color: green;">1.52x</span> | Strong performance under disorder |
+| Random Read | TidesDB | <span style="color: green;">1.76x</span> | Dramatic architectural improvement |
+| Mixed (50/50) | TidesDB | <span style="color: orange;">1.16x write / 1.04x read</span> | Balanced performance |
+| Zipfian Write | TidesDB | <span style="color: green;">1.98x</span> | Excellent hot-key handling |
+| Zipfian Mixed | TidesDB | <span style="color: green;">1.99x write / 1.80x read</span> | Superior cache utilization |
+| Delete | TidesDB | <span style="color: orange;">1.10x</span> | Efficient tombstone management |
+| Large Value | TidesDB | <span style="color: green;">2.23x</span> | Scales well with size |
+| Small Value | TidesDB | <span style="color: orange;">1.21x</span> | Consistent advantage |
 
 ### Resource Efficiency Summary
 
 | Metric | TidesDB Average | RocksDB Average | Winner |
 |--------|-----------------|-----------------|--------|
-| **Write Amplification** | 1.11x | 1.33x | **TidesDB (17% lower)** |
-| **Space Amplification** | 0.09x | 0.12x | **TidesDB (25% lower)** |
-| **Database Size** | Consistently smaller | Baseline | **TidesDB (1.2x-6.1x smaller)** |
-| **Memory Usage (Writes)** | 2.5-11.6 GB | 2.7-11.6 GB | **TidesDB (slightly lower)** |
-| **Memory Usage (Reads)** | 1.7 GB | 0.3 GB | **RocksDB (5.2x lower)** |
+| **Write Amplification** | 1.11x | 1.33x | <span style="color: orange;">**TidesDB (17% lower)**</span> |
+| **Space Amplification** | 0.09x | 0.12x | <span style="color: orange;">**TidesDB (25% lower)**</span> |
+| **Database Size** | Consistently smaller | Baseline | <span style="color: green;">**TidesDB (1.2x-6.1x smaller)**</span> |
+| **Memory Usage (Writes)** | 2.5-11.6 GB | 2.7-11.6 GB | <span style="color: orange;">**TidesDB (slightly lower)**</span> |
+| **Memory Usage (Reads)** | 1.7 GB | 0.3 GB | <span style="color: red;">**RocksDB (5.2x lower)**</span> |
 
 ### Latency Characteristics
 
 | Percentile | Operation | TidesDB | RocksDB | Winner |
 |------------|-----------|---------|---------|--------|
-| **P50** | Random Write | 2,831 μs | 4,696 μs | TidesDB (1.7x lower) |
-| **P50** | Random Read | 3 μs | 5 μs | TidesDB (1.7x lower) |
-| **P50** | Zipfian Read | 2 μs | 3 μs | TidesDB (1.5x lower) |
-| **P99** | Random Write | 8,389 μs | 12,071 μs | TidesDB (1.4x lower) |
-| **P99** | Random Read | 5 μs | 13 μs | TidesDB (2.6x lower) |
+| **P50** | Random Write | 2,831 μs | 4,696 μs | <span style="color: green;">TidesDB (1.7x lower)</span> |
+| **P50** | Random Read | 3 μs | 5 μs | <span style="color: green;">TidesDB (1.7x lower)</span> |
+| **P50** | Zipfian Read | 2 μs | 3 μs | <span style="color: green;">TidesDB (1.5x lower)</span> |
+| **P99** | Random Write | 8,389 μs | 12,071 μs | <span style="color: orange;">TidesDB (1.4x lower)</span> |
+| **P99** | Random Read | 5 μs | 13 μs | <span style="color: green;">TidesDB (2.6x lower)</span> |
 
 ## Architectural Implications
 
