@@ -30,11 +30,12 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_IO` | `-4` | I/O operation failed (file read/write error) |
 | `TDB_ERR_CORRUPTION` | `-5` | Data corruption detected (checksum failure, invalid format version, truncated data) |
 | `TDB_ERR_EXISTS` | `-6` | Resource already exists (e.g., column family name collision) |
-| `TDB_ERR_LOCK` | `-7` | Lock acquisition failed |
-| `TDB_ERR_CONFLICT` | `-8` | Transaction conflict detected (write-write or read-write conflict in SERIALIZABLE/SNAPSHOT isolation) |
-| `TDB_ERR_OVERFLOW` | `-9` | Numeric overflow or buffer overflow |
-| `TDB_ERR_TOO_LARGE` | `-10` | Key or value size exceeds maximum allowed size |
-| `TDB_ERR_MEMORY_LIMIT` | `-11` | Operation would exceed memory limits (safety check to prevent OOM) |
+| `TDB_ERR_CONFLICT` | `-7` | Transaction conflict detected (write-write or read-write conflict in SERIALIZABLE/SNAPSHOT isolation) |
+| `TDB_ERR_OVERFLOW` | `-8` | Numeric overflow or buffer overflow |
+| `TDB_ERR_TOO_LARGE` | `-9` | Key or value size exceeds maximum allowed size |
+| `TDB_ERR_MEMORY_LIMIT` | `-10` | Operation would exceed memory limits (safety check to prevent OOM) |
+| `TDB_ERR_INVALID_DB` | `-11` | Database handle is invalid (e.g., after close) |
+| `TDB_ERR_UNKNOWN` | `-12` | Unknown or unspecified error |
 
 **Error categories**
 - `TDB_ERR_CORRUPTION` indicates data integrity issues requiring immediate attention
@@ -56,8 +57,8 @@ if (result != TDB_SUCCESS)
         case TDB_ERR_INVALID_ARGS:
             fprintf(stderr, "invalid arguments\n");
             break;
-        case TDB_ERR_READONLY:
-            fprintf(stderr, "cannot write to read-only transaction\n");
+        case TDB_ERR_CONFLICT:
+            fprintf(stderr, "transaction conflict detected\n");
             break;
         default:
             fprintf(stderr, "operation failed with error code: %d\n", result);
@@ -74,11 +75,11 @@ if (result != TDB_SUCCESS)
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .enable_debug_logging = 0,         /* Enable debug logging (default: 0) */
-    .num_flush_threads = 2,            /* Flush thread pool size (default: 2) */
-    .num_compaction_threads = 2,       /* Compaction thread pool size (default: 2) */
+    .num_flush_threads = 2,                /* Flush thread pool size (default: 2) */
+    .num_compaction_threads = 2,           /* Compaction thread pool size (default: 2) */
+    .log_level = TDB_LOG_INFO,             /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 0 = disabled) */
-    .max_open_sstables = 100           /* Max cached SSTable structures (default: 100) */
+    .max_open_sstables = 100,              /* Max cached SSTable structures (default: 100) */
 };
 
 tidesdb_t *db = NULL;
@@ -93,43 +94,52 @@ if (tidesdb_close(db) != 0)
 }
 ```
 
-### Debug Logging
+### Logging
 
-TidesDB provides runtime debug logging that can be enabled/disabled dynamically.
+TidesDB provides structured logging with multiple severity levels.
 
-**Enable at startup**
+**Log Levels**
+- `TDB_LOG_DEBUG` - Detailed diagnostic information
+- `TDB_LOG_INFO` - General informational messages (default)
+- `TDB_LOG_WARN` - Warning messages for potential issues
+- `TDB_LOG_ERROR` - Error messages for failures
+- `TDB_LOG_FATAL` - Critical errors that may cause shutdown
+- `TDB_LOG_NONE` - Disable all logging
+
+**Configure at startup**
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .enable_debug_logging = 1  
+    .log_level = TDB_LOG_DEBUG  /* Enable debug logging */
 };
 
 tidesdb_t *db = NULL;
 tidesdb_open(&config, &db);
 ```
 
-**Enable/disable at runtime**
+**Production configuration**
 ```c
-extern int _tidesdb_debug_enabled;  /* Global debug flag */
-
-/* Enable debug logging */
-_tidesdb_debug_enabled = 1;
-
-/* Your operations here -- debug logs will be written to stderr */
-
-/* Disable debug logging */
-_tidesdb_debug_enabled = 0;
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .log_level = TDB_LOG_WARN  /* Only warnings and errors */
+};
 ```
 
-**Output**
-Debug logs are written to **stderr** with the format
+**Output format**
+Logs are written to **stderr** with timestamps:
 ```
-[TidesDB DEBUG] filename:line: message
+[HH:MM:SS.mmm] [LEVEL] filename:line: message
+```
+
+**Example output**
+```
+[22:58:00.454] [INFO] tidesdb.c:9322: Opening TidesDB with path=./mydb
+[22:58:00.456] [INFO] tidesdb.c:9478: Block clock cache created with max_bytes=64.00 MB
 ```
 
 **Redirect to file**
 ```bash
-./your_program 2> tidesdb_debug.log  # Redirect stderr to file
+./your_program 2> tidesdb.log  # Redirect stderr to file
 ```
 
 ## Column Family Operations
@@ -160,7 +170,7 @@ tidesdb_column_family_config_t cf_config = {
     .compression_algorithm = COMPRESS_LZ4,      /* LZ4, SNAPPY, or ZSTD */
     .enable_bloom_filter = 1,                   /* Enable bloom filters */
     .bloom_fpr = 0.01,                          /* 1% false positive rate */
-    .enable_block_indexes = 1,                  /* Enable succinct trie block indexes */
+    .enable_block_indexes = 1,                  /* Enable compact block indexes */
     .index_sample_ratio = 16,                   /* Sample 1 in 16 keys for index (default: 16) */
     .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
     .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
@@ -179,7 +189,8 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 
 **Using custom comparator**
 ```c
-tidesdb_register_comparator("reverse", my_reverse_compare);
+/* Register comparator after opening database but before creating CF */
+tidesdb_register_comparator(db, "reverse", my_reverse_compare, NULL, NULL);
 
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 strncpy(cf_config.comparator_name, "reverse", TDB_MAX_COMPARATOR_NAME - 1);  
@@ -689,11 +700,11 @@ TidesDB provides seek operations that allow you to position an iterator at a spe
 **How Seek Works**
 
 **With Block Indexes Enabled** (`enable_block_indexes = 1`):
-- Uses succinct trie to find the predecessor block (largest indexed key <= target)
-- The trie samples keys at a configurable ratio (default 1:16 via `index_sample_ratio`)
-- Jumps directly to the target block using the block index
+- Uses compact block index with parallel arrays (min/max key prefixes and file positions)
+- Binary search through sampled keys at configurable ratio (default 1:16 via `index_sample_ratio`)
+- Jumps directly to the target block using the file position
 - Scans forward from that block to find the exact key
-- **Performance** · O(log n) block lookup + O(k) entries per block scan
+- **Performance** · O(log n) binary search + O(k) entries per block scan
 
 **Without Block Indexes** (`enable_block_indexes = 0`):
 - Starts from the first klog block
@@ -701,10 +712,10 @@ TidesDB provides seek operations that allow you to position an iterator at a spe
 - **Performance** · O(n) blocks × O(k) entries per block
 
 **Example** · For a 1GB SSTable with 4KB blocks:
-- With indexes: ~10 trie lookups + scan 1 block (~100 entries)
+- With indexes: ~10 binary search steps + scan 1 block (~100 entries)
 - Without indexes: scan ~250,000 blocks sequentially
 
-Block indexes provide dramatic speedup for large SSTables at the cost of ~5-10% storage overhead for the succinct trie structure.
+Block indexes provide dramatic speedup for large SSTables at the cost of ~2-5% storage overhead for the compact index structure (parallel arrays with delta-encoded file positions).
 
 #### Seek to Specific Key
 
@@ -966,8 +977,11 @@ See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 4,      /* 4 threads for flush operations (default: 2) */
-    .num_compaction_threads = 8  /* 8 threads for compaction (default: 2) */
+    .num_flush_threads = 4,                /* 4 threads for flush operations (default: 2) */
+    .num_compaction_threads = 8,           /* 8 threads for compaction (default: 2) */
+    .log_level = TDB_LOG_INFO,             /* Log level */
+    .block_cache_size = 64 * 1024 * 1024,  /* 64MB block cache */
+    .max_open_sstables = 100,              /* Max open SSTables */
 };
 
 tidesdb_t *db = NULL;
@@ -984,8 +998,11 @@ See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-po
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .max_open_sstables = 200,  /* LRU cache for 200 SSTable structures (default: 100) */
-    .block_cache_size = 128 * 1024 * 1024  /* 128MB global block cache (default: 0) */
+    .num_flush_threads = 2,
+    .num_compaction_threads = 2,
+    .log_level = TDB_LOG_INFO,
+    .block_cache_size = 128 * 1024 * 1024,  /* 128MB global block cache (default: 0) */
+    .max_open_sstables = 200,               /* LRU cache for 200 SSTable structures (default: 100) */
 };
 
 tidesdb_t *db = NULL;

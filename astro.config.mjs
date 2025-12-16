@@ -164,7 +164,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
-						{ label: 'TidesDB vs RocksDB: Which Storage Engine is Faster?', slug: 'articles/tidesdb-vs-rocksdb' },
+						{ label: 'Comparative Analysis of TidesDB v6 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb6-rocksdb1075' },
 					],
 				},
 				{
