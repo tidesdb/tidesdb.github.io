@@ -332,6 +332,162 @@ Or run tests directly
 ./build/tidesdb_tests
 ```
 
+## Read Profiling
+
+TidesDB includes optional read profiling instrumentation to analyze read performance and cache effectiveness. When enabled, it tracks detailed statistics about where reads are served from (memtable, immutable, SSTable), cache hit rates, bloom filter effectiveness, and I/O patterns.
+
+### Enabling Read Profiling
+
+Read profiling is disabled by default to avoid overhead in production. Enable it at build time:
+
+```bash
+# Enable read profiling
+cmake -B build -DENABLE_READ_PROFILING=ON
+cmake --build build
+```
+
+**For production builds**, keep it disabled:
+```bash
+cmake -B build -DENABLE_READ_PROFILING=OFF  # Default
+```
+
+### Using Read Profiling
+
+Once enabled, use the profiling API in your code:
+
+```c
+#include <tidesdb.h>
+
+int main() {
+    tidesdb_t *db;
+    tidesdb_config_t config = {/* ... */};
+    tidesdb_open(&config, &db);
+    
+    /* Perform operations */
+    tidesdb_txn_t *txn;
+    tidesdb_txn_begin(db, &txn);
+    
+    /* ... do reads ... */
+    
+    tidesdb_txn_commit(txn);
+    
+    /* Print profiling statistics */
+    tidesdb_print_read_stats(db);
+    
+    /* Or get stats programmatically */
+    tidesdb_read_stats_t stats;
+    tidesdb_get_read_stats(db, &stats);
+    printf("Total reads: %lu\n", stats.total_reads);
+    printf("Cache hit rate: %.1f%%\n", 
+           100.0 * stats.cache_block_hits / 
+           (stats.cache_block_hits + stats.cache_block_misses));
+    
+    tidesdb_close(db);
+    return 0;
+}
+```
+
+### Statistics Collected
+
+When profiling is enabled, TidesDB tracks:
+
+#### Read Hit Location
+- **`total_reads`** · Total number of read operations
+- **`memtable_hits`** · Reads served from active memtable (fastest)
+- **`immutable_hits`** · Reads served from immutable memtables
+- **`sstable_hits`** · Reads served from SSTables on disk
+
+#### SSTable Search Efficiency
+- **`levels_searched`** · Total LSM levels searched across all reads
+- **`sstables_checked`** · Total SSTables examined (bloom filter + range checks)
+- **`bloom_checks`** ·- Number of bloom filter checks performed
+- **`bloom_hits`** · Bloom filter checks that indicated key might exist
+
+#### Block-Level Cache Performance
+- **`cache_block_hits`** · Blocks served from cache (zero I/O)
+- **`cache_block_misses`** · Blocks read from disk
+- **`disk_reads`** · Total disk read operations
+- **`blocks_read`** · Total blocks read from disk
+
+### Example Output
+
+```
+*=== TidesDB Read Profiling Stats ===*
+Total Reads:           10000
+
+Read Hit Location:
+  Memtable hits:       2500 (25.0%)
+  Immutable hits:      1500 (15.0%)
+  SSTable hits:        6000 (60.0%)
+
+SSTable Search:
+  Levels searched:     18000 (avg: 1.80 per read)
+  SSTables checked:    24000 (avg: 2.40 per read)
+  Bloom checks:        24000
+  Bloom hits:          6500 (27.1%)
+
+Block-Level Cache:
+  Cache hits:          15000
+  Cache misses:        3000
+  Cache hit rate:      83.3%
+  Blocks read:         3000 (avg: 0.30 per read)
+  Disk reads:          3000
+```
+
+### Interpreting Results
+
+#### Good Performance Indicators
+- **High memtable/immutable hit rate** (>20%) · Recent data is being accessed
+- **High cache hit rate** (>80%) · Block cache is sized appropriately
+- **High bloom hit rate** (>90%) · Bloom filters are effective at filtering non-existent keys
+- **Low avg levels per read** (<2.0) · LSM tree is well-compacted
+- **Low avg blocks per read** (<1.0) · Good data locality
+
+#### Performance Issues
+- **Low cache hit rate** (<50%) · Consider increasing `block_cache_size`
+- **High avg levels per read** (>3.0) · May need more aggressive compaction
+- **Low bloom hit rate** (<80%) · Increase bloom filter size or reduce false positive rate
+- **High avg SSTables per read** (>5.0) · Compaction may be falling behind
+
+### Performance Impact
+
+When **enabled**
+- Adds atomic increment operations on read path (~1-2% overhead)
+- Minimal memory overhead (~64 bytes for stats structure)
+- No impact on write performance
+
+ When **disabled** (default)
+- Zero overhead - profiling code is compiled out via `#ifdef`
+- No runtime cost
+
+### Use Cases
+
+**Development & Testing**
+```bash
+# Enable profiling for development
+cmake -B build -DENABLE_READ_PROFILING=ON -DCMAKE_BUILD_TYPE=Debug
+```
+
+**Performance Tuning**
+```bash
+# Profile with production-like config
+cmake -B build -DENABLE_READ_PROFILING=ON -DCMAKE_BUILD_TYPE=Release
+```
+
+**Production Deployment**
+```bash
+# Disable for zero overhead
+cmake -B build -DENABLE_READ_PROFILING=OFF -DCMAKE_BUILD_TYPE=Release
+```
+
+### Notes
+
+- Statistics are cumulative from database open to close
+- Thread-safe using atomic operations
+- Can be queried multiple times during database lifetime
+- Useful for identifying cache sizing issues and compaction tuning needs
+- Benchmark suite automatically uses profiling when available
+
 ## Benchmarking
 
 TidesDB includes a comprehensive benchmark suite with fully configurable parameters.
@@ -367,11 +523,11 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_NUM_SEEK_OPS` | Number of iterator seek operations | 100 |
 | `BENCH_KEY_SIZE` | Key size in bytes | 16 |
 | `BENCH_VALUE_SIZE` | Value size in bytes | 100 |
-| `BENCH_NUM_THREADS` | Number of concurrent threads | 2 |
-| `BENCH_DB_DEBUG` | Enable debug logging (0=off, 1=on) | 1 |
-| `BENCH_KEY_PATTERN` | Key distribution pattern | "sequential" |
+| `BENCH_NUM_THREADS` | Number of concurrent threads | 4 |
+| `BENCH_KEY_PATTERN` | Key distribution pattern | "random" |
 | `BENCH_CF_NAME` | Column family name | "benchmark_cf" |
 | `BENCH_DB_PATH` | Directory path | "benchmark_db" |
+| `BENCH_DB_LOG_LEVEL` | Database log level | TDB_LOG_DEBUG |
 | `BENCH_DB_FLUSH_POOL_THREADS` | Flush thread pool size | 2 |
 | `BENCH_DB_COMPACTION_POOL_THREADS` | Compaction thread pool size | 2 |
 
@@ -382,7 +538,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_WRITE_BUFFER_SIZE` | Memtable flush threshold (bytes) | 67108864 (64MB) |
 | `BENCH_LEVEL_RATIO` | Level size multiplier | 10 |
 | `BENCH_DIVIDING_LEVEL_OFFSET` | Compaction dividing level offset | 2 |
-| `BENCH_MAX_LEVELS` | Maximum LSM levels | 7 |
+| `BENCH_MIN_LEVELS` | Minimum LSM levels, TidesDB can scale up levels if need be. | 4 |
 | `BENCH_SKIP_LIST_MAX_LEVEL` | Skip list max level | 16 |
 | `BENCH_SKIP_LIST_PROBABILITY` | Skip list probability | 0.25 |
 | `BENCH_ENABLE_COMPRESSION` | Enable compression (0=off, 1=on) | 1 |
@@ -390,7 +546,8 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_ENABLE_BLOOM_FILTER` | Enable bloom filter (0=off, 1=on) | 1 |
 | `BENCH_BLOOM_FILTER_FP_RATE` | Bloom filter false positive rate | 0.01 |
 | `BENCH_ENABLE_BLOCK_INDEXES` | Enable block indexes | 1 |
-| `BENCH_BLOCK_INDEX_SAMPLING_COUNT` | Index sampling ratio (1 in N keys) | 16 |
+| `BENCH_BLOCK_INDEX_SAMPLING_COUNT` | Block index sampling ratio (every Nth block) | 1 |
+| `BENCH_BLOCK_INDEX_PREFIX_LEN` | Prefix length for block index keys (bytes) | 16 |
 | `BENCH_SYNC_MODE` | Sync mode | TDB_SYNC_NONE |
 | `BENCH_SYNC_INTERVAL_US` | Sync interval in microseconds (for TDB_SYNC_INTERVAL) | 128000 (128ms) |
 | `BENCH_COMPARATOR_NAME` | Key comparator | "memcmp" |
