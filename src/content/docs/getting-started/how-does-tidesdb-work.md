@@ -46,7 +46,7 @@ TidesDB organizes data into column families, a design pattern that provides name
 
 </div>
 
-A column family maintains complete storage isolation through dedicated data structures at each tier of the LSM hierarchy. The memory tier consists of an atomically-swapped active memtable pointer, a monotonically increasing memtable generation counter (ensuring each memtable has a unique identifier) for versioning, an active WAL file handle, and a queue of immutable memtables awaiting flush. The active memtable pointer is swapped atomically using compare-and-swap operations on the `active_memtable` field, while the immutable memtable is added to the flush queue to ensure correct ordering during recovery. The disk tier organizes SSTables into a dynamically allocated array of levels, with each level protected by a reader-writer lock that enables concurrent reads while serializing structural modifications during compaction. Sequence number generation occurs independently per column family through atomic increment operations, ensuring that transaction ordering within a column family remains consistent while allowing concurrent operations across different column families to proceed without coordination overhead.
+A column family maintains complete storage isolation through dedicated data structures at each tier of the LSM hierarchy. The memory tier consists of an atomically-swapped active memtable pointer, a monotonically increasing memtable generation counter (ensuring each memtable has a unique identifier) for versioning, an active WAL file handle, and a queue of immutable memtables awaiting flush. The active memtable pointer is swapped atomically using compare-and-swap operations on the `active_memtable` field, while the immutable memtable is added to the flush queue to ensure correct ordering during recovery. The disk tier organizes SSTables into a fixed-size array of levels (TDB_MAX_LEVELS = 32), with each level using atomic pointers for lock-free access that enables concurrent reads while compaction atomically updates level structures. Sequence number generation occurs independently per column family through atomic increment operations, ensuring that transaction ordering within a column family remains consistent while allowing concurrent operations across different column families to proceed without coordination overhead.
 
 Configuration parameters are specified per column family (CF) at creation time and persisted to disk in INI format within the column family's directory. These parameters control fundamental operational characteristics including memtable flush thresholds that determine memory-to-disk transition points, skip list structural parameters (maximum level and probability) that affect search performance, compression algorithms and settings that balance CPU utilization against storage efficiency, bloom filter configuration including false positive rates, block index enablement for direct block access, sync mode (`TDB_SYNC_NONE`, `TDB_SYNC_INTERVAL`, `TDB_SYNC_FULL` - see Section 4.4 for details) with configurable sync interval in microseconds for interval mode, and compaction policies including automatic background compaction triggers and thread allocation. Many parameters including sync mode and sync interval can be updated at runtime and persisted back to disk, allowing operational tuning without database restart. Once a column family is created, certain parameters such as the key comparator function become immutable for the lifetime of the column family, ensuring consistent sort order across all storage tiers and preventing data corruption from comparator changes.
 
@@ -96,7 +96,7 @@ The block manager is TidesDB's low-level storage abstraction that manages both W
 Every block manager file (WAL or SSTable) has the following structure
 
 ```
-[File Header is 12 bytes]
+[File Header is 8 bytes]
 [Block 0]
 [Block 1]
 [Block 2]
@@ -256,7 +256,7 @@ SSTables use atomic reference counting to manage their lifecycle safely. When an
 
 **SSTable File Handle Management**
 
-The storage engine uses a background reaper thread to manage SSTable file handles and prevent file descriptor exhaustion. The system is configured via `max_open_sstables` (default 100). When an SSTable is accessed, its block managers (klog and vlog) are opened if not already open, and the `last_access_time` is updated atomically. The SSTable metadata structure remains in memory with its reference count tracking active users.
+The storage engine uses a background reaper thread to manage SSTable file handles and prevent file descriptor exhaustion. The system is configured via `max_open_sstables` (default 512). When an SSTable is accessed, its block managers (klog and vlog) are opened if not already open, and the `last_access_time` is updated atomically. The SSTable metadata structure remains in memory with its reference count tracking active users.
 
 The reaper thread runs continuously in the background, waking every 100ms to check if the number of open SSTables exceeds the configured limit. When the limit is reached, the reaper:
 
@@ -274,7 +274,7 @@ SSTables use the block manager format with key-value separation across two files
 
 **Klog File (L<level>_<id>.klog) - Keys and Metadata**
 ```
-[File Header - 12 bytes Block Manager Header]
+[File Header - 8 bytes Block Manager Header]
 [Block 0: Klog Block with N entries]
 [Block 1: Klog Block with M entries]
 ...
@@ -286,7 +286,7 @@ SSTables use the block manager format with key-value separation across two files
 
 **Vlog File (L<level>_<id>.vlog) - Large Values**
 ```
-[File Header - 12 bytes Block Manager Header]
+[File Header - 8 bytes Block Manager Header]
 [Block 0: Vlog Block with N values]
 [Block 1: Vlog Block with M values]
 ...
@@ -301,7 +301,7 @@ SSTables use the block manager format with key-value separation across two files
 
 **Value Threshold and Separation**
 
-Values smaller than or equal to `value_threshold` (default 1KB) are stored inline within klog entries, enabling single-file access for small key-value pairs. Values exceeding the threshold are written to the vlog file, with the klog entry storing only the vlog offset. This separation optimizes for the common case where most values are small while efficiently handling large values without bloating the klog. During recovery, the system reads backwards from the klog end: metadata (last), then index (if present), then bloom filter (if present), establishing the data end offset before loading entries.
+Values smaller than or equal to `value_threshold` (default 4KB) are stored inline within klog entries, enabling single-file access for small key-value pairs. Values exceeding the threshold are written to the vlog file, with the klog entry storing only the vlog offset. This separation optimizes for the common case where most values are small while efficiently handling large values without bloating the klog. During recovery, the system reads backwards from the klog end: metadata (last), then index (if present), then bloom filter (if present), establishing the data end offset before loading entries.
 
 #### Klog Block Format
 
@@ -692,17 +692,17 @@ TidesDB implements the **Spooky algorithm** (Dayan et al., 2018), a generalized 
 
 ### 6.1 Multi-Level Architecture and Capacity Management
 
-The compaction system organizes SSTables into a hierarchy of levels numbered from 0 to N-1, where each level maintains a capacity constraint that grows exponentially with level number. Level 0 serves as the landing zone for newly flushed memtables and contains SSTables in arbitrary chronological order without key range constraints. Subsequent levels (1 through N-1) maintain sorted, non-overlapping key ranges within each level, enabling efficient binary search during read operations. Level capacity is calculated as `base_capacity * (size_ratio ^ level_number)`, where `base_capacity` defaults to the memtable flush threshold and `size_ratio` (typically 10) determines the exponential growth rate. This geometric progression ensures that each level can accommodate all data from previous levels while maintaining bounded space amplification.
+The compaction system organizes SSTables into a hierarchy of levels numbered from 1 to N, where each level maintains a capacity constraint that grows exponentially with level number. Level 1 (stored in array index 0) serves as the landing zone for newly flushed memtables and contains SSTables in arbitrary chronological order without key range constraints. Subsequent levels (2 through N) maintain sorted, non-overlapping key ranges within each level, enabling efficient binary search during read operations. Level capacity is calculated as `base_capacity * (size_ratio ^ level_number)`, where `base_capacity` defaults to the memtable flush threshold and `size_ratio` (typically 10) determines the exponential growth rate. This geometric progression ensures that each level can accommodate all data from previous levels while maintaining bounded space amplification.
 
-When Level 0 reaches capacity, the system dynamically creates Level 1 if it doesn't exist, triggering the first compaction operation. As data ages through the hierarchy, levels are added on-demand when lower levels reach capacity, with the maximum number of levels determined by total dataset size and configured capacity parameters. The system tracks both current size (sum of all SSTable sizes in bytes) and capacity (maximum allowed size) for each level, using these metrics to make compaction decisions. A level is considered full when `current_size >= capacity`, triggering merge operations that consolidate data into higher levels while removing obsolete versions, tombstones, and expired TTL entries.
+When Level 1 reaches capacity, the system dynamically creates Level 2 if it doesn't exist, triggering the first compaction operation. As data ages through the hierarchy, levels are added on-demand when lower levels reach capacity, with the maximum number of levels determined by total dataset size and configured capacity parameters. The system tracks both current size (sum of all SSTable sizes in bytes) and capacity (maximum allowed size) for each level, using these metrics to make compaction decisions. A level is considered full when `current_size >= capacity`, triggering merge operations that consolidate data into higher levels while removing obsolete versions, tombstones, and expired TTL entries.
 
 ### 6.2 Dividing Level and Merge Strategy Selection
 
-Compaction decisions are governed by a dividing level X, calculated as `X = num_levels - 1 - dividing_level_offset`, where `dividing_level_offset` (default 1, configurable per column family) controls the aggressiveness of compaction. For example, with 5 levels and offset=1, X = 5 - 1 - 1 = 3. The dividing level partitions the storage hierarchy into two regions: levels 0 through X-1 contain recently written data subject to frequent merges, while levels X+1 through N-1 contain stable historical data that undergoes less frequent consolidation. This partitioning strategy balances write amplification (cost of rewriting data during compaction) against read amplification (number of levels to search during queries) by concentrating merge activity in the upper levels where data turnover is highest.
+Compaction decisions are governed by a dividing level X, calculated as `X = num_levels - 1 - dividing_level_offset`, where `dividing_level_offset` (default 1, configurable per column family) controls the aggressiveness of compaction. For example, with 5 levels and offset=1, X = 5 - 1 - 1 = 3. The dividing level partitions the storage hierarchy into two regions: levels 1 through X-1 contain recently written data subject to frequent merges, while levels X+1 through N contain stable historical data that undergoes less frequent consolidation. This partitioning strategy balances write amplification (cost of rewriting data during compaction) against read amplification (number of levels to search during queries) by concentrating merge activity in the upper levels where data turnover is highest.
 
-The system implements **Spooky Algorithm 2** to select merge strategies. Before compaction begins, the active memtable is flushed to ensure all data is in SSTables. The algorithm then finds the smallest level q (1 ≤ q ≤ X) where `capacity_q < cumulative_size(0...q)`, meaning level q cannot accommodate the merge of all data from levels 0 through q. This becomes the target level:
+The system implements **Spooky Algorithm 2** to select merge strategies. Before compaction begins, the active memtable is flushed to ensure all data is in SSTables. The algorithm then finds the smallest level q (1 ≤ q ≤ X) where `capacity_q < cumulative_size(1...q)`, meaning level q cannot accommodate the merge of all data from levels 1 through q. This becomes the target level:
 
-- If `target < X`: Perform **full preemptive merge** of levels 0 to target
+- If `target < X`: Perform **full preemptive merge** of levels 1 to target
 - If `target == X`: Perform **dividing merge** into level X
 - If no suitable level found: Default to dividing merge at X
 
@@ -710,13 +710,13 @@ After the primary merge, if level X is full (`size_X >= capacity_X`), the algori
 
 ### 6.3 Full Preemptive Merge
 
-Full preemptive merge consolidates all data from levels 0 through q into level q, where q < X. This operation is selected when an upper level has sufficient capacity to absorb all data from levels above it, enabling aggressive consolidation that reduces the number of levels requiring search during read operations. The merge process creates a multi-way merge iterator that simultaneously scans all SSTables in the source levels, producing a sorted stream of key-value pairs with duplicates resolved by selecting the newest version based on sequence numbers. Tombstones and expired TTL entries are purged during the merge, reclaiming storage space and improving read performance by eliminating obsolete data from the storage hierarchy.
+Full preemptive merge consolidates all data from levels 1 through q into level q, where q < X. This operation is selected when an upper level has sufficient capacity to absorb all data from levels above it, enabling aggressive consolidation that reduces the number of levels requiring search during read operations. The merge process creates a multi-way merge iterator that simultaneously scans all SSTables in the source levels, producing a sorted stream of key-value pairs with duplicates resolved by selecting the newest version based on sequence numbers. Tombstones and expired TTL entries are purged during the merge, reclaiming storage space and improving read performance by eliminating obsolete data from the storage hierarchy.
 
-The output of a full preemptive merge consists of one or more new SSTables written to the target level q, with each output SSTable sized to match the configured SSTable size target. Source SSTables from levels 0 through q are deleted atomically after the merge completes successfully, using temporary file naming and atomic rename operations to ensure crash safety. This merge strategy provides optimal read performance by minimizing the number of levels containing data, at the cost of higher write amplification since data is rewritten multiple times as it moves through the hierarchy. The strategy is most effective for workloads with high update rates and frequent key overwrites, where aggressive consolidation quickly eliminates obsolete versions.
+The output of a full preemptive merge consists of one or more new SSTables written to the target level q, with each output SSTable sized to match the configured SSTable size target. Source SSTables from levels 1 through q are deleted atomically after the merge completes successfully, using temporary file naming and atomic rename operations to ensure crash safety. This merge strategy provides optimal read performance by minimizing the number of levels containing data, at the cost of higher write amplification since data is rewritten multiple times as it moves through the hierarchy. The strategy is most effective for workloads with high update rates and frequent key overwrites, where aggressive consolidation quickly eliminates obsolete versions.
 
 ### 6.4 Dividing Merge
 
-Dividing merge operates at level X, consolidating all data from levels 0 through X into level X. This operation is selected when no upper level has sufficient capacity for a full preemptive merge, indicating that data must be pushed deeper into the hierarchy. The merge algorithm follows the same multi-way merge pattern as full preemptive merge, creating sorted output SSTables while purging tombstones and expired entries. However, dividing merge plays a critical role in the overall compaction strategy by serving as the primary mechanism for moving data from the frequently-modified upper levels into the stable lower levels.
+Dividing merge operates at level X, consolidating all data from levels 1 through X into level X. This operation is selected when no upper level has sufficient capacity for a full preemptive merge, indicating that data must be pushed deeper into the hierarchy. The merge algorithm follows the same multi-way merge pattern as full preemptive merge, creating sorted output SSTables while purging tombstones and expired entries. However, dividing merge plays a critical role in the overall compaction strategy by serving as the primary mechanism for moving data from the frequently-modified upper levels into the stable lower levels.
 
 After a dividing merge completes, the system recalculates level statistics and evaluates whether additional levels must be created to accommodate the merged data. If level X reaches capacity after the merge, a new level X+1 is created with capacity calculated as `capacity_X * size_ratio`, providing space for future compactions. This dynamic level creation ensures that the storage hierarchy grows organically with dataset size, maintaining bounded space amplification while avoiding premature level creation that would waste memory and increase read amplification. The dividing merge strategy balances write amplification and read amplification by concentrating merge activity at a single level rather than rewriting data through every level in the hierarchy.
 
@@ -728,9 +728,9 @@ The partitioned merge algorithm identifies a subset of SSTables within the targe
 
 ### 6.6 Background Compaction and Thread Pool Coordination
 
-Compaction operations execute asynchronously through the engine-level compaction thread pool, decoupling merge activity from application write operations and enabling sustained write throughput independent of compaction performance. The system automatically triggers compaction using **Spooky's α (alpha) parameter** when Level 0 reaches the file count threshold (`TDB_L0_FILE_NUM_COMPACTION_TRIGGER`, default 4 SSTables) or when Level 0 exceeds its capacity by size. This dual-trigger mechanism prevents L0 explosion with small write buffers while maintaining predictable compaction behavior. After each memtable flush, the system checks L0's SSTable count and size, submitting a compaction task to the thread pool if either threshold is exceeded. Background compaction threads execute a blocking dequeue pattern, waiting efficiently on the compaction queue until work arrives, then processing compaction tasks to completion before returning to the wait state.
+Compaction operations execute asynchronously through the engine-level compaction thread pool, decoupling merge activity from application write operations and enabling sustained write throughput independent of compaction performance. The system automatically triggers compaction using **Spooky's α (alpha) parameter** when Level 1 reaches the file count threshold (`TDB_L1_FILE_NUM_COMPACTION_TRIGGER`, default 4 SSTables) or when Level 1 exceeds its capacity by size. This dual-trigger mechanism prevents Level 1 explosion with small write buffers while maintaining predictable compaction behavior. After each memtable flush, the system checks Level 1's SSTable count and size, submitting a compaction task to the thread pool if either threshold is exceeded. Background compaction threads execute a blocking dequeue pattern, waiting efficiently on the compaction queue until work arrives, then processing compaction tasks to completion before returning to the wait state.
 
-Each compaction task is protected by a per-column-family atomic flag (`is_compacting`) that serializes merge operations within a single column family while allowing concurrent compaction across different column families. The flag is checked using atomic compare-and-swap, enabling the system to skip redundant compaction attempts when a merge is already in progress. This non-blocking approach prevents queue buildup and resource exhaustion during periods of high write activity, while ensuring that compaction makes forward progress whenever resources are available. The file count trigger (α = 4) is a system-wide constant derived from the Spooky paper, balancing read amplification (number of L0 files to search) against write amplification (frequency of compaction).
+Each compaction task is protected by a per-column-family atomic flag (`is_compacting`) that serializes merge operations within a single column family while allowing concurrent compaction across different column families. The flag is checked using atomic compare-and-swap, enabling the system to skip redundant compaction attempts when a merge is already in progress. This non-blocking approach prevents queue buildup and resource exhaustion during periods of high write activity, while ensuring that compaction makes forward progress whenever resources are available. The file count trigger (α = 4) is a system-wide constant derived from the Spooky paper, balancing read amplification (number of Level 1 files to search) against write amplification (frequency of compaction).
 
 ### 6.7 Dynamic Capacity Adaptation (DCA)
 
@@ -749,9 +749,9 @@ Where
 - `N_L` = current data size at the largest level L
 - `T` = level size ratio (default 10)
 - `L` = total number of levels
-- `i` = level number (0 to L-2)
+- `i` = level number (1-based, from 1 to L-1)
 
-This formula ensures that level capacities maintain the geometric progression `C_0 : C_1 : C_2 : ... = 1 : T : T² : ...` while anchoring to the actual size of the largest level rather than theoretical maximums.
+This formula ensures that level capacities maintain the geometric progression `C_1 : C_2 : C_3 : ... = 1 : T : T² : ...` while anchoring to the actual size of the largest level rather than theoretical maximums.
 
 #### Why DCA Matters
 
@@ -976,7 +976,7 @@ This adaptive approach allows TidesDB to maintain optimal compaction behavior ac
 
 ### 6.8 Compaction Mechanics Summary
 
-During compaction, SSTables are merged using the Spooky algorithm strategies (full preemptive, dividing, or partitioned merge). For each key, only the newest version is retained based on sequence numbers, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are marked for deletion and removed after their reference count reaches zero, ensuring active reads complete safely. The system automatically adds new levels when the largest level exceeds capacity, and removes empty levels when no pending work exists (no flushes in progress and L0 is empty). After each compaction, Dynamic Capacity Adaptation recalibrates level capacities to maintain optimal hierarchy proportions based on actual data distribution in the largest level.
+During compaction, SSTables are merged using the Spooky algorithm strategies (full preemptive, dividing, or partitioned merge). For each key, only the newest version is retained based on sequence numbers, while tombstones (deletion markers) and expired TTL entries are purged. Original SSTables are marked for deletion and removed after their reference count reaches zero, ensuring active reads complete safely. The system automatically adds new levels when the largest level exceeds capacity, and removes empty levels when no pending work exists (no flushes in progress and Level 1 is empty). After each compaction, Dynamic Capacity Adaptation recalibrates level capacities to maintain optimal hierarchy proportions based on actual data distribution in the largest level.
 
 ## 7. Performance Optimizations
 ### 7.1 Block Indices
@@ -1001,7 +1001,7 @@ Each SSTable optionally contains a compact block index stored as the second-to-l
 - **~13x smaller** with sampling while maintaining fast lookups
 
 **Construction**
-During SSTable creation, blocks are sampled at a configurable ratio (default 1:16 via `index_sample_ratio`). For each sampled block, the index stores the minimum and maximum key prefixes along with the block's file position. Construction is O(1) memory with a single pass during SSTable write.
+During SSTable creation, blocks are sampled at a configurable ratio (default 1:1 via `index_sample_ratio`, meaning every block is indexed). For each sampled block, the index stores the minimum and maximum key prefixes along with the block's file position. Construction is O(1) memory with a single pass during SSTable write.
 
 **Lookup Process**
 When searching for a key, `compact_block_index_find_predecessor()` performs a binary search through the min_key_prefixes array using prefix comparison. It returns the file position of the largest indexed block where min_prefix ≤ target_key. The cursor is then positioned directly at that file offset, avoiding sequential scanning through earlier blocks.
@@ -1458,7 +1458,7 @@ The MANIFEST is stored as a plain text file with the following structure:
 - **Line 1** · Manifest format version (currently 6)
 - **Line 2** · Global sequence number for the column family
 - **Remaining lines** · One SSTable entry per line in CSV format
-  - `level`: LSM tree level (0-based)
+  - `level`: LSM tree level (1-based, matching level_num)
   - `id`: Unique SSTable identifier
   - `num_entries`: Number of key-value pairs in the SSTable
   - `size_bytes`: Total size of the SSTable in bytes
@@ -1618,7 +1618,7 @@ done
 
 **Disk Space Monitoring**
 
-Monitor WAL file count, which is typically 1-3 per column family (1 active + 1-2 in flush queue). Many WAL files (>5) may indicate a flush backlog, slow I/O, or configuration issue. Monitor L0 SSTable count as it triggers compaction at the system-wide threshold (`TDB_L0_FILE_NUM_COMPACTION_TRIGGER`, fixed at 4 files). Set appropriate `write_buffer_size` based on write patterns and flush speed.
+Monitor WAL file count, which is typically 1-3 per column family (1 active + 1-2 in flush queue). Many WAL files (>5) may indicate a flush backlog, slow I/O, or configuration issue. Monitor L1 SSTable count as it triggers compaction at the system-wide threshold (`TDB_L1_FILE_NUM_COMPACTION_TRIGGER`, fixed at 4 files). Set appropriate `write_buffer_size` based on write patterns and flush speed.
 
 **Backup Strategy**
 ```bash
@@ -1638,15 +1638,15 @@ TidesDB uses several system-wide constants (defined in `tidesdb.c`) that control
 
 ```c
 /* α (alpha) - trigger compaction */
-TDB_L0_FILE_NUM_COMPACTION_TRIGGER = 4
+TDB_L1_FILE_NUM_COMPACTION_TRIGGER = 4
 
 /* β (beta) - slow down writes */
-TDB_L0_SLOWDOWN_WRITES_TRIGGER = 20
-TDB_L0_SLOWDOWN_WRITES_DELAY_US = 20000  // 20ms delay
+TDB_L1_SLOWDOWN_WRITES_TRIGGER = 20
+TDB_L1_SLOWDOWN_WRITES_DELAY_US = 20000  // 20ms delay
 
 /* γ (gamma) - stop writes (emergency) */
-TDB_L0_STOP_WRITES_TRIGGER = 36
-TDB_L0_STOP_WRITES_DELAY_US = 100000     // 100ms delay
+TDB_L1_STOP_WRITES_TRIGGER = 36
+TDB_L1_STOP_WRITES_DELAY_US = 100000     // 100ms delay
 ```
 
 These implement the Spooky algorithm's write throttling:
@@ -1654,13 +1654,13 @@ These implement the Spooky algorithm's write throttling:
 - **β = 20 files** · Write slowdown, add 20ms delay per write to apply backpressure
 - **γ = 36 files** · Write stall, add 100ms delay per write (emergency mode)
 
-#### L0 Capacity Backpressure
+#### L1 Capacity Backpressure
 
 ```c
-TDB_BACKPRESSURE_THRESHOLD_L0_FULL = 100      // 100% full
-TDB_BACKPRESSURE_THRESHOLD_L0_CRITICAL = 98   // 98% full
-TDB_BACKPRESSURE_THRESHOLD_L0_HIGH = 95       // 95% full
-TDB_BACKPRESSURE_THRESHOLD_L0_MODERATE = 90   // 90% full
+TDB_BACKPRESSURE_THRESHOLD_L1_FULL = 100      // 100% full
+TDB_BACKPRESSURE_THRESHOLD_L1_CRITICAL = 98   // 98% full
+TDB_BACKPRESSURE_THRESHOLD_L1_HIGH = 95       // 95% full
+TDB_BACKPRESSURE_THRESHOLD_L1_MODERATE = 90   // 90% full
 
 TDB_BACKPRESSURE_DELAY_EMERGENCY_US = 50000   // 50ms
 TDB_BACKPRESSURE_DELAY_CRITICAL_US = 10000    // 10ms
@@ -1668,7 +1668,7 @@ TDB_BACKPRESSURE_DELAY_HIGH_US = 5000         // 5ms
 TDB_BACKPRESSURE_DELAY_MODERATE_US = 1000     // 1ms
 ```
 
-When L0 reaches capacity thresholds, writes are delayed to prevent overwhelming the compaction system.
+When L1 reaches capacity thresholds, writes are delayed to prevent overwhelming the compaction system.
 
 #### Immutable Memtable Queue Backpressure
 
@@ -1708,7 +1708,7 @@ The reaper thread wakes every 100ms to check if `num_open_sstables >= max_open_s
 
 **Performance Tuning**
 
-Larger `write_buffer_size` results in fewer, larger SSTables with less compaction, while smaller `write_buffer_size` creates more, smaller SSTables with more compaction. The L0 file count trigger (`TDB_L0_FILE_NUM_COMPACTION_TRIGGER = 4`) is a fixed system constant derived from the Spooky algorithm and cannot be configured per column family. To reduce read amplification, decrease `write_buffer_size` to trigger more frequent flushes and compaction. To reduce write amplification, increase `write_buffer_size` to batch more writes before flushing.
+Larger `write_buffer_size` results in fewer, larger SSTables with less compaction, while smaller `write_buffer_size` creates more, smaller SSTables with more compaction. The L1 file count trigger (`TDB_L1_FILE_NUM_COMPACTION_TRIGGER = 4`) is a fixed system constant derived from the Spooky algorithm and cannot be configured per column family. To reduce read amplification, decrease `write_buffer_size` to trigger more frequent flushes and compaction. To reduce write amplification, increase `write_buffer_size` to batch more writes before flushing.
 
 ## 10. Error Handling
 

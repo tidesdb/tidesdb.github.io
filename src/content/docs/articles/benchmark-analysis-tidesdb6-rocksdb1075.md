@@ -3,6 +3,8 @@ title: "Comparative Analysis of TidesDB v6 & RocksDB v10.7.5"
 description: "Comprehensive performance benchmarks and architectural implications of both engines."
 ---
 
+*by Alex Gaetano Padula*
+
 This document presents extensive performance benchmarks comparing **TidesDB** and **RocksDB**, two LSM-tree based storage engines. The tests cover 10 different workload scenarios with detailed metrics on throughput, latency, resource usage, and amplification factors.
 
 **We recommend you benchmark your own use case to determine which storage engine is best for your needs!**
@@ -424,3 +426,5 @@ TidesDB's most remarkable achievement is delivering 1.76x faster random reads th
 The space efficiency alone—with databases 1.2x-6.1x smaller than RocksDB for identical data—represents substantial cost savings in cloud storage scenarios. At scale, this could translate to millions of dollars in reduced storage costs while simultaneously improving performance.
 
 Very excite ;)
+
+*Thanks for reading!*
