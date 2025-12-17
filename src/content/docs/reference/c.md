@@ -78,8 +78,8 @@ tidesdb_config_t config = {
     .num_flush_threads = 2,                /* Flush thread pool size (default: 2) */
     .num_compaction_threads = 2,           /* Compaction thread pool size (default: 2) */
     .log_level = TDB_LOG_INFO,             /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
-    .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 0 = disabled) */
-    .max_open_sstables = 100,              /* Max cached SSTable structures (default: 100) */
+    .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
+    .max_open_sstables = 512,              /* Max cached SSTable structures (default: 512) */
 };
 
 tidesdb_t *db = NULL;
@@ -163,22 +163,21 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 tidesdb_column_family_config_t cf_config = {
     .write_buffer_size = 128 * 1024 * 1024,     /* 128MB memtable flush threshold */
     .level_size_ratio = 10,                     /* Level size multiplier (default: 10) */
-    .max_levels = 7,                            /* Maximum LSM levels (default: 7) */
+    .min_levels = 5,                            /* Minimum LSM levels (default: 5) */
     .dividing_level_offset = 1,                 /* Compaction dividing level offset (default: 1) */
     .skip_list_max_level = 12,                  /* Skip list max level */
     .skip_list_probability = 0.25f,             /* Skip list probability */
-    .compression_algorithm = COMPRESS_LZ4,      /* LZ4, SNAPPY, or ZSTD */
+    .compression_algorithm = LZ4_COMPRESSION,   /* LZ4_COMPRESSION, SNAPPY_COMPRESSION, or ZSTD_COMPRESSION */
     .enable_bloom_filter = 1,                   /* Enable bloom filters */
     .bloom_fpr = 0.01,                          /* 1% false positive rate */
     .enable_block_indexes = 1,                  /* Enable compact block indexes */
-    .index_sample_ratio = 16,                   /* Sample 1 in 16 keys for index (default: 16) */
+    .index_sample_ratio = 1,                    /* Sample every block for index (default: 1) */
     .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
     .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
     .comparator_name = {0},                     /* Empty = use default "memcmp" */
-    .klog_block_size = 4096,                    /* Klog block size (default: 4096) */
-    .vlog_block_size = 4096,                    /* Vlog block size (default: 4096) */
-    .value_threshold = 1024,                    /* Values > 1KB go to vlog (default: 1024) */
-    .l0_compaction_threshold = 4                /* Trigger compaction when L0 has 4 SSTables (default: 4) */
+    .value_threshold = 4096,                    /* Values > 4KB go to vlog (default: 4096) */
+    .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
+    .default_isolation_level = TDB_ISOLATION_READ_COMMITTED  /* Default transaction isolation */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -701,7 +700,7 @@ TidesDB provides seek operations that allow you to position an iterator at a spe
 
 **With Block Indexes Enabled** (`enable_block_indexes = 1`):
 - Uses compact block index with parallel arrays (min/max key prefixes and file positions)
-- Binary search through sampled keys at configurable ratio (default 1:16 via `index_sample_ratio`)
+- Binary search through sampled keys at configurable ratio (default 1:1 via `index_sample_ratio`, meaning every block is indexed)
 - Jumps directly to the target block using the file position
 - Scans forward from that block to find the exact key
 - **Performance** · O(log n) binary search + O(k) entries per block scan
@@ -1001,8 +1000,8 @@ tidesdb_config_t config = {
     .num_flush_threads = 2,
     .num_compaction_threads = 2,
     .log_level = TDB_LOG_INFO,
-    .block_cache_size = 128 * 1024 * 1024,  /* 128MB global block cache (default: 0) */
-    .max_open_sstables = 200,               /* LRU cache for 200 SSTable structures (default: 100) */
+    .block_cache_size = 128 * 1024 * 1024,  /* 128MB global block cache (default: 64MB) */
+    .max_open_sstables = 200,               /* LRU cache for 200 SSTable structures (default: 512) */
 };
 
 tidesdb_t *db = NULL;
