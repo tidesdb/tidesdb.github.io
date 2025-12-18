@@ -26,7 +26,6 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 
 **Test Configuration**
 - **Sync Mode** · DISABLED (maximum performance)
-- **Default Batch Size** · 1000 operations
 - **Threads** · 8 concurrent threads
 - **Key Size** · 16 bytes (unless specified)
 - **Value Size** · 100 bytes (unless specified)
