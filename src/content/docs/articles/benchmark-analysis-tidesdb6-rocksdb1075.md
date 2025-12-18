@@ -5,6 +5,8 @@ description: "Comprehensive performance benchmarks and architectural implication
 
 *by Alex Gaetano Padula*
 
+*published on December 16th, 2025*
+
 This document presents extensive performance benchmarks comparing **TidesDB** and **RocksDB**, two LSM-tree based storage engines. The tests cover 10 different workload scenarios with detailed metrics on throughput, latency, resource usage, and amplification factors.
 
 **We recommend you benchmark your own use case to determine which storage engine is best for your needs!**

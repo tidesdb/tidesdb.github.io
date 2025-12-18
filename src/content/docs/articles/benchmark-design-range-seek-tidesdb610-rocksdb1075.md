@@ -5,6 +5,8 @@ description: "Deep dive into how block caching and index design deliver 4-9x fas
 
 *by Alex Gaetano Padula*
 
+*published on December 17th, 2025*
+
 After optimizing TidesDB's seek and range query performance, I want to share the architectural decisions that led to some remarkable results. The benchmarks show TidesDB achieving 4.17x faster random seeks and 4.74x faster sequential seeks compared to RocksDB. This isn't luck or cherry-picked workloads - it's the result of specific design choices around block caching, index structures, and memory management.
 
 You can download the raw benchmark report <a href="/benchmark_results_tdb610_rdb1075_range_seek1.txt" download>here</a>
