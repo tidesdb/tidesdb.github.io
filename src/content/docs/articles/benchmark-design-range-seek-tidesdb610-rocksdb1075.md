@@ -285,16 +285,16 @@ The decision depends on your deployment constraints.
 
 TidesDB uses CLOCK eviction instead of LRU because:
 
-1. **Better concurrency** - no global LRU list to lock
-2. **Simpler atomics** - just a reference bit per entry
-3. **Good-enough approximation** - CLOCK is "LRU-ish" without the overhead
-4. **Lock-free reads** - cache hits don't acquire locks
+1. **Better concurrency** · no global LRU list to lock
+2. **Simpler atomics** · just a reference bit per entry
+3. **Good-enough approximation** · CLOCK is "LRU-ish" without the overhead
+4. **Lock-free reads** · cache hits don't acquire locks
 
 ### Partitioning Strategy
 
 With 2 partitions per CPU core:
 - 8 cores = 16 partitions
-- Hash key → partition (deterministic)
+- Hash key -> partition (deterministic)
 - Each partition has independent lock
 - Contention reduced by 16x
 
@@ -317,12 +317,12 @@ Only when refcount reaches zero is the block freed. This prevents:
 
 ### Sparse Sampling with Prefix Compression
 
-TidesDB's block indices use:
+TidesDB's block indices use
 - **Sampling ratio** · 1:1 by default (every block sampled)
 - **Prefix length** · 16 bytes for min/max keys
 - **Position encoding** · Delta-encoded with varint compression
 
-For 1M entries across 1000 blocks:
+For 1M entries across 1000 blocks
 - Index size · ~50 KB (with compression)
 - Lookup time · O(log n) binary search in memory
 - Disk I/O · Zero (index is resident)
@@ -368,7 +368,7 @@ TidesDB achieves 4.17x higher throughput with **26% less CPU**. This suggests:
 3. Memory-resident indices reduce syscall overhead
 4. Atomic operations scale better than mutexes
 
-RocksDB's higher CPU usage likely comes from:
+RocksDB's higher CPU usage likely comes from
 - More cache misses -> more decompression
 - More index loads -> more syscalls
 - More lock contention -> more context switches
