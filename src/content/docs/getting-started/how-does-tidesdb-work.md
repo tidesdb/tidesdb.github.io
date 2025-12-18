@@ -22,11 +22,11 @@ This document provides a comprehensive technical exploration of TidesDB's archit
 Before diving into the details, here are the key terms used throughout this document:
 
 - **LSM-tree** · Log-Structured Merge-tree, the foundational data structure
-- **Memtable** · In-memory buffer that accepts writes (implemented as a skip list)
+- **Memtable** · In-memory skip list data structure that stores key-value pairs for fast access
 - **SSTable** · Sorted String Table, immutable on-disk file containing sorted key-value pairs
 - **Klog** · Key log file (`.klog`), contains sorted keys with metadata and small inline values
 - **Vlog** · Value log file (`.vlog`), contains large values referenced by offset from klog
-- **WAL** · Write-Ahead Log, ensures durability by recording operations before applying them
+- **WAL** · Write-Ahead Log, ensures durability by recording operations to disk before they're applied to the memtable
 - **Column Family (CF)** · Independent key-value namespace with its own configuration and storage
 - **Compaction** · Process of merging SSTables to reduce storage overhead and improve read performance
 - **Sequence Number** · Monotonically increasing counter that establishes total ordering of transactions
@@ -59,7 +59,7 @@ At the storage engine level, TidesDB maintains a central database instance (`tid
 The database instance manages shared infrastructure:
 - **Thread pools** · Engine-level pools for flush and compaction operations (shared across all column families)
 - **Reaper thread** · Background thread that closes unused SSTable file handles when the open file limit is reached
-- **Global block cache** · Optional lock-free cache for decompressed klog and vlog blocks (shared across all CFs)
+- **Global block cache** · Optional lock-free cache for decompressed klog blocks (shared across all CFs)
 - **Recovery synchronization** · Primitives that ensure crash-safe initialization
 
 Column families are organized in a dynamically resizable array protected by a reader-writer lock (`cf_list_lock`), enabling concurrent read access to the column family list while serializing structural modifications during column family creation and deletion operations.
@@ -98,9 +98,11 @@ Column families enable domain-specific optimization strategies within a single d
 
 </div>
 
-The memtable is the first landing point for all column family write operations. TidesDB implements the memtable using a lock-free skip list with atomic operations and a versioning strategy for exceptional read performance. When a key is updated, a new version is prepended to the version list for that key, but reads always return the newest version (head of the list), implementing **last-write-wins** semantics. This allows concurrent reads and writes without blocking.
+The memtable is an in-memory skip list data structure that provides fast access to recently written data. Write operations follow this sequence: **WAL first** (durability), then **memtable** (in-memory access). The WAL ensures durability by persisting operations to disk before they're applied to the memtable, guaranteeing that committed data survives crashes.
 
-For detailed concurrency mechanics, see **Section 8.1 Lock-Free Skip List Operations**.
+TidesDB implements the memtable using a lock-free skip list with atomic operations and a versioning strategy for exceptional read performance. When a key is updated, a new version is prepended to the version list for that key, but reads always return the newest version (head of the list), implementing **last-write-wins** semantics. This allows concurrent reads and writes without blocking.
+
+For detailed concurrency mechanics, see **Section 8.1 Lock-Free Skip List Operations**. For WAL mechanics, see **Section 4.4 Write-Ahead Log**.
 
 **Memory Management**
 
