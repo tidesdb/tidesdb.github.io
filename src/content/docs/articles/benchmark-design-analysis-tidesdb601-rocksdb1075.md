@@ -77,7 +77,7 @@ The benchmarks show TidesDB using 1,722 MB vs RocksDB's 332 MB during random rea
 
 ### How TidesDB Manages SSTables in Memory
 
-**The key insight: TidesDB keeps SSTable metadata in memory until it's safe to free.**
+**The key insight  TidesDB keeps SSTable metadata in memory until it's safe to free.**
 
 When you open an SSTable for reading, TidesDB:
 1. Opens the file handles (klog + vlog)
@@ -87,7 +87,7 @@ When you open an SSTable for reading, TidesDB:
 5. Sets up atomic reference counting
 6. Updates `last_access_time` atomically
 
-**Here's the critical part: The SSTable structure stays in memory until the reference count reaches zero.** This includes:
+**Here's the critical part · The SSTable structure stays in memory until the reference count reaches zero.** This includes:
 - Min/max keys (enables range filtering without disk access)
 - Bloom filter (enables false-positive filtering without disk access)
 - Compact block index (enables direct seeks to specific blocks)
@@ -117,14 +117,14 @@ This is the key design decision. Even after file handles close, the SSTable meta
 
 **1. Compact Block Indices**
 
-My block indices use sparse sampling (configurable, default samples every block) with prefix compression. For 1M entries with sampling ratio 16, the index is only ~2.5MB instead of 32MB. These indices are small enough to keep in memory permanently without significant cost.
+My block indices use sparse sampling (configurable via `index_sample_ratio`, default is 1 which samples every block) with prefix compression. For 1M entries, the default configuration (ratio 1:1) keeps the full index in memory. If you configure a higher sampling ratio like 16:1, the index would be only ~2.5MB instead of 32MB, trading some seek precision for memory savings. These indices are small enough to keep in memory permanently without significant cost.
 
 The format is:
 - Min key prefix (16 bytes)
 - Max key prefix (16 bytes)
 - File position (8 bytes, delta-encoded with varint compression)
 
-With a sampling ratio like 16:1 (configurable via `index_sample_ratio`), you get 13x smaller indices. Keeping these in memory means every read can directly seek to the right block without rebuilding the index from disk.
+With sparse sampling ratios (configurable via `index_sample_ratio`), you can reduce index size significantly. The default ratio of 1:1 samples every block for maximum seek precision. Keeping these in memory means every read can directly seek to the right block without rebuilding the index from disk.
 
 **2. Bloom Filters**
 
@@ -132,7 +132,7 @@ Bloom filters are critical for LSM-trees. Without them, you'd check every SSTabl
 
 The cost is memory - typically 10 bits per key. For 1M keys, that's 1.25MB per SSTable. In a database with 10 levels and multiple SSTables per level, bloom filters can add up to 100-200MB.
 
-But here's the trade-off: Keeping bloom filters in memory means you can eliminate 99% of unnecessary SSTable checks **without any disk I/O**. The memory cost is paid once; the disk I/O savings happen on every read.
+But here's the trade-off · Keeping bloom filters in memory means you can eliminate 99% of unnecessary SSTable checks **without any disk I/O**. The memory cost is paid once; the disk I/O savings happen on every read.
 
 **3. Reference Counting Safety**
 
@@ -156,7 +156,7 @@ Here's the scenario
 
 Without this reference counting, you'd have race conditions:
 - Thread A reading → compaction deletes SSTable → Thread A crashes (use-after-free)
-- Solution: complicated locking or delayed deletion with uncertainty
+- Solution · complicated locking or delayed deletion with uncertainty
 
 With reference counting, it's simple and safe · **The SSTable stays in memory until nothing is using it.**
 
@@ -180,23 +180,23 @@ This design choice produces the 1.76x read advantage and 3μs median latency:
 4. If file closed, reopen (fast, no index/filter rebuild)
 5. Read block (I/O) or hit CLOCK cache (memory)
 
-The difference: TidesDB eliminates 2-3 disk I/O operations per read by keeping metadata in memory. For random reads, this is the difference between 3μs and 5μs median latency.
+The difference · TidesDB eliminates 2-3 disk I/O operations per read by keeping metadata in memory. For random reads, this is the difference between 3μs and 5μs median latency.
 
 ### The Memory Trade-off Quantified
 
 For a database with 10M keys across multiple SSTables
 
 **TidesDB memory usage:**
-- Block indices: ~25MB (sparse sampling)
-- Bloom filters: ~125MB (10 bits per key)
-- Min/max keys: ~5MB  
-- SSTable structures: ~20MB
-- Block cache: ~1.5GB (configurable)
+- Block indices · ~25MB (sparse sampling)
+- Bloom filters · ~125MB (10 bits per key)
+- Min/max keys · ~5MB  
+- SSTable structures · ~20MB
+- Block cache · ~1.5GB (configurable)
 - **Total · ~1.7GB**
 
 **RocksDB memory usage:**
-- Block cache only: ~300MB (conservative)
-- Indices/filters loaded on-demand: disk I/O
+- Block cache only · ~300MB (conservative)
+- Indices/filters loaded on-demand · disk I/O
 - **Total · ~300MB**
 
 The 5.2x difference comes from TidesDB keeping indices and bloom filters resident, while RocksDB loads them on-demand.

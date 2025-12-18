@@ -105,7 +105,7 @@ Read performance is critical for many database workloads, particularly those inv
 
 TidesDB demonstrates superior read performance, achieving 2.55M ops/sec versus RocksDB's 1.45M ops/sec—a 76% advantage. This represents a complete reversal from earlier benchmarks where RocksDB held a 5.68x read advantage.
 
-The latency characteristics are particularly impressive: TidesDB achieves 3 μs median latency versus RocksDB's 5 μs (1.7x lower), and at the P99 percentile, TidesDB's 5 μs versus RocksDB's 13 μs represents a 2.6x advantage. These microsecond-level latencies indicate highly efficient index structures and cache utilization.
+The latency characteristics are particularly impressive · TidesDB achieves 3 μs median latency versus RocksDB's 5 μs (1.7x lower), and at the P99 percentile, TidesDB's 5 μs versus RocksDB's 13 μs represents a 2.6x advantage. These microsecond-level latencies indicate highly efficient index structures and cache utilization.
 
 However, RocksDB maintains a significant memory efficiency advantage during reads, consuming only 332 MB versus TidesDB's 1,722 MB (5.2x lower). This suggests TidesDB achieves its read performance through more aggressive memory caching, which could be a consideration for memory-constrained environments.
 
@@ -161,7 +161,7 @@ Many real-world applications exhibit skewed access patterns where certain keys a
 
 The Zipfian workload continues to reveal exceptional performance from TidesDB. With nearly 2x write advantages (1.98x-1.99x) and 1.80x read advantage, TidesDB demonstrates superior handling of skewed access patterns that are common in real-world applications.
 
-The space efficiency is extraordinary: 5.5x-6.1x smaller database sizes (10 MB vs 56-62 MB) for similar unique key counts indicate TidesDB's internal LSM architecture is highly effective for repeated writes to the same keys. RocksDB's LSM-tree architecture requires multiple versions of the same key to exist temporarily until compaction occurs, explaining the larger footprint.
+The space efficiency is extraordinary · 5.5x-6.1x smaller database sizes (10 MB vs 56-62 MB) for similar unique key counts indicate TidesDB's internal LSM architecture is highly effective for repeated writes to the same keys. RocksDB's LSM-tree architecture requires multiple versions of the same key to exist temporarily until compaction occurs, explaining the larger footprint.
 
 TidesDB's read performance advantage in this scenario (2.73M ops/sec vs 1.52M ops/sec, with 2 μs vs 3 μs median latency) demonstrates excellent cache utilization for hot data. The consistent 2 μs read latency represents exceptional performance for frequently accessed keys.
 
@@ -185,9 +185,9 @@ Deletion efficiency impacts applications with high turnover rates, such as cachi
 
 TidesDB demonstrates a modest but consistent 10% advantage in delete throughput (3.81M vs 3.47M ops/sec), with 1.2x lower median latency. Both engines show impressive delete performance exceeding 3 million operations per second.
 
-The write amplification factors are notable: both engines show values well below 1.0 (0.18x and 0.28x), indicating that deletion operations write significantly less data to disk than the original data size—expected behavior as deletions primarily involve tombstone markers rather than physical data removal. TidesDB's 36% lower write amplification (0.18x vs 0.28x) suggests more efficient tombstone handling.
+The write amplification factors are notable · both engines show values well below 1.0 (0.18x and 0.28x), indicating that deletion operations write significantly less data to disk than the original data size—expected behavior as deletions primarily involve tombstone markers rather than physical data removal. TidesDB's 36% lower write amplification (0.18x vs 0.28x) suggests more efficient tombstone handling.
 
-The critical difference lies in space reclamation: TidesDB achieves a final database size of 0.00 MB after deleting all 5 million records, while RocksDB retains 63.77 MB. This demonstrates TidesDB performs immediate or aggressive garbage collection, while RocksDB requires explicit compaction to fully reclaim space. For applications with high delete rates or strict storage requirements, this difference could be operationally significant.
+The critical difference lies in space reclamation · TidesDB achieves a final database size of 0.00 MB after deleting all 5 million records, while RocksDB retains 63.77 MB. This demonstrates TidesDB performs immediate or aggressive garbage collection, while RocksDB requires explicit compaction to fully reclaim space. For applications with high delete rates or strict storage requirements, this difference could be operationally significant.
 
 ## 7. Large Value Performance
 
@@ -398,7 +398,7 @@ RocksDB demonstrates different optimization priorities as a mature LSM-tree impl
 
 ## Conclusions
 
-This comprehensive benchmark suite reveals that TidesDB v6.0.0 represents a significant advancement in storage engine design, achieving what has historically been difficult: excellent performance across both read and write operations without major trade-offs.
+This comprehensive benchmark suite reveals that TidesDB v6.0.0 represents a significant advancement in storage engine design, achieving what has historically been difficult · excellent performance across both read and write operations without major trade-offs.
 
 **TidesDB's Strengths**
 - Superior write throughput (1.32x-3.28x faster across workloads)
