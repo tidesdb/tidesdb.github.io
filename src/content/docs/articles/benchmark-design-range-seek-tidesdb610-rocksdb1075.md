@@ -403,10 +403,6 @@ Point seeks benefit from aggressive caching. Range queries benefit from sequenti
 
 The 1μs median latency on sequential seeks shows that with proper caching, storage engine latency can approach memory latency. This opens up new use cases.
 
-### 8. The Recovery Bug Was Critical
-
-The initial benchmark failures revealed a race condition where transactions could start before database recovery completed. The fix (`wait_for_open` now checks both `is_open` and `!is_recovering`) was essential for correctness.
-
 ## When TidesDB's Seek Performance Matters
 
 **Use TidesDB when**
