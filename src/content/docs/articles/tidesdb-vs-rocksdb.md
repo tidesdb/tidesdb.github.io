@@ -7,6 +7,8 @@ description: "Comprehensive performance benchmarks comparing TidesDB v4.0.0 and 
 
 *by Alex Gaetano Padula*
 
+*published on November 17th, 2025*
+
 <div class="historic">
 <span>!</span>
 This article presents performance data from an older version of TidesDB (v4.0.0) and should be considered outdated. Please refer to more recent benchmark analyses for current performance comparisons.  This is just for historical reference and analysis.

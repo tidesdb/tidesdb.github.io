@@ -5,6 +5,8 @@ description: "Deep dive into architectural decisions and performance characteris
 
 *by Alex Gaetano Padula*
 
+*published on December 17th, 2025*
+
 After spending the better part of two years building TidesDB from the ground up, I want to share some insights about the architectural decisions that led to the performance characteristics you're seeing in these benchmarks. This isn't just about being "fast" - it's about understanding what trade-offs you're making and why.
 
 You can download the raw benchtool report <a href="/benchmark_results_tdb601_rdb1075_1.txt" download>here</a>
