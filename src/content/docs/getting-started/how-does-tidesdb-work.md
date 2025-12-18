@@ -397,7 +397,7 @@ The index is serialized with space-efficient encoding:
 [Max Key Prefixes - count × prefix_len bytes]
 ```
 
-File positions use delta encoding with varint compression: the first position is stored as-is, subsequent positions store the delta from the previous position. This typically achieves 50-70% compression for sequential file positions.
+File positions use delta encoding with varint compression · the first position is stored as-is, subsequent positions store the delta from the previous position. This typically achieves 50-70% compression for sequential file positions.
 
 **Lookup Process**
 
@@ -448,7 +448,7 @@ Always written as the last block in the file
    - Optionally compress the entire block
    - Write as data block and record the file position
    - Add key to bloom filter (if enabled)
-   - If sampled (block_num % index_sample_ratio == 0): add min/max key prefixes and file position to block index
+   - If sampled (block_num % index_sample_ratio == 0) · add min/max key prefixes and file position to block index
    - Track min/max keys for metadata
 4. Serialize and write bloom filter block (if enabled)
 5. Serialize and write compact block index block (if enabled) with varint-compressed file positions
@@ -458,7 +458,7 @@ Always written as the last block in the file
 
 1. **Load SSTable** (recovery or first access)
    - SSTable structure already exists in memory (loaded during recovery or compaction)
-   - If block managers are closed: open klog and vlog block manager files on-demand
+   - If block managers are closed · open klog and vlog block manager files on-demand
    - Update `last_access_time` atomically for reaper tracking
    - Increment reference count via `tidesdb_sstable_ref`
    - Metadata, bloom filter, and block index are already loaded in memory from recovery
@@ -470,21 +470,21 @@ Always written as the last block in the file
    - Update `last_access_time` atomically
    - Check if key is within min/max range using configured comparator (quick rejection)
    - Check bloom filter if enabled (probabilistic rejection)
-   - If block indexes enabled: query compact block index for file position
+   - If block indexes enabled · query compact block index for file position
      - Binary search min_key_prefixes to find predecessor block
      - Position cursor directly at the returned file offset
      - Read klog block at that position
-   - If block indexes disabled: linear scan through klog data blocks from beginning
+   - If block indexes disabled · linear scan through klog data blocks from beginning
    - Decompress klog block if compression is enabled
    - Parse klog block header (num_entries, block_size)
    - Iterate through entries in the block:
-     - Parse klog entry header (33 bytes): flags, key_size, value_size, ttl, seq, vlog_offset
+     - Parse klog entry header (33 bytes) · flags, key_size, value_size, ttl, seq, vlog_offset
      - Compare entry key with search key using comparator
-     - If match found:
+     - If match found ·
        - Check TTL expiration (return NOT_FOUND if expired)
        - Check tombstone flag (return NOT_FOUND if deleted)
-       - If vlog_offset == 0: value is inline in klog, return it
-       - If vlog_offset > 0: read value from vlog file at offset, decompress if needed, return it
+       - If vlog_offset == 0 · value is inline in klog, return it
+       - If vlog_offset > 0 · read value from vlog file at offset, decompress if needed, return it
    - Release SSTable reference (decrement reference count)
    - Return value or TDB_ERR_NOT_FOUND if not present
 
@@ -500,7 +500,7 @@ For durability, TidesDB implements a write-ahead logging mechanism with a rotati
    
 </div>
 
-File Format: `wal_<memtable_id>.log`
+File Format · `wal_<memtable_id>.log`
 
 WAL files follow the naming pattern `wal_0.log`, `wal_1.log`, `wal_2.log`, etc. Each memtable has its own dedicated WAL file, with the WAL ID matching the memtable ID (a monotonically increasing counter). Multiple WAL files can exist simultaneously - one for the active memtable and others for memtables in the flush queue. WAL files are deleted only after the memtable is successfully flushed to an SSTable and freed.
 
@@ -610,7 +610,7 @@ This multi-tier search ensures the most recent version of a key is always retrie
 
 ### 5.3 Transactions
 
-TidesDB provides transaction support with multi-column-family capabilities and configurable isolation levels. Transactions are initiated through `tidesdb_txn_begin()` or `tidesdb_txn_begin_with_isolation()`, with a single transaction capable of operating across multiple column families atomically. The system implements MVCC (Multi-Version Concurrency Control) with five isolation levels: READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SNAPSHOT ISOLATION, and SERIALIZABLE (see Section 8.3 for detailed semantics). Iterators acquire atomic references on both memtables and SSTables, creating consistent point-in-time snapshots unaffected by concurrent compaction or writes.
+TidesDB provides transaction support with multi-column-family capabilities and configurable isolation levels. Transactions are initiated through `tidesdb_txn_begin()` or `tidesdb_txn_begin_with_isolation()`, with a single transaction capable of operating across multiple column families atomically. The system implements MVCC (Multi-Version Concurrency Control) with five isolation levels · READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SNAPSHOT ISOLATION, and SERIALIZABLE (see Section 8.3 for detailed semantics). Iterators acquire atomic references on both memtables and SSTables, creating consistent point-in-time snapshots unaffected by concurrent compaction or writes.
 
 **Global Sequence Numbering**
 
@@ -643,7 +643,7 @@ Write transactions use a completely lock-free commit path with atomic operations
 3. After passing conflict detection, a global sequence is assigned via `atomic_fetch_add(&db->global_seq, 1)`
 4. The sequence is marked as "in-progress" in the commit status tracker
 5. For each participating CF:
-   - If multi-CF (`num_cfs > 1`): Write metadata header (num_cfs, checksum, CF names) to WAL
+   - If multi-CF (`num_cfs > 1`) · Write metadata header (num_cfs, checksum, CF names) to WAL
    - Write all operations for that CF to its WAL using lock-free group commit
    - Insert operations into the CF's active memtable using lock-free skip list CAS
 6. Mark the sequence as "committed" in the commit status tracker (makes transaction visible)
@@ -702,9 +702,9 @@ Compaction decisions are governed by a dividing level X, calculated as `X = num_
 
 The system implements **Spooky Algorithm 2** to select merge strategies. Before compaction begins, the active memtable is flushed to ensure all data is in SSTables. The algorithm then finds the smallest level q (1 ≤ q ≤ X) where `capacity_q < cumulative_size(1...q)`, meaning level q cannot accommodate the merge of all data from levels 1 through q. This becomes the target level:
 
-- If `target < X`: Perform **full preemptive merge** of levels 1 to target
-- If `target == X`: Perform **dividing merge** into level X
-- If no suitable level found: Default to dividing merge at X
+- If `target < X` · Perform **full preemptive merge** of levels 1 to target
+- If `target == X` · Perform **dividing merge** into level X
+- If no suitable level found · Default to dividing merge at X
 
 After the primary merge, if level X is full (`size_X >= capacity_X`), the algorithm applies the same logic to find the smallest level z (X+1 ≤ z ≤ num_levels) where `capacity_z < cumulative_size(X...z)`, then performs a **partitioned merge** from X to z. This two-phase approach ensures data flows efficiently through the hierarchy.
 
@@ -997,7 +997,7 @@ Each SSTable optionally contains a compact block index stored as the second-to-l
 **Space Efficiency**
 - Approximately (2 × prefix_len + 8) bytes per sampled block
 - 1 million entries, sample ratio 16, prefix_len 16 → ~2.5MB index size
-- Compare to full block index: 32 bytes per block → ~32MB for 1M blocks
+- Compare to full block index · 32 bytes per block → ~32MB for 1M blocks
 - **~13x smaller** with sampling while maintaining fast lookups
 
 **Construction**
@@ -1035,8 +1035,8 @@ The complete lookup process for a key in an SSTable:
    - Return value or continue to next block
 
 **Performance Characteristics**
-- With block index: O(log n) binary search + O(sample_ratio) block scans
-- Without block index: O(num_blocks) linear scan
+- With block index · O(log n) binary search + O(sample_ratio) block scans
+- Without block index · O(num_blocks) linear scan
 - Bloom filter eliminates ~99% of unnecessary lookups for non-existent keys
 
 #### Graceful Degradation
@@ -1050,7 +1050,7 @@ This approach ensures that TidesDB maintains correctness even when optimizations
 
 ### 7.2 Compression
 
-TidesDB supports multiple compression algorithms for SSTable data: Snappy emphasizes speed over compression ratio, LZ4 provides a balanced approach with good speed and reasonable compression, and ZSTD offers a higher compression ratio at the cost of some performance. Compression is applied only to SSTable entries (data blocks) to reduce disk usage and I/O. WAL entries remain uncompressed for fast writes and recovery.
+TidesDB supports multiple compression algorithms for SSTable data · Snappy emphasizes speed over compression ratio, LZ4 provides a balanced approach with good speed and reasonable compression, and ZSTD offers a higher compression ratio at the cost of some performance. Compression is applied only to SSTable entries (data blocks) to reduce disk usage and I/O. WAL entries remain uncompressed for fast writes and recovery.
 
 ### 7.3 Sync Modes
 
@@ -1143,11 +1143,11 @@ TidesDB implements multi-version concurrency control (MVCC) using sequence numbe
 
 **READ UNCOMMITTED (Level 0)**
 
-Implementation: `skip_list_get_with_seq()` is called with `snapshot_seq = UINT64_MAX`, which bypasses all version filtering and returns the latest version regardless of commit status.
+Implementation · `skip_list_get_with_seq()` is called with `snapshot_seq = UINT64_MAX`, which bypasses all version filtering and returns the latest version regardless of commit status.
 
 ```c
 if (snapshot_seq == UINT64_MAX) {
-    // Read uncommitted: see all versions, use latest
+    // Read uncommitted · see all versions, use latest
     if (version == NULL) return -1;
 }
 ```
@@ -1156,7 +1156,7 @@ No transaction registration, no read/write set tracking, no conflict detection. 
 
 **READ COMMITTED (Level 1)**
 
-Implementation: Each read operation captures a fresh snapshot by loading `atomic_load(&cf->commit_seq)` at read time. The snapshot refreshes on every `tidesdb_txn_get()` call.
+Implementation · Each read operation captures a fresh snapshot by loading `atomic_load(&cf->commit_seq)` at read time. The snapshot refreshes on every `tidesdb_txn_get()` call.
 
 ```c
 if (txn->isolation_level == TDB_ISOLATION_READ_COMMITTED) {
@@ -1169,7 +1169,7 @@ Reads filter versions using `skip_list_get_with_seq()` with the per-read snapsho
 
 **REPEATABLE READ (Level 2)**
 
-Implementation: Snapshot captured once at transaction begin via `tidesdb_txn_add_cf_internal()`, stored in `txn->cf_snapshots[cf_idx]`. All subsequent reads use this fixed snapshot.
+Implementation · Snapshot captured once at transaction begin via `tidesdb_txn_add_cf_internal()`, stored in `txn->cf_snapshots[cf_idx]`. All subsequent reads use this fixed snapshot.
 
 ```c
 if (txn->isolation_level == TDB_ISOLATION_REPEATABLE_READ) {
@@ -1180,15 +1180,15 @@ if (txn->isolation_level == TDB_ISOLATION_REPEATABLE_READ) {
 
 Transaction registers in the column family's active transaction buffer (`cf->active_txn_buffer`) to enable conflict detection. At commit time, the system performs two checks:
 
-1. **Read-set validation**: For each key in `txn->read_keys[]`, check if `found_seq > key_read_seq`. If true, another transaction modified the key after we read it → abort with `TDB_ERR_CONFLICT`.
+1. **Read-set validation** · For each key in `txn->read_keys[]`, check if `found_seq > key_read_seq`. If true, another transaction modified the key after we read it → abort with `TDB_ERR_CONFLICT`.
 
-2. **Write-write conflict detection**: For each key in `txn->write_keys[]`, check if `found_seq > cf_snapshot`. If true, another transaction committed a write to the same key → abort with `TDB_ERR_CONFLICT`.
+2. **Write-write conflict detection** · For each key in `txn->write_keys[]`, check if `found_seq > cf_snapshot`. If true, another transaction committed a write to the same key → abort with `TDB_ERR_CONFLICT`.
 
 Prevents lost updates but allows phantom reads in range scans.
 
 **SNAPSHOT ISOLATION (Level 3)**
 
-Implementation: Identical to REPEATABLE READ with enhanced write conflict detection. Uses the same snapshot capture, read-set tracking, and write-write conflict checks.
+Implementation · Identical to REPEATABLE READ with enhanced write conflict detection. Uses the same snapshot capture, read-set tracking, and write-write conflict checks.
 
 ```c
 if (txn->isolation_level == TDB_ISOLATION_SNAPSHOT) {
@@ -1197,11 +1197,11 @@ if (txn->isolation_level == TDB_ISOLATION_SNAPSHOT) {
 }
 ```
 
-The key difference is semantic: SNAPSHOT isolation explicitly guarantees first-committer-wins semantics for overlapping write sets, making it suitable for workloads with high contention on specific keys. The implementation is the same as REPEATABLE READ in TidesDB's current design.
+The key difference is semantic · SNAPSHOT isolation explicitly guarantees first-committer-wins semantics for overlapping write sets, making it suitable for workloads with high contention on specific keys. The implementation is the same as REPEATABLE READ in TidesDB's current design.
 
 **SERIALIZABLE (Level 4) · SSI Implementation**
 
-Implementation: Full Serializable Snapshot Isolation (SSI) with read-write antidependency detection. Extends SNAPSHOT isolation with an additional check at commit time.
+Implementation · Full Serializable Snapshot Isolation (SSI) with read-write antidependency detection. Extends SNAPSHOT isolation with an additional check at commit time.
 
 At transaction begin, registers in `cf->active_txn_buffer` with isolation level stored:
 ```c
@@ -1259,7 +1259,7 @@ static void check_rw_conflict(uint32_t id, void *data, void *ctx) {
 
 **Key Insight** · This detects **dangerous structures** in the serialization graph. If transaction T1 (committing) is writing keys, and transaction T2 (active) has a snapshot from before T1 started, then T2 might have read old values of keys T1 is writing. This creates a read-write antidependency (T2 →rw T1), which combined with a write-read dependency (T1 →wr T2) would form a cycle, violating serializability. By aborting T1, we prevent the cycle.
 
-This is a **conservative** SSI implementation: it may abort transactions that wouldn't actually cause anomalies (false positives), but it never allows non-serializable executions (no false negatives). The overhead is proportional to the number of active SERIALIZABLE transactions, not all transactions, making it practical for mixed workloads.
+This is a **conservative** SSI implementation · it may abort transactions that wouldn't actually cause anomalies (false positives), but it never allows non-serializable executions (no false negatives). The overhead is proportional to the number of active SERIALIZABLE transactions, not all transactions, making it practical for mixed workloads.
 
 **MVCC Implementation**
 
@@ -1304,7 +1304,7 @@ entry->buffer_slot_id = *slot_id;
 buffer_get_generation(cf->active_txn_buffer, *slot_id, &entry->generation);
 ```
 
-The `buffer_acquire()` call performs an atomic CAS operation to find a FREE slot and transition it to ACQUIRED state. If all slots are occupied (buffer exhausted), the transaction fails immediately rather than compromising SERIALIZABLE guarantees. This is a critical design choice: SSI correctness requires tracking all active SERIALIZABLE transactions, so buffer exhaustion must be treated as a hard error.
+The `buffer_acquire()` call performs an atomic CAS operation to find a FREE slot and transition it to ACQUIRED state. If all slots are occupied (buffer exhausted), the transaction fails immediately rather than compromising SERIALIZABLE guarantees. This is a critical design choice · SSI correctness requires tracking all active SERIALIZABLE transactions, so buffer exhaustion must be treated as a hard error.
 
 **Lock-Free Buffer Slot States**
 
@@ -1360,7 +1360,7 @@ With generation counters:
 1. T1 acquires slot 5 (generation 10), stores P1
 2. T1 commits, releases slot 5 (generation increments to 11)
 3. T2 acquires slot 5 (generation 11), stores P2
-4. Concurrent thread validates: slot 5, generation 10 ≠ 11 → **detects stale reference, skips**
+4. Concurrent thread validates · slot 5, generation 10 ≠ 11 → **detects stale reference, skips**
 
 This enables safe concurrent access without locking the entire buffer.
 
@@ -1458,10 +1458,10 @@ The MANIFEST is stored as a plain text file with the following structure:
 - **Line 1** · Manifest format version (currently 6)
 - **Line 2** · Global sequence number for the column family
 - **Remaining lines** · One SSTable entry per line in CSV format
-  - `level`: LSM tree level (1-based, matching level_num)
-  - `id`: Unique SSTable identifier
-  - `num_entries`: Number of key-value pairs in the SSTable
-  - `size_bytes`: Total size of the SSTable in bytes
+  - `level` · LSM tree level (1-based, matching level_num)
+  - `id` · Unique SSTable identifier
+  - `num_entries` · Number of key-value pairs in the SSTable
+  - `size_bytes` · Total size of the SSTable in bytes
 
 **Example**
 ```
@@ -1493,12 +1493,12 @@ This provides several benefits:
 **API**
 
 The manifest uses intuitive open/close semantics:
-- `tidesdb_manifest_open(path)`: Opens or creates a manifest file
-- `tidesdb_manifest_add_sstable()`: Adds or updates an SSTable entry (thread-safe)
-- `tidesdb_manifest_remove_sstable()`: Removes an SSTable entry (thread-safe)
-- `tidesdb_manifest_has_sstable()`: Checks if an SSTable exists (thread-safe read)
-- `tidesdb_manifest_commit(path)`: Writes manifest to disk atomically
-- `tidesdb_manifest_close()`: Closes file and frees resources
+- `tidesdb_manifest_open(path)` · Opens or creates a manifest file
+- `tidesdb_manifest_add_sstable()` · Adds or updates an SSTable entry (thread-safe)
+- `tidesdb_manifest_remove_sstable()` · Removes an SSTable entry (thread-safe)
+- `tidesdb_manifest_has_sstable()` · Checks if an SSTable exists (thread-safe read)
+- `tidesdb_manifest_commit(path)` · Writes manifest to disk atomically
+- `tidesdb_manifest_close()` · Closes file and frees resources
 
 **Recovery**
 
