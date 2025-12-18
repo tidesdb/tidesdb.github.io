@@ -144,6 +144,22 @@ export default defineConfig({
 						name: 'revisit-after',
 						content: '7 days'
 					}
+				},
+				{
+					tag: 'script',
+					attrs: {
+						async: true,
+						src: 'https://www.googletagmanager.com/gtag/js?id=G-5P4BKM1TX3'
+					}
+				},
+				{
+					tag: 'script',
+					content: `
+						window.dataLayer = window.dataLayer || [];
+						function gtag(){dataLayer.push(arguments);}
+						gtag('js', new Date());
+						gtag('config', 'G-5P4BKM1TX3');
+					`
 				}
 			],
 			sidebar: [

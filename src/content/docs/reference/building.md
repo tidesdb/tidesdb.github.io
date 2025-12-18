@@ -249,18 +249,40 @@ cmake --build build
 Once you have the dependencies installed, you can build using the commands below.
 
 ### Unix (Linux/macOS)
-```bash
-rm -rf build && cmake -S . -B build
-cmake --build build
-cmake --install build
 
-# Production build
-rm -rf build && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTIDESDB_WITH_SANITIZER=OFF -DTIDESDB_BUILD_TESTS=OFF
-cmake --build build --config Release
+#### Standard Build (Production)
+By default, TidesDB builds with optimizations enabled and debugging features disabled:
+
+```bash
+rm -rf build && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 cmake --install build
 
 # On linux run ldconfig to update the shared library cache
 ldconfig
+```
+
+#### Development Build
+For development, enable sanitizers and profiling:
+
+```bash
+rm -rf build && cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DTIDESDB_WITH_SANITIZER=ON \
+  -DENABLE_READ_PROFILING=ON
+cmake --build build
+```
+
+#### Minimal Build (No Tests)
+For embedded systems or minimal deployments:
+
+```bash
+rm -rf build && cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DTIDESDB_BUILD_TESTS=OFF \
+  -DBUILD_SHARED_LIBS=OFF
+cmake --build build
+cmake --install build
 ```
 
 ### Windows
@@ -332,23 +354,33 @@ Or run tests directly
 ./build/tidesdb_tests
 ```
 
-## Read Profiling
+## Build Options
+
+TidesDB provides several CMake options to customize the build:
+
+| Option | Description | Default |
+|--------|-------------|----------|
+| `TIDESDB_WITH_SANITIZER` | Enable address/undefined behavior sanitizers | `OFF` |
+| `TIDESDB_BUILD_TESTS` | Build test suite | `ON` |
+| `BUILD_SHARED_LIBS` | Build shared libraries instead of static | `ON` |
+| `ENABLE_READ_PROFILING` | Enable read profiling instrumentation | `OFF` |
+| `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | `Release` |
+
+### Read Profiling
 
 TidesDB includes optional read profiling instrumentation to analyze read performance and cache effectiveness. When enabled, it tracks detailed statistics about where reads are served from (memtable, immutable, SSTable), cache hit rates, bloom filter effectiveness, and I/O patterns.
 
-### Enabling Read Profiling
-
-Read profiling is disabled by default to avoid overhead in production. Enable it at build time:
+**Read profiling is disabled by default** to avoid overhead in production. Enable it for development or performance analysis:
 
 ```bash
-# Enable read profiling
-cmake -B build -DENABLE_READ_PROFILING=ON
+# Development build with profiling
+cmake -B build -DENABLE_READ_PROFILING=ON -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ```
 
-**For production builds**, keep it disabled:
+**For production builds**, profiling is automatically disabled:
 ```bash
-cmake -B build -DENABLE_READ_PROFILING=OFF  # Default
+cmake -B build  # ENABLE_READ_PROFILING=OFF by default
 ```
 
 ### Using Read Profiling
@@ -464,20 +496,25 @@ When **enabled**
 
 **Development & Testing**
 ```bash
-# Enable profiling for development
-cmake -B build -DENABLE_READ_PROFILING=ON -DCMAKE_BUILD_TYPE=Debug
+# Enable profiling and sanitizers for development
+cmake -B build \
+  -DENABLE_READ_PROFILING=ON \
+  -DTIDESDB_WITH_SANITIZER=ON \
+  -DCMAKE_BUILD_TYPE=Debug
 ```
 
 **Performance Tuning**
 ```bash
-# Profile with production-like config
-cmake -B build -DENABLE_READ_PROFILING=ON -DCMAKE_BUILD_TYPE=Release
+# Profile with production-like config (no sanitizers)
+cmake -B build \
+  -DENABLE_READ_PROFILING=ON \
+  -DCMAKE_BUILD_TYPE=Release
 ```
 
 **Production Deployment**
 ```bash
-# Disable for zero overhead
-cmake -B build -DENABLE_READ_PROFILING=OFF -DCMAKE_BUILD_TYPE=Release
+# Default: profiling and sanitizers disabled for zero overhead
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 ```
 
 ### Notes
@@ -539,7 +576,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_LEVEL_RATIO` | Level size multiplier | 10 |
 | `BENCH_DIVIDING_LEVEL_OFFSET` | Compaction dividing level offset | 2 |
 | `BENCH_MIN_LEVELS` | Minimum LSM levels, TidesDB can scale up levels if need be. | 4 |
-| `BENCH_SKIP_LIST_MAX_LEVEL` | Skip list max level | 16 |
+| `BENCH_SKIP_LIST_MAX_LEVEL` | Skip list max level | 12 |
 | `BENCH_SKIP_LIST_PROBABILITY` | Skip list probability | 0.25 |
 | `BENCH_ENABLE_COMPRESSION` | Enable compression (0=off, 1=on) | 1 |
 | `BENCH_COMPRESSION_ALGORITHM` | Compression algorithm | LZ4_COMPRESSION |
