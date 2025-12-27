@@ -1,6 +1,6 @@
 ---
 title: "What I Learned Building a Storage Engine That Outperforms RocksDB"
-description: "What did I the creator of TidesDB learn while building a storage engine that outperforms RocksDB?"
+description: "Lessons learned building TidesDB - an embeddable storage engine that outperforms RocksDB through lock-free concurrency, adaptive compaction, and aggressive caching."
 ---
 
 *by Alex Gaetano Padula*

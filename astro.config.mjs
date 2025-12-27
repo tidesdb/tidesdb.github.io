@@ -78,43 +78,8 @@ export default defineConfig({
 				{
 					tag: 'meta',
 					attrs: {
-						property: 'og:title',
-						content: 'TidesDB - Fast Embeddable Storage Engine'
-					}
-				},
-				{
-					tag: 'meta',
-					attrs: {
-						property: 'og:description',
-						content: 'High-performance LSM-tree based key-value storage engine library written in C. Features ACID transactions, column families, compression, and cross-platform support.'
-					}
-				},
-				{
-					tag: 'meta',
-					attrs: {
-						property: 'og:url',
-						content: 'https://tidesdb.com'
-					}
-				},
-				{
-					tag: 'meta',
-					attrs: {
 						name: 'twitter:card',
 						content: 'summary_large_image'
-					}
-				},
-				{
-					tag: 'meta',
-					attrs: {
-						name: 'twitter:title',
-						content: 'TidesDB - Fast Embeddable Storage Engine'
-					}
-				},
-				{
-					tag: 'meta',
-					attrs: {
-						name: 'twitter:description',
-						content: 'High-performance LSM-tree based key-value storage engine library written in C. ACID transactions, high concurrency, cross-platform.'
 					}
 				},
 				{
