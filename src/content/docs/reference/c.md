@@ -31,11 +31,10 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_CORRUPTION` | `-5` | Data corruption detected (checksum failure, invalid format version, truncated data) |
 | `TDB_ERR_EXISTS` | `-6` | Resource already exists (e.g., column family name collision) |
 | `TDB_ERR_CONFLICT` | `-7` | Transaction conflict detected (write-write or read-write conflict in SERIALIZABLE/SNAPSHOT isolation) |
-| `TDB_ERR_OVERFLOW` | `-8` | Numeric overflow or buffer overflow |
-| `TDB_ERR_TOO_LARGE` | `-9` | Key or value size exceeds maximum allowed size |
-| `TDB_ERR_MEMORY_LIMIT` | `-10` | Operation would exceed memory limits (safety check to prevent OOM) |
-| `TDB_ERR_INVALID_DB` | `-11` | Database handle is invalid (e.g., after close) |
-| `TDB_ERR_UNKNOWN` | `-12` | Unknown or unspecified error |
+| `TDB_ERR_TOO_LARGE` | `-8` | Key or value size exceeds maximum allowed size |
+| `TDB_ERR_MEMORY_LIMIT` | `-9` | Operation would exceed memory limits (safety check to prevent OOM) |
+| `TDB_ERR_INVALID_DB` | `-10` | Database handle is invalid (e.g., after close) |
+| `TDB_ERR_UNKNOWN` | `-11` | Unknown or unspecified error |
 
 **Error categories**
 - `TDB_ERR_CORRUPTION` indicates data integrity issues requiring immediate attention
@@ -46,7 +45,7 @@ TidesDB provides detailed error codes for production use.
 ### Example Error Handling
 
 ```c
-int result = tidesdb_txn_put(txn, key, key_size, value, value_size, -1);
+int result = tidesdb_txn_put(txn, cf, key, key_size, value, value_size, -1);
 if (result != TDB_SUCCESS)
 {
     switch (result)
@@ -172,12 +171,15 @@ tidesdb_column_family_config_t cf_config = {
     .bloom_fpr = 0.01,                          /* 1% false positive rate */
     .enable_block_indexes = 1,                  /* Enable compact block indexes */
     .index_sample_ratio = 1,                    /* Sample every block for index (default: 1) */
+    .block_index_prefix_len = 16,               /* Block index prefix length (default: 16) */
     .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
     .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
     .comparator_name = {0},                     /* Empty = use default "memcmp" */
-    .value_threshold = 4096,                    /* Values > 4KB go to vlog (default: 4096) */
+    .klog_value_threshold = 4096,               /* Values > 4KB go to vlog (default: 4096) */
     .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
-    .default_isolation_level = TDB_ISOLATION_READ_COMMITTED  /* Default transaction isolation */
+    .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
+    .l1_file_count_trigger = 4,                 /* L1 file count trigger for compaction (default: 4) */
+    .l0_queue_stall_threshold = 10              /* L0 queue stall threshold (default: 10) */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -315,8 +317,12 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 - `enable_bloom_filter` - Cannot change bloom filter presence
 - `comparator_name` - Cannot change sort order
 - `level_size_ratio` - Cannot change LSM level sizing
-- `value_threshold` - Cannot change klog/vlog separation
-- `klog_block_size` / `vlog_block_size` - Cannot change block sizes
+- `klog_value_threshold` - Cannot change klog/vlog separation
+- `min_levels` - Cannot change minimum LSM levels
+- `dividing_level_offset` - Cannot change compaction strategy
+- `block_index_prefix_len` - Cannot change block index structure
+- `l1_file_count_trigger` - Cannot change compaction trigger
+- `l0_queue_stall_threshold` - Cannot change backpressure threshold
 
 **Configuration persistence**
 
@@ -530,9 +536,15 @@ if (tidesdb_txn_commit(txn) != 0)
 tidesdb_txn_free(txn);
 ```
 
+**Savepoint API**
+- `tidesdb_txn_savepoint(txn, "name")` - Create a savepoint
+- `tidesdb_txn_rollback_to_savepoint(txn, "name")` - Rollback to savepoint
+- `tidesdb_txn_release_savepoint(txn, "name")` - Release savepoint without rolling back
+
 **Savepoint behavior**
 - Savepoints capture the transaction state at a specific point
 - Rolling back to a savepoint discards all operations after that savepoint
+- Releasing a savepoint frees its resources without rolling back
 - Multiple savepoints can be created with different names
 - Creating a savepoint with an existing name updates that savepoint
 - Savepoints are automatically freed when the transaction commits or rolls back
@@ -574,8 +586,8 @@ tidesdb_txn_free(txn);
 **Multi-CF guarantees**
 - Either all CFs commit or none do (atomic)
 - Automatically detected when operations span multiple CFs
-- Uses global sequence numbers with high-bit flagging
-- Recovery validates completeness across all participating CFs
+- Uses global sequence numbers for atomic ordering
+- Each CF's WAL receives operations with the same commit sequence number
 - No two-phase commit or coordinator overhead
 
 ### Isolation Levels
@@ -882,23 +894,23 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 
 :::note[Sync Mode Options]
 - **TDB_SYNC_NONE** · No explicit sync, relies on OS page cache (fastest, least durable)
-  - Best for · Maximum throughput, acceptable data loss on crash
-  - Use case · Caches, temporary data, reproducible workloads
+    - Best for · Maximum throughput, acceptable data loss on crash
+    - Use case · Caches, temporary data, reproducible workloads
 
 - **TDB_SYNC_INTERVAL** · Periodic background syncing at configurable intervals (balanced)
-  - Best for · Production workloads requiring good performance with bounded data loss
-  - Use case · Most applications, configurable durability window
-  - Features:
-    - Single background sync thread monitors all column families using interval mode
-    - Configurable sync interval via `sync_interval_us` (microseconds)
-    - Structural operations (flush, compaction, WAL rotation) always enforce durability
-    - At most `sync_interval_us` worth of data at risk on crash
+    - Best for · Production workloads requiring good performance with bounded data loss
+    - Use case · Most applications, configurable durability window
+    - Features:
+        - Single background sync thread monitors all column families using interval mode
+        - Configurable sync interval via `sync_interval_us` (microseconds)
+        - Structural operations (flush, compaction, WAL rotation) always enforce durability
+        - At most `sync_interval_us` worth of data at risk on crash
 
 - **TDB_SYNC_FULL** · Fsync on every write operation (slowest, most durable)
-  - Best for · Critical data requiring maximum durability
-  - Use case · Financial transactions, audit logs, critical metadata
-  - Note: Structural operations always use fsync regardless of sync mode
-:::
+    - Best for · Critical data requiring maximum durability
+    - Use case · Financial transactions, audit logs, critical metadata
+    - Note: Structural operations always use fsync regardless of sync mode
+      :::
 
 ### Sync Interval Examples
 
