@@ -7,7 +7,7 @@ description: "What did I the creator of TidesDB learn while building a storage e
 
 *published on December 27th, 2025*
 
-I spent the past two years building TidesDB, an embeddable key-value storage engine written in C. But this isn't version 1.0 - it's version 7.0. There have been many revisions, complete rewrites, failed experiments. I learn constantly, obsessively. Each version taught me something new about storage engines, LSM-trees, lock-free algorithms, or the subtle ways systems break.
+I spent the past two years building TidesDB, an embeddable key-value storage engine written in C. But this isn't version 1.0 - it's version 7.0. There have been many revisions(majors, minors and patches), complete rewrites, failed experiments. I learn constantly, obsessively. Each version taught me something new about storage engines, LSM-trees, lock-free algorithms, or the subtle ways systems break.
 
 I don't tend to follow others. I design from the ground up, experiment, find the bugs, discover the bottlenecks, and keep building. Storage engines are my obsession - the kind where you wake up at 3am thinking about data loss, a missing feature, or even atomic memory ordering on something you wrote recently. It's hard to leave alone. Some people collect stamps; I collect insights about how data moves through memory and disk.
 
