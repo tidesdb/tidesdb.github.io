@@ -180,11 +180,11 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
-						{ label: 'TidesDB vs RocksDB: Which Storage Engine is Faster?', slug: 'articles/tidesdb-vs-rocksdb' },
-						{ label: 'Comparative Analysis of TidesDB v6 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb6-rocksdb1075' },
-						{ label: 'Design Decisions and Performance Analysis of TidesDB v6.0.1 & RocksDB v10.7.5', slug: 'articles/benchmark-design-analysis-tidesdb601-rocksdb1075' },
-						{ label: 'Seek and Range Query Performance · TidesDB v6.1.0 vs RocksDB v10.7.5', slug: 'articles/benchmark-design-range-seek-tidesdb610-rocksdb1075' },
 						{ label: 'TidesDB 7 - RocksDB 10.7.5', slug: 'articles/benchmark-analysis-tidesdb7-rocksdb1075' },
+						{ label: 'Seek and Range Query Performance · TidesDB v6.1.0 vs RocksDB v10.7.5', slug: 'articles/benchmark-design-range-seek-tidesdb610-rocksdb1075' },
+						{ label: 'Design Decisions and Performance Analysis of TidesDB v6.0.1 & RocksDB v10.7.5', slug: 'articles/benchmark-design-analysis-tidesdb601-rocksdb1075' },
+						{ label: 'Comparative Analysis of TidesDB v6 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb6-rocksdb1075' },
+						{ label: 'TidesDB vs RocksDB: Which Storage Engine is Faster?', slug: 'articles/tidesdb-vs-rocksdb' },
 					],
 				},
 				{
