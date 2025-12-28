@@ -171,13 +171,17 @@ Many people say "it's not possible" or "it's not worth it". Don't listen to them
 
 Sometimes your original design is not the best. Don't be afraid to change it. 
 
-**Lock-free is worth it if you commit fully.** 
+**Start with research, not reinvention.** 
 
-Half lock-free, half mutex code is worse than all-mutex. The 2.63x sequential write advantage comes from consistent lock-free design throughout.
+I didn't try to invent new algorithms or really copy other storage engines. I read papers (O'Neil's LSM-tree, WiscKey, Spooky, SSI, etc.) and implemented them faithfully and failed many times. The innovation was in the integration - making them work together with linear scaling concurrency and unique features. Spooky (2022), WiscKey (2016), SSI (2008) - all implementable. The gap between research and practice is smaller than people think.
 
-**Research papers work in production.** 
+**Lock-free is hard but worth it.** 
 
-Spooky (2022), WiscKey (2016), SSI (2008) - all implementable. The gap between research and practice is smaller than people think.
+I spent weeks debugging race conditions, ABA problems, and memory ordering issues. The payoff: Very good CPU utilization on 8 cores. Traditional mutex-based designs can't achieve this. Half lock-free, half mutex code is worse than all-mutex. The 2.63x sequential write advantage comes from consistent lock-free design throughout.
+
+**Measure everything.** 
+
+The cached timestamp optimization came from profiling and running the system benchmarks and tests over and over and over AGAIN. Syscalls are expensive. We cache them when we can. One atomic load instead of a syscall - thousands of times per second.
 
 **Memory trade-offs are acceptable.** 
 
@@ -191,9 +195,21 @@ Atomic refcounts + careful lifecycle management eliminate entire classes of race
 
 The difference between 1.08x and 1.34x write amplification compounds over billions of operations. DCA's adaptive behavior produces consistently low write amp.
 
+**Cross-platform from day one.** 
+
+I didn't build for Linux first and port later. I used `compat.h` from the start. This forced abstractions and caught portability issues early and still do.
+
+**Test on real hardware.** 
+
+The batch=10,000 failure only appeared under high contention on real multi-core CPUs. Synthetic tests didn't catch it.
+
 **Extreme cases reveal limits.** 
 
 At batch size 10,000 with 8 threads (80,000 concurrent operations), lock-free skip lists saturate with CAS contention. Think of it like too many people trying to edit the same Google Doc simultaneously - eventually the atomic operations start failing and retrying, burning CPU without making progress. TidesDB drops to 852K ops/sec vs RocksDB's 1.33M. I optimized for common cases (batches of 10-1,000), not extremes.
+
+**Document and benchmark honestly.** 
+
+Honesty is key.
 
 ## What's Not Tested
 
@@ -724,32 +740,6 @@ Not just "compiles on multiple platforms" - the database files are portable. Cre
 **7. Modular, Reusable Components**
 
 Each component (skip list, bloom filter, block manager, clock cache) is a standalone module with its own test suite. You can use the skip list in your own project without pulling in the entire database. Clean interfaces, zero dependencies between modules.
-
-## Lessons from Building a Storage Engine
-
-**Start with research, not reinvention.** 
-
-I didn't try to invent new algorithms or really copy other storage engines. I read papers (O'Neil's LSM-tree, WiscKey, Spooky, SSI, etc.) and implemented them faithfully and failed many times. The innovation was in the integration - making them work together with linear scaling concurrency and unique features.
-
-**Lock-free is hard but worth it.** 
-
-I spent weeks debugging race conditions, ABA problems, and memory ordering issues. The payoff: Very good CPU utilization on 8 cores. Traditional mutex-based designs can't achieve this.
-
-**Measure everything.** 
-
-The cached timestamp optimization came from profiling and running the system benchmarks and tests over and over and over AGAIN. Syscalls are expensive. We cache them when we can. One atomic load instead of a syscall - thousands of times per second.
-
-**Cross-platform from day one.** 
-
-I didn't build for Linux first and port later. I used `compat.h` from the start. This forced abstractions and caught portability issues early and still do.
-
-**Test on real hardware.** 
-
-The batch=10,000 failure only appeared under high contention on real multi-core CPUs. Synthetic tests didn't catch it.
-
-**Document and benchmark honestly.** 
-
-Honesty it key.
 
 ## The Path Forward
 
