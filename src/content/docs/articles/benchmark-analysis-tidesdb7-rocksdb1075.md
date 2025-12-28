@@ -551,7 +551,7 @@ Performance degradation at batch=10,000 suggests TidesDB's write path has differ
 
 **5. Memory vs Performance Tradeoff**
 
-TidesDB uses significantly more memory (often 2-5x) to achieve better performance. This isn't overhead - it's architectural: in-memory bloom filters, metadata, and reference-counted structures for lockless operation. Classic space-time tradeoff.
+TidesDB uses significantly more memory (often 2-5x) to achieve better performance, though sometimes temporarily. This isn't overhead - it's architectural: in-memory bloom filters, metadata, and reference-counted structures for lockless operation. Classic space-time tradeoff.
 
 ## Workload Recommendations
 
