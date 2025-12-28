@@ -64,23 +64,35 @@ If you have 5 levels and the largest level is 64GB:
 
 If you write 200GB but only 64GB survives compaction, capacities shrink proportionally. This triggers more frequent compaction of obsolete versions.
 
-Result: 1.08x average write amplification across all workloads vs RocksDB's 1.34x. For Zipfian (hot key) workloads, the database is 5.6x smaller (10.2 MB vs 57.6 MB) because DCA aggressively compacts obsolete versions.
+**Dynamic Level Growth and Shrinkage**
+
+DCA isn't just about recalibrating capacities - the number of levels itself adapts to the data:
+
+- **Growth** · When the largest level reaches capacity, TidesDB adds a new empty level. The new level starts empty and fills naturally through compaction. This allows the database to scale from 5 levels to 32 levels as data grows.
+
+- **Shrinkage** · When the largest level becomes completely empty (no SSTables), TidesDB removes it - but never below the configured minimum (default 5 levels). This shrinks the database back down when data is deleted or compacted away.
+
+- **Floor constraint** · The system maintains a minimum of 5 levels (configurable via `min_levels`) even if all data fits in fewer levels. This prevents thrashing when data size fluctuates near level boundaries.
+
+This adaptive behavior is what makes DCA truly "dynamic" - the LSM-tree structure grows and shrinks with your data, maintaining optimal level ratios throughout.
+
+Result · 1.08x average write amplification across all workloads vs RocksDB's 1.34x. For Zipfian (hot key) workloads, the database is 5.6x smaller (10.2 MB vs 57.6 MB) because DCA aggressively compacts obsolete versions.
 
 ### WiscKey-Style Key-Value Separation
 
 Every SSTable has two files:
 - **klog** (key log) · sorted keys with metadata and small inline values
-- **vlog** (value log) · large values (>4KB) referenced by offset
+- **vlog** (value log) · large values (≥4KB) referenced by offset
 
 **Why separate keys and values?** 
 
-In traditional LSM-trees, compaction rewrites entire key-value pairs. If your value is 4KB, you're rewriting 4KB every time that key gets compacted. With key-value separation, compaction only rewrites the key and a pointer to the value. The 4KB value stays put in the vlog.
+In traditional LSM-trees, compaction rewrites entire key-value pairs. If your value is 4KB, you're rewriting 4KB every time that key gets compacted. With key-value separation, compaction rewrites both keys and values, but to separate files - keys go to the new klog, values go to the new vlog. The benefit is that iteration only needs to read the klog, not the vlog.
 
 **The tradeoff?** 
 
 Writes are slightly slower (two files to write) but iteration is much faster (only read keys, not values) and write amplification is lower (only keys get rewritten during compaction).
 
-For 4KB values, TidesDB achieves 96K writes/sec with 1.07x write amplification. Iteration is 2.08x faster (835K vs 401K ops/sec) because we only read keys, not 4KB value blobs. Compaction only moves key references - values stay in the vlog.
+For 4KB values, TidesDB achieves 96K writes/sec with 1.07x write amplification. Iteration is 2.08x faster (835K vs 401K ops/sec) because we only read keys from the klog, not 4KB value blobs from the vlog. During compaction, values are rewritten to new vlogs alongside their keys in new klogs.
 
 ### Memory Trade-offs
 
@@ -147,7 +159,7 @@ A distribution where some keys are accessed much more frequently than others - l
 - **RocksDB** · Database size after deletes: 63.77 MB
 - **Result** · Complete space reclamation
 
-The large value result is interesting. TidesDB's dual-path write (klog + vlog) is slightly slower for writes, but iteration only reads keys, making it 2.08x faster. The write amplification advantage (1.07x vs 1.21x) comes from compaction only moving key references.
+The large value result is interesting. TidesDB's dual-path write (klog + vlog) is slightly slower for writes, but iteration only reads keys, making it 2.08x faster. The write amplification advantage (1.07x vs 1.21x) comes from the separation allowing optimized I/O patterns - sequential writes to both files during compaction, but reads can skip the vlog entirely during iteration.
 
 ## What I Learned
 
@@ -176,6 +188,7 @@ Using more memory for 1.13x faster reads and 29% lower latency is a good trade o
 Atomic refcounts + careful lifecycle management eliminate entire classes of race conditions. SSTable metadata stays in memory until safe to free.
 
 **Compaction strategy matters more than people realize.** 
+
 The difference between 1.08x and 1.34x write amplification compounds over billions of operations. DCA's adaptive behavior produces consistently low write amp.
 
 **Extreme cases reveal limits.** 
@@ -220,8 +233,9 @@ do {
     if (skip_list_validate_sequence(old_head, seq) != 0) {
         return -1;  // Sequence number validation failed
     }
-    atomic_store_explicit(&new_version->next, old_head, memory_order_release);
-} while (!atomic_compare_exchange_weak(versions_ptr, &old_head, new_version));
+    atomic_store_explicit(&new_version->next, old_head, memory_order_relaxed);
+} while (!atomic_compare_exchange_weak_explicit(versions_ptr, &old_head, new_version,
+                                                 memory_order_release, memory_order_acquire));
 ```
 
 **Why this matters?** 
@@ -299,7 +313,7 @@ The block manager uses a self-describing file format that enables fast validatio
 ```
 [HEADER: 8 bytes]
   - Magic: 0x544442 ("TDB", 3 bytes)
-  - Version: 7 (1 byte)
+  - Version: 6 (1 byte)
   - Padding: 4 bytes reserved
 
 [BLOCK 1]
@@ -412,8 +426,16 @@ void *queue_dequeue_wait(queue_t *queue) {
     pthread_mutex_lock(&queue->lock);
     
     // Wait until queue is not empty or shutdown
+    // Uses timed wait for NetBSD compatibility where signals can be missed
     while (queue->head == NULL && !queue->shutdown) {
-        pthread_cond_wait(&queue->not_empty, &queue->lock);
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_nsec += QUEUE_WAIT_TIMEOUT_NS;  // 100ms
+        if (ts.tv_nsec >= QUEUE_NS_PER_SEC) {
+            ts.tv_sec += 1;
+            ts.tv_nsec -= QUEUE_NS_PER_SEC;
+        }
+        pthread_cond_timedwait(&queue->not_empty, &queue->lock, &ts);
     }
     
     void *data = queue_dequeue_internal(queue);
@@ -453,10 +475,10 @@ When level 1 exceeds threshold (default 4 SSTables):
 
 **Why This Design?**
 
-- **Write path never blocks**: Enqueue is fast (just mutex lock/unlock), write operations return immediately
-- **Workers don't spin**: Condition variables mean zero CPU usage when idle
-- **Parallel processing**: Multiple workers can process different column families simultaneously
-- **Retry safety**: If flush fails (disk full), work is re-enqueued with exponential backoff
+- Write path never blocks · Enqueue is fast (just mutex lock/unlock), write operations return immediately
+- Workers don't spin · Condition variables mean zero CPU usage when idle
+- Parallel processing · Multiple workers can process different column families simultaneously
+- Retry safety · If flush fails (disk full), work is re-enqueued with exponential backoff
 
 The hybrid approach gives you the best of both worlds: lock-free reads for checking queue state, efficient blocking for workers, and safe concurrent access.
 
@@ -474,10 +496,10 @@ The old memtable goes to an immutable queue for flushing. Writers immediately us
 
 ### SSI Conflict Detection · Hash Table Optimization
 
-For serializable transactions, TidesDB tracks read sets to detect conflicts. Small transactions (< 64 reads) use arrays. Larger transactions automatically switch to a hash table using xxHash for O(1) conflict detection:
+For serializable transactions, TidesDB tracks read sets to detect conflicts. Small transactions (< 64 reads) use arrays. At 64 reads, transactions automatically switch to a hash table using xxHash for O(1) conflict detection:
 
 ```c
-if (read_set_size > 64) {
+if (read_set_count == 64) {
     create_hash_table_for_conflict_detection();
 }
 ```
@@ -488,7 +510,7 @@ Most transactions are small. Arrays are faster for small read sets (better cache
 
 ### Node Pooling · Reducing Allocation Overhead
 
-The queue implementation maintains a pool of up to 64 reusable nodes. Instead of malloc/free on every enqueue/dequeue, nodes are recycled:
+The queue implementation maintains a pool of up to 64 reusable nodes. Instead of malloc/free on every enqueue/dequeue, nodes are recycled.
 
 **Why this matters?** 
 
@@ -507,10 +529,10 @@ TidesDB implements full ACID transactions with 5 isolation levels:
 
 **Read-Your-Own-Writes Optimization**
 
-Transactions check their write set before reading from memtables. For small transactions (< 256 ops), this is a linear scan from the end (cache-friendly). For large transactions, it automatically builds a hash table for O(1) lookups:
+Transactions check their write set before reading from memtables. For small transactions (< 64 ops), this is a linear scan from the end (cache-friendly). At 64 operations, it automatically builds a hash table for O(1) lookups:
 
 ```c
-if (txn->num_ops == 256 && !txn->write_set_hash) {
+if (txn->num_ops == 64 && !txn->write_set_hash) {
     txn->write_set_hash = tidesdb_write_set_hash_create();
     // Populate hash with all existing operations
 }
@@ -518,7 +540,7 @@ if (txn->num_ops == 256 && !txn->write_set_hash) {
 
 **SSI Conflict Detection**
 
-For serializable isolation, TidesDB tracks read sets to detect dangerous structures. Small transactions (< 64 reads) use arrays. Large transactions automatically switch to xxHash-based hash tables for O(1) conflict detection:
+For serializable isolation, TidesDB tracks read sets to detect dangerous structures. Small transactions (< 64 reads) use arrays. At 64 reads, transactions automatically switch to xxHash-based hash tables for O(1) conflict detection:
 
 ```c
 if (txn->read_set_count == 64 && !txn->read_set_hash) {
@@ -615,13 +637,13 @@ View rest of API documentation [here](https://tidesdb.com/reference/c/).
 
 ## Implementation Details
 
-TidesDB is ~565KB of C code (the main engine) plus 8 focused modules totaling ~150KB:
+TidesDB is ~575KB of C code (the main engine) plus 8 focused modules totaling ~160KB:
 - **block_manager** (32KB) · Lock-free file I/O with atomic reference counting
 - **skip_list** (48KB) · Multi-version lock-free skip list with MVCC
 - **clock_cache** (31KB) · Partitioned CLOCK eviction with atomic state machines
 - **bloom_filter** (9KB) · Probabilistic filters for negative lookups
 - **buffer** (11KB) · Lock-free buffer with generation counters
-- **queue** (11KB) · Lock-free queue for background workers
+- **queue** (13KB) · Hybrid lock-free queue for background workers
 - **manifest** (10KB) · Transaction log for metadata changes
 - **compress** (6KB) · LZ4/Snappy/Zstd compression wrapper
 
@@ -634,7 +656,7 @@ It supports:
 - 3 compression algorithms (LZ4, Snappy, Zstd)
 - 3 sync modes (none, interval, full)
 
-Tested on 10 platform/architecture combinations: Linux (x86, x64, PowerPC), macOS (x64, ARM64), Windows (x86, x64), FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, Illumos, Solaris.
+Tested on 15 platform/architecture combinations: Linux (x86, x64, PowerPC), macOS (x64, x86, PowerPC G5), Windows MSVC (x86, x64), Windows MinGW (x86, x64), FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, OmniOS (Illumos).
 
 ## A Complete Database Foundation
 
@@ -669,7 +691,7 @@ With TidesDB, you can build:
 - **WiredTiger** · Feature-rich, but complex API, larger codebase
 - **SQLite** · SQL interface, but not optimized for write-heavy workloads
 
-TidesDB combines the best aspects: ACID transactions with SSI, column families, compression, TTL, custom comparators, and a clean C API - all in ~715KB of code.
+TidesDB combines the best aspects: ACID transactions with SSI, column families, compression, TTL, custom comparators, and a clean C API - all in ~735KB of code.
 
 ## What Differentiates TidesDB
 
