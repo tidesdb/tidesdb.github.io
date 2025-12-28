@@ -3,6 +3,8 @@ title: How does TidesDB work?
 description: A comprehensive design overview of TidesDB's architecture, core components, and operational mechanisms.
 ---
 
+## System Overview
+
 ## Introduction
 
 TidesDB is an embeddable key-value storage engine built on log-structured merge trees (LSM trees). LSM trees optimize for write-heavy workloads by batching writes in memory and flushing sorted runs to disk. This trades write amplification (data written multiple times during compaction) for improved write throughput and sequential I/O patterns. The fundamental tradeoff: writes are fast but reads must search multiple sorted files.
@@ -10,6 +12,12 @@ TidesDB is an embeddable key-value storage engine built on log-structured merge 
 The system provides ACID transactions with five isolation levels and manages data through a hierarchy of sorted string tables (SSTables). Each level holds roughly N× more data than the previous level. Compaction merges SSTables from adjacent levels, discarding obsolete entries and reclaiming space.
 
 Data flows from memory to disk in stages. Writes go to an in-memory skip list (chosen over AVL trees for lock-free reads and simpler implementation) backed by a write-ahead log. When the skip list exceeds the set write buffer size, it becomes immutable and a background worker flushes it to disk as an SSTable. These tables accumulate in levels. Compaction merges tables from adjacent levels, maintaining the level size invariant.
+
+<div class="architecture-diagram">
+
+![Architecture Diagram](../../../assets/img16.png)
+
+</div>
 
 ## Data Model
 
@@ -28,6 +36,12 @@ A column family maintains:
 ### Sorted String Tables
 
 Each sorted string table (SSTable) consists of two files: a key log (.klog) and a value log (.vlog). The key log stores keys, metadata, and values smaller than the configured threshold (default 4KB). Values exceeding this threshold reside in the value log, with the key log storing only file offsets. This separation keeps the key log compact for efficient scanning while accommodating arbitrarily large values.
+
+<div class="architecture-diagram">
+
+![TidesDB SSTable KLog](../../../assets/img17.png)
+
+</div>
 
 The key log uses a block-based format. Each block (fixed at 64KB) contains multiple entries serialized with variable-length integer encoding. Blocks compress independently using LZ4, Zstd, or Snappy. The key log ends with three auxiliary structures: a block index for binary search, a bloom filter for negative lookups, and a metadata block with SSTable statistics.
 
@@ -48,6 +62,14 @@ value (value_size bytes, if inline)
 The flags byte encodes tombstones (0x01), TTL presence (0x02), value log indirection (0x04), and delta sequence encoding (0x08). Variable-length integers save space: a value under 128 requires one byte, while the full 64-bit range needs at most ten bytes.
 
 Write-ahead logs use the same format. Each memtable has its own WAL file, named by the SSTable ID it will become. Recovery reads these files in sequence order, deserializes entries into skip lists, and enqueues them for asynchronous flushing.
+
+#### VLog Format
+
+<div class="architecture-diagram">
+
+![TidesDB SSTable VLog](../../../assets/img18.png)
+
+</div>
 
 ## Transactions
 
@@ -140,6 +162,12 @@ Each column family maintains a queue of immutable memtables awaiting flush. When
 
 ### Search Order
 
+<div class="architecture-diagram">
+
+![TidesDB Read Path](../../../assets/img19.png)
+
+</div>
+
 A read searches for a key in order:
 
 1. Active memtable
@@ -201,10 +229,9 @@ This ensures the search always starts from the correct block, avoiding false neg
 
 **Usage in Seeks and Iteration** · Block indexes are also used by iterator seek operations (`tidesdb_iter_seek()` and `tidesdb_iter_seek_for_prev()`). When seeking to a key:
 
-1. The bloom filter is checked first (eliminates 99% of negative lookups)
-2. The block index finds the predecessor block using binary search
-3. The cursor jumps directly to that block position
-4. The iterator scans forward (or backward for `seek_for_prev`) from there
+1. The block index finds the predecessor block using binary search
+2. The cursor jumps directly to that block position
+3. The iterator scans forward (or backward for `seek_for_prev`) from there
 
 This optimization is critical for range queries - without block indexes, seeking to a key in the middle of a large SSTable would require scanning all blocks from the beginning. With block indexes, the seek operation is O(log N) on the index plus O(M) scanning a few blocks, rather than O(N×M) scanning all blocks.
 
