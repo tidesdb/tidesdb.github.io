@@ -1,7 +1,22 @@
 ---
 title: "What I Learned Building a Storage Engine That Outperforms RocksDB"
 description: "Lessons learned building TidesDB - an embeddable storage engine that outperforms RocksDB through lock-free concurrency, adaptive compaction, and aggressive caching."
+head:
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://tidesdb.com/pexels-eusouomatteus-6869101.jpg
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: https://tidesdb.com/pexels-eusouomatteus-6869101.jpg
 ---
+
+<div class="article-image">
+
+![What I Learned Building a Storage Engine That Outperforms RocksDB](/pexels-eusouomatteus-6869101.jpg)
+
+</div>
 
 *by Alex Gaetano Padula*
 
@@ -764,4 +779,3 @@ Every storage engine makes trade-offs. TidesDB makes trade-offs for modern hardw
 - Documentation · https://tidesdb.com
 - Benchmarks · https://tidesdb.com/articles/benchmark-analysis-tidesdb7-rocksdb1075
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
-
