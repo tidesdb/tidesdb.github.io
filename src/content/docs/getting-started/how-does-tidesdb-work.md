@@ -143,6 +143,44 @@ The bloom filter (default 1% FPR) and block index are optional optimizations con
 
 The block cache uses a clock eviction policy with reference counting. Multiple readers share cached blocks without copying. The clock hand skips blocks with refcount > 1 (actively in use). When the cache evicts a block, it decrements the reference count; the block frees when the count reaches zero.
 
+### Block Index
+
+The block index enables fast key lookups by mapping key ranges to file offsets. Instead of scanning all blocks sequentially, the system uses binary search on the index to jump directly to the block that might contain the key.
+
+**Structure** · The index stores three parallel arrays:
+- `min_key_prefixes` · First key prefix of each indexed block (configurable length, default 16 bytes)
+- `max_key_prefixes` · Last key prefix of each indexed block
+- `file_positions` · File offset where each block starts
+
+**Sparse Sampling** · The `index_sample_ratio` (default 1) controls how many blocks to index. A ratio of 1 indexes every block; a ratio of 10 indexes every 10th block. Sparse indexing reduces memory usage at the cost of potentially scanning multiple blocks on lookup.
+
+**Prefix Compression** · Keys are stored as fixed-length prefixes (default 16 bytes, configurable via `block_index_prefix_len`). Keys shorter than the prefix length are zero-padded. This trades precision for space - keys with identical prefixes may require scanning multiple blocks to disambiguate.
+
+**Binary Search Algorithm** · `compact_block_index_find_predecessor()` finds the rightmost block where `min_key <= search_key <= max_key`:
+
+1. Create search key prefix (pad with zeros if shorter than prefix length)
+2. Early exit if search key < first block's min key (return first block)
+3. Binary search for blocks where `min_key <= search_key <= max_key`
+4. Return the rightmost matching block (handles keys at block boundaries)
+5. If no exact match, return the last block where `min_key <= search_key`
+
+This ensures the search always starts from the correct block, avoiding false negatives when keys fall between indexed blocks.
+
+**Serialization** · The index serializes compactly using delta encoding for file positions (varints) and raw prefix bytes. Format: `varint(count)`, `varint(prefix_len)`, delta-encoded file positions, min key prefixes, max key prefixes. This achieves ~50% space savings compared to storing absolute positions.
+
+**Custom Comparators** · The index supports pluggable comparator functions, allowing column families with custom key orderings (uint64, lexicographic, reverse, etc.) to use block indexes correctly.
+
+**Memory Usage** · For an SSTable with 1000 blocks and default 16-byte prefixes: 32KB for prefixes + 8KB for positions = 40KB. With sparse sampling (ratio 10), this reduces to 4KB. The index is loaded into memory when an SSTable is opened and remains resident.
+
+**Usage in Seeks and Iteration** · Block indexes are also used by iterator seek operations (`tidesdb_iter_seek()` and `tidesdb_iter_seek_for_prev()`). When seeking to a key:
+
+1. The bloom filter is checked first (eliminates 99% of negative lookups)
+2. The block index finds the predecessor block using binary search
+3. The cursor jumps directly to that block position
+4. The iterator scans forward (or backward for `seek_for_prev`) from there
+
+This optimization is critical for range queries - without block indexes, seeking to a key in the middle of a large SSTable would require scanning all blocks from the beginning. With block indexes, the seek operation is O(log N) on the index plus O(M) scanning a few blocks, rather than O(N×M) scanning all blocks.
+
 ## Compaction
 
 ### Compaction Policies
