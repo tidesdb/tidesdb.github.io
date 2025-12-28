@@ -270,7 +270,15 @@ Four worker pools handle asynchronous operations:
 
 **Reaper worker** (1 thread) closes unused SSTable file handles when the open file count exceeds the limit (configurable, default 512). It sorts SSTables by last access time (updated atomically on each SSTable open, not on every read) and closes the oldest 25%. With more SSTables than the limit, the reaper runs continuously, causing file descriptor thrashing.
 
-Workers coordinate through lock-free queues and atomic flags. The main thread enqueues work and returns immediately. Workers process work asynchronously, allowing high write throughput.
+### Work Distribution
+
+The database maintains two global work queues: one for flush operations, one for compaction operations. Each work item identifies the target column family. When a memtable exceeds its size threshold, the system enqueues a flush work item containing the column family pointer and immutable memtable. When a level exceeds capacity, it enqueues a compaction work item with the column family and level range.
+
+Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously - worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags to prevent concurrent operations on the same structure: only one flush can run per column family at a time, and only one compaction per level range.
+
+This design enables parallelism across column families while avoiding conflicts within a single column family. With N column families and 2 flush workers, flush latency is roughly N/2 × flush_time. The global queue provides natural load balancing - whichever worker finishes first picks up the next item, regardless of which column family it belongs to.
+
+Workers coordinate through thread-safe queues and atomic flags. The main thread enqueues work and returns immediately. Workers process work asynchronously, allowing high write throughput.
 
 ## Error Handling
 
