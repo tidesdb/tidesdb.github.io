@@ -545,17 +545,13 @@ Seeks, point reads, and small range queries show TidesDB's largest advantages (2
 
 TidesDB's lockless design using reference counting and deferred cleanup explains both the high CPU utilization (511% on 8 cores) and excellent multi-threaded scaling. The tradeoff is higher memory usage to maintain reference-counted structures and defer cleanup operations.
 
-**4. RocksDB Better for Large Values**
-
-With 4KB values, RocksDB was 12% faster and used 2.7x less memory. TidesDB's buffering strategy appears optimized for smaller values.
-
-**5. Batch Size Matters More for TidesDB**
+**4. Batch Size Matters More for TidesDB**
 
 Performance degradation at batch=10,000 suggests TidesDB's write path has different batching characteristics than RocksDB.
 
-**6. Memory vs Performance Tradeoff**
+**5. Memory vs Performance Tradeoff**
 
-TidesDB uses significantly more memory (often 2-5x) to achieve better performance. This isn't overhead - it's architectural: in-memory bloom filters, metadata, and reference-counted structures for lockless operation. Classic space-time tradeoff.
+TidesDB uses significantly more memory (often 2-5x) to achieve better performance, though sometimes temporarily. This isn't overhead - it's architectural: in-memory bloom filters, metadata, and reference-counted structures for lockless operation. Classic space-time tradeoff.
 
 ## Workload Recommendations
 
