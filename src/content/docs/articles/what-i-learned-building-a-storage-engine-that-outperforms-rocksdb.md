@@ -707,7 +707,7 @@ Each component (skip list, bloom filter, block manager, clock cache) is a standa
 
 **Start with research, not reinvention.** 
 
-I didn't try to invent new algorithms or really copy other storage engines. I read papers (O'Neil's LSM-tree, WiscKey, Spooky, SSI) and implemented them faithfully and failed many times. The innovation was in the integration - making them work together with linear scaling concurrency features.
+I didn't try to invent new algorithms or really copy other storage engines. I read papers (O'Neil's LSM-tree, WiscKey, Spooky, SSI, etc.) and implemented them faithfully and failed many times. The innovation was in the integration - making them work together with linear scaling concurrency and unique features.
 
 **Lock-free is hard but worth it.** 
 
@@ -733,7 +733,7 @@ Honesty it key.
 
 The goal isn't to declare victory and stop. It's to continue making TidesDB the best it can be.   Incorporating feedback, fixing and finding bugs, and staying current with research. Storage engines are never "done" - they evolve with hardware, workloads, and understanding.
 
-If you're building something that needs fast, embeddable storage with ACID guarantees, give TidesDB a try. If you find bugs or have ideas, open an issue or join the Discord. This is a learning journey, and I'm excited to see where it goes.
+If you're building something that needs fast, embeddable storage with ACID guarantees, give TidesDB a try. If you find bugs or have ideas, open an issue or join the Discord. 
 
 ## Conclusion
 
@@ -753,6 +753,3 @@ Every storage engine makes trade-offs. TidesDB makes trade-offs for modern hardw
 - Benchmarks · https://tidesdb.com/articles/benchmark-analysis-tidesdb7-rocksdb1075
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
 
-**About me** 
-
-I'm Alex Gaetano Padula, a software engineer who's spent the last few years building databases and storage engines from first principles. You can find me at https://alexpadula.com or https://github.com/guycipher.
