@@ -988,8 +988,8 @@ See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 4,                /* 4 threads for flush operations (default: 2) */
-    .num_compaction_threads = 8,           /* 8 threads for compaction (default: 2) */
+    .num_flush_threads = 2,                /* 4 threads for flush operations (default: 2) */
+    .num_compaction_threads = 2,           /* 8 threads for compaction (default: 2) */
     .log_level = TDB_LOG_INFO,             /* Log level */
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB block cache */
     .max_open_sstables = 100,              /* Max open SSTables */
