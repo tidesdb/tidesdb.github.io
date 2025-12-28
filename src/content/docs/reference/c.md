@@ -5,7 +5,7 @@ description: Complete C API reference for TidesDB
 
 ## Overview
 
-TidesDB uses a simple API. All functions return `0` on success and a negative error code on failure.
+TidesDB is designed to provide a simple and intuitive C API for all your embedded storage needs.  This document is complete reference for the C API covering database operations, transactions, column families, iterators and more.
 
 ## Include
 
