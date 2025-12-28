@@ -590,6 +590,11 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_COMPARATOR_NAME` | Key comparator | "memcmp" |
 | `BENCH_BLOCK_CACHE_SIZE` | Global block cache size (bytes) | 67108864 (64MB) |
 | `BENCH_ISOLATION_LEVEL` | Transaction isolation level | TDB_ISOLATION_READ_COMMITTED |
+| `BENCH_KLOG_VALUE_THRESHOLD` | Key-log value separation threshold (bytes) | 4096 (4KB) |
+| `BENCH_MIN_DISK_SPACE` | Minimum free disk space required (bytes) | 104857600 (100MB) |
+| `BENCH_L1_FILE_COUNT_TRIGGER` | L1 file count trigger for compaction | 4 |
+| `BENCH_L0_QUEUE_STALL_THRESHOLD` | L0 queue stall threshold for backpressure | 10 |
+| `BENCH_MAX_OPEN_SSTABLES` | Maximum number of open SSTables | 512 |
 
 ### Key Distribution Patterns
 
