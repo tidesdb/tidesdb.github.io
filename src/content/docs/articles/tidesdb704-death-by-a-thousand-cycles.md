@@ -22,9 +22,9 @@ head:
 
 *December 29th, 2025*
 
-Between TidesDB 7.0.2 and 7.0.4, I focused exclusively on micro-optimizations, the kind of changes that save CPU cycles and memory, reduce branch mispredictions, and eliminate unnecessary work. No new features. No architectural changes. Just attention to hot paths.
+Between TidesDB 7.0.3 and 7.0.4, I focused exclusively on micro-optimizations, the kind of changes that save CPU cycles and memory, reduce branch mispredictions, and eliminate unnecessary work. No new features. No architectural changes. Just attention to hot paths.
 
-The result: **6.64M ops/sec** sequential writes (up from 6.21M), **2 μs p50 latency** on hot-key reads (down from 5 μs), and measurably lower resource consumption across the board. This article documents what changed, why it matters, and what the data reveals about performance at the somewhat instruction level.
+The result: **6.64M ops/sec** sequential writes (up from 6.21M), **2 μs p50 latency** on hot-key reads (down from 5 μs), and measurably lower resource consumption across the board. This article documents what changed, why it matters, and what the data reveals about performance at the instruction level.
 
 ## Test Environment
 
@@ -66,9 +66,10 @@ Point lookups are the most common operation. Every get was allocating a cursor (
 - With contention (8 threads) · can spike to 500+ ns
 
 **Measured impact**
-- CPU cycles saved per lookup · 8500+ cycles
-- At 4.9 GHz · 1,734 ns = 1.73 μs saved per operation
-- At 1M ops/sec · saves 1.73 seconds per million operations
+- CPU cycles saved per lookup · ~735 cycles (malloc/free elimination)
+- At 4.9 GHz · ~150 ns saved per operation  
+- With contention (8 threads) · saves up to 500+ ns per operation
+- At 1M ops/sec · saves 0.15-0.5+ seconds per million operations
 - Memory allocator contention eliminated (shows in reduced lock contention in perf profiles)
 
 For cursors that iterate multiple blocks, heap allocation still makes sense. But for single-block point lookups, stack allocation is pure win.
@@ -117,7 +118,7 @@ READ_UNCOMMITTED and READ_COMMITTED don't track read sets - they don't need to d
 - REPEATABLE_READ · ~25%
 - SERIALIZABLE · ~5%
 
-This optimization benefits 70% of transactions really!
+This optimization benefits 70% of transactions significantly.
 
 ### 5. Arena Allocator for Read Keys
 
@@ -168,30 +169,28 @@ Without atomic reservation, two threads could get the same slot value, leading t
 
 
 ### 8. KLOG Value Threshold Adjustment
-**Change** · Increased default value separation threshold from lower values to 512 bytes (or even 256).
+**Change** · Increased default value separation threshold to 512 bytes (from a lower threshold).
 
 **Why this matters**
 
 The KLOG (key log) stores keys and small values together. The vLog stores large values separately. The threshold determines what's "small" vs "large".
 
-**With lower threshold**
+**With higher threshold (512 bytes)**
 
-- More values go to vLog
-- KLOG has more entries per block
-- Better binary search efficiency (more keys fit in cache)
-- Fewer vLog lookups for small values
+- More values stay inline in KLOG (vs going to vLog)
+- Slightly larger KLOG files
+- But: dramatically faster lookups for medium-sized values (avoiding vLog reads)
+- Values 256-512 bytes benefit most from this change
 
 **The tradeoff**
 
-- Values 256-512 bytes now inline in KLOG
-- Slightly larger KLOG files
-- But: dramatically faster lookups for medium-sized values
+Lower thresholds would put more values in vLog, making KLOG more compact with better cache efficiency. However, the higher 512-byte threshold significantly improves read performance for medium-sized values by avoiding separate vLog lookups.
 
 ## Performance Impact · The Numbers
 
 ### Sequential Writes
 
-**v7.0.0** · 6,205,918 ops/sec
+**v7.0.3** · 6,205,918 ops/sec
 **v7.0.4** · 6,639,793 ops/sec
 
 **Improvement** · +433,875 ops/sec (+7.0%)
@@ -202,7 +201,7 @@ The KLOG (key log) stores keys and small values together. The vLog stores large 
 - p99 · 2,352 μs -> 1,740 μs (26% reduction)
 
 **CPU utilization**
-- v7.0.0 · 511%
+- v7.0.3 · 511%
 - v7.0.4 · 467%
 
 **Improvement** · Using 9% less CPU for 7% more throughput = 15% efficiency gain
@@ -211,7 +210,7 @@ The p95 and p99 improvements are particularly notable. These tail latencies typi
 
 ### Random Writes
 
-**v7.0.0** · 1,660,333 ops/sec
+**v7.0.3** · 1,660,333 ops/sec
 **v7.0.4** · 1,922,021 ops/sec
 
 **Improvement** · +261,688 ops/sec (+15.8%)
@@ -224,7 +223,7 @@ Random writes benefit more from micro-optimizations because they exercise more c
 
 ### Random Reads
 
-**v7.0.0** · 1,215,655 ops/sec
+**v7.0.3** · 1,215,655 ops/sec
 **v7.0.4** · 1,350,000 ops/sec (estimated from p50 latency)
 
 **Improvement** · ~11%
@@ -235,16 +234,17 @@ Random writes benefit more from micro-optimizations because they exercise more c
 - p99 · 14 μs -> 5,011 μs (tail latency unchanged - this is cache misses)
 
 The median latency going from 5 μs to 2 μs is dramatic. This is directly from:
-1. Stack-based cursors (~300 cycles)
+1. Stack-based cursors (~150 cycles baseline, ~500 cycles with contention)
 2. Better block index search (~200 cycles)
+3. Combined inline value conditions (~200 cycles)
 
-Total · ~1000 cycles saved ≈ 200 ns at 5 GHz ≈ achieving 2 μs from 5 μs when other work is factored in.
+Total · ~550-900 cycles saved depending on workload characteristics ≈ 112-184 ns at 4.9 GHz. When combined with other micro-optimizations throughout the codebase, this contributes to achieving 2 μs from 5 μs.
 
 The p99 tail latency of 5ms is unchanged because it represents disk I/O (cache misses). No amount of CPU optimization fixes that - it's physics.
 
 ### Zipfian Hot Key Reads
 
-**v7.0.0** · 2,792,994 ops/sec
+**v7.0.3** · 2,792,994 ops/sec
 **v7.0.4** · 3,200,000 ops/sec (estimated)
 
 **Improvement** · ~15%
