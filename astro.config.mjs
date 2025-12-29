@@ -145,6 +145,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						{ label: 'Death by a Thousand Cycles - Micro-Optimizations in TidesDB v7.0.4', slug: 'articles/tidesdb704-death-by-a-thousand-cycles' },
 						{ label: 'What I Learned Building a Storage Engine That Outperforms RocksDB', slug: 'articles/what-i-learned-building-a-storage-engine-that-outperforms-rocksdb' },
 						{ label: 'TidesDB 7 - RocksDB 10.7.5', slug: 'articles/benchmark-analysis-tidesdb7-rocksdb1075' },
 						{ label: 'Seek and Range Query Performance · TidesDB v6.1.0 vs RocksDB v10.7.5', slug: 'articles/benchmark-design-range-seek-tidesdb610-rocksdb1075' },
