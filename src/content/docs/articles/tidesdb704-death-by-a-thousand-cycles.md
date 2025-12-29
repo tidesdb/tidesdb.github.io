@@ -169,7 +169,7 @@ Without atomic reservation, two threads could get the same slot value, leading t
 
 
 ### 8. KLOG Value Threshold Adjustment
-**Change** · Increased default value separation threshold to 512 bytes (from a lower threshold).
+**Change** · Decreased default value separation threshold to 512 bytes, was previously 1024*4(4KB)
 
 **Why this matters**
 
@@ -180,7 +180,6 @@ The KLOG (key log) stores keys and small values together. The vLog stores large 
 - More values stay inline in KLOG (vs going to vLog)
 - Slightly larger KLOG files
 - But: dramatically faster lookups for medium-sized values (avoiding vLog reads)
-- Values 256-512 bytes benefit most from this change
 
 **The tradeoff**
 
