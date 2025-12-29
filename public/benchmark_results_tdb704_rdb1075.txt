@@ -1,0 +1,3559 @@
+===================================
+TidesDB vs RocksDB Comparison
+Date: Mon Dec 29 04:20:06 AM EST 2025
+Sync Mode: DISABLED (maximum performance)
+Default Batch Size: 1000
+===================================
+
+### 1. Sequential Write Performance (Batched) ###
+
+========================================
+TEST: Sequential Write (10M ops, 8 threads, batch=1000)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Sequential
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 6639793.21 ops/sec
+  ITER: 6402597.92 ops/sec (10000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 2342979.38 ops/sec
+  ITER: 4926076.83 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 6639793.21 ops/sec
+  Duration: 1.506 seconds
+  Latency (avg): 1026.41 μs
+  Latency (p50): 911.00 μs
+  Latency (p95): 1455.00 μs
+  Latency (p99): 1740.00 μs
+  Latency (min): 681.00 μs
+  Latency (max): 340950.00 μs
+
+ITERATION:
+  Throughput: 6402597.92 ops/sec
+  Duration: 1.562 seconds
+
+Resource Usage:
+  Peak RSS: 2457.03 MB
+  Peak VMS: 2990.12 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1205.72 MB
+  CPU User Time: 12.914 seconds
+  CPU System Time: 1.425 seconds
+  CPU Utilization: 467.2%
+  Database Size: 110.65 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.10x
+
+=== Comparison vs rocksdb ===
+
+PUT: 2.83x faster
+ITER: 1.30x faster
+
+Resource Comparison:
+  Peak RSS: 2457.03 MB vs 2472.60 MB
+  Peak VMS: 2990.12 MB vs 3085.64 MB
+  Disk Reads: 0.00 MB vs 0.01 MB
+  Disk Writes: 1205.72 MB vs 1574.91 MB
+  CPU User Time: 12.914 s vs 15.818 s
+  CPU System Time: 1.425 s vs 1.439 s
+  CPU Utilization: 467.2% vs 273.8%
+  Database Size: 110.65 MB vs 208.53 MB
+
+Amplification Comparison:
+  Write Amplification: 1.09x vs 1.42x
+  Space Amplification: 0.10x vs 0.19x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 2. Random Write Performance (Batched) ###
+
+========================================
+TEST: Random Write (10M ops, 8 threads, batch=1000)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 1922021.66 ops/sec
+  ITER: 3970656.85 ops/sec (10000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1576426.00 ops/sec
+  ITER: 4208943.75 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 1922021.66 ops/sec
+  Duration: 5.203 seconds
+  Latency (avg): 2930.54 μs
+  Latency (p50): 2454.00 μs
+  Latency (p95): 4150.00 μs
+  Latency (p99): 4908.00 μs
+  Latency (min): 814.00 μs
+  Latency (max): 3300150.00 μs
+
+ITERATION:
+  Throughput: 3970656.85 ops/sec
+  Duration: 2.518 seconds
+
+Resource Usage:
+  Peak RSS: 2675.35 MB
+  Peak VMS: 3514.59 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1206.09 MB
+  CPU User Time: 33.820 seconds
+  CPU System Time: 2.156 seconds
+  CPU Utilization: 465.9%
+  Database Size: 218.19 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.20x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.22x faster
+ITER: 0.94x slower
+
+Resource Comparison:
+  Peak RSS: 2675.35 MB vs 2936.65 MB
+  Peak VMS: 3514.59 MB vs 3854.03 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 1206.09 MB vs 1463.33 MB
+  CPU User Time: 33.820 s vs 23.530 s
+  CPU System Time: 2.156 s vs 1.154 s
+  CPU Utilization: 465.9% vs 272.2%
+  Database Size: 218.19 MB vs 151.27 MB
+
+Amplification Comparison:
+  Write Amplification: 1.09x vs 1.32x
+  Space Amplification: 0.20x vs 0.14x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 3. Random Read Performance ###
+
+========================================
+TEST: Random Read (10M ops, 8 threads)
+========================================
+Populating TidesDB for read test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2299308.32 ops/sec
+  ITER: 4064396.29 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2299308.32 ops/sec
+  Duration: 4.349 seconds
+  Latency (avg): 3061.16 μs
+  Latency (p50): 2741.00 μs
+  Latency (p95): 5096.00 μs
+  Latency (p99): 6188.00 μs
+  Latency (min): 888.00 μs
+  Latency (max): 699871.00 μs
+
+ITERATION:
+  Throughput: 4064396.29 ops/sec
+  Duration: 2.460 seconds
+
+Resource Usage:
+  Peak RSS: 2385.56 MB
+  Peak VMS: 3098.91 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1202.31 MB
+  CPU User Time: 36.718 seconds
+  CPU System Time: 2.046 seconds
+  CPU Utilization: 569.1%
+  Database Size: 130.86 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.12x
+
+Running TidesDB read test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Read-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  GET: 51590.95 ops/sec
+  ITER: 7484660.19 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+GET Operations:
+  Throughput: 51590.95 ops/sec
+  Duration: 193.832 seconds
+  Latency (avg): 109.03 μs
+  Latency (p50): 2.00 μs
+  Latency (p95): 4.00 μs
+  Latency (p99): 5011.00 μs
+  Latency (min): 0.00 μs
+  Latency (max): 125317.00 μs
+
+ITERATION:
+  Throughput: 7484660.19 ops/sec
+  Duration: 1.336 seconds
+
+Resource Usage:
+  Peak RSS: 1804.22 MB
+  Peak VMS: 2203.96 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 3.61 MB
+  CPU User Time: 603.427 seconds
+  CPU System Time: 490.006 seconds
+  CPU Utilization: 558.1%
+  Database Size: 88.18 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for read test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2100972.31 ops/sec
+  ITER: 4025533.15 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2100972.31 ops/sec
+  Duration: 4.760 seconds
+  Latency (avg): 3806.39 μs
+  Latency (p50): 3779.00 μs
+  Latency (p95): 4459.00 μs
+  Latency (p99): 5073.00 μs
+  Latency (min): 1185.00 μs
+  Latency (max): 76662.00 μs
+
+ITERATION:
+  Throughput: 4025533.15 ops/sec
+  Duration: 2.484 seconds
+
+Resource Usage:
+  Peak RSS: 308.27 MB
+  Peak VMS: 1357.95 MB
+  Disk Reads: 0.01 MB
+  Disk Writes: 1461.81 MB
+  CPU User Time: 20.501 seconds
+  CPU System Time: 1.506 seconds
+  CPU Utilization: 303.3%
+  Database Size: 118.05 MB
+
+Amplification Factors:
+  Write Amplification: 1.32x
+  Space Amplification: 0.11x
+
+Running RocksDB read test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Read-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  GET: 1397127.28 ops/sec
+  ITER: 6240775.35 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+GET Operations:
+  Throughput: 1397127.28 ops/sec
+  Duration: 7.158 seconds
+  Latency (avg): 5.17 μs
+  Latency (p50): 5.00 μs
+  Latency (p95): 9.00 μs
+  Latency (p99): 13.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 884.00 μs
+
+ITERATION:
+  Throughput: 6240775.35 ops/sec
+  Duration: 1.602 seconds
+
+Resource Usage:
+  Peak RSS: 353.05 MB
+  Peak VMS: 1375.37 MB
+  Disk Reads: 0.01 MB
+  Disk Writes: 85.92 MB
+  CPU User Time: 52.751 seconds
+  CPU System Time: 7.046 seconds
+  CPU Utilization: 632.3%
+  Database Size: 86.11 MB
+
+Amplification Factors:
+  Read Amplification: 0.00x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 4. Mixed Workload (50/50 Read/Write, Batched) ###
+
+========================================
+TEST: Mixed Workload (5M ops, 8 threads, batch=1000)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Mixed
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2201348.55 ops/sec
+  GET: 1702509.60 ops/sec
+  ITER: 2906528.94 ops/sec (5000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1821676.12 ops/sec
+  GET: 1627874.42 ops/sec
+  ITER: 4933803.16 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2201348.55 ops/sec
+  Duration: 2.271 seconds
+  Latency (avg): 2616.62 μs
+  Latency (p50): 2350.00 μs
+  Latency (p95): 3197.00 μs
+  Latency (p99): 3731.00 μs
+  Latency (min): 736.00 μs
+  Latency (max): 1440762.00 μs
+
+GET Operations:
+  Throughput: 1702509.60 ops/sec
+  Duration: 2.937 seconds
+  Latency (avg): 4.17 μs
+  Latency (p50): 4.00 μs
+  Latency (p95): 8.00 μs
+  Latency (p99): 10.00 μs
+  Latency (min): 0.00 μs
+  Latency (max): 516.00 μs
+
+ITERATION:
+  Throughput: 2906528.94 ops/sec
+  Duration: 1.720 seconds
+
+Resource Usage:
+  Peak RSS: 1386.35 MB
+  Peak VMS: 1910.19 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 615.57 MB
+  CPU User Time: 38.527 seconds
+  CPU System Time: 1.225 seconds
+  CPU Utilization: 547.5%
+  Database Size: 42.88 MB
+
+Amplification Factors:
+  Write Amplification: 1.11x
+  Space Amplification: 0.08x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.21x faster
+GET: 1.05x faster
+ITER: 0.59x slower
+
+Resource Comparison:
+  Peak RSS: 1386.35 MB vs 1585.02 MB
+  Peak VMS: 1910.19 MB vs 2444.73 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 615.57 MB vs 691.31 MB
+  CPU User Time: 38.527 s vs 32.679 s
+  CPU System Time: 1.225 s vs 1.981 s
+  CPU Utilization: 547.5% vs 484.3%
+  Database Size: 42.88 MB vs 75.55 MB
+
+Amplification Comparison:
+  Write Amplification: 1.11x vs 1.25x
+  Space Amplification: 0.08x vs 0.14x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 5. Hot Key Workload (Zipfian Distribution, Batched) ###
+
+========================================
+TEST: Zipfian Write (5M ops, 8 threads, batch=1000)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Zipfian (hot keys)
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2754051.62 ops/sec
+  ITER: 4255377.82 ops/sec (660524 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1624497.95 ops/sec
+  ITER: 1018785.03 ops/sec (661111 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2754051.62 ops/sec
+  Duration: 1.816 seconds
+  Latency (avg): 2709.50 μs
+  Latency (p50): 2646.00 μs
+  Latency (p95): 3674.00 μs
+  Latency (p99): 4087.00 μs
+  Latency (min): 1122.00 μs
+  Latency (max): 133650.00 μs
+
+ITERATION:
+  Throughput: 4255377.82 ops/sec
+  Duration: 0.155 seconds
+
+Resource Usage:
+  Peak RSS: 791.26 MB
+  Peak VMS: 1121.41 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 576.93 MB
+  CPU User Time: 11.312 seconds
+  CPU System Time: 2.051 seconds
+  CPU Utilization: 677.9%
+  Database Size: 10.23 MB
+
+Amplification Factors:
+  Write Amplification: 1.04x
+  Space Amplification: 0.02x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.70x faster
+ITER: 4.18x faster
+
+Resource Comparison:
+  Peak RSS: 791.26 MB vs 894.31 MB
+  Peak VMS: 1121.41 MB vs 1741.64 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 576.93 MB vs 684.19 MB
+  CPU User Time: 11.312 s vs 10.349 s
+  CPU System Time: 2.051 s vs 0.831 s
+  CPU Utilization: 677.9% vs 299.6%
+  Database Size: 10.23 MB vs 57.87 MB
+
+Amplification Comparison:
+  Write Amplification: 1.04x vs 1.24x
+  Space Amplification: 0.02x vs 0.10x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Zipfian Mixed (5M ops, 8 threads, batch=1000)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Zipfian (hot keys)
+  Workload: Mixed
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2660208.39 ops/sec
+  GET: 3237576.61 ops/sec
+  ITER: 4269398.11 ops/sec (663362 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1575686.53 ops/sec
+  GET: 1929907.31 ops/sec
+  ITER: 2049327.23 ops/sec (663898 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2660208.39 ops/sec
+  Duration: 1.880 seconds
+  Latency (avg): 2669.52 μs
+  Latency (p50): 2569.00 μs
+  Latency (p95): 3660.00 μs
+  Latency (p99): 4055.00 μs
+  Latency (min): 834.00 μs
+  Latency (max): 174987.00 μs
+
+GET Operations:
+  Throughput: 3237576.61 ops/sec
+  Duration: 1.544 seconds
+  Latency (avg): 1.82 μs
+  Latency (p50): 2.00 μs
+  Latency (p95): 3.00 μs
+  Latency (p99): 4.00 μs
+  Latency (min): 0.00 μs
+  Latency (max): 218.00 μs
+
+ITERATION:
+  Throughput: 4269398.11 ops/sec
+  Duration: 0.155 seconds
+
+Resource Usage:
+  Peak RSS: 835.11 MB
+  Peak VMS: 1159.58 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 576.93 MB
+  CPU User Time: 22.529 seconds
+  CPU System Time: 2.943 seconds
+  CPU Utilization: 653.6%
+  Database Size: 10.27 MB
+
+Amplification Factors:
+  Write Amplification: 1.04x
+  Space Amplification: 0.02x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.69x faster
+GET: 1.68x faster
+ITER: 2.08x faster
+
+Resource Comparison:
+  Peak RSS: 835.11 MB vs 980.95 MB
+  Peak VMS: 1159.58 MB vs 1804.48 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 576.93 MB vs 684.52 MB
+  CPU User Time: 22.529 s vs 29.133 s
+  CPU System Time: 2.943 s vs 2.331 s
+  CPU Utilization: 653.6% vs 487.0%
+  Database Size: 10.27 MB vs 63.41 MB
+
+Amplification Comparison:
+  Write Amplification: 1.04x vs 1.24x
+  Space Amplification: 0.02x vs 0.11x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 6. Delete Performance (Batched) ###
+
+========================================
+TEST: Random Delete (5M ops, 8 threads, batch=1000)
+========================================
+Populating TidesDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2401419.33 ops/sec
+  ITER: 4106809.91 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2401419.33 ops/sec
+  Duration: 2.082 seconds
+  Latency (avg): 2403.25 μs
+  Latency (p50): 2206.00 μs
+  Latency (p95): 2982.00 μs
+  Latency (p99): 3508.00 μs
+  Latency (min): 809.00 μs
+  Latency (max): 1277848.00 μs
+
+ITERATION:
+  Throughput: 4106809.91 ops/sec
+  Duration: 1.217 seconds
+
+Resource Usage:
+  Peak RSS: 1347.89 MB
+  Peak VMS: 1807.12 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 603.43 MB
+  CPU User Time: 14.097 seconds
+  CPU System Time: 0.944 seconds
+  CPU Utilization: 455.8%
+  Database Size: 104.96 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.19x
+
+Running TidesDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 3254221.05 ops/sec
+  ITER: 3128284.70 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 3254221.05 ops/sec
+  Duration: 1.536 seconds
+  Latency (avg): 2294.07 μs
+  Latency (p50): 2263.00 μs
+  Latency (p95): 3353.00 μs
+  Latency (p99): 3944.00 μs
+  Latency (min): 834.00 μs
+  Latency (max): 4992.00 μs
+
+ITERATION:
+  Throughput: 3128284.70 ops/sec
+  Duration: 1.598 seconds
+
+Resource Usage:
+  Peak RSS: 969.23 MB
+  Peak VMS: 1361.67 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 104.83 MB
+  CPU User Time: 12.984 seconds
+  CPU System Time: 0.611 seconds
+  CPU Utilization: 414.0%
+  Database Size: 82.27 MB
+
+Amplification Factors:
+  Write Amplification: 0.19x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2089853.68 ops/sec
+  ITER: 3799028.36 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2089853.68 ops/sec
+  Duration: 2.393 seconds
+  Latency (avg): 3824.75 μs
+  Latency (p50): 3840.00 μs
+  Latency (p95): 4797.00 μs
+  Latency (p99): 5897.00 μs
+  Latency (min): 893.00 μs
+  Latency (max): 20123.00 μs
+
+ITERATION:
+  Throughput: 3799028.36 ops/sec
+  Duration: 1.316 seconds
+
+Resource Usage:
+  Peak RSS: 223.66 MB
+  Peak VMS: 1293.76 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 691.98 MB
+  CPU User Time: 9.330 seconds
+  CPU System Time: 0.724 seconds
+  CPU Utilization: 270.6%
+  Database Size: 74.30 MB
+
+Amplification Factors:
+  Write Amplification: 1.25x
+  Space Amplification: 0.13x
+
+Running RocksDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 3433922.07 ops/sec
+  ITER: 0.00 ops/sec (0 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 3433922.07 ops/sec
+  Duration: 1.456 seconds
+  Latency (avg): 2327.74 μs
+  Latency (p50): 2299.00 μs
+  Latency (p95): 2992.00 μs
+  Latency (p99): 3422.00 μs
+  Latency (min): 532.00 μs
+  Latency (max): 35088.00 μs
+
+Resource Usage:
+  Peak RSS: 172.62 MB
+  Peak VMS: 1294.28 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 157.12 MB
+  CPU User Time: 10.181 seconds
+  CPU System Time: 0.512 seconds
+  CPU Utilization: 351.6%
+  Database Size: 65.04 MB
+
+Amplification Factors:
+  Write Amplification: 0.28x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 7. Large Value Performance (Batched) ###
+
+========================================
+TEST: Large Values (1M ops, 256B key, 4KB value, batch=1000)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 1000000
+  Key Size: 256 bytes
+  Value Size: 4096 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 125206.18 ops/sec
+  ITER: 981615.33 ops/sec (1000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 144827.23 ops/sec
+  ITER: 455745.93 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 1000000
+Threads: 8
+Key Size: 256 bytes
+Value Size: 4096 bytes
+
+PUT Operations:
+  Throughput: 125206.18 ops/sec
+  Duration: 7.987 seconds
+  Latency (avg): 26766.36 μs
+  Latency (p50): 19304.00 μs
+  Latency (p95): 55490.00 μs
+  Latency (p99): 83758.00 μs
+  Latency (min): 11622.00 μs
+  Latency (max): 2549273.00 μs
+
+ITERATION:
+  Throughput: 981615.33 ops/sec
+  Duration: 1.019 seconds
+
+Resource Usage:
+  Peak RSS: 4265.26 MB
+  Peak VMS: 4678.62 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 4418.82 MB
+  CPU User Time: 16.871 seconds
+  CPU System Time: 8.594 seconds
+  CPU Utilization: 282.8%
+  Database Size: 302.31 MB
+
+Amplification Factors:
+  Write Amplification: 1.06x
+  Space Amplification: 0.07x
+
+=== Comparison vs rocksdb ===
+
+PUT: 0.86x slower
+ITER: 2.15x faster
+
+Resource Comparison:
+  Peak RSS: 4265.26 MB vs 3758.17 MB
+  Peak VMS: 4678.62 MB vs 4465.02 MB
+  Disk Reads: 0.00 MB vs 0.01 MB
+  Disk Writes: 4418.82 MB vs 5187.36 MB
+  CPU User Time: 16.871 s vs 16.681 s
+  CPU System Time: 8.594 s vs 4.349 s
+  CPU Utilization: 282.8% vs 231.1%
+  Database Size: 302.31 MB vs 347.20 MB
+
+Amplification Comparison:
+  Write Amplification: 1.06x vs 1.25x
+  Space Amplification: 0.07x vs 0.08x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 8. Small Value Performance (Batched) ###
+
+========================================
+TEST: Small Values (50M ops, 16B key, 64B value, batch=1000)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 50000000
+  Key Size: 16 bytes
+  Value Size: 64 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 1537889.40 ops/sec
+  ITER: 3824371.11 ops/sec (50000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1138050.02 ops/sec
+  ITER: 4168162.34 ops/sec (50000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 50000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 64 bytes
+
+PUT Operations:
+  Throughput: 1537889.40 ops/sec
+  Duration: 32.512 seconds
+  Latency (avg): 3585.69 μs
+  Latency (p50): 2699.00 μs
+  Latency (p95): 4683.00 μs
+  Latency (p99): 5554.00 μs
+  Latency (min): 729.00 μs
+  Latency (max): 20928162.00 μs
+
+ITERATION:
+  Throughput: 3824371.11 ops/sec
+  Duration: 13.074 seconds
+
+Resource Usage:
+  Peak RSS: 11769.75 MB
+  Peak VMS: 13586.88 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 4475.66 MB
+  CPU User Time: 198.419 seconds
+  CPU System Time: 7.567 seconds
+  CPU Utilization: 451.8%
+  Database Size: 1002.74 MB
+
+Amplification Factors:
+  Write Amplification: 1.17x
+  Space Amplification: 0.26x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.35x faster
+ITER: 0.92x slower
+
+Resource Comparison:
+  Peak RSS: 11769.75 MB vs 11751.11 MB
+  Peak VMS: 13586.88 MB vs 12558.52 MB
+  Disk Reads: 0.00 MB vs 0.55 MB
+  Disk Writes: 4475.66 MB vs 5743.17 MB
+  CPU User Time: 198.419 s vs 145.356 s
+  CPU System Time: 7.567 s vs 6.092 s
+  CPU Utilization: 451.8% vs 270.8%
+  Database Size: 1002.74 MB vs 558.75 MB
+
+Amplification Comparison:
+  Write Amplification: 1.17x vs 1.51x
+  Space Amplification: 0.26x vs 0.15x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 9. Batch Size Comparison ###
+Testing impact of different batch sizes on write performance
+
+========================================
+TEST: Batch Size 1 (no batching, 10M ops)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 1049290.64 ops/sec
+  ITER: 3034641.65 ops/sec (10000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 838108.32 ops/sec
+  ITER: 4501898.68 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 1049290.64 ops/sec
+  Duration: 9.530 seconds
+  Latency (avg): 6.54 μs
+  Latency (p50): 6.00 μs
+  Latency (p95): 9.00 μs
+  Latency (p99): 12.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 1944245.00 μs
+
+ITERATION:
+  Throughput: 3034641.65 ops/sec
+  Duration: 3.295 seconds
+
+Resource Usage:
+  Peak RSS: 2212.90 MB
+  Peak VMS: 3081.78 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1427.20 MB
+  CPU User Time: 37.761 seconds
+  CPU System Time: 39.543 seconds
+  CPU Utilization: 567.2%
+  Database Size: 111.05 MB
+
+Amplification Factors:
+  Write Amplification: 1.29x
+  Space Amplification: 0.10x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.25x faster
+ITER: 0.67x slower
+
+Resource Comparison:
+  Peak RSS: 2212.90 MB vs 2611.73 MB
+  Peak VMS: 3081.78 MB vs 3470.09 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 1427.20 MB vs 1548.95 MB
+  CPU User Time: 37.761 s vs 108.135 s
+  CPU System Time: 39.543 s vs 5.785 s
+  CPU Utilization: 567.2% vs 764.3%
+  Database Size: 111.05 MB vs 132.86 MB
+
+Amplification Comparison:
+  Write Amplification: 1.29x vs 1.40x
+  Space Amplification: 0.10x vs 0.12x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Batch Size 10 (10M ops)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 10
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2160642.47 ops/sec
+  ITER: 3664284.15 ops/sec (10000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1475822.63 ops/sec
+  ITER: 4046469.66 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2160642.47 ops/sec
+  Duration: 4.628 seconds
+  Latency (avg): 25.09 μs
+  Latency (p50): 22.00 μs
+  Latency (p95): 33.00 μs
+  Latency (p99): 40.00 μs
+  Latency (min): 6.00 μs
+  Latency (max): 2758812.00 μs
+
+ITERATION:
+  Throughput: 3664284.15 ops/sec
+  Duration: 2.729 seconds
+
+Resource Usage:
+  Peak RSS: 2688.54 MB
+  Peak VMS: 3516.91 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1251.35 MB
+  CPU User Time: 28.011 seconds
+  CPU System Time: 4.088 seconds
+  CPU Utilization: 432.0%
+  Database Size: 250.34 MB
+
+Amplification Factors:
+  Write Amplification: 1.13x
+  Space Amplification: 0.23x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.46x faster
+ITER: 0.91x slower
+
+Resource Comparison:
+  Peak RSS: 2688.54 MB vs 2924.05 MB
+  Peak VMS: 3516.91 MB vs 3853.90 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 1251.35 MB vs 1447.38 MB
+  CPU User Time: 28.011 s vs 40.455 s
+  CPU System Time: 4.088 s vs 10.404 s
+  CPU Utilization: 432.0% vs 545.1%
+  Database Size: 250.34 MB vs 161.93 MB
+
+Amplification Comparison:
+  Write Amplification: 1.13x vs 1.31x
+  Space Amplification: 0.23x vs 0.15x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Batch Size 100 (10M ops)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 100
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2050284.04 ops/sec
+  ITER: 3785967.16 ops/sec (10000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1720845.78 ops/sec
+  ITER: 4081862.57 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2050284.04 ops/sec
+  Duration: 4.877 seconds
+  Latency (avg): 272.66 μs
+  Latency (p50): 239.00 μs
+  Latency (p95): 346.00 μs
+  Latency (p99): 411.00 μs
+  Latency (min): 76.00 μs
+  Latency (max): 3025188.00 μs
+
+ITERATION:
+  Throughput: 3785967.16 ops/sec
+  Duration: 2.641 seconds
+
+Resource Usage:
+  Peak RSS: 2675.01 MB
+  Peak VMS: 3508.96 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1232.43 MB
+  CPU User Time: 31.305 seconds
+  CPU System Time: 2.736 seconds
+  CPU Utilization: 452.3%
+  Database Size: 248.56 MB
+
+Amplification Factors:
+  Write Amplification: 1.11x
+  Space Amplification: 0.22x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.19x faster
+ITER: 0.93x slower
+
+Resource Comparison:
+  Peak RSS: 2675.01 MB vs 2921.45 MB
+  Peak VMS: 3508.96 MB vs 3853.77 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 1232.43 MB vs 1457.08 MB
+  CPU User Time: 31.305 s vs 27.212 s
+  CPU System Time: 2.736 s vs 4.565 s
+  CPU Utilization: 452.3% vs 384.1%
+  Database Size: 248.56 MB vs 189.68 MB
+
+Amplification Comparison:
+  Write Amplification: 1.11x vs 1.32x
+  Space Amplification: 0.22x vs 0.17x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Batch Size 1000 (10M ops)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 1984009.68 ops/sec
+  ITER: 3964560.01 ops/sec (10000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1594745.50 ops/sec
+  ITER: 4219822.36 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 1984009.68 ops/sec
+  Duration: 5.040 seconds
+  Latency (avg): 2798.71 μs
+  Latency (p50): 2574.00 μs
+  Latency (p95): 3398.00 μs
+  Latency (p99): 3793.00 μs
+  Latency (min): 919.00 μs
+  Latency (max): 3077938.00 μs
+
+ITERATION:
+  Throughput: 3964560.01 ops/sec
+  Duration: 2.522 seconds
+
+Resource Usage:
+  Peak RSS: 2675.26 MB
+  Peak VMS: 3506.03 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1206.61 MB
+  CPU User Time: 32.769 seconds
+  CPU System Time: 2.006 seconds
+  CPU Utilization: 459.8%
+  Database Size: 240.82 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.22x
+
+=== Comparison vs rocksdb ===
+
+PUT: 1.24x faster
+ITER: 0.94x slower
+
+Resource Comparison:
+  Peak RSS: 2675.26 MB vs 2914.95 MB
+  Peak VMS: 3506.03 MB vs 3853.90 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 1206.61 MB vs 1462.25 MB
+  CPU User Time: 32.769 s vs 22.802 s
+  CPU System Time: 2.006 s vs 1.285 s
+  CPU Utilization: 459.8% vs 278.4%
+  Database Size: 240.82 MB vs 116.27 MB
+
+Amplification Comparison:
+  Write Amplification: 1.09x vs 1.32x
+  Space Amplification: 0.22x vs 0.11x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Batch Size 10000 (10M ops)
+========================================
+Running TidesDB (with RocksDB baseline)...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 10000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 10000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 1059759.30 ops/sec
+  ITER: 3949481.39 ops/sec (10000000 keys)
+
+=== Cleaning database for baseline comparison ===
+
+=== Running RocksDB Baseline ===
+
+Running RocksDB benchmark...
+  PUT: 1321307.67 ops/sec
+  ITER: 4091090.59 ops/sec (10000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 10000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 1059759.30 ops/sec
+  Duration: 9.436 seconds
+  Latency (avg): 48905.44 μs
+  Latency (p50): 44114.00 μs
+  Latency (p95): 50600.00 μs
+  Latency (p99): 55657.00 μs
+  Latency (min): 25262.00 μs
+  Latency (max): 5468050.00 μs
+
+ITERATION:
+  Throughput: 3949481.39 ops/sec
+  Duration: 2.532 seconds
+
+Resource Usage:
+  Peak RSS: 2688.92 MB
+  Peak VMS: 3516.74 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 1220.70 MB
+  CPU User Time: 53.532 seconds
+  CPU System Time: 2.261 seconds
+  CPU Utilization: 466.2%
+  Database Size: 76.53 MB
+
+Amplification Factors:
+  Write Amplification: 1.10x
+  Space Amplification: 0.07x
+
+=== Comparison vs rocksdb ===
+
+PUT: 0.80x slower
+ITER: 0.97x slower
+
+Resource Comparison:
+  Peak RSS: 2688.92 MB vs 2935.73 MB
+  Peak VMS: 3516.74 MB vs 3981.90 MB
+  Disk Reads: 0.00 MB vs 0.00 MB
+  Disk Writes: 1220.70 MB vs 1459.08 MB
+  CPU User Time: 53.532 s vs 22.108 s
+  CPU System Time: 2.261 s vs 1.147 s
+  CPU Utilization: 466.2% vs 232.0%
+  Database Size: 76.53 MB vs 123.06 MB
+
+Amplification Comparison:
+  Write Amplification: 1.10x vs 1.32x
+  Space Amplification: 0.07x vs 0.11x
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 10. Batch Size Impact on Deletes ###
+
+========================================
+TEST: Delete Batch=1 (5M ops)
+========================================
+Populating TidesDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 1021078.74 ops/sec
+  ITER: 3901793.42 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 1021078.74 ops/sec
+  Duration: 4.897 seconds
+  Latency (avg): 6.73 μs
+  Latency (p50): 6.00 μs
+  Latency (p95): 10.00 μs
+  Latency (p99): 12.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 1280698.00 μs
+
+ITERATION:
+  Throughput: 3901793.42 ops/sec
+  Duration: 1.281 seconds
+
+Resource Usage:
+  Peak RSS: 1089.43 MB
+  Peak VMS: 1929.29 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 709.10 MB
+  CPU User Time: 16.627 seconds
+  CPU System Time: 22.564 seconds
+  CPU Utilization: 599.0%
+  Database Size: 55.31 MB
+
+Amplification Factors:
+  Write Amplification: 1.28x
+  Space Amplification: 0.10x
+
+Running TidesDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 1196675.54 ops/sec
+  ITER: 3164030.29 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 1196675.54 ops/sec
+  Duration: 4.178 seconds
+  Latency (avg): 6.52 μs
+  Latency (p50): 6.00 μs
+  Latency (p95): 9.00 μs
+  Latency (p99): 12.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 2611.00 μs
+
+ITERATION:
+  Throughput: 3164030.29 ops/sec
+  Duration: 1.580 seconds
+
+Resource Usage:
+  Peak RSS: 816.18 MB
+  Peak VMS: 1132.33 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 185.97 MB
+  CPU User Time: 13.818 seconds
+  CPU System Time: 21.004 seconds
+  CPU Utilization: 568.1%
+  Database Size: 0.00 MB
+
+Amplification Factors:
+  Write Amplification: 0.34x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 896196.43 ops/sec
+  ITER: 4195479.12 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 896196.43 ops/sec
+  Duration: 5.579 seconds
+  Latency (avg): 8.67 μs
+  Latency (p50): 8.00 μs
+  Latency (p95): 11.00 μs
+  Latency (p99): 14.00 μs
+  Latency (min): 2.00 μs
+  Latency (max): 3769.00 μs
+
+ITERATION:
+  Throughput: 4195479.12 ops/sec
+  Duration: 1.192 seconds
+
+Resource Usage:
+  Peak RSS: 276.24 MB
+  Peak VMS: 1293.76 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 713.73 MB
+  CPU User Time: 48.426 seconds
+  CPU System Time: 2.922 seconds
+  CPU Utilization: 720.7%
+  Database Size: 83.51 MB
+
+Amplification Factors:
+  Write Amplification: 1.29x
+  Space Amplification: 0.15x
+
+Running RocksDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 958652.36 ops/sec
+  ITER: 0.00 ops/sec (0 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 958652.36 ops/sec
+  Duration: 5.216 seconds
+  Latency (avg): 8.22 μs
+  Latency (p50): 8.00 μs
+  Latency (p95): 11.00 μs
+  Latency (p99): 14.00 μs
+  Latency (min): 3.00 μs
+  Latency (max): 416.00 μs
+
+Resource Usage:
+  Peak RSS: 193.54 MB
+  Peak VMS: 1293.88 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 180.82 MB
+  CPU User Time: 44.190 seconds
+  CPU System Time: 2.119 seconds
+  CPU Utilization: 720.5%
+  Database Size: 69.73 MB
+
+Amplification Factors:
+  Write Amplification: 0.33x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Delete Batch=100 (5M ops)
+========================================
+Populating TidesDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 100
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2298630.75 ops/sec
+  ITER: 4112599.69 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2298630.75 ops/sec
+  Duration: 2.175 seconds
+  Latency (avg): 245.31 μs
+  Latency (p50): 213.00 μs
+  Latency (p95): 312.00 μs
+  Latency (p99): 378.00 μs
+  Latency (min): 79.00 μs
+  Latency (max): 1295142.00 μs
+
+ITERATION:
+  Throughput: 4112599.69 ops/sec
+  Duration: 1.216 seconds
+
+Resource Usage:
+  Peak RSS: 1346.84 MB
+  Peak VMS: 1804.38 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 615.45 MB
+  CPU User Time: 13.985 seconds
+  CPU System Time: 1.328 seconds
+  CPU Utilization: 451.1%
+  Database Size: 50.37 MB
+
+Amplification Factors:
+  Write Amplification: 1.11x
+  Space Amplification: 0.09x
+
+Running TidesDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 100
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 3553597.13 ops/sec
+  ITER: 3222355.41 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 3553597.13 ops/sec
+  Duration: 1.407 seconds
+  Latency (avg): 205.97 μs
+  Latency (p50): 189.00 μs
+  Latency (p95): 330.00 μs
+  Latency (p99): 410.00 μs
+  Latency (min): 59.00 μs
+  Latency (max): 2831.00 μs
+
+ITERATION:
+  Throughput: 3222355.41 ops/sec
+  Duration: 1.552 seconds
+
+Resource Usage:
+  Peak RSS: 813.04 MB
+  Peak VMS: 1128.38 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 105.67 MB
+  CPU User Time: 11.016 seconds
+  CPU System Time: 0.728 seconds
+  CPU Utilization: 396.4%
+  Database Size: 95.51 MB
+
+Amplification Factors:
+  Write Amplification: 0.19x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 100
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2726095.55 ops/sec
+  ITER: 4232485.34 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2726095.55 ops/sec
+  Duration: 1.834 seconds
+  Latency (avg): 293.27 μs
+  Latency (p50): 280.00 μs
+  Latency (p95): 355.00 μs
+  Latency (p99): 389.00 μs
+  Latency (min): 66.00 μs
+  Latency (max): 55244.00 μs
+
+ITERATION:
+  Throughput: 4232485.34 ops/sec
+  Duration: 1.181 seconds
+
+Resource Usage:
+  Peak RSS: 194.92 MB
+  Peak VMS: 1293.73 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 688.77 MB
+  CPU User Time: 10.693 seconds
+  CPU System Time: 2.399 seconds
+  CPU Utilization: 433.0%
+  Database Size: 90.86 MB
+
+Amplification Factors:
+  Write Amplification: 1.25x
+  Space Amplification: 0.16x
+
+Running RocksDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 100
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 2746238.75 ops/sec
+  ITER: 0.00 ops/sec (0 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 2746238.75 ops/sec
+  Duration: 1.821 seconds
+  Latency (avg): 290.94 μs
+  Latency (p50): 284.00 μs
+  Latency (p95): 405.00 μs
+  Latency (p99): 464.00 μs
+  Latency (min): 49.00 μs
+  Latency (max): 2110.00 μs
+
+Resource Usage:
+  Peak RSS: 235.05 MB
+  Peak VMS: 1294.32 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 170.16 MB
+  CPU User Time: 12.007 seconds
+  CPU System Time: 1.904 seconds
+  CPU Utilization: 399.7%
+  Database Size: 92.58 MB
+
+Amplification Factors:
+  Write Amplification: 0.31x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Delete Batch=1000 (5M ops)
+========================================
+Populating TidesDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2155374.02 ops/sec
+  ITER: 4278829.04 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2155374.02 ops/sec
+  Duration: 2.320 seconds
+  Latency (avg): 2709.21 μs
+  Latency (p50): 2370.00 μs
+  Latency (p95): 3504.00 μs
+  Latency (p99): 4260.00 μs
+  Latency (min): 791.00 μs
+  Latency (max): 1501626.00 μs
+
+ITERATION:
+  Throughput: 4278829.04 ops/sec
+  Duration: 1.169 seconds
+
+Resource Usage:
+  Peak RSS: 1347.86 MB
+  Peak VMS: 1808.21 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 603.92 MB
+  CPU User Time: 15.369 seconds
+  CPU System Time: 1.056 seconds
+  CPU Utilization: 470.8%
+  Database Size: 102.48 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.19x
+
+Running TidesDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 3327288.76 ops/sec
+  ITER: 3240528.91 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 3327288.76 ops/sec
+  Duration: 1.503 seconds
+  Latency (avg): 2277.79 μs
+  Latency (p50): 2191.00 μs
+  Latency (p95): 3375.00 μs
+  Latency (p99): 4503.00 μs
+  Latency (min): 825.00 μs
+  Latency (max): 8180.00 μs
+
+ITERATION:
+  Throughput: 3240528.91 ops/sec
+  Duration: 1.543 seconds
+
+Resource Usage:
+  Peak RSS: 961.78 MB
+  Peak VMS: 1353.45 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 104.52 MB
+  CPU User Time: 12.476 seconds
+  CPU System Time: 0.698 seconds
+  CPU Utilization: 413.3%
+  Database Size: 82.59 MB
+
+Amplification Factors:
+  Write Amplification: 0.19x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2131455.38 ops/sec
+  ITER: 4194525.31 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2131455.38 ops/sec
+  Duration: 2.346 seconds
+  Latency (avg): 3749.85 μs
+  Latency (p50): 3795.00 μs
+  Latency (p95): 4394.00 μs
+  Latency (p99): 5343.00 μs
+  Latency (min): 1003.00 μs
+  Latency (max): 20542.00 μs
+
+ITERATION:
+  Throughput: 4194525.31 ops/sec
+  Duration: 1.192 seconds
+
+Resource Usage:
+  Peak RSS: 271.36 MB
+  Peak VMS: 1293.76 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 690.54 MB
+  CPU User Time: 8.999 seconds
+  CPU System Time: 0.667 seconds
+  CPU Utilization: 272.9%
+  Database Size: 79.08 MB
+
+Amplification Factors:
+  Write Amplification: 1.25x
+  Space Amplification: 0.14x
+
+Running RocksDB delete test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Delete-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  DELETE: [8 threads started] ..............................................................[T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 3409845.72 ops/sec
+  ITER: 0.00 ops/sec (0 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+DELETE Operations:
+  Throughput: 3409845.72 ops/sec
+  Duration: 1.466 seconds
+  Latency (avg): 2340.91 μs
+  Latency (p50): 2332.00 μs
+  Latency (p95): 3150.00 μs
+  Latency (p99): 3448.00 μs
+  Latency (min): 525.00 μs
+  Latency (max): 17352.00 μs
+
+Resource Usage:
+  Peak RSS: 171.99 MB
+  Peak VMS: 1294.35 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 157.84 MB
+  CPU User Time: 9.815 seconds
+  CPU System Time: 0.369 seconds
+  CPU Utilization: 340.0%
+  Database Size: 64.18 MB
+
+Amplification Factors:
+  Write Amplification: 0.29x
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 11. Seek Performance (Block Index Effectiveness) ###
+
+========================================
+TEST: Random Seek (5M ops, 8 threads)
+========================================
+Populating TidesDB for seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2446064.28 ops/sec
+  ITER: 4295588.00 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2446064.28 ops/sec
+  Duration: 2.044 seconds
+  Latency (avg): 2299.06 μs
+  Latency (p50): 2100.00 μs
+  Latency (p95): 2793.00 μs
+  Latency (p99): 3056.00 μs
+  Latency (min): 907.00 μs
+  Latency (max): 1169403.00 μs
+
+ITERATION:
+  Throughput: 4295588.00 ops/sec
+  Duration: 1.164 seconds
+
+Resource Usage:
+  Peak RSS: 1347.74 MB
+  Peak VMS: 1803.07 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 604.66 MB
+  CPU User Time: 13.397 seconds
+  CPU System Time: 1.113 seconds
+  CPU Utilization: 452.2%
+  Database Size: 42.89 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.08x
+
+Running TidesDB seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Seek
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  SEEK: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+2538083.95 ops/sec
+  ITER: 7888538.11 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+SEEK Operations:
+  Throughput: 2538083.95 ops/sec
+  Duration: 1.970 seconds
+  Latency (avg): 2.93 μs
+  Latency (p50): 3.00 μs
+  Latency (p95): 4.00 μs
+  Latency (p99): 5.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 587.00 μs
+
+ITERATION:
+  Throughput: 7888538.11 ops/sec
+  Duration: 0.634 seconds
+
+Resource Usage:
+  Peak RSS: 852.90 MB
+  Peak VMS: 1192.39 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 15.661 seconds
+  CPU System Time: 0.316 seconds
+  CPU Utilization: 549.1%
+  Database Size: 42.89 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2168874.65 ops/sec
+  ITER: 4132631.01 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2168874.65 ops/sec
+  Duration: 2.305 seconds
+  Latency (avg): 3685.43 μs
+  Latency (p50): 3772.00 μs
+  Latency (p95): 4239.00 μs
+  Latency (p99): 4651.00 μs
+  Latency (min): 1018.00 μs
+  Latency (max): 6456.00 μs
+
+ITERATION:
+  Throughput: 4132631.01 ops/sec
+  Duration: 1.210 seconds
+
+Resource Usage:
+  Peak RSS: 208.21 MB
+  Peak VMS: 1293.76 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 692.46 MB
+  CPU User Time: 8.922 seconds
+  CPU System Time: 0.767 seconds
+  CPU Utilization: 275.1%
+  Database Size: 72.25 MB
+
+Amplification Factors:
+  Write Amplification: 1.25x
+  Space Amplification: 0.13x
+
+Running RocksDB seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Seek
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  SEEK: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+904533.70 ops/sec
+  ITER: 4990732.21 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+SEEK Operations:
+  Throughput: 904533.70 ops/sec
+  Duration: 5.528 seconds
+  Latency (avg): 8.49 μs
+  Latency (p50): 8.00 μs
+  Latency (p95): 13.00 μs
+  Latency (p99): 17.00 μs
+  Latency (min): 3.00 μs
+  Latency (max): 3229.00 μs
+
+ITERATION:
+  Throughput: 4990732.21 ops/sec
+  Duration: 1.002 seconds
+
+Resource Usage:
+  Peak RSS: 228.06 MB
+  Peak VMS: 1302.79 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 40.163 seconds
+  CPU System Time: 3.873 seconds
+  CPU Utilization: 637.9%
+  Database Size: 52.74 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Sequential Seek (5M ops, 8 threads)
+========================================
+Populating TidesDB for seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Sequential
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 4404118.38 ops/sec
+  ITER: 7287971.06 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 4404118.38 ops/sec
+  Duration: 1.135 seconds
+  Latency (avg): 1261.61 μs
+  Latency (p50): 1148.00 μs
+  Latency (p95): 1356.00 μs
+  Latency (p99): 1951.00 μs
+  Latency (min): 654.00 μs
+  Latency (max): 640167.00 μs
+
+ITERATION:
+  Throughput: 7287971.06 ops/sec
+  Duration: 0.686 seconds
+
+Resource Usage:
+  Peak RSS: 1347.84 MB
+  Peak VMS: 1806.89 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 605.93 MB
+  CPU User Time: 7.026 seconds
+  CPU System Time: 1.005 seconds
+  CPU Utilization: 440.8%
+  Database Size: 55.30 MB
+
+Amplification Factors:
+  Write Amplification: 1.10x
+  Space Amplification: 0.10x
+
+Running TidesDB seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Sequential
+  Workload: Seek
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  SEEK: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+5805825.33 ops/sec
+  ITER: 7749222.75 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+SEEK Operations:
+  Throughput: 5805825.33 ops/sec
+  Duration: 0.861 seconds
+  Latency (avg): 1.09 μs
+  Latency (p50): 1.00 μs
+  Latency (p95): 2.00 μs
+  Latency (p99): 2.00 μs
+  Latency (min): 0.00 μs
+  Latency (max): 386.00 μs
+
+ITERATION:
+  Throughput: 7749222.75 ops/sec
+  Duration: 0.645 seconds
+
+Resource Usage:
+  Peak RSS: 842.94 MB
+  Peak VMS: 1128.03 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 6.247 seconds
+  CPU System Time: 0.548 seconds
+  CPU Utilization: 381.9%
+  Database Size: 55.30 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Sequential
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2491279.28 ops/sec
+  ITER: 5082803.96 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2491279.28 ops/sec
+  Duration: 2.007 seconds
+  Latency (avg): 3208.98 μs
+  Latency (p50): 2989.00 μs
+  Latency (p95): 4045.00 μs
+  Latency (p99): 5241.00 μs
+  Latency (min): 959.00 μs
+  Latency (max): 46681.00 μs
+
+ITERATION:
+  Throughput: 5082803.96 ops/sec
+  Duration: 0.984 seconds
+
+Resource Usage:
+  Peak RSS: 237.48 MB
+  Peak VMS: 1293.63 MB
+  Disk Reads: 0.01 MB
+  Disk Writes: 739.95 MB
+  CPU User Time: 7.207 seconds
+  CPU System Time: 0.747 seconds
+  CPU Utilization: 265.6%
+  Database Size: 122.53 MB
+
+Amplification Factors:
+  Write Amplification: 1.34x
+  Space Amplification: 0.22x
+
+Running RocksDB seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Sequential
+  Workload: Seek
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  SEEK: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+1880392.02 ops/sec
+  ITER: 6054844.78 ops/sec (5000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+SEEK Operations:
+  Throughput: 1880392.02 ops/sec
+  Duration: 2.659 seconds
+  Latency (avg): 3.31 μs
+  Latency (p50): 3.00 μs
+  Latency (p95): 6.00 μs
+  Latency (p99): 8.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 4007.00 μs
+
+ITERATION:
+  Throughput: 6054844.78 ops/sec
+  Duration: 0.826 seconds
+
+Resource Usage:
+  Peak RSS: 204.43 MB
+  Peak VMS: 1292.56 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 87.18 MB
+  CPU User Time: 19.814 seconds
+  CPU System Time: 0.247 seconds
+  CPU Utilization: 531.8%
+  Database Size: 87.29 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Zipfian Seek (5M ops, 8 threads)
+========================================
+Populating TidesDB for seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Zipfian (hot keys)
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 2580458.70 ops/sec
+  ITER: 4511006.05 ops/sec (660294 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2580458.70 ops/sec
+  Duration: 1.938 seconds
+  Latency (avg): 2920.71 μs
+  Latency (p50): 2923.00 μs
+  Latency (p95): 4033.00 μs
+  Latency (p99): 4329.00 μs
+  Latency (min): 844.00 μs
+  Latency (max): 137473.00 μs
+
+ITERATION:
+  Throughput: 4511006.05 ops/sec
+  Duration: 0.146 seconds
+
+Resource Usage:
+  Peak RSS: 787.99 MB
+  Peak VMS: 1121.41 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 576.93 MB
+  CPU User Time: 11.570 seconds
+  CPU System Time: 2.679 seconds
+  CPU Utilization: 683.6%
+  Database Size: 10.23 MB
+
+Amplification Factors:
+  Write Amplification: 1.04x
+  Space Amplification: 0.02x
+
+Running TidesDB seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Zipfian (hot keys)
+  Workload: Seek
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  SEEK: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+3493994.17 ops/sec
+  ITER: 7902885.66 ops/sec (660294 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+SEEK Operations:
+  Throughput: 3493994.17 ops/sec
+  Duration: 1.431 seconds
+  Latency (avg): 1.04 μs
+  Latency (p50): 1.00 μs
+  Latency (p95): 2.00 μs
+  Latency (p99): 2.00 μs
+  Latency (min): 0.00 μs
+  Latency (max): 286.00 μs
+
+ITERATION:
+  Throughput: 7902885.66 ops/sec
+  Duration: 0.084 seconds
+
+Resource Usage:
+  Peak RSS: 130.73 MB
+  Peak VMS: 610.61 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 7.532 seconds
+  CPU System Time: 3.111 seconds
+  CPU Utilization: 590.6%
+  Database Size: 10.23 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Zipfian (hot keys)
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 1743470.62 ops/sec
+  ITER: 2048514.01 ops/sec (656602 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 1743470.62 ops/sec
+  Duration: 2.868 seconds
+  Latency (avg): 4523.41 μs
+  Latency (p50): 4812.00 μs
+  Latency (p95): 5745.00 μs
+  Latency (p99): 6011.00 μs
+  Latency (min): 1190.00 μs
+  Latency (max): 77320.00 μs
+
+ITERATION:
+  Throughput: 2048514.01 ops/sec
+  Duration: 0.321 seconds
+
+Resource Usage:
+  Peak RSS: 179.85 MB
+  Peak VMS: 1293.63 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 678.99 MB
+  CPU User Time: 9.114 seconds
+  CPU System Time: 0.838 seconds
+  CPU Utilization: 311.8%
+  Database Size: 56.24 MB
+
+Amplification Factors:
+  Write Amplification: 1.23x
+  Space Amplification: 0.10x
+
+Running RocksDB seek test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 5000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Zipfian (hot keys)
+  Workload: Seek
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  SEEK: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+682245.33 ops/sec
+  ITER: 2266700.73 ops/sec (656602 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 5000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+SEEK Operations:
+  Throughput: 682245.33 ops/sec
+  Duration: 7.329 seconds
+  Latency (avg): 10.66 μs
+  Latency (p50): 11.00 μs
+  Latency (p95): 19.00 μs
+  Latency (p99): 23.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 1191.00 μs
+
+ITERATION:
+  Throughput: 2266700.73 ops/sec
+  Duration: 0.290 seconds
+
+Resource Usage:
+  Peak RSS: 217.05 MB
+  Peak VMS: 1295.37 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 48.623 seconds
+  CPU System Time: 6.757 seconds
+  CPU Utilization: 691.0%
+  Database Size: 36.64 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+### 12. Range Query Performance ###
+
+========================================
+TEST: Range Scan 100 keys (1M ops, 8 threads)
+========================================
+Populating TidesDB for range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 3453026.75 ops/sec
+  ITER: 4825812.30 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 3453026.75 ops/sec
+  Duration: 0.290 seconds
+  Latency (avg): 1927.68 μs
+  Latency (p50): 1916.00 μs
+  Latency (p95): 2711.00 μs
+  Latency (p99): 2926.00 μs
+  Latency (min): 770.00 μs
+  Latency (max): 63578.00 μs
+
+ITERATION:
+  Throughput: 4825812.30 ops/sec
+  Duration: 0.207 seconds
+
+Resource Usage:
+  Peak RSS: 285.54 MB
+  Peak VMS: 645.09 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 121.18 MB
+  CPU User Time: 2.170 seconds
+  CPU System Time: 0.217 seconds
+  CPU Utilization: 480.2%
+  Database Size: 9.19 MB
+
+Amplification Factors:
+  Write Amplification: 1.10x
+  Space Amplification: 0.08x
+
+Running TidesDB range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Range Query
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  RANGE: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+378630.69 ops/sec
+  ITER: 7674243.70 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+RANGE Query Operations:
+  Throughput: 378630.69 ops/sec
+  Duration: 2.641 seconds
+  Latency (avg): 19.67 μs
+  Latency (p50): 16.00 μs
+  Latency (p95): 40.00 μs
+  Latency (p99): 51.00 μs
+  Latency (min): 3.00 μs
+  Latency (max): 1443.00 μs
+  Keys per range: 100
+
+ITERATION:
+  Throughput: 7674243.70 ops/sec
+  Duration: 0.130 seconds
+
+Resource Usage:
+  Peak RSS: 190.12 MB
+  Peak VMS: 611.32 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 19.685 seconds
+  CPU System Time: 0.264 seconds
+  CPU Utilization: 703.1%
+  Database Size: 9.19 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 1939913.13 ops/sec
+  ITER: 4342954.43 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 1939913.13 ops/sec
+  Duration: 0.515 seconds
+  Latency (avg): 4110.58 μs
+  Latency (p50): 4023.00 μs
+  Latency (p95): 5436.00 μs
+  Latency (p99): 6653.00 μs
+  Latency (min): 914.00 μs
+  Latency (max): 19392.00 μs
+
+ITERATION:
+  Throughput: 4342954.43 ops/sec
+  Duration: 0.230 seconds
+
+Resource Usage:
+  Peak RSS: 106.52 MB
+  Peak VMS: 1285.12 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 126.78 MB
+  CPU User Time: 1.436 seconds
+  CPU System Time: 0.172 seconds
+  CPU Utilization: 215.1%
+  Database Size: 19.06 MB
+
+Amplification Factors:
+  Write Amplification: 1.15x
+  Space Amplification: 0.17x
+
+Running RocksDB range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Range Query
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  RANGE: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+305709.99 ops/sec
+  ITER: 4729049.13 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+RANGE Query Operations:
+  Throughput: 305709.99 ops/sec
+  Duration: 3.271 seconds
+  Latency (avg): 24.96 μs
+  Latency (p50): 24.00 μs
+  Latency (p95): 33.00 μs
+  Latency (p99): 48.00 μs
+  Latency (min): 3.00 μs
+  Latency (max): 1134.00 μs
+  Keys per range: 100
+
+ITERATION:
+  Throughput: 4729049.13 ops/sec
+  Duration: 0.211 seconds
+
+Resource Usage:
+  Peak RSS: 200.24 MB
+  Peak VMS: 1293.39 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 24.983 seconds
+  CPU System Time: 0.344 seconds
+  CPU Utilization: 713.6%
+  Database Size: 14.08 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Range Scan 1000 keys (500K ops, 8 threads)
+========================================
+Populating TidesDB for range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 500000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 4928099.04 ops/sec
+  ITER: 5138270.87 ops/sec (500000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 500000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 4928099.04 ops/sec
+  Duration: 0.101 seconds
+  Latency (avg): 1492.60 μs
+  Latency (p50): 1518.00 μs
+  Latency (p95): 1835.00 μs
+  Latency (p99): 2084.00 μs
+  Latency (min): 602.00 μs
+  Latency (max): 2493.00 μs
+
+ITERATION:
+  Throughput: 5138270.87 ops/sec
+  Duration: 0.097 seconds
+
+Resource Usage:
+  Peak RSS: 151.79 MB
+  Peak VMS: 609.41 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 57.59 MB
+  CPU User Time: 0.749 seconds
+  CPU System Time: 0.095 seconds
+  CPU Utilization: 424.6%
+  Database Size: 4.45 MB
+
+Amplification Factors:
+  Write Amplification: 1.04x
+  Space Amplification: 0.08x
+
+Running TidesDB range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 500000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Range Query
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  RANGE: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+41835.57 ops/sec
+  ITER: 8173674.23 ops/sec (500000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 500000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+RANGE Query Operations:
+  Throughput: 41835.57 ops/sec
+  Duration: 11.952 seconds
+  Latency (avg): 159.46 μs
+  Latency (p50): 150.00 μs
+  Latency (p95): 214.00 μs
+  Latency (p99): 262.00 μs
+  Latency (min): 2.00 μs
+  Latency (max): 8229.00 μs
+  Keys per range: 1000
+
+ITERATION:
+  Throughput: 8173674.23 ops/sec
+  Duration: 0.061 seconds
+
+Resource Usage:
+  Peak RSS: 105.96 MB
+  Peak VMS: 610.41 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 79.024 seconds
+  CPU System Time: 0.864 seconds
+  CPU Utilization: 662.9%
+  Database Size: 4.45 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 500000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Random
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2161349.03 ops/sec
+  ITER: 6643282.31 ops/sec (500000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 500000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2161349.03 ops/sec
+  Duration: 0.231 seconds
+  Latency (avg): 3659.74 μs
+  Latency (p50): 3749.00 μs
+  Latency (p95): 4113.00 μs
+  Latency (p99): 5226.00 μs
+  Latency (min): 834.00 μs
+  Latency (max): 5309.00 μs
+
+ITERATION:
+  Throughput: 6643282.31 ops/sec
+  Duration: 0.075 seconds
+
+Resource Usage:
+  Peak RSS: 89.12 MB
+  Peak VMS: 1301.50 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 61.77 MB
+  CPU User Time: 0.628 seconds
+  CPU System Time: 0.050 seconds
+  CPU Utilization: 220.8%
+  Database Size: 56.80 MB
+
+Amplification Factors:
+  Write Amplification: 1.12x
+  Space Amplification: 1.03x
+
+Running RocksDB range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 500000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Random
+  Workload: Range Query
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  RANGE: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+49059.85 ops/sec
+  ITER: 6941841.25 ops/sec (500000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 500000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+RANGE Query Operations:
+  Throughput: 49059.85 ops/sec
+  Duration: 10.192 seconds
+  Latency (avg): 160.53 μs
+  Latency (p50): 151.00 μs
+  Latency (p95): 193.00 μs
+  Latency (p99): 228.00 μs
+  Latency (min): 2.00 μs
+  Latency (max): 816.00 μs
+  Keys per range: 1000
+
+ITERATION:
+  Throughput: 6941841.25 ops/sec
+  Duration: 0.072 seconds
+
+Resource Usage:
+  Peak RSS: 74.97 MB
+  Peak VMS: 1232.41 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 80.306 seconds
+  CPU System Time: 0.112 seconds
+  CPU Utilization: 780.8%
+  Database Size: 7.49 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+========================================
+TEST: Sequential Range Scan 100 keys (1M ops, 8 threads)
+========================================
+Populating TidesDB for range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Sequential
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  PUT: 6693082.03 ops/sec
+  ITER: 7137045.55 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 6693082.03 ops/sec
+  Duration: 0.149 seconds
+  Latency (avg): 1009.52 μs
+  Latency (p50): 910.00 μs
+  Latency (p95): 1444.00 μs
+  Latency (p99): 1571.00 μs
+  Latency (min): 680.00 μs
+  Latency (max): 27755.00 μs
+
+ITERATION:
+  Throughput: 7137045.55 ops/sec
+  Duration: 0.140 seconds
+
+Resource Usage:
+  Peak RSS: 285.48 MB
+  Peak VMS: 644.66 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 120.73 MB
+  CPU User Time: 1.072 seconds
+  CPU System Time: 0.238 seconds
+  CPU Utilization: 451.9%
+  Database Size: 11.04 MB
+
+Amplification Factors:
+  Write Amplification: 1.09x
+  Space Amplification: 0.10x
+
+Running TidesDB range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: tidesdb (v7.0.4)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Sequential
+  Workload: Range Query
+  Sync Mode: Disabled (fast)
+
+Running TidesDB benchmark...
+  RANGE: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+499755.12 ops/sec
+  ITER: 7866706.52 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: tidesdb (v7.0.4)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+RANGE Query Operations:
+  Throughput: 499755.12 ops/sec
+  Duration: 2.001 seconds
+  Latency (avg): 15.26 μs
+  Latency (p50): 13.00 μs
+  Latency (p95): 35.00 μs
+  Latency (p99): 37.00 μs
+  Latency (min): 11.00 μs
+  Latency (max): 1202.00 μs
+  Keys per range: 100
+
+ITERATION:
+  Throughput: 7866706.52 ops/sec
+  Duration: 0.127 seconds
+
+Resource Usage:
+  Peak RSS: 186.35 MB
+  Peak VMS: 611.33 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 15.355 seconds
+  CPU System Time: 0.172 seconds
+  CPU Utilization: 710.9%
+  Database Size: 11.04 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+Populating RocksDB for range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1000
+  Key Pattern: Sequential
+  Workload: Write-only
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  PUT: 2785437.73 ops/sec
+  ITER: 6071977.22 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+PUT Operations:
+  Throughput: 2785437.73 ops/sec
+  Duration: 0.359 seconds
+  Latency (avg): 2863.23 μs
+  Latency (p50): 2878.00 μs
+  Latency (p95): 3193.00 μs
+  Latency (p99): 3340.00 μs
+  Latency (min): 742.00 μs
+  Latency (max): 3574.00 μs
+
+ITERATION:
+  Throughput: 6071977.22 ops/sec
+  Duration: 0.165 seconds
+
+Resource Usage:
+  Peak RSS: 91.35 MB
+  Peak VMS: 1283.71 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 133.30 MB
+  CPU User Time: 1.076 seconds
+  CPU System Time: 0.165 seconds
+  CPU Utilization: 235.7%
+  Database Size: 26.27 MB
+
+Amplification Factors:
+  Write Amplification: 1.20x
+  Space Amplification: 0.24x
+
+Running RocksDB range test...
+=== TidesDB Storage Engine Benchmarker ===
+
+Configuration:
+  Engine: rocksdb (vunknown)
+  Operations: 1000000
+  Key Size: 16 bytes
+  Value Size: 100 bytes
+  Threads: 8
+  Batch Size: 1
+  Key Pattern: Sequential
+  Workload: Range Query
+  Sync Mode: Disabled (fast)
+
+Running RocksDB benchmark...
+  RANGE: [8 threads started] [T0 done] [T1 done] [T2 done] [T3 done] [T4 done] [T5 done] [T6 done] [T7 done] 
+394471.40 ops/sec
+  ITER: 4890262.51 ops/sec (1000000 keys)
+
+
+**=== Benchmark Results ===**
+
+Engine: rocksdb (vunknown)
+Operations: 1000000
+Threads: 8
+Key Size: 16 bytes
+Value Size: 100 bytes
+
+RANGE Query Operations:
+  Throughput: 394471.40 ops/sec
+  Duration: 2.535 seconds
+  Latency (avg): 18.77 μs
+  Latency (p50): 18.00 μs
+  Latency (p95): 26.00 μs
+  Latency (p99): 43.00 μs
+  Latency (min): 1.00 μs
+  Latency (max): 1069.00 μs
+  Keys per range: 100
+
+ITERATION:
+  Throughput: 4890262.51 ops/sec
+  Duration: 0.204 seconds
+
+Resource Usage:
+  Peak RSS: 146.47 MB
+  Peak VMS: 1294.37 MB
+  Disk Reads: 0.00 MB
+  Disk Writes: 0.00 MB
+  CPU User Time: 19.020 seconds
+  CPU System Time: 0.116 seconds
+  CPU Utilization: 683.9%
+  Database Size: 21.03 MB
+
+Amplification Factors:
+
+Cleaning up /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/db-bench...
+
+
+===================================
+Benchmark Suite Complete!
+Results saved to: benchmark_results.txt
+===================================
