@@ -173,17 +173,10 @@ Without atomic reservation, two threads could get the same slot value, leading t
 
 **Why this matters**
 
-The KLOG (key log) stores keys and small values together. The vLog stores large values separately. The threshold determines what's "small" vs "large".
+The KLOG (key log) stores keys and small values together. The VLog stores large values separately. The threshold determines what's "small" vs "large".
 
-**With higher threshold (512 bytes)**
-
-- More values stay inline in KLOG (vs going to vLog)
-- Slightly larger KLOG files
-- But: dramatically faster lookups for medium-sized values (avoiding vLog reads)
-
-**The tradeoff**
-
-Lower thresholds would put more values in vLog, making KLOG more compact with better cache efficiency. However, the higher 512-byte threshold significantly improves read performance for medium-sized values by avoiding separate vLog lookups.
+**With lower threshold (512 bytes)**
+- More keys in a klog block of 64KB
 
 ## Performance Impact · The Numbers
 
