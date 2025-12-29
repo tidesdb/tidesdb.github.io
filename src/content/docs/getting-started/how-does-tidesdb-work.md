@@ -35,7 +35,7 @@ A column family maintains:
 
 ### Sorted String Tables
 
-Each sorted string table (SSTable) consists of two files: a key log (.klog) and a value log (.vlog). The key log stores keys, metadata, and values smaller than the configured threshold (default 4KB). Values exceeding this threshold reside in the value log, with the key log storing only file offsets. This separation keeps the key log compact for efficient scanning while accommodating arbitrarily large values.
+Each sorted string table (SSTable) consists of two files: a key log (.klog) and a value log (.vlog). The key log stores keys, metadata, and values smaller than the configured threshold (default 512 bytes). Values exceeding this threshold reside in the value log, with the key log storing only file offsets. This separation keeps the key log compact for efficient scanning while accommodating arbitrarily large values.
 
 <div class="architecture-diagram">
 
@@ -121,7 +121,7 @@ The transaction uses hash-based deduplication (simple multiplicative hash: `hash
 
 When a memtable exceeds its configured size (default 64MB), the system atomically swaps in a new empty memtable and enqueues the old one for flushing. The swap takes one atomic store with a memory fence for visibility.
 
-A flush worker dequeues the immutable memtable and creates an SSTable. It iterates the skip list in sorted order, writing entries to 64KB blocks. Values exceeding the threshold (default 4KB) go to the value log; the key log stores only the file offset. The worker compresses each block, writes the block index and bloom filter, and appends metadata. It then fsyncs both files, adds the SSTable to level 1, commits to the manifest, and deletes the write-ahead log.
+A flush worker dequeues the immutable memtable and creates an SSTable. It iterates the skip list in sorted order, writing entries to 64KB blocks. Values exceeding the threshold (default 512 bytes) go to the value log; the key log stores only the file offset. The worker compresses each block, writes the block index and bloom filter, and appends metadata. It then fsyncs both files, adds the SSTable to level 1, commits to the manifest, and deletes the write-ahead log.
 
 The ordering is critical: fsync before manifest commit ensures the SSTable is durable before it becomes discoverable. Manifest commit before WAL deletion ensures crash recovery can find the data.
 
@@ -377,7 +377,7 @@ Each level holds N× more data than the previous level. This determines write am
 
 ### Value Log Threshold
 
-Values exceeding the configured threshold (default 4KB) go to the value log. This keeps the key log compact for efficient scanning. The threshold balances two costs: small thresholds cause many value log lookups (extra disk seeks); large thresholds bloat the key log (more data to scan during iteration). The default 4KB is a heuristic - it's roughly the size where the indirection cost (reading vlog offset, seeking to vlog, reading value) becomes cheaper than scanning a large inline value during iteration.
+Values exceeding the configured threshold (default 512 bytes) go to the value log. This keeps the key log compact for efficient scanning. The threshold balances two costs: small thresholds cause many value log lookups (extra disk seeks); large thresholds bloat the key log (more data to scan during iteration). The default 512 bytes is a heuristic - it's roughly the size where the indirection cost (reading vlog offset, seeking to vlog, reading value) becomes cheaper than scanning a large inline value during iteration.
 
 ### Bloom Filter FPR
 

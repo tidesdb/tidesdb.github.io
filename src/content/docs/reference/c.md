@@ -175,7 +175,7 @@ tidesdb_column_family_config_t cf_config = {
     .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
     .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
     .comparator_name = {0},                     /* Empty = use default "memcmp" */
-    .klog_value_threshold = 4096,               /* Values > 4KB go to vlog (default: 4096) */
+    .klog_value_threshold = 512,               /* Values > 512 bytes go to vlog (default: 512) */
     .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
     .l1_file_count_trigger = 4,                 /* L1 file count trigger for compaction (default: 4) */
@@ -716,15 +716,6 @@ TidesDB provides seek operations that allow you to position an iterator at a spe
 - Jumps directly to the target block using the file position
 - Scans forward from that block to find the exact key
 - **Performance** · O(log n) binary search + O(k) entries per block scan
-
-**Without Block Indexes** (`enable_block_indexes = 0`):
-- Starts from the first klog block
-- Scans sequentially through all blocks until target is found
-- **Performance** · O(n) blocks × O(k) entries per block
-
-**Example** · For a 1GB SSTable with 4KB blocks:
-- With indexes: ~10 binary search steps + scan 1 block (~100 entries)
-- Without indexes: scan ~250,000 blocks sequentially
 
 Block indexes provide dramatic speedup for large SSTables at the cost of ~2-5% storage overhead for the compact index structure (parallel arrays with delta-encoded file positions).
 
