@@ -345,7 +345,7 @@ Functions return integer error codes. Zero indicates success; negative values in
 - `TDB_ERR_CORRUPTION` (-5): data corruption detected
 - `TDB_ERR_CONFLICT` (-7): transaction conflict
 
-More status codes can be seen in the [C reference](/reference/c.md) section.
+More status codes can be seen in the [C reference](/reference/c) section.
 
 The system distinguishes transient errors (disk space, memory) from permanent errors (corruption, invalid arguments). Critical operations use fsync for durability. All disk reads validate checksums at the block manager level.  At a higher level the system utilizes magic numbers to detect corruption at the SSTable level.
 
