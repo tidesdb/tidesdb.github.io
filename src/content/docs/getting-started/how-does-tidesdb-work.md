@@ -121,7 +121,7 @@ The transaction uses hash-based deduplication (simple multiplicative hash: `hash
 
 When a memtable exceeds its configured size (default 64MB), the system atomically swaps in a new empty memtable and enqueues the old one for flushing. The swap takes one atomic store with a memory fence for visibility.
 
-A flush worker dequeues the immutable memtable and creates an SSTable. It iterates the skip list in sorted order, writing entries to 64KB blocks. Values exceeding the threshold (default 512 bytes) go to the value log; the key log stores only the file offset. The worker compresses each block, writes the block index and bloom filter, and appends metadata. It then fsyncs both files, adds the SSTable to level 1, commits to the manifest, and deletes the write-ahead log.
+A flush worker dequeues the immutable memtable and creates an SSTable. It iterates the skip list in sorted order, writing entries to 64KB blocks. Values exceeding the threshold (default 512 bytes) go to the value log; the key log stores only the file offset. The worker compresses each block optionally, writes the block index and bloom filter, and appends metadata. It then fsyncs both files, adds the SSTable to level 1, commits to the manifest, and deletes the write-ahead log.
 
 The ordering is critical: fsync before manifest commit ensures the SSTable is durable before it becomes discoverable. Manifest commit before WAL deletion ensures crash recovery can find the data.
 
@@ -275,7 +275,7 @@ DCA is separate from compaction policies. Compaction policies (full/dividing/par
 
 This ensures capacities remain proportional to actual data distribution. Without rebalancing, intermediate levels would have stale capacities after removal.
 
-**Initialization** · Column families start with `min_levels` (configurable, default 5) pre-allocated. If recovery finds SSTables at level N > min_levels, initializes with N levels (e.g., finds level 8 SSTables → initializes with 8 levels). If recovery finds SSTables at level N < min_levels, still initializes with min_levels (e.g., finds level 3 SSTables → initializes with 5 levels, leaving levels 4-5 empty). The floor prevents small databases from thrashing between 2-3 levels and guarantees predictable read performance.
+**Initialization** · Column families start with `min_levels` (configurable, default 5) pre-allocated. If recovery finds SSTables at level N > min_levels, initializes with N levels (e.g., finds level 8 SSTables -> initializes with 8 levels). If recovery finds SSTables at level N < min_levels, still initializes with min_levels (e.g., finds level 3 SSTables -> initializes with 5 levels, leaving levels 4-5 empty). The floor prevents small databases from thrashing between 2-3 levels and guarantees predictable read performance.
 
 ### Merge Process
 
