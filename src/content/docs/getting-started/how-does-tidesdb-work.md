@@ -320,7 +320,7 @@ Four worker pools handle asynchronous operations:
 
 **Compaction workers** (configurable, default 2 threads) merge SSTables across levels. Multiple workers enable parallel compaction of different level ranges.
 
-**Sync worker** (1 thread) periodically fsyncs write-ahead logs for column families configured with interval sync mode. It scans all column families, finds the minimum sync interval, sleeps for that duration, and fsyncs all WALs.
+**Sync worker** (1 thread) periodically fsyncs write-ahead logs for column families configured with interval sync mode. It scans all column families, finds the minimum sync interval, sleeps for that duration, and fsyncs all WALs.  This is only run if **any** of the column families during start up are configured with interval sync mode.  If none are configured with interval sync mode, the sync worker is not started.
 
 **Reaper worker** (1 thread) closes unused SSTable file handles when the open file count exceeds the limit (configurable, default 512). It sorts SSTables by last access time (updated atomically on each SSTable open, not on every read) and closes the oldest 25%. With more SSTables than the limit, the reaper runs continuously, causing file descriptor thrashing.
 
@@ -345,7 +345,9 @@ Functions return integer error codes. Zero indicates success; negative values in
 - `TDB_ERR_CORRUPTION` (-5): data corruption detected
 - `TDB_ERR_CONFLICT` (-7): transaction conflict
 
-The system distinguishes transient errors (disk space, memory) from permanent errors (corruption, invalid arguments). Critical operations use fsync for durability. All disk reads validate checksums.
+More status codes can be seen in the [C reference](/reference/c.md) section.
+
+The system distinguishes transient errors (disk space, memory) from permanent errors (corruption, invalid arguments). Critical operations use fsync for durability. All disk reads validate checksums at the block manager level.  At a higher level the system utilizes magic numbers to detect corruption at the SSTable level.
 
 **Error scenarios:**
 
@@ -446,7 +448,7 @@ The bloom filter implementation uses a packed bitset (uint64_t words) with multi
 
 **Hash function** · Uses a simple multiplicative hash with different seeds for each of the h hash functions. Each hash sets one bit in the bitset using `bitset[hash % m / 64] |= (1ULL << (hash % 64))`.
 
-**Integration** · TidesDB creates one bloom filter per SSTable during flush, adding all keys. The filter is serialized and written to the klog file after data blocks. During reads, the system checks the bloom filter before consulting the block index. With 1% FPR, this eliminates 99% of disk reads for absent keys. The filter is loaded into memory when an SSTable is opened and remains resident.
+**Integration** · TidesDB creates one bloom filter per SSTable during flush and merges, adding all keys. The filter is serialized and written to the klog file after data blocks. During reads, the system checks the bloom filter before consulting the block index. With 1% FPR, this eliminates 99% of disk reads for absent keys. The filter is loaded into memory when an SSTable is opened and remains resident.
 
 ### Buffer
 
