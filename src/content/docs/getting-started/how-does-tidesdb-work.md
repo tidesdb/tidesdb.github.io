@@ -164,7 +164,7 @@ Each column family maintains a queue of immutable memtables awaiting flush. When
 
 <div class="architecture-diagram">
 
-![TidesDB Read Path](../../../assets/img19.png)
+![TidesDB Read Path](../../../assets/img22.png)
 
 </div>
 
