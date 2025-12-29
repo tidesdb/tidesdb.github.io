@@ -429,6 +429,4 @@ The path forward is more profiling, more testing, more optimization, more attent
 
 **Links**
 - GitHub · https://github.com/tidesdb/tidesdb
-- Documentation · https://tidesdb.com
-- Benchmarks · https://tidesdb.com/articles/benchmark-analysis-tidesdb7-rocksdb1075
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
