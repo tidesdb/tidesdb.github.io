@@ -22,9 +22,9 @@ head:
 
 *December 29th, 2025*
 
-Between TidesDB 7.0.0 and 7.0.4, I focused exclusively on micro-optimizations, the kind of changes that save CPU cycles and memory, reduce branch mispredictions, and eliminate unnecessary work. No new features. No architectural changes. Just attention to hot paths.
+Between TidesDB 7.0.2 and 7.0.4, I focused exclusively on micro-optimizations, the kind of changes that save CPU cycles and memory, reduce branch mispredictions, and eliminate unnecessary work. No new features. No architectural changes. Just attention to hot paths.
 
-The result: **6.64M ops/sec** sequential writes (up from 6.21M), **2 μs p50 latency** on hot-key reads (down from 5 μs), and measurably lower resource consumption across the board. This article documents what changed, why it matters, and what the data reveals about performance at the instruction level.
+The result: **6.64M ops/sec** sequential writes (up from 6.21M), **2 μs p50 latency** on hot-key reads (down from 5 μs), and measurably lower resource consumption across the board. This article documents what changed, why it matters, and what the data reveals about performance at the somewhat instruction level.
 
 ## Test Environment
 
@@ -53,21 +53,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 
 Let me walk through each change and explain the reasoning..
 
-### 1. Redundant Bloom Filter Check Elimination
-
-**Change** · Removed duplicate bloom filter check in read path.
-
-**Why this matters?** 
-
-Bloom filter checks involve hashing (xxHash3) and multiple bit array accesses. On a miss, we're computing the hash twice and checking bits twice. For 10M operations, that's 20M hash computations when 10M would suffice.
-
-**Measured impact**
-- Random read p50 · 5 μs -> 2 μs (60% reduction)
-- CPU cycles saved · ~500 cycles per lookup (hash + memory access)
-
-The bloom filter false positive rate is 1%, meaning 99% of checks correctly identify missing keys. The redundant check was defensive programming that became a hot path bottleneck.
-
-### 2. Stack-Based Cursors for Point Lookups
+### 1. Stack-Based Cursors for Point Lookups
 
 **Change** · Use stack allocation for cursors in SSTable get operations instead of heap allocation.
 
@@ -87,7 +73,7 @@ Point lookups are the most common operation. Every get was allocating a cursor (
 
 For cursors that iterate multiple blocks, heap allocation still makes sense. But for single-block point lookups, stack allocation is pure win.
 
-### 3. Combined Inline Value Conditions
+### 2. Combined Inline Value Conditions
 
 **Change** · Merged multiple conditional checks into single expression for better branch prediction.
 
@@ -101,7 +87,7 @@ Modern CPUs use branch predictors that work better with fewer, more predictable 
 
 This optimization targets the common case (small values, no vlog) with a single well-predicted branch, while the uncommon cases (large values with vlog) take a slightly more complex path that still works correctly.
 
-### 4. Block Index Early Termination
+### 3. Block Index Early Termination
 
 **Change** · Exit binary search when we definitively know the key isn't in range.
 
@@ -114,7 +100,7 @@ The old code would binary search to find the *first* block where `key <= max_key
 
 With 100 blocks per SSTable, this changes 100 comparisons worst-case to log₂(100) ≈ 7 comparisons.
 
-### 5. Deferred Read Set Allocation
+### 4. Deferred Read Set Allocation
 
 **Change** · Only allocate read set hash table for high isolation levels that need it.
 
@@ -133,7 +119,7 @@ READ_UNCOMMITTED and READ_COMMITTED don't track read sets - they don't need to d
 
 This optimization benefits 70% of transactions really!
 
-### 6. Arena Allocator for Read Keys
+### 5. Arena Allocator for Read Keys
 
 **Change** · Use arena allocation for read set keys instead of individual mallocs.
 
@@ -151,7 +137,7 @@ Transactions often read 10-1000 keys. Individual malloc for each key creates all
 - Reduced malloc/free calls · 100 -> 1 per transaction
 - Better cache locality (keys stored contiguously)
 
-### 7. Skip Deduplication for Small Transactions
+### 6. Skip Deduplication for Small Transactions
 
 **Change** · Don't build hash table for deduplication when read set is small.
 
@@ -168,7 +154,7 @@ Hash table has initialization overhead (~1000 cycles). For small transactions (�
 - Linear comparison · ~10 cycles per key
 - Break-even point · 5-8 keys (depends on hash quality)
 
-### 8. Atomic Fetch-Add for SSTable Slot Reservation
+### 7. Atomic Fetch-Add for SSTable Slot Reservation
 
 **Change** · Use atomic operation to reserve slot before writing metadata.
 
@@ -181,7 +167,7 @@ Without atomic reservation, two threads could get the same slot value, leading t
 - Compaction thread contention reduced (no lock needed)
 
 
-### 9. KLOG Value Threshold Adjustment
+### 8. KLOG Value Threshold Adjustment
 **Change** · Increased default value separation threshold from lower values to 512 bytes (or even 256).
 
 **Why this matters**
@@ -249,9 +235,8 @@ Random writes benefit more from micro-optimizations because they exercise more c
 - p99 · 14 μs -> 5,011 μs (tail latency unchanged - this is cache misses)
 
 The median latency going from 5 μs to 2 μs is dramatic. This is directly from:
-1. Eliminating redundant bloom filter check (~500 cycles)
-2. Stack-based cursors (~300 cycles)
-3. Better block index search (~200 cycles)
+1. Stack-based cursors (~300 cycles)
+2. Better block index search (~200 cycles)
 
 Total · ~1000 cycles saved ≈ 200 ns at 5 GHz ≈ achieving 2 μs from 5 μs when other work is factored in.
 
