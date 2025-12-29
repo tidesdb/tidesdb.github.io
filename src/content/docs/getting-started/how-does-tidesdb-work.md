@@ -11,7 +11,7 @@ TidesDB is an embeddable key-value storage engine built on log-structured merge 
 
 The system provides ACID transactions with five isolation levels and manages data through a hierarchy of sorted string tables (SSTables). Each level holds roughly N× more data than the previous level. Compaction merges SSTables from adjacent levels, discarding obsolete entries and reclaiming space.
 
-Data flows from memory to disk in stages. Writes go to an in-memory skip list (chosen over AVL trees for lock-free reads and simpler implementation) backed by a write-ahead log. When the skip list exceeds the set write buffer size, it becomes immutable and a background worker flushes it to disk as an SSTable. These tables accumulate in levels. Compaction merges tables from adjacent levels, maintaining the level size invariant.
+Data flows from memory to disk in stages. Writes go to an in-memory skip list (chosen over AVL trees for easier lock-free potential and implementation) backed by a write-ahead log. When the skip list exceeds the set write buffer size, it becomes immutable and a background worker flushes it to disk as an SSTable. These tables accumulate in levels. Compaction merges tables from adjacent levels, maintaining the level size invariant.
 
 <div class="architecture-diagram">
 
@@ -67,7 +67,7 @@ Write-ahead logs use the same format. Each memtable has its own WAL file, named 
 
 <div class="architecture-diagram">
 
-![TidesDB SSTable VLog](../../../assets/img18.png)
+![TidesDB SSTable VLog](../../../assets/img20.png)
 
 </div>
 
