@@ -23,7 +23,7 @@ reads through bloom filters, caching, block indices, and compaction.
 - Optional bloom filters (configurable false positive rate) reduce disk reads for absent keys. Built during SSTable creation and persisted in metadata.
 - Key-value separation (WiscKey-style) with configurable threshold. Small values stored inline in klog, large values in vlog with offset reference. Reduces write amplification during compaction.
 - TTL support for automatic key-value expiration. Expired entries skipped during reads and removed during compaction.
-- Custom comparators with built-in default comparators: memcmp, lexicographic, reverse. Used consistently across skip lists, SSTables, and compaction.
+- Custom comparators with 6 built-in comparators: memcmp, lexicographic, uint64, int64, reverse, case_insensitive. Used consistently across skip lists, SSTables, and compaction.
 - Lock-free block manager using `pread`/`pwrite` for concurrent I/O. Reference-counted blocks with atomic operations. xxHash32 checksums for integrity. Supports up to 4GB blocks with partial reads.
 - Two-tier caching
   - File handle cache with LRU eviction (default 512 open SSTables). Background reaper closes oldest unused files.
@@ -32,9 +32,9 @@ reads through bloom filters, caching, block indices, and compaction.
 - Three sync modes · `TDB_SYNC_NONE` (OS-managed), `TDB_SYNC_FULL` (fsync every write), `TDB_SYNC_INTERVAL` (periodic sync). Structural operations always enforce durability.
 - Compression support · LZ4, Zstd, Snappy (configurable per column family). Applied to klog and vlog blocks, not WAL.
 - Block indexes for fast seeks. Sample every Nth block (configurable ratio, default 1 = every block) storing prefix boundaries and file positions for binary search.
-- Cross-platform · Linux, macOS, Windows, BSD variants, Solaris/Illumos on x86, ARM, RISC-V, PowerPC (32-bit and 64-bit). Comprehensive platform abstraction layer (`compat.h`).
+- Cross-platform · Linux, macOS, Windows, BSD variants, Solaris/Illumos on x86, ARM, RISC-V, PowerPC (32-bit and 64-bit). Comprehensive platform abstraction layer.
 - File portability · Little-endian serialization throughout. Database files work across any platform/architecture without conversion.
-- Clean C API · Returns `TDB_SUCCESS` (0) on success, negative error codes on failure (`TDB_ERR_MEMORY`, `TDB_ERR_INVALID_ARGS`, `TDB_ERR_NOT_FOUND`, `TDB_ERR_IO`, `TDB_ERR_CORRUPTION`, `TDB_ERR_CONFLICT`, etc.). Configurable debug logging with 5 levels: `TDB_LOG_DEBUG` (most verbose), `TDB_LOG_INFO`, `TDB_LOG_WARN`, `TDB_LOG_ERROR`, `TDB_LOG_FATAL`, and `TDB_LOG_NONE` (disable). Log level set via `tidesdb_config_t` at database open. Timestamped log output to stderr with file/line information.
+- Clean C API · Returns `TDB_SUCCESS` (0) on success, negative error codes on failure (`TDB_ERR_MEMORY`, `TDB_ERR_INVALID_ARGS`, `TDB_ERR_NOT_FOUND`, `TDB_ERR_IO`, `TDB_ERR_CORRUPTION`, `TDB_ERR_CONFLICT`, etc.). Configurable debug logging with 6 levels: `TDB_LOG_DEBUG` (most verbose), `TDB_LOG_INFO`, `TDB_LOG_WARN`, `TDB_LOG_ERROR`, `TDB_LOG_FATAL`, and `TDB_LOG_NONE` (disable). Log level set via `tidesdb_config_t` at database open. Timestamped log output to stderr with file/line information.
 
 ## Community
 
