@@ -21,6 +21,7 @@ export default defineConfig({
 				replacesTitle: true,
 			},
 			social: {
+				youtube: 'https://www.youtube.com/@TidesDB',
 				github: 'https://github.com/tidesdb/tidesdb',
 				discord: 'https://discord.gg/tWEmjR66cy',
 			},
@@ -153,6 +154,10 @@ export default defineConfig({
 						{ label: 'Comparative Analysis of TidesDB v6 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb6-rocksdb1075' },
 						{ label: 'TidesDB vs RocksDB: Which Storage Engine is Faster?', slug: 'articles/tidesdb-vs-rocksdb' },
 					],
+				},
+				{
+					label: 'YouTube',
+					link: 'https://www.youtube.com/@TidesDB',
 				},
 				{
 					label: 'GitHub', link: 'https://github.com/tidesdb',
