@@ -429,6 +429,7 @@ input[type="search"]:focus, input[type="text"]:focus {
 	background: rgba(25, 62, 220, 0.1);
 	transform: translate(-50%, -50%);
 	transition: width 0.6s, height 0.6s;
+	pointer-events: none;
 }
 
 .card:hover::before {
