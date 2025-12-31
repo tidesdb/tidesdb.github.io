@@ -1,6 +1,6 @@
 ---
-title: "Using TidesDB with Java Using JExtract"
-description: "An article on recent patch v7.0.6 and how we can now use TidesDB with Java using JExtract."
+title: "Using TidesDB with Java via JExtract"
+description: "Step-by-step guide to using TidesDB with Java via JExtract. Learn how v7.0.6's simplified db.h header enables seamless Java bindings for high performance key-value storage."
 head:
   - tag: meta
     attrs:
