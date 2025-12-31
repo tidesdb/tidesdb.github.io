@@ -146,7 +146,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
-						{ label: 'Using TidesDB with Java Using JExtract', slug: 'articles/using-tidesdb-with-java-using-jextract' },
+						{ label: 'Using TidesDB with Java via JExtract', slug: 'articles/using-tidesdb-with-java-via-jextract' },
 						{ label: 'Death by a Thousand Cycles - Micro-Optimizations in TidesDB v7.0.4', slug: 'articles/tidesdb704-death-by-a-thousand-cycles' },
 						{ label: 'What I Learned Building a Storage Engine That Outperforms RocksDB', slug: 'articles/what-i-learned-building-a-storage-engine-that-outperforms-rocksdb' },
 						{ label: 'TidesDB 7 - RocksDB 10.7.5', slug: 'articles/benchmark-analysis-tidesdb7-rocksdb1075' },
