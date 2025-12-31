@@ -9,12 +9,34 @@ TidesDB is designed to provide a simple and intuitive C API for all your embedde
 
 ## Include
 
+:::note
+You can use other components of TidesDB such as skip list, bloom filter etc. under `tidesdb/` - this also prevents collisions.
+:::
+
+### Choosing Between `tidesdb.h` and `db.h`
+
+TidesDB provides two header files with different purposes:
+
+**tidesdb.h**
+
+Full C implementation header. Mainly use this for native C/C++ applications.
+
 ```c
 #include <tidesdb/tidesdb.h>
 ```
 
-:::note
-You can use other components of TidesDB such as skip list, bloom filter etc. under `tidesdb/` - this also prevents collisions.
+**db.h**
+
+db.h is mainly an FFI/Language binding interface with minimal dependencies and simpler ABI.
+
+```c
+#include <tidesdb/db.h>
+```
+
+:::tip[When to Use Each]
+- C/C++ applications ➞ Use `tidesdb.h` for full access to the API
+- Language bindings (jextract, rust-bindgen, ctypes, cgo, etc.) ➞ Use `db.h` for a stable FFI interface
+- Library developers ➞ Use `db.h` to avoid exposing internal implementation details
 :::
 
 ## Error Codes
