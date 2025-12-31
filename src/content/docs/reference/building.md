@@ -287,6 +287,10 @@ cmake --install build
 
 ### Windows
 
+:::note[BUILD_SHARED_LIBS on Windows]
+By default, TidesDB builds as a **static library** on Windows (`BUILD_SHARED_LIBS=OFF`) to avoid DLL export/import complexity. If you need a shared library (DLL), explicitly set `-DBUILD_SHARED_LIBS=ON` during configuration. Note that shared builds require proper symbol exports and may need additional configuration.
+:::
+
 #### MinGW-w64 
 MinGW-w64 provides a GCC-based toolchain with better C11 support and POSIX compatibility.
 
