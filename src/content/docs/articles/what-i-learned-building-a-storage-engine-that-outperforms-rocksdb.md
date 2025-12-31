@@ -97,7 +97,7 @@ Result · 1.08x average write amplification across all workloads vs RocksDB's 1.
 
 Every SSTable has two files:
 - **klog** (key log) · sorted keys with metadata and small inline values
-- **vlog** (value log) · large values (≥4KB) referenced by offset
+- **vlog** (value log) · large values (≥4KB) referenced by offset; In _v7.0.5_+ the threshold is 512 bytes
 
 **Why separate keys and values?** 
 
@@ -301,7 +301,7 @@ With 8 threads and 16 partitions, average contention is 0.5 threads per partitio
 ### Sparse Block Indexes · Binary Search Optimization
 
 TidesDB uses sparse sampled block indexes for fast key lookups. Instead of indexing every block, it samples every Nth block (configurable `index_sample_ratio`, default 1 = every block). Each index entry stores:
-- First key prefix (configurable length, default 16 bytes)
+- First key prefix (configurable length, default 16 bytes, this goes for both first and last key prefix)
 - Last key prefix
 - File position of the block
 
@@ -324,7 +324,7 @@ while (left <= right) {
 
 **How SEEK uses block indexes**
 
-Iterator seek operations also use block indexes to jump directly to the right block, then scan forward from there. The bloom filter is checked first (eliminates 99% of negative lookups), then the block index narrows down to the specific block.
+Iterator seek operations also use block indexes to jump directly to the right block, then scan forward or backwards from there.
 
 **Why sparse sampling?**
 
