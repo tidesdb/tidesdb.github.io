@@ -61,7 +61,7 @@ Plus Dynamic Capacity Adaptation (DCA). After every compaction, DCA recalibrates
 C[i] = N_L / T^(L-1-i)
 ```
 
-**Breaking down the formula:**
+**Breaking down the formula**
 
 - `C[i]` = capacity for level i
 - `N_L` = actual current size of the largest level (not a theoretical max)
@@ -776,6 +776,5 @@ Every storage engine makes trade-offs. TidesDB makes trade-offs for modern hardw
 
 **Links**
 - GitHub · https://github.com/tidesdb/tidesdb
-- Documentation · https://tidesdb.com
 - Benchmarks · https://tidesdb.com/articles/benchmark-analysis-tidesdb7-rocksdb1075
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
