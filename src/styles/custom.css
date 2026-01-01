@@ -498,20 +498,18 @@ input[type="search"]:focus, input[type="text"]:focus {
 	border: none;
 }
 
-.architecture-diagram img {
+:root[data-theme='light'] .architecture-diagram img {
 	box-shadow: rgba(9, 30, 66, 0.25) 0px 1px 1px, rgba(9, 30, 66, 0.13) 0px 0px 1px 1px;
-	border-radius: 28px;
-	filter: brightness(115%)!important;
+	border-radius: 12px;
+	filter: brightness(115%);
 }
 
 /* Invert architecture diagram in dark mode for better visibility */
 :root .architecture-diagram img {
-	filter: invert(100%) hue-rotate(180deg) brightness(100%)!important;
+	border-radius: 12px;
+	box-shadow: rgba(9, 30, 66, 0.25) 0px 1px 1px, rgba(9, 30, 66, 0.13) 0px 0px 1px 1px;
+	filter: invert(100%) hue-rotate(180deg) brightness(100%);
 
-}
-
-:root[data-theme='light'] .architecture-diagram img {
-	filter: none;
 }
 
 .pagination-links a {
