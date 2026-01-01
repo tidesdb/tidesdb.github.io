@@ -500,7 +500,7 @@ input[type="search"]:focus, input[type="text"]:focus {
 
 :root[data-theme='light'] .architecture-diagram img {
 	border-radius: 12px;
-	filter: brightness(115%);
+	filter: brightness(112%);
 	border: none;
 	box-shadow: none;
 }

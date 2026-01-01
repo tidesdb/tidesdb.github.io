@@ -169,7 +169,7 @@ The transaction uses hash-based deduplication (simple multiplicative hash: `hash
 
 <div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
-![TidesDB SSTable KLog](../../../assets/img27.png)
+![TidesDB SSTable KLog](../../../assets/img45.png)
 
 </div>
 
