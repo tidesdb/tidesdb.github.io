@@ -405,7 +405,7 @@ Four worker pools handle asynchronous operations:
 
 <div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
-![Compaction worker](../../../assets/img42.png)
+![Compaction worker](../../../assets/img43.png)
 
 </div>
 
@@ -607,7 +607,7 @@ The manifest tracks SSTable metadata in a simple text format with reader-writer 
 
 <div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
-![Platform Portability](../../../assets/img30.png)
+![Platform Portability](../../../assets/img44.png)
 
 </div>
 
