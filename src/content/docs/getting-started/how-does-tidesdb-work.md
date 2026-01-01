@@ -25,6 +25,8 @@ Data flows from memory to disk in stages. Writes go to an in-memory skip list (c
 
 The database organizes data into column families. Each column family is an independent key-value namespace with its own configuration, memtables, write-ahead logs, and disk levels. 
 
+<br/>
+
 <div style="float: left; clear: both; margin-right: 20px; width: 228px; margin-bottom: 10px;" class="architecture-diagram">
 
 ![TidesDB Column Families](../../../assets/img35.png)
@@ -55,7 +57,7 @@ Each sorted string table (SSTable) consists of two files: a key log (.klog) and 
 
 </div>
 
-
+<br/>
 
 <div style="float: left; clear: both; margin-right: 20px; width: 148px; margin-bottom: 20px;" class="architecture-diagram">
 
@@ -82,6 +84,7 @@ value (value_size bytes, if inline)
 
 The flags byte encodes tombstones (0x01), TTL presence (0x02), value log indirection (0x04), and delta sequence encoding (0x08). Variable-length integers save space: a value under 128 requires one byte, while the full 64-bit range needs at most ten bytes.
 
+<br/>
 
 <div style="max-width: 480px; margin: 0 auto;" class="architecture-diagram">
 
@@ -94,6 +97,7 @@ Write-ahead logs use the same format. Each memtable has its own WAL file, named 
 
 ## Transactions
 
+<br/>
 
 <div style="max-width: 480px; margin: 0 auto;" class="architecture-diagram">
 
@@ -133,6 +137,8 @@ The snapshot sequence determines which versions the transaction sees: it reads t
 At commit time, the system assigns a commit sequence number from a global atomic counter. It writes operations to the write-ahead log, applies them to the active memtable with the commit sequence, and marks the sequence as committed in a fixed-size buffer (hardcoded at 65536 entries). The buffer wraps around: sequence N maps to slot N % 65536. This limits the maximum sequence number gap between oldest active transaction and newest commit to 65536. Long-running transactions may cause commits to stall waiting for buffer space. Readers skip versions whose sequence numbers are not yet marked committed.
 
 ### Multi-Column Family Transactions
+
+<br/>
 
 <div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
 
@@ -289,6 +295,8 @@ This optimization is critical for range queries - without block indexes, seeking
 
 ### Compaction Policies
 
+<br/>
+
 <div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
 
 ![Compaction](../../../assets/img31.png)
@@ -370,6 +378,8 @@ For SSTables, the system uses strict validation, rejecting any corruption. This 
 
 ## Background Workers
 
+<br/>
+
 <div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
 ![TidesDB Workers](../../../assets/img40.png)
@@ -388,6 +398,8 @@ Four worker pools handle asynchronous operations:
 </div>
 
 **Compaction workers** (configurable, default 2 threads) merge SSTables across levels. Multiple workers enable parallel compaction of different level ranges.
+
+<br/>
 
 <div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
@@ -589,6 +601,7 @@ The manifest tracks SSTable metadata in a simple text format with reader-writer 
 
 ### Platform Compatibility (compat.h)
 
+<br/>
 
 <div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
