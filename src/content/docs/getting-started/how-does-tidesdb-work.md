@@ -13,7 +13,7 @@ Data flows from memory to disk in stages. Writes go to an in-memory skip list (c
 
 <br/>
 
-<div style="max-width: 420px; margin: 0 auto;" class="architecture-diagram">
+<div style="max-width: 528px; margin: 0 auto;" class="architecture-diagram">
 
 ![Sorted runs](../../../assets/img36.png)
 
@@ -390,6 +390,8 @@ For SSTables, the system uses strict validation, rejecting any corruption. This 
 Four worker pools handle asynchronous operations:
 
 **Flush workers** (configurable, default 2 threads) dequeue immutable memtables and write them to SSTables. Multiple workers enable parallel flushing across column families.
+
+<br/>
 
 <div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
