@@ -13,13 +13,19 @@ Data flows from memory to disk in stages. Writes go to an in-memory skip list (c
 
 <div class="architecture-diagram">
 
-![Sorted runs](../../../assets/img28.png)
+![Sorted runs](../../../assets/img36.png)
 
 </div>
 
 ## Data Model
 
 ### Column Families
+
+<div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
+
+![TidesDB Column Families](../../../assets/img35.png)
+
+</div>
 
 The database organizes data into column families. Each column family is an independent key-value namespace with its own configuration, memtables, write-ahead logs, and disk levels. This isolation allows different column families to use different compression algorithms, comparators, and tuning parameters within the same database instance.
 
@@ -37,11 +43,19 @@ Each sorted string table (SSTable) consists of two files: a key log (.klog) and 
 
 <div class="architecture-diagram">
 
-![TidesDB SSTable KLog](../../../assets/img17.png)
+![TidesDB SSTable](../../../assets/img37.png)
+
+</div>
+
+
+<div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
+
+![TidesDB KLog](../../../assets/img38.png)
 
 </div>
 
 The key log uses a block-based format. Each block (fixed at 64KB) contains multiple entries serialized with variable-length integer encoding. Blocks compress independently using LZ4, Zstd, or Snappy. The key log ends with three auxiliary structures: a block index for binary search, a bloom filter for negative lookups, and a metadata block with SSTable statistics.
+
 
 ### File Format
 
@@ -59,15 +73,14 @@ value (value_size bytes, if inline)
 
 The flags byte encodes tombstones (0x01), TTL presence (0x02), value log indirection (0x04), and delta sequence encoding (0x08). Variable-length integers save space: a value under 128 requires one byte, while the full 64-bit range needs at most ten bytes.
 
-Write-ahead logs use the same format. Each memtable has its own WAL file, named by the SSTable ID it will become. Recovery reads these files in sequence order, deserializes entries into skip lists, and enqueues them for asynchronous flushing.
-
-#### VLog Format
-
 <div class="architecture-diagram">
 
-![TidesDB SSTable VLog](../../../assets/img20.png)
+![TidesDB SSTable VLog](../../../assets/img39.png)
 
 </div>
+
+Write-ahead logs use the same format. Each memtable has its own WAL file, named by the SSTable ID it will become. Recovery reads these files in sequence order, deserializes entries into skip lists, and enqueues them for asynchronous flushing.
+
 
 ## Transactions
 
@@ -348,6 +361,13 @@ The manifest tracks the maximum sequence number across all SSTables. Recovery up
 For SSTables, the system uses strict validation, rejecting any corruption. This reflects the different roles: logs are temporary and rebuilt on recovery; SSTables are permanent and must be correct.
 
 ## Background Workers
+
+<div class="architecture-diagram">
+
+![TidesDB Workers](../../../assets/img40.png)
+
+</div>
+
 
 Four worker pools handle asynchronous operations:
 
