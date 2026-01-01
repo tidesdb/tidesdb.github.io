@@ -11,7 +11,9 @@ The system provides ACID transactions with five isolation levels and manages dat
 
 Data flows from memory to disk in stages. Writes go to an in-memory skip list (chosen over AVL trees for easier lock-free potential and implementation) backed by a write-ahead log. When the skip list exceeds the set write buffer size, it becomes immutable and a background worker flushes it to disk as an SSTable. These tables accumulate in levels. Compaction merges tables from adjacent levels, maintaining the level size invariant.
 
-<div class="architecture-diagram">
+<br/>
+
+<div style="max-width: 420px; margin: 0 auto;" class="architecture-diagram">
 
 ![Sorted runs](../../../assets/img36.png)
 
@@ -21,13 +23,17 @@ Data flows from memory to disk in stages. Writes go to an in-memory skip list (c
 
 ### Column Families
 
-<div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
+The database organizes data into column families. Each column family is an independent key-value namespace with its own configuration, memtables, write-ahead logs, and disk levels. 
+
+<div style="float: left; clear: both; margin-right: 20px; width: 228px; margin-bottom: 10px;" class="architecture-diagram">
 
 ![TidesDB Column Families](../../../assets/img35.png)
 
 </div>
 
-The database organizes data into column families. Each column family is an independent key-value namespace with its own configuration, memtables, write-ahead logs, and disk levels. This isolation allows different column families to use different compression algorithms, comparators, and tuning parameters within the same database instance.
+This isolation allows different column families to use different compression algorithms, comparators, and tuning parameters within the same database instance.
+
+
 
 A column family maintains:
 
@@ -41,14 +47,17 @@ A column family maintains:
 
 Each sorted string table (SSTable) consists of two files: a key log (.klog) and a value log (.vlog). The key log stores keys, metadata, and values smaller than the configured threshold (default 512 bytes). Values exceeding this threshold reside in the value log, with the key log storing only file offsets. This separation keeps the key log compact for efficient scanning while accommodating arbitrarily large values.
 
-<div class="architecture-diagram">
+<br/>
+
+<div style="max-width: 420px; margin: 0 auto;" class="architecture-diagram">
 
 ![TidesDB SSTable](../../../assets/img37.png)
 
 </div>
 
 
-<div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
+
+<div style="float: left; clear: both; margin-right: 20px; width: 148px; margin-bottom: 20px;" class="architecture-diagram">
 
 ![TidesDB KLog](../../../assets/img38.png)
 
@@ -73,7 +82,8 @@ value (value_size bytes, if inline)
 
 The flags byte encodes tombstones (0x01), TTL presence (0x02), value log indirection (0x04), and delta sequence encoding (0x08). Variable-length integers save space: a value under 128 requires one byte, while the full 64-bit range needs at most ten bytes.
 
-<div class="architecture-diagram">
+
+<div style="max-width: 480px; margin: 0 auto;" class="architecture-diagram">
 
 ![TidesDB SSTable VLog](../../../assets/img39.png)
 
@@ -85,7 +95,7 @@ Write-ahead logs use the same format. Each memtable has its own WAL file, named 
 ## Transactions
 
 
-<div class="architecture-diagram">
+<div style="max-width: 480px; margin: 0 auto;" class="architecture-diagram">
 
 ![Isolation Levels](../../../assets/img34.png)
 
@@ -124,7 +134,7 @@ At commit time, the system assigns a commit sequence number from a global atomic
 
 ### Multi-Column Family Transactions
 
-<div class="architecture-diagram">
+<div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
 
 ![Compaction](../../../assets/img33.png)
 
@@ -149,7 +159,9 @@ The transaction uses hash-based deduplication (simple multiplicative hash: `hash
 
 ### Memtable Flush
 
-<div class="architecture-diagram">
+<br/>
+
+<div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
 ![TidesDB SSTable KLog](../../../assets/img27.png)
 
@@ -196,12 +208,6 @@ Each column family maintains a queue of immutable memtables awaiting flush. When
 
 ## Read Path
 
-<div class="architecture-diagram">
-
-![TidesDB Read Path](../../../assets/img26.png)
-
-</div>
-
 ### Search Order
 
 A read searches for a key in order:
@@ -234,7 +240,9 @@ The bloom filter (default 1% FPR) and block index are optional optimizations con
 
 The block cache uses a clock eviction policy with reference counting. Multiple readers share cached blocks without copying. The clock hand skips blocks with refcount > 1 (actively in use). When the cache evicts a block, it decrements the reference count; the block frees when the count reaches zero.
 
-<div class="architecture-diagram">
+<br/>
+
+<div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
 ![TidesDB Optimized Read Path](../../../assets/img25.png)
 
@@ -279,13 +287,13 @@ This optimization is critical for range queries - without block indexes, seeking
 
 ## Compaction
 
-<div class="architecture-diagram">
+### Compaction Policies
+
+<div style="float: left; clear: both; margin-right: 20px; width: 248px; margin-bottom: 20px;" class="architecture-diagram">
 
 ![Compaction](../../../assets/img31.png)
 
 </div>
-
-### Compaction Policies
 
 The system employs three policies based on the Spooky paper:
 
@@ -362,7 +370,7 @@ For SSTables, the system uses strict validation, rejecting any corruption. This 
 
 ## Background Workers
 
-<div class="architecture-diagram">
+<div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
 ![TidesDB Workers](../../../assets/img40.png)
 
@@ -373,7 +381,7 @@ Four worker pools handle asynchronous operations:
 
 **Flush workers** (configurable, default 2 threads) dequeue immutable memtables and write them to SSTables. Multiple workers enable parallel flushing across column families.
 
-<div class="architecture-diagram">
+<div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
 ![Flush worker](../../../assets/img29.png)
 
@@ -381,9 +389,9 @@ Four worker pools handle asynchronous operations:
 
 **Compaction workers** (configurable, default 2 threads) merge SSTables across levels. Multiple workers enable parallel compaction of different level ranges.
 
-<div class="architecture-diagram">
+<div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
-![Compaction worker](../../../assets/img24.png)
+![Compaction worker](../../../assets/img42.png)
 
 </div>
 
@@ -582,7 +590,7 @@ The manifest tracks SSTable metadata in a simple text format with reader-writer 
 ### Platform Compatibility (compat.h)
 
 
-<div class="architecture-diagram">
+<div style="max-width: 548px; margin: 0 auto;" class="architecture-diagram">
 
 ![Platform Portability](../../../assets/img30.png)
 
