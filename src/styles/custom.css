@@ -499,9 +499,10 @@ input[type="search"]:focus, input[type="text"]:focus {
 }
 
 :root[data-theme='light'] .architecture-diagram img {
-	box-shadow: rgba(9, 30, 66, 0.25) 0px 1px 1px, rgba(9, 30, 66, 0.13) 0px 0px 1px 1px;
 	border-radius: 12px;
 	filter: brightness(115%);
+	border: none;
+	box-shadow: none;
 }
 
 /* Invert architecture diagram in dark mode for better visibility */
