@@ -519,6 +519,12 @@ TidesDB's internal components are designed as reusable, well-tested modules with
 
 ### Block Manager
 
+<div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
+
+![TidesDB Block Manager](../../../assets/img52.png)
+
+</div>
+
 The block manager provides a lock-free, append-only file abstraction with atomic reference counting and checksumming. Each file begins with an 8-byte header (3-byte magic "TDB", 1-byte version, 4-byte padding). Blocks consist of a header (4-byte size, 4-byte xxHash32 checksum), data, and footer (4-byte size duplicate, 4-byte magic "BTDB") for fast backward validation.
 
 **Lock-free concurrency** · Writers use `pread`/`pwrite` for position-independent I/O, allowing concurrent reads and writes without locks. These POSIX functions are abstracted through `compat.h` for cross-platform support (Windows uses `ReadFile`/`WriteFile` with `OVERLAPPED` structures). The file size is tracked atomically in memory to avoid syscalls. Blocks use atomic reference counting - callers must call `block_manager_block_release()` when done, and blocks free when refcount reaches zero. Durability operations use `fdatasync` (also abstracted via `compat.h`).
@@ -531,6 +537,11 @@ The block manager provides a lock-free, append-only file abstraction with atomic
 
 ### Bloom Filter
 
+<div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
+
+![TidesDB Bloom Filter](../../../assets/img46.png)
+
+</div>
 The bloom filter implementation uses a packed bitset (uint64_t words) with multiple hash functions to provide probabilistic set membership testing. The filter calculates optimal parameters from the desired false positive rate and expected element count: `m = -n*ln(p)/(ln(2)^2)` bits and `h = (m/n)*ln(2)` hash functions.
 
 **Sparse serialization** · The filter serializes using varint encoding for headers and sparse encoding for the bitset - it stores only non-zero words with their indices. This achieves 70-90% space savings for low fill rates (< 50%). The serialization format: varint(m), varint(h), varint(non_zero_count), then pairs of varint(index) and uint64_t(word).
@@ -540,6 +551,12 @@ The bloom filter implementation uses a packed bitset (uint64_t words) with multi
 **Integration** · TidesDB creates one bloom filter per SSTable during flush and merges, adding all keys. The filter is serialized and written to the klog file after data blocks. During reads, the system checks the bloom filter before consulting the block index. With 1% FPR, this eliminates 99% of disk reads for absent keys. The filter is loaded into memory when an SSTable is opened and remains resident.
 
 ### Buffer
+
+<div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
+
+![TidesDB Buffer](../../../assets/img47.png)
+
+</div>
 
 The buffer provides a lock-free slot allocator with atomic state machines and generation counters for ABA prevention. Each slot has four states: FREE (0), ACQUIRED (1), OCCUPIED (2), RELEASING (3). State transitions use atomic compare-and-swap operations.
 
@@ -553,6 +570,12 @@ The buffer provides a lock-free slot allocator with atomic state machines and ge
 
 ### Clock Cache
 
+<div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
+
+![TidesDB Clock Cache](../../../assets/img48.png)
+
+</div>
+
 The clock cache implements a partitioned, lock-free cache with hybrid hash table + CLOCK eviction. Each partition contains a circular array of slots for CLOCK and a separate hash index for O(1) lookups. The hash index uses linear probing with a maximum probe distance of 64.
 
 **Partitioning** · The cache divides into N partitions (default: 2 per CPU core, up to 128). Each partition has independent CLOCK hand and hash index. Keys are hashed to partitions using `hash(key) & partition_mask`. This reduces contention - with 64 partitions and 16 threads, average contention is 16/64 = 0.25 threads per partition.
@@ -564,6 +587,12 @@ The clock cache implements a partitioned, lock-free cache with hybrid hash table
 **Integration** · TidesDB uses the clock cache for deserialized klog blocks. Cache keys are "cf_name:sstable_id:block_offset". On cache hit, the system increments the ref_bit and returns the cached block without disk I/O or deserialization. Multiple readers share the same cached block. The zero-copy design eliminates memory allocation on the hot read path.
 
 ### Skip List
+
+<div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
+
+![TidesDB Skip List](../../../assets/img49.png)
+
+</div>
 
 The skip list provides a lock-free, multi-versioned ordered map with MVCC support. Each key has a linked list of versions, newest first. Versions store sequence numbers, values, TTL, and tombstone flags. The skip list uses probabilistic leveling (default p=0.25, max_level=32) for O(log n) average search time.
 
@@ -579,6 +608,12 @@ The skip list provides a lock-free, multi-versioned ordered map with MVCC suppor
 
 ### Queue
 
+<div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
+
+![TidesDB Queue](../../../assets/img50.png)
+
+</div>
+
 The queue provides a thread-safe FIFO with node pooling and blocking dequeue. Operations use a mutex for writes and atomic operations for lock-free size queries. The queue maintains both a regular head pointer (protected by lock) and an atomic_head pointer for lock-free reads.
 
 **Node pooling** · The queue maintains a free list of reusable nodes (up to 64). When dequeuing, nodes are returned to the pool instead of freed. When enqueuing, nodes are allocated from the pool if available. This reduces malloc/free overhead for high-throughput workloads.
@@ -590,6 +625,12 @@ The queue provides a thread-safe FIFO with node pooling and blocking dequeue. Op
 **Integration** · TidesDB uses queues for work distribution to background workers. The flush queue holds immutable memtables awaiting flush. The compaction queue holds compaction work items. Workers call `queue_dequeue_wait()` to block until work arrives. The node pooling reduces allocation overhead when memtables flush frequently.
 
 ### Manifest
+
+<div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
+
+![TidesDB Manifest](../../../assets/img51.png)
+
+</div>
 
 The manifest tracks SSTable metadata in a simple text format with reader-writer locks for concurrency. Each line represents one SSTable: `level,id,num_entries,size_bytes`. The manifest file begins with a version header and global sequence number.
 
