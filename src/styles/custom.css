@@ -498,9 +498,14 @@ input[type="search"]:focus, input[type="text"]:focus {
 	border: none;
 }
 
+.architecture-diagram img {
+	border-radius: 20px;
+}
+
 /* Invert architecture diagram in dark mode for better visibility */
 :root .architecture-diagram img {
-	filter: invert(1);
+	filter: invert(100%) hue-rotate(180deg);
+
 }
 
 :root[data-theme='light'] .architecture-diagram img {

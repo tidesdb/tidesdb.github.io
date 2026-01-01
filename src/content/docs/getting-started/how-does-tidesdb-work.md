@@ -13,7 +13,7 @@ Data flows from memory to disk in stages. Writes go to an in-memory skip list (c
 
 <div class="architecture-diagram">
 
-![Architecture Diagram](../../../assets/img16.png)
+![Sorted runs](../../../assets/img28.png)
 
 </div>
 
@@ -71,6 +71,14 @@ Write-ahead logs use the same format. Each memtable has its own WAL file, named 
 
 ## Transactions
 
+
+<div class="architecture-diagram">
+
+![Isolation Levels](../../../assets/img34.png)
+
+</div>
+
+
 ### Isolation Levels
 
 The system provides five isolation levels:
@@ -92,6 +100,7 @@ The system provides five isolation levels:
 
 This is simplified SSI - it detects pivot transactions but does not maintain a full precedence graph or perform cycle detection. False aborts are possible when non-pivot transactions have both flags set.
 
+
 ### Multi-Version Concurrency Control
 
 Each transaction receives a snapshot sequence number at begin time. For Read Uncommitted, this is UINT64_MAX (sees all versions). For Read Committed, it refreshes on each read. For Repeatable Read, Snapshot, and Serializable, the snapshot is `global_seq - 1`, capturing all transactions committed before this one started.
@@ -99,6 +108,16 @@ Each transaction receives a snapshot sequence number at begin time. For Read Unc
 The snapshot sequence determines which versions the transaction sees: it reads the most recent version with sequence number less than or equal to its snapshot sequence.
 
 At commit time, the system assigns a commit sequence number from a global atomic counter. It writes operations to the write-ahead log, applies them to the active memtable with the commit sequence, and marks the sequence as committed in a fixed-size buffer (hardcoded at 65536 entries). The buffer wraps around: sequence N maps to slot N % 65536. This limits the maximum sequence number gap between oldest active transaction and newest commit to 65536. Long-running transactions may cause commits to stall waiting for buffer space. Readers skip versions whose sequence numbers are not yet marked committed.
+
+### Multi-Column Family Transactions
+
+<div class="architecture-diagram">
+
+![Compaction](../../../assets/img33.png)
+
+</div>
+
+TidesDB achieves multi-column-family transactions through an elegant design where the transaction structure maintains an array of all involved column families, and when you commit, it assigns operations across all these column families the same sequence number from a global atomic counter shared throughout the database. This shared sequence number serves as a lightweight coordination mechanism that ensures atomicity without the overhead of traditional two-phase commit protocols, as each column family's write-ahead log records its operations with this same sequence number, effectively synchronizing the commit across all involved column families in a single atomic step.
 
 ## Write Path
 
@@ -116,6 +135,12 @@ A transaction buffers operations in memory until commit. At commit time:
 The transaction uses hash-based deduplication (simple multiplicative hash: `hash = hash * 31 + key[i]`) to apply only the final operation for each key. This is a fast non-cryptographic hash - collisions are possible but rare, and would cause the transaction to write both operations to the memtable (skip list handles duplicates correctly). This optimization reduces memtable size when a transaction modifies the same key multiple times.
 
 ### Memtable Flush
+
+<div class="architecture-diagram">
+
+![TidesDB SSTable KLog](../../../assets/img27.png)
+
+</div>
 
 When a memtable exceeds its configured size (default 64MB), the system atomically swaps in a new empty memtable and enqueues the old one for flushing. The swap takes one atomic store with a memory fence for visibility.
 
@@ -158,13 +183,13 @@ Each column family maintains a queue of immutable memtables awaiting flush. When
 
 ## Read Path
 
-### Search Order
-
 <div class="architecture-diagram">
 
-![TidesDB Read Path](../../../assets/img23.png)
+![TidesDB Read Path](../../../assets/img26.png)
 
 </div>
+
+### Search Order
 
 A read searches for a key in order:
 
@@ -195,6 +220,12 @@ The bloom filter (default 1% FPR) and block index are optional optimizations con
 **Bloom filter false positive cost** · A false positive requires: (1) bloom filter check (memory access), (2) block index lookup (likely cache miss = disk read), (3) block read and deserialize (cache miss = disk read), (4) binary search block (memory). That's 2 disk reads for a key that doesn't exist. With 1% FPR and high query rate, this adds significant I/O.
 
 The block cache uses a clock eviction policy with reference counting. Multiple readers share cached blocks without copying. The clock hand skips blocks with refcount > 1 (actively in use). When the cache evicts a block, it decrements the reference count; the block frees when the count reaches zero.
+
+<div class="architecture-diagram">
+
+![TidesDB Optimized Read Path](../../../assets/img25.png)
+
+</div>
 
 ### Block Index
 
@@ -234,6 +265,12 @@ This ensures the search always starts from the correct block, avoiding false neg
 This optimization is critical for range queries - without block indexes, seeking to a key in the middle of a large SSTable would require scanning all blocks from the beginning. With block indexes, the seek operation is O(log N) on the index plus O(M) scanning a few blocks, rather than O(N×M) scanning all blocks.
 
 ## Compaction
+
+<div class="architecture-diagram">
+
+![Compaction](../../../assets/img31.png)
+
+</div>
 
 ### Compaction Policies
 
@@ -316,7 +353,19 @@ Four worker pools handle asynchronous operations:
 
 **Flush workers** (configurable, default 2 threads) dequeue immutable memtables and write them to SSTables. Multiple workers enable parallel flushing across column families.
 
+<div class="architecture-diagram">
+
+![Flush worker](../../../assets/img29.png)
+
+</div>
+
 **Compaction workers** (configurable, default 2 threads) merge SSTables across levels. Multiple workers enable parallel compaction of different level ranges.
+
+<div class="architecture-diagram">
+
+![Compaction worker](../../../assets/img24.png)
+
+</div>
 
 **Sync worker** (1 thread) periodically fsyncs write-ahead logs for column families configured with interval sync mode. It scans all column families, finds the minimum sync interval, sleeps for that duration, and fsyncs all WALs.  This is only run if **any** of the column families during start up are configured with interval sync mode.  If none are configured with interval sync mode, the sync worker is not started.
 
@@ -511,6 +560,14 @@ The manifest tracks SSTable metadata in a simple text format with reader-writer 
 **Integration** · TidesDB uses one manifest per column family. During flush, the system adds the new SSTable to the manifest and fsyncs before deleting the WAL. During compaction, it adds new SSTables and removes old ones atomically. During recovery, it reads the manifest to determine which SSTables belong to which levels. The manifest is the source of truth for the LSM tree structure.
 
 ### Platform Compatibility (compat.h)
+
+
+<div class="architecture-diagram">
+
+![Platform Portability](../../../assets/img30.png)
+
+</div>
+
 
 The `compat.h` header isolates all platform-specific code, enabling TidesDB to run on Windows (MSVC, MinGW), macOS, Linux, BSD variants, and Solaris/Illumos without changes to the core implementation. I/O operations (`pread`/`pwrite`, `fdatasync`) map to Windows equivalents (`ReadFile`/`WriteFile` with `OVERLAPPED`, `FlushFileBuffers`). Atomics use C11 `stdatomic.h` on modern compilers or Windows `Interlocked*` functions on older MSVC. Threading uses POSIX `pthread` (pthreads-win32 on MSVC, native on MinGW). File system operations (`opendir`/`readdir`) map to Windows `FindFirstFile`/`FindNextFile`. Semaphores use Windows APIs on MSVC, native `semaphore.h` elsewhere. Type definitions handle platform differences (`off_t`, `ssize_t`, format specifiers). Performance hints (`PREFETCH_READ`, `LIKELY`, `UNLIKELY`) use compiler intrinsics where available. Every source file includes `compat.h` first. The abstraction layer has zero runtime overhead - all macros and inline functions compile to native platform calls.
 
