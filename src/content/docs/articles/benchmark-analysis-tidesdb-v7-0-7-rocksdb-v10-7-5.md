@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![What I Learned Building a Storage Engine That Outperforms RocksDB](/pexels-therato-2419014.jpg)
+![Comparative Analysis of TidesDB v7.0.7 & RocksDB v10.7.5](/pexels-therato-2419014.jpg)
 
 </div>
 
