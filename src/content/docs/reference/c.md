@@ -3,6 +3,10 @@ title: TidesDB C API Reference
 description: Complete C API reference for TidesDB
 ---
 
+If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/c.md).
+
+<hr/>
+
 ## Overview
 
 TidesDB is designed to provide a simple and intuitive C API for all your embedded storage needs.  This document is complete reference for the C API covering database operations, transactions, column families, iterators and more.
