@@ -24,7 +24,7 @@ head:
 
 In this article we will compare the latest patch of TidesDB which is v7.0.7 with the latest patch of RocksDB which is v10.7.5 at the time of this writing.
 
-In the latest patch of TidesDB I focused on optimizing the seek and range performance of the storage engine.  The primary changes made were caching iterator sources and only rebuilding seek iterators only when absolutely necessary, like after a compaction.
+In this patch I focused on seek and range performance improvements through prudent optimizations. The core focus was speeding up seeks and minimizing resource utilization by implementing iterator source caching. Sources are now cached and only rebuilt when absolutely necessary, such as after compaction. Additional enhancements include combined I/O operations in the block manager that group adjacent reads into single disk operations, and lazy evaluation that defers expensive decoding, decompression, and lookups until values are actually requested. These architectural improvements substantially reduce computational overhead while enabling efficient data reuse across operations, validated through expanded integration tests.
 
 ## Test Configuration
 
