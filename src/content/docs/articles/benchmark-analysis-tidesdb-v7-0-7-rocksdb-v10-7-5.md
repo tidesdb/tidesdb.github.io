@@ -213,7 +213,7 @@ Full iteration throughput consistently favored TidesDB:
 
 The Zipfian result is particularly striking. When iterating over a small key space with high update frequency, TidesDB's cached iterators provide massive advantages by avoiding expensive iterator reconstruction. This validates the v7.0.7 optimization strategy of caching iterator sources and only rebuilding after compaction.
 
-## Large Value Performance Deep Dive: 8KB Values
+## 8KB Value Value Performance
 
 The 4KB value benchmarks in the main suite revealed performance concerns for TidesDB. To investigate further, a dedicated large value benchmark was conducted with 8KB values, 100K operations, and 2 threads. The results tell a more nuanced story than the initial 4KB tests suggested.
 
@@ -265,18 +265,16 @@ Full iteration throughput favored TidesDB significantly:
 
 This validates that TidesDB's iterator implementation is efficient for large values when performing full scans, even if range queries with limits show regressions.
 
-### Analysis · Thread Count and Memory Bandwidth
+### Large Value Buffering
 
-The dramatic difference between 4KB/8-thread and 8KB/2-thread results points to a **scalability issue with large values under high concurrency**. Several factors likely contribute:
-
-1. Memory bandwidth saturation · 8 threads writing 4KB values generate 32KB of memory traffic per batch. With large values, this exceeds available memory bandwidth, causing threads to stall.
-
-2. Lock contention · TidesDB's write path may have coarser-grained locks that become bottlenecks when values are large and many threads compete.
-
-3. Buffer management · Large values require larger internal buffers. With 8 threads, buffer allocation and management overhead may dominate.
+Large values require larger internal buffers such as larger memtables, cache sizes and so forth. With 8 threads, buffer allocation and management overhead may dominate. So have an eye.
 
 The read performance advantage suggests TidesDB's read path is better optimized for large sequential I/O patterns. The 2x throughput with 6x less memory indicates efficient streaming of large values without excessive buffering.
 
+### Summary
+
 The v7.0.7 iterator caching optimization successfully improved seek and range performance, delivering on its design goals. The trade-offs are reasonable for most server deployments but require careful evaluation based on specific workload characteristics and resource constraints.
 
+---
 
+*Thanks for reading!*
