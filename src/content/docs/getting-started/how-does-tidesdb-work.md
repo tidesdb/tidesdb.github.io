@@ -3,6 +3,10 @@ title: How does TidesDB work?
 description: A comprehensive design overview of TidesDB's architecture, core components, and operational mechanisms.
 ---
 
+If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/getting-started/how-does-tidesdb-work.md).
+
+<hr/>
+
 ## Introduction
 
 TidesDB is an embeddable key-value storage engine built on log-structured merge trees (LSM trees). LSM trees optimize for write-heavy workloads by batching writes in memory and flushing sorted runs to disk. This trades write amplification (data written multiple times during compaction) for improved write throughput and sequential I/O patterns. The fundamental tradeoff: writes are fast but reads must search multiple sorted files.
