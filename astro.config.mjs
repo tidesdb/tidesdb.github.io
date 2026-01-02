@@ -146,6 +146,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						{ label: '1GB Value Observations TidesDB 7 & RocksDB 10', slug: 'articles/1gb-values-rocksdb10-tidesdb7' },
 						{ label: 'Comparative Analysis of TidesDB v7.0.7 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb-v7-0-7-rocksdb-v10-7-5' },
 						{ label: 'Using TidesDB with Java via JExtract', slug: 'articles/using-tidesdb-with-java-via-jextract' },
 						{ label: 'Death by a Thousand Cycles - Micro-Optimizations in TidesDB v7.0.4', slug: 'articles/tidesdb704-death-by-a-thousand-cycles' },

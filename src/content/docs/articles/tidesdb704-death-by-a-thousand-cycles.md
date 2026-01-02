@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![What I Learned Building a Storage Engine That Outperforms RocksDB](/pexels-athena-2582935.jpg)
+![Death by a Thousand Cycles - Micro-Optimizations in TidesDB v7.0.4](/pexels-athena-2582935.jpg)
 
 </div>
 
