@@ -79,7 +79,7 @@ CPU utilization remained high for TidesDB (483.5%) versus RocksDB (261.2%), but 
 
 Point lookups showed TidesDB at 1.72M ops/sec versus RocksDB at 1.50M ops/sec (**1.15x**). The latency numbers are revealing: TidesDB achieved p50 of 4μs and p99 of 11μs, while RocksDB showed p50 of 4μs and p99 of 14μs.
 
-Memory usage patterns diverged significantly. TidesDB peaked at 1853 MB RSS versus RocksDB's 356 MB—a 5.2x difference. TidesDB maintains larger in-memory structures through aggressive iterator and block index caching. The trade-off is deliberate: memory for speed. In memory-constrained environments, this becomes problematic.
+Memory usage patterns diverged. TidesDB peaked at 1853 MB RSS versus RocksDB's 356 MB—a 5.2x difference. TidesDB maintains larger in-memory structures through aggressive iterator and block index caching. The trade-off is deliberate: memory for speed. In memory-constrained environments, this becomes problematic.
 
 The iteration performance advantage went to TidesDB (6.17M ops/sec vs 5.72M ops/sec), suggesting the iterator caching optimizations in v7.0.7 are effective. Database size after compaction favored TidesDB slightly (87 MB vs 86 MB), indicating similar compression efficiency.
 
@@ -119,7 +119,7 @@ TidesDB's internal buffering and memory management are not optimized for large v
 
 With 64-byte values and 50M operations, TidesDB achieved 1.09M ops/sec versus RocksDB's 1.03M ops/sec (**1.06x faster**). The performance gap is modest, but resource usage tells a different story.
 
-Memory consumption was nearly identical (11.8 GB vs 11.7 GB), but disk writes favored TidesDB significantly (4462 MB vs 5785 MB). Write amplification was 1.17x versus 1.52x—a 30% reduction. However, space amplification was worse for TidesDB (0.26x vs 0.11x), with final database sizes of 986 MB versus 437 MB.
+Memory consumption was nearly identical (11.8 GB vs 11.7 GB), but disk writes favored TidesDB (4462 MB vs 5785 MB). Write amplification was 1.17x versus 1.52x—a 30% reduction. However, space amplification was worse for TidesDB (0.26x vs 0.11x), with final database sizes of 986 MB versus 437 MB.
 
 TidesDB defers file removal if reads are frequent and reference counts are high.
 
@@ -161,7 +161,7 @@ Space amplification results were mixed:
 - Mixed workload · 0.08x vs 0.14x (TidesDB better)
 - Small values · 0.26x vs 0.11x (RocksDB better)
 
-TidesDB's space amplification varies significantly by workload. Under sequential and mixed patterns, it excels. Under random writes and high-volume small values, it consumes more space. The compaction trigger heuristics use fixed size-ratio thresholds and could be tuned based on workload characteristics—adaptive compaction triggers would help.
+TidesDB's space amplification varies by workload. Under sequential and mixed patterns, it excels. Under random writes and high-volume small values, it consumes more space. The compaction trigger heuristics use fixed size-ratio thresholds and could be tuned based on workload characteristics—adaptive compaction triggers would help.
 
 ## Batch Size Sensitivity
 
@@ -196,12 +196,12 @@ For sequential writes and reads, TidesDB achieves better per-CPU efficiency. For
 
 ## Memory Footprint
 
-Memory usage patterns diverged significantly:
+Memory usage patterns diverged:
 - Random reads · TidesDB 1853 MB vs RocksDB 356 MB (5.2x)
 - Random writes · TidesDB 2676 MB vs RocksDB 2938 MB (0.91x)
 - Sequential writes · TidesDB 2415 MB vs RocksDB 2692 MB (0.90x)
 
-TidesDB's read-heavy workloads consume significantly more memory due to aggressive caching of iterators and block indices. Write-heavy workloads show comparable or lower memory usage. The iterator caching optimization deliberately trades memory for speed—a reasonable trade-off in modern servers but problematic in constrained environments.
+TidesDB's read-heavy workloads consume more memory due to aggressive caching of iterators and block indices. Write-heavy workloads show comparable or lower memory usage. The iterator caching optimization deliberately trades memory for speed—a reasonable trade-off in modern servers but problematic in constrained environments.
 
 ## Iteration Performance
 
@@ -215,13 +215,13 @@ The Zipfian result is particularly striking. When iterating over a small key spa
 
 ## 8KB Value Value Performance
 
-The 4KB value benchmarks in the main suite revealed performance concerns for TidesDB. To investigate further, a dedicated large value benchmark was conducted with 8KB values, 100K operations, and 2 threads. The results tell a more nuanced story than the initial 4KB tests suggested.
+The main benchmark suite tested 4KB values with 8 threads and showed TidesDB struggling with large value writes. To isolate whether this was a large-value issue or a high-concurrency issue, a dedicated test was run with 8KB values and 2 threads. The results show TidesDB excels with large values when thread count is moderate.
 
 ### Write Performance
 
 **Sequential writes** showed TidesDB at 110.9K ops/sec versus RocksDB's 89.8K ops/sec—a **1.24x advantage**. This is a dramatic improvement over the 4KB results where TidesDB was 0.58x slower. The latency distribution confirms the improvement: TidesDB p50 of 8μs and p99 of 33μs versus RocksDB's p50 of 9μs and p99 of 42μs.
 
-**Random writes** maintained similar performance: TidesDB at 108.3K ops/sec versus RocksDB's 92.0K ops/sec (**1.18x faster**). The consistency between sequential and random patterns suggests TidesDB's large value handling improves significantly when thread count is reduced from 8 to 2.
+**Random writes** maintained similar performance: TidesDB at 108.3K ops/sec versus RocksDB's 92.0K ops/sec (**1.18x faster**). The consistency between sequential and random patterns suggests TidesDB's large value handling improves when thread count is reduced from 8 to 2.
 
 This performance reversal is significant. The 4KB benchmark used 8 threads and showed severe degradation. The 8KB benchmark with 2 threads shows TidesDB winning. This is potentially due to **lock contention or memory bandwidth saturation** under high thread counts with large values. With fewer threads, TidesDB's architecture handles large values efficiently.
 
@@ -249,7 +249,7 @@ The sequential seek regression is notable given TidesDB's dominance in small val
 
 ### Range Query Performance
 
-Range scans of 100 keys revealed unexpected behavior. **Sequential range queries** showed TidesDB at 12.4K ops/sec versus RocksDB's 40.7K ops/sec (**0.30x slower**). This is a significant regression.
+Range scans of 100 keys revealed unexpected behavior. **Sequential range queries** showed TidesDB at 12.4K ops/sec versus RocksDB's 40.7K ops/sec (**0.30x slower**). This is a regression.
 
 The latency distribution explains the problem: TidesDB p50 of 154μs versus RocksDB's 45μs—a **3.4x latency disadvantage**. The p99 gap widened further: 319μs versus 120μs.
 
@@ -259,7 +259,7 @@ The CPU utilization during range queries was extreme: TidesDB at 197-198% versus
 
 ### Iteration Performance
 
-Full iteration throughput favored TidesDB significantly:
+Full iteration throughput favored TidesDB:
 - Sequential · 677K ops/sec vs 347K ops/sec (1.95x)
 - Random · 643K ops/sec vs 343K ops/sec (1.87x)
 
