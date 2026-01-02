@@ -24,7 +24,7 @@ head:
 
 This question comes up often on the TidesDB Discord, how do these engines handle very large values? In this article, I benchmark 1GB values against TidesDB 7 and RocksDB 10. The first run uses default configurations for both engines; The second increases the memtable write buffer and cache to 3GB each.
 
-One recommendation before diving in, if possible, break up large values into smaller chunks with keys that sort near each other. This improves locality and reduces fragmentation. For example, a multi-gigabyte video file could be stored as sequential chunks in TidesDB, then read back in order for streaming playback.
+One recommendation before diving in, if possible, break up large values into smaller chunks with keys that sort near each other. This improves locality and reduces fragmentation. For example, a multi-gigabyte video file could be stored as sequential chunks in TidesDB, then read back in order for streaming playback. In practice, chunking is almost always the better approach, really these benchmarks represent an _extreme_ edge case.
 
 # Test Configuration
 
