@@ -48,6 +48,8 @@ You can download the raw benchtool report for first run wih 64mb memtable write 
 
 You can download the raw benchtool report for second run with 3GB memtable write buffer and 3GB cache <a href="/large_value_benchmark_1gb_results_tdb7_rdb10_2.txt" download>here</a>
 
+You can download the raw benchtool report for second run with 3GB memtable write buffer and 3GB cache with RocksDB utilizing BlobDB <a href="/large_value_benchmark_1gb_results_tdb7_rdb10_3.txt" download>here</a>
+
 You can find the **benchtool** source code <a href="https://github.com/tidesdb/benchtool" target="_blank">here</a> and run your own benchmarks!
 
 
@@ -99,19 +101,50 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 | Peak RSS | 25 MB | 3,095 MB | TidesDB (124x less) |
 | Avg Latency | 601ms | 925ms | TidesDB (35% lower) |
 
+### Run 3 · RocksDB with BlobDB Enabled (3GB memtable/cache)
+
+RocksDB's BlobDB is designed specifically for large values - it separates keys from values similar to TidesDB's klog/vlog approach. This run tests whether BlobDB closes the gap.
+
+| Operation | TidesDB | RocksDB BlobDB | Winner |
+|-----------|---------|----------------|--------|
+| **PUT** | 0.20 ops/sec | 0.44 ops/sec | RocksDB (2.2x) |
+| **GET** | 1.54 ops/sec | 0.95 ops/sec | TidesDB (1.62x) |
+| **RANGE** | 0.18 ops/sec | 0.59 ops/sec | RocksDB (3.3x) |
+
+**Resource Usage (PUT)**
+
+| Metric | TidesDB | RocksDB BlobDB | Winner |
+|--------|---------|----------------|--------|
+| Peak RSS | 6,182 MB | 1,046 MB | RocksDB (5.9x less) |
+| Database Size | 40.16 MB | 1,060 MB | TidesDB (26x smaller) |
+| Write Amplification | 1.00x | 1.00x | Similar |
+
+**Resource Usage (GET)**
+
+| Metric | TidesDB | RocksDB BlobDB | Winner |
+|--------|---------|----------------|--------|
+| Peak RSS | 25 MB | 27 MB | Similar |
+| Avg Latency | 605ms | 1,006ms | TidesDB (40% lower) |
+
+**BlobDB Observations**
+
+With BlobDB enabled, RocksDB's memory usage during reads drops dramatically from 3,095 MB to just 27 MB - now matching TidesDB's efficiency. This confirms that key-value separation is the key architectural decision for large value handling.
+
+However, TidesDB still wins on GET throughput (1.62x faster) and latency (40% lower). RocksDB BlobDB also uses significantly less memory during writes (1,046 MB vs 6,182 MB), though it still produces a 26x larger database.
+
 ### Key Observations
 
 **RocksDB wins on writes and range scans with 1GB values.** 
 
-RocksDB's write path seems to be optimized for large values but at quite a cost - it achieves 1.57-2.4x faster PUT throughput. For range queries, RocksDB is 4.4-4.7x faster. 
+RocksDB's write path seems to be optimized for large values but at quite a cost - it achieves 1.57-2.4x faster PUT throughput. For range queries, RocksDB is 3.3-4.7x faster (BlobDB narrows the gap slightly). 
 
-**TidesDB wins on point reads.** 
+**TidesDB wins on point reads - even against BlobDB.** 
 
-TidesDB achieves 1.39-1.49x faster GET operations with 32-35% lower latency. The WiscKey-style key-value separation pays off here - keys are stored separately from values, so finding the right key is fast even when values are massive.
+TidesDB achieves 1.39-1.62x faster GET operations with 32-40% lower latency across all configurations. Even when RocksDB uses BlobDB (its own key-value separation), TidesDB's read path remains significantly faster. The WiscKey-style klog/vlog separation pays off here - keys are stored separately from values, so finding the right key is fast even when values are massive.
 
-**TidesDB uses dramatically less memory for reads.** 
+**BlobDB levels the memory playing field for reads.** 
 
-During GET operations, TidesDB uses only 25 MB of RAM compared to RocksDB's 3,095 MB - that's 124x less memory. This is because TidesDB doesn't need to load entire 1GB values into memory to find them; it can locate the key first, then stream the value.
+Without BlobDB, RocksDB uses 3,095 MB during GET operations vs TidesDB's 25 MB (124x difference). With BlobDB enabled, RocksDB drops to 27 MB - essentially matching TidesDB. This proves key-value separation is the critical architectural decision for large value handling. TidesDB doesn't need to load entire 1GB values into memory to find them; it can locate the key first, then stream the value.
 
 **TidesDB produces 26x smaller databases.** 
 
@@ -139,6 +172,34 @@ If you must store 1GB values, consider chunking them into smaller pieces (say, 4
 
 These results show general patterns, but your specific access patterns, hardware, and configuration will determine which engine performs best for you.
 
+## Why TidesDB Excels at Large Value Reads?
+
+Diving into the TidesDB source code reveals the architectural decisions that drive these benchmark results.
+
+**The klog/vlog Separation**
+
+TidesDB implements a WiscKey-inspired design with separate storage for keys and large values. The `tidesdb_klog_entry_t` structure stores key metadata (flags, sizes, TTL, sequence number) alongside a `vlog_offset` field that points to where large values live on disk. When a value exceeds the configurable `klog_value_threshold` (default 512 bytes), it's written to a separate value log (vlog) file rather than being stored inline with the key. This is the core reason TidesDB uses only 25MB of RAM during GET operations versus RocksDB's 3GB - the engine can locate keys without loading massive values into memory.
+
+```c
+if (value_size >= sst->config->klog_value_threshold && !deleted && value)
+{
+    /* write value directly as a block to vlog */
+    block_manager_block_t *vlog_block = block_manager_block_create(final_size, final_data);
+    ...
+    kv->entry.vlog_offset = (uint64_t)block_offset;
+}
+```
+
+During reads, TidesDB first searches the compact klog using bloom filters and block indexes to find the key, then performs a single targeted `pread()` to fetch the value from its vlog offset. This two-phase approach means the read path touches minimal data until the exact value location is known.
+
+**Aggressive Compression on Large Values**
+
+Each 1GB value is individually compressed (LZ4 by default) before being written to the vlog. The `compress_data()` function wraps the value with an 8-byte size header for decompression, and the block manager stores it with checksums for integrity. This per-value compression explains the 26x smaller database footprint - highly compressible data (like the benchmark's test values) shrinks dramatically, while RocksDB's block-based compression operates on mixed key-value blocks that may not compress as efficiently for this workload.
+
+**The Write Path Trade-off**
+
+The benchmark's finding that larger memtables hurt TidesDB's write performance makes sense when examining the flush path. During memtable flush, TidesDB iterates through all entries, compresses large values individually, writes them to vlog, then serializes klog blocks with compression. For 1GB values, this means each write triggers a full compression pass on a gigabyte of data. The default 64MB memtable forces more frequent but smaller flushes, while a 3GB memtable accumulates more data before triggering this expensive operation - but the compression cost per value remains constant regardless of memtable size.
+
 *Thanks for reading!*
 
 ---
@@ -146,5 +207,7 @@ These results show general patterns, but your specific access patterns, hardware
 **Links**
 - GitHub · https://github.com/tidesdb/tidesdb
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
+- RocksDB · https://github.com/facebook/rocksdb
+- RocksDB BlobDB · https://github.com/facebook/rocksdb/wiki/BlobDB
 
 Join the TidesDB Discord for more updates and discussions at https://discord.gg/tWEmjR66cy
