@@ -125,7 +125,7 @@ The system provides five isolation levels:
 **Serializable** implements serializable snapshot isolation (SSI). The system tracks read-write conflicts:
 
 1. Each transaction maintains a read set (arrays of CF pointers, keys, key sizes, sequence numbers)
-2. When read set exceeds threshold (default 64 entries), creates a hash table (`tidesdb_read_set_hash_t`) using xxHash for O(1) conflict detection
+2. Creates a hash table (`tidesdb_read_set_hash_t`) using xxHash for O(1) conflict detection
 3. At commit, checks all concurrent transactions: if transaction T reads key K that another transaction T' writes, sets `T.has_rw_conflict_out = 1` and `T'.has_rw_conflict_in = 1`
 4. If both flags are set (transaction is a pivot in dangerous structure), aborts
 
@@ -313,7 +313,7 @@ The system employs three policies based on the Spooky paper:
 
 **Dividing merge** merges levels 1 through X into level X+1. If X is the largest level, it first calls DCA to add a new level, then performs the merge. This reduces temporary space by spreading output across the level structure.
 
-**Partitioned merge** divides the key space into ranges and merges each range independently. This produces smaller output files and enables parallel compaction.
+**Partitioned merge** divides the key space into ranges and merges each range independently. This produces smaller output files and enables parallel compaction though currently TidesDB does not utilize parallelism for this, it's done serially.
 
 ### Compaction Triggers
 
