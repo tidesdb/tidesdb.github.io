@@ -22,7 +22,7 @@ head:
 
 *published on January 2nd, 2026*
 
-This question comes up often on the TidesDB Discord, how do these engines handle very large values? In this article, I benchmark 1GB values against TidesDB 7 and RocksDB 10. The first run uses default configurations for both engines; The second increases the memtable write buffer and cache to 3GB each.
+This question comes up often on the TidesDB <a href="https://discord.gg/tWEmjR66cy" target="_blank">Discord</a>, how do these engines handle very large values? In this article, I benchmark 1GB values against TidesDB 7 and RocksDB 10.  The first run uses rather default configurations for both engines (64mb memtable/block cache); The second increases the memtable write buffer and cache to 3GB each, the third run uses BlobDB with RocksDB.
 
 One recommendation before diving in, if possible, break up large values into smaller chunks with keys that sort near each other. This improves locality and reduces fragmentation. For example, a multi-gigabyte video file could be stored as sequential chunks in TidesDB, then read back in order for streaming playback. In practice, chunking is almost always the better approach, really these benchmarks represent an _extreme_ edge case.
 
@@ -44,14 +44,19 @@ All benchmarks were executed with sync mode disabled to measure maximum throughp
 - **RocksDB v10.7.5**
 - GCC with -O3 optimization
 
+<hr/>
+
 You can download the raw benchtool report for first run wih 64mb memtable write buffer and 64mb cache <a href="/large_value_benchmark_1gb_results_tdb7_rdb10_1.txt" download>here</a>
 
 You can download the raw benchtool report for second run with 3GB memtable write buffer and 3GB cache <a href="/large_value_benchmark_1gb_results_tdb7_rdb10_2.txt" download>here</a>
 
-You can download the raw benchtool report for second run with 3GB memtable write buffer and 3GB cache with RocksDB utilizing BlobDB <a href="/large_value_benchmark_1gb_results_tdb7_rdb10_3.txt" download>here</a>
+You can download the raw benchtool report for third run with RocksDB utilizing BlobDB <a href="/large_value_benchmark_1gb_results_tdb7_rdb10_3.txt" download>here</a>
 
 You can find the **benchtool** source code <a href="https://github.com/tidesdb/benchtool" target="_blank">here</a> and run your own benchmarks!
 
+_These benchmarks don't run many operations, just enough to get a sense of both engines capabilities with this certain large value scenario._
+
+<hr/>
 
 ## Findings
 
