@@ -632,7 +632,7 @@ The queue provides a thread-safe FIFO with node pooling and blocking dequeue. Op
 
 <div style="float: left; clear: both; margin-right: 20px; width: 100px; margin-bottom: 10px;" class="architecture-diagram">
 
-![TidesDB Manifest](../../../assets/img51.png)
+![TidesDB Manifest](../../../assets/img56.png)
 
 </div>
 
