@@ -311,7 +311,7 @@ The system employs three policies based on the Spooky paper:
 
 **Full preemptive merge** combines all SSTables from two adjacent levels into the target level. Simple but generates large temporary files.
 
-**Dividing merge** merges levels 1 through X into level X+1. If X is the largest level, it first calls DCA to add a new level, then performs the merge. This reduces temporary space by spreading output across the level structure.  If there are no boundaries, it falls back to a full merg
+**Dividing merge** merges levels 1 through X into level X+1. If X is the largest level, it first calls DCA to add a new level, then performs the merge. This reduces temporary space by spreading output across the level structure.  If there are no boundaries, it falls back to a full merge.
 
 **Partitioned merge** divides the key space into ranges and merges each range independently. This produces smaller output files and enables parallel compaction though currently TidesDB does not utilize parallelism for this, it's done serially.  The structure mirrors dividing merge but works on a wider level range and keeps reusing the largest level’s SSTable keys as partition boundaries. It partitions the merged data so that each new SSTable only covers a single key range, which prevents gigantic SSTables and keeps higher levels from exploding in size.
 
