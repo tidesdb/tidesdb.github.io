@@ -119,17 +119,21 @@ if (tidesdb_close(db) != 0)
 }
 ```
 
+:::note[Multiple DBs Allowed]
+Multiple TidesDB instances can be opened in the same process, each with its own configuration and data directory.
+:::
+
 ### Logging
 
 TidesDB provides structured logging with multiple severity levels.
 
 **Log Levels**
-- `TDB_LOG_DEBUG` - Detailed diagnostic information
-- `TDB_LOG_INFO` - General informational messages (default)
-- `TDB_LOG_WARN` - Warning messages for potential issues
-- `TDB_LOG_ERROR` - Error messages for failures
-- `TDB_LOG_FATAL` - Critical errors that may cause shutdown
-- `TDB_LOG_NONE` - Disable all logging
+- `TDB_LOG_DEBUG` · Detailed diagnostic information
+- `TDB_LOG_INFO` · General informational messages (default)
+- `TDB_LOG_WARN` · Warning messages for potential issues
+- `TDB_LOG_ERROR` · Error messages for failures
+- `TDB_LOG_FATAL` · Critical errors that may cause shutdown
+- `TDB_LOG_NONE` · Disable all logging
 
 **Configure at startup**
 ```c
@@ -329,26 +333,26 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 ```
 
 **Updatable settings** (safe to change at runtime):
-- `write_buffer_size` - Memtable flush threshold
-- `skip_list_max_level` - Skip list level for **new** memtables
-- `skip_list_probability` - Skip list probability for **new** memtables
-- `bloom_fpr` - False positive rate for **new** SSTables
-- `index_sample_ratio` - Index sampling ratio for **new** SSTables
-- `sync_mode` - Durability mode (TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL)
-- `sync_interval_us` - Sync interval in microseconds (only used when sync_mode is TDB_SYNC_INTERVAL)
+- `write_buffer_size` · Memtable flush threshold
+- `skip_list_max_level` · Skip list level for **new** memtables
+- `skip_list_probability` · Skip list probability for **new** memtables
+- `bloom_fpr` · False positive rate for **new** SSTables
+- `index_sample_ratio` · Index sampling ratio for **new** SSTables
+- `sync_mode` · Durability mode (TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL)
+- `sync_interval_us` · Sync interval in microseconds (only used when sync_mode is TDB_SYNC_INTERVAL)
 
 **Non-updatable settings** (would corrupt existing data):
-- `compression_algorithm` - Cannot change on existing SSTables
-- `enable_block_indexes` - Cannot change index structure
-- `enable_bloom_filter` - Cannot change bloom filter presence
-- `comparator_name` - Cannot change sort order
-- `level_size_ratio` - Cannot change LSM level sizing
-- `klog_value_threshold` - Cannot change klog/vlog separation
-- `min_levels` - Cannot change minimum LSM levels
-- `dividing_level_offset` - Cannot change compaction strategy
-- `block_index_prefix_len` - Cannot change block index structure
-- `l1_file_count_trigger` - Cannot change compaction trigger
-- `l0_queue_stall_threshold` - Cannot change backpressure threshold
+- `compression_algorithm` · Cannot change on existing SSTables
+- `enable_block_indexes` · Cannot change index structure
+- `enable_bloom_filter` · Cannot change bloom filter presence
+- `comparator_name` · Cannot change sort order
+- `level_size_ratio` · Cannot change LSM level sizing
+- `klog_value_threshold` · Cannot change klog/vlog separation
+- `min_levels` · Cannot change minimum LSM levels
+- `dividing_level_offset` · Cannot change compaction strategy
+- `block_index_prefix_len` · Cannot change block index structure
+- `l1_file_count_trigger` · Cannot change compaction trigger
+- `l0_queue_stall_threshold` · Cannot change backpressure threshold
 
 **Configuration persistence**
 
@@ -563,9 +567,9 @@ tidesdb_txn_free(txn);
 ```
 
 **Savepoint API**
-- `tidesdb_txn_savepoint(txn, "name")` - Create a savepoint
-- `tidesdb_txn_rollback_to_savepoint(txn, "name")` - Rollback to savepoint
-- `tidesdb_txn_release_savepoint(txn, "name")` - Release savepoint without rolling back
+- `tidesdb_txn_savepoint(txn, "name")` · Create a savepoint
+- `tidesdb_txn_rollback_to_savepoint(txn, "name")` · Rollback to savepoint
+- `tidesdb_txn_release_savepoint(txn, "name")` · Release savepoint without rolling back
 
 **Savepoint behavior**
 - Savepoints capture the transaction state at a specific point
@@ -812,7 +816,7 @@ TidesDB provides six built-in comparators that are automatically registered on d
 - **Use case** · C strings, text keys
 - **Warning** · Keys must be null-terminated or behavior is undefined
 
-**`"uint64"`** - Unsigned 64-bit integer comparison
+**`"uint64"`** · Unsigned 64-bit integer comparison
 - Interprets 8-byte keys as uint64_t values
 - Falls back to memcmp if key_size != 8
 - **Use case** · Numeric IDs, timestamps, counters
