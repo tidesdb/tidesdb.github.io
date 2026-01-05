@@ -302,7 +302,6 @@ This optimization is critical for range queries - without block indexes, seeking
 
 ## Compaction
 
-### Compaction Policies
 
 <br/>
 
@@ -312,63 +311,260 @@ This optimization is critical for range queries - without block indexes, seeking
 
 </div>
 
-The system employs three policies based on the Spooky paper:
+### Strategy
 
-**Full preemptive merge** combines all SSTables from two adjacent levels into the target level. Simple but generates large temporary files.
+The strategy consists of three distinct policies based on the principles of the "Spooky" compaction algorithm described in academic literature, working in concert with Dynamic Capacity Adaptation (DCA) to maintain an efficient LSM-tree structure.
 
-**Dividing merge** merges levels 1 through X into level X+1. If X is the largest level, it first calls DCA to add a new level, then performs the merge. This reduces temporary space by spreading output across the level structure.  If there are no boundaries, it falls back to a full merge.
+### Overview
 
-**Partitioned merge** divides the key space into ranges and merges each range independently. This produces smaller output files and enables parallel compaction though currently TidesDB does not utilize parallelism for this, it's done serially.  The structure mirrors dividing merge but works on a wider level range and keeps reusing the largest level’s SSTable keys as partition boundaries. It partitions the merged data so that each new SSTable only covers a single key range, which prevents gigantic SSTables and keeps higher levels from exploding in size.
+The primary goal of compaction in TidesDB is to reduce read amplification by merging multiple SSTable files, cleaning up obsolete data, and maintaining an efficient LSM-tree structure. TidesDB does not use traditional selectable policies (like Leveled or Tiered); instead, it employs three complementary merge strategies that are automatically selected based on the current state of the database.
 
-### Compaction Triggers
+The core logic resides in the `tidesdb_trigger_compaction` function, which acts as the central controller for the entire process.
 
-Compaction triggers when level 1 accumulates a threshold number of SSTables (default 4) or when a level exceeds its capacity. Each level has capacity N× the previous level (configurable ratio, default 10×).
+### Triggering Process
 
-### Dynamic Capacity Adaptation
+Compaction is triggered when specific thresholds are exceeded, indicating that the LSM-tree structure requires rebalancing.
 
-DCA is separate from compaction policies. Compaction policies (full/dividing/partitioned) determine how to merge data. DCA determines when to add or remove levels from the structure.
+### Trigger Conditions
 
-**Level Addition** · Triggered by dividing merge when merging into the largest level, or by compaction when a level exceeds capacity. The system:
-1. Creates a new empty level with capacity = previous_largest_capacity × ratio
-2. Atomically increments `num_active_levels`
-3. Lets normal compaction move data down (does not move data during addition to avoid key loss)
+Compaction initiates under two conditions:
 
-**Level Removal** · Triggered after compaction when the largest level becomes completely empty. The system:
-1. Checks if `num_active_levels > min_levels` (configurable, default 5, prevents thrashing)
-2. Frees the empty level
-3. Updates new largest level capacity: `new_capacity = old_capacity / ratio`
-4. Atomically decrements `num_active_levels`
-5. Calls `tidesdb_apply_dca()` to rebalance
+1.  **Level 1 SSTable accumulation** · When Level 1 accumulates a threshold number of SSTables (configurable, default 4 files), the system recognizes that flushed memtables are piling up and need to be merged down into the LSM-tree hierarchy.
 
-**Capacity Rebalancing** · `tidesdb_apply_dca()` runs after level removal. It updates all level capacities using `C[i] = N_L / T^(L-1-i)` where:
-- `N_L` = current size of largest level
-- `T` = level size ratio
-- `L` = number of levels
-- `i` = level index (0-based)
+2.  **Level capacity exceeded** · When any level's total size exceeds its configured capacity, the system must merge data into the next level to maintain the level size invariant. Each level holds approximately N× more data than the previous level (configurable ratio, default 10×).
 
-This ensures capacities remain proportional to actual data distribution. Without rebalancing, intermediate levels would have stale capacities after removal.
+### Calculating the Dividing Level
 
-**Initialization** · Column families start with `min_levels` (configurable, default 5) pre-allocated. If recovery finds SSTables at level N > min_levels, initializes with N levels (e.g., finds level 8 SSTables -> initializes with 8 levels). If recovery finds SSTables at level N < min_levels, still initializes with min_levels (e.g., finds level 3 SSTables -> initializes with 5 levels, leaving levels 4-5 empty). The floor prevents small databases from thrashing between 2-3 levels and guarantees predictable read performance.
+The algorithm calculates a **dividing level (X)** that serves as the primary compaction target. This is not a theoretical reference point but rather a concrete level in the LSM-tree computed using:
 
-### Merge Process
+```
+X = num_levels - 1 - dividing_level_offset
+```
 
-During compaction:
+Where `dividing_level_offset` is a configurable parameter (default 1) that controls compaction aggressiveness. A lower offset means more aggressive compaction (merging more frequently into higher levels), while a higher offset defers compaction work.
 
-1. The system opens all source SSTables and creates merge sources
-2. It builds a min-heap (`tidesdb_merge_heap_t`) with elements `tidesdb_merge_source_t*` containing:
-   - Source type (memtable or SSTable)
-   - Current key-value pair (`current_kv`)
-   - Cursor for iterating source (skip list cursor or block manager cursor)
-3. It pops the minimum element, advances that source's cursor to the next entry, and sifts down
-4. It discards tombstones, expired TTL entries, and duplicates (keeping newest by sequence number)
-5. It writes surviving entries to new SSTables in blocks (64KB each)
-6. It fsyncs the new SSTables
-7. It commits them to the manifest
-8. It marks old SSTables for deletion
+For example, with 7 active levels and the default offset of 1:
+```
+X = 7 - 1 - 1 = 5
+```
 
-If a source encounters corruption during advance, `tidesdb_merge_heap_pop()` returns the corrupted SSTable for deletion and removes that source from the heap.
+This means Level 5 serves as the primary merge destination.
 
-Large values flow through compaction: the system reads from the source value log, recompresses according to current configuration, and writes to the destination value log. This allows compression settings to change over time.
+### Selecting the Merge Strategy
+
+Based on the compaction trigger and the relationship between the affected level and the dividing level X, the algorithm selects one of three merge strategies:
+
+1.  **If Level 1 exceeds the SSTable threshold** · The system performs a **dividing merge**, merging all levels from 1 through X into level X+1.
+
+2.  **If a level before X exceeds capacity** · The system performs a **partitioned merge**, which is a more targeted, preemptive cleanup designed to prevent cascading compaction pressure.
+
+3.  **If level X or beyond exceeds capacity** · The system performs a **full preemptive merge** of the specific level range that exceeded capacity.
+
+### The Three Merge Modes
+
+The compaction algorithm employs three distinct merge methods, each optimized for different scenarios within the LSM-tree lifecycle.
+
+#### 1. Full Preemptive Merge
+
+This is the most straightforward merge operation. It combines all SSTables from two adjacent levels into the target level.
+
+*   **When it's used**
+    *   When a level at or beyond the dividing level X exceeds its capacity.
+    *   As a fallback mechanism by the other merge functions when they cannot determine partitioning boundaries (e.g., when there are no existing SSTables at the target level to use as partition guides).
+
+*   **What it does**
+    *   Takes a `start_level` and `target_level` as input.
+    *   Opens all SSTables from both levels.
+    *   Creates a min-heap containing merge sources from all SSTables.
+    *   Iteratively pops the minimum key from the heap, writing surviving entries (non-tombstones, non-expired TTLs, keeping only the newest version by sequence number) to new SSTables at the target level.
+    *   Fsyncs the new SSTables, commits them to the manifest, and marks old SSTables for deletion.
+
+*   **Characteristics**
+    *   Simple and effective for small-scale merges.
+    *   Generates potentially large output files since it doesn't partition the key space.
+    *   Used when more sophisticated partitioning is not possible or necessary.
+
+#### 2. Dividing Merge
+
+This is the standard, large-scale compaction method for maintaining the overall health of the LSM-tree. It is designed to periodically consolidate the upper levels of the tree into a deeper level.
+
+*   **When it's used**
+    *   When Level 1 accumulates the threshold number of SSTables (default 4), indicating that memtable flushes are accumulating faster than they can be absorbed into the tree.
+    *   This is the expected scenario during normal write-heavy workloads.
+
+*   **What it does**
+    *   Merges all levels from Level 1 through the dividing level X into level X+1.
+    *   If X is the largest level in the database, the system first invokes Dynamic Capacity Adaptation (DCA) to add a new level before performing the merge. This ensures there's always a destination level available.
+    *   The merge is intelligent about partitioning. It examines the largest level in the database and extracts the minimum and maximum keys from each SSTable at that level. These key ranges serve as partition boundaries.
+    *   The key space is divided into ranges based on these boundaries, and the merge is performed in chunks. Each chunk produces SSTables that cover only a single key range.
+    *   This partitioning prevents the creation of monolithic SSTables and distributes data more evenly across the target level.
+    *   If no partitioning boundaries can be determined (e.g., the target level is empty), the function falls back to calling `tidesdb_full_preemptive_merge`.
+
+*   **Characteristics**
+    *   Handles large-scale data movement efficiently.
+    *   Produces smaller, more manageable output files due to partitioning.
+    *   Critical for maintaining read performance by preventing excessive file proliferation at upper levels.
+
+#### 3. Partitioned Merge
+
+This is a specialized, preemptive merge designed for urgent, targeted cleanups. It addresses a specific scenario where intermediate levels begin to accumulate data unexpectedly.
+
+*   **When it's used**
+    *   When a level **before** the dividing level X exceeds its capacity. This indicates a sudden influx of data or a localized hotspot that needs to be handled quickly before it cascades into a larger compaction crisis.
+
+*   **What it does**
+    *   Performs a merge on a specific range of levels (from the overflowing level to a target level, typically a few levels down) rather than merging all the way from Level 1.
+    *   Like `tidesdb_dividing_merge`, it uses the largest level's SSTable key ranges as partition boundaries.
+    *   It divides the key space and merges each partition independently, producing smaller output SSTables that each cover a single key range.
+    *   This approach is more focused and less resource-intensive than a full dividing merge, allowing the system to relieve pressure in a specific area of the LSM-tree without triggering a full tree-wide compaction.
+
+*   **Characteristics**
+    *   Fast and targeted, addressing localized problems.
+    *   Reduces the scope of compaction work compared to dividing merge.
+    *   Helps prevent compaction from falling behind during bursty write patterns.
+
+### Dynamic Capacity Adaptation (DCA)
+
+DCA is a separate mechanism from the compaction policies themselves. While the three merge policies determine **how** to merge data, DCA determines **when** to add or remove levels from the LSM-tree structure and continuously recalibrates level capacities to match the actual data distribution.
+
+#### The DCA Process
+
+DCA is not a constantly running process. Instead, it is triggered automatically after operations that significantly change the structure or data distribution of the LSM-tree:
+
+*   **After a compaction cycle completes** The `tidesdb_trigger_compaction` function calls `tidesdb_apply_dca` at the end of its run.
+*   **After a level is removed** The `tidesdb_remove_level` function calls `tidesdb_apply_dca` to rebalance the capacities of the remaining levels.
+
+#### Capacity Recalculation Formula
+
+The core of DCA is the `tidesdb_apply_dca()` function, which recalculates the capacity of all levels based on the actual size of the largest (bottom-most) level. The formula used is:
+
+```
+C_i = N_L / T^(L-i)
+```
+
+Where:
+*   `C_i` = the new calculated **capacity** for level `i`
+*   `N_L` = the actual size in bytes of data in the **largest level** `L` (the "ground truth" of how much data exists)
+*   `T` = the configured **level size ratio** between levels (default 10, meaning each level is 10× larger than the one above)
+*   `L` = the total number of **active levels** in the column family
+*   `i` = the index of the current level being calculated
+
+**Execution steps**
+
+1.  Get the current number of active levels (`L`).
+2.  Identify the largest level and measure its current total size (`N_L`).
+3.  Iterate backwards from the second-to-last level (`L-1`) up to Level 0.
+4.  For each level `i`, apply the formula to calculate the new capacity (`C_i`).
+5.  Update the `max_level_size` property for that level with the newly calculated value.
+
+This adaptive approach ensures that level capacities remain proportional to the real-world size of data at the bottom of the tree. As the database grows or shrinks, DCA automatically adjusts capacities to maintain optimal compaction timing—preventing both over-provisioned capacities (which cause high read amplification) and under-provisioned capacities (which cause excessive compaction and high write amplification).
+
+#### Level Addition
+
+DCA adds a new level when:
+
+1.  The dividing merge attempts to merge into the largest level (X is the maximum level number).
+2.  A level exceeds its capacity and needs a destination level that doesn't yet exist.
+
+**Process**
+
+1.  The system creates a new empty level with capacity calculated as: `previous_largest_capacity × level_size_ratio`.
+2.  It atomically increments `num_active_levels` to reflect the new structure.
+3.  Normal compaction then moves data into this new level. **The data is not moved during level addition itself** to avoid complex data migration logic and potential key loss.
+4.  The next `tidesdb_apply_dca()` invocation will recalculate capacities for all levels based on the new level count.
+
+#### Level Removal
+
+DCA removes a level when:
+
+1.  After compaction, the largest level becomes completely empty.
+2.  The number of active levels exceeds the configured minimum (default 5 levels).
+
+**Process**
+
+1.  The system verifies that `num_active_levels > min_levels` to prevent thrashing (repeatedly adding and removing levels).
+2.  It frees the empty level structure.
+3.  It updates the new largest level's capacity using the formula: `new_capacity = old_capacity / level_size_ratio`.
+4.  It atomically decrements `num_active_levels`.
+5.  It invokes `tidesdb_apply_dca()` to rebalance all level capacities based on the new level count and the actual size of the new largest level.
+
+#### Initialization
+
+Column families start with a minimum number of pre-allocated levels (configurable via `min_levels`, default 5). During recovery:
+
+*   If the manifest indicates SSTables exist at level N where N > min_levels, the system initializes with N levels to accommodate the existing data.
+*   If SSTables exist only at levels below min_levels (e.g., only Levels 1-3), the system still initializes with min_levels (e.g., 5), leaving upper levels (4-5) empty.
+*   This floor prevents small databases from thrashing between 2-3 levels and guarantees predictable read performance by maintaining a minimum tree depth.
+*   After initialization, `tidesdb_apply_dca()` is invoked to set appropriate capacities for all levels based on the actual data found during recovery.
+
+### The Merge Process
+
+All three merge policies share a common merge execution path with slight variations:
+
+#### Execution Steps
+
+1.  **Open all source SSTables** · The system opens the klog and vlog files for all SSTables involved in the merge (from both the source and target levels).
+
+2.  **Create merge sources** · For each SSTable, a merge source structure is created containing:
+    *   The source type (SSTable or memtable, though memtables are typically only merged during flush).
+    *   The current key-value pair being considered (`current_kv`).
+    *   A cursor for iterating through the source (either a skip list cursor for memtables or a block manager cursor for SSTables).
+
+3.  **Build a min-heap** · The system constructs a min-heap (`tidesdb_merge_heap_t`) with elements of type `tidesdb_merge_source_t*`. The heap orders sources by their current key using the column family's configured comparator.
+
+4.  **Iterative merge**
+    *   The system repeatedly pops the minimum element from the heap (the source with the smallest current key).
+    *   It advances that source's cursor to the next entry.
+    *   It sifts the source back down into the heap based on its new current key.
+
+5.  **Filtering and deduplication**
+    *   **Tombstones** · Entries marked as deleted are discarded and not written to the output.
+    *   **Expired TTLs** · Entries whose time-to-live has expired are discarded.
+    *   **Duplicates** · When multiple sources contain the same key, only the version with the highest sequence number (the newest version) is kept. Older versions are discarded.
+
+6.  **Write to new SSTables**
+    *   Surviving entries are written to new SSTables at the target level.
+    *   Data is written in blocks (fixed size 64KB).
+    *   Values exceeding the configured threshold (default 512 bytes) are written to the value log (.vlog), while the key log (.klog) stores only the file offset.
+    *   Values smaller than the threshold are stored inline in the key log.
+    *   Blocks are optionally compressed using the column family's configured compression algorithm (LZ4, Zstd, or Snappy).
+
+7.  **Finalize SSTables**
+    *   After all data is written, the system appends auxiliary structures to each key log: a block index for fast lookups, a bloom filter for negative lookups (if enabled), and a metadata block with SSTable statistics.
+    *   The system fsyncs both the klog and vlog files to ensure durability.
+
+8.  **Update manifest**
+    *   The new SSTables are committed to the manifest file, which tracks which SSTables belong to which levels.
+    *   This operation is atomic—the manifest file is updated in a single write and fsync.
+
+9.  **Delete old SSTables**
+    *   The old SSTables from the source and target levels are marked for deletion.
+    *   The actual file deletion may be deferred by the reaper worker to avoid blocking the compaction worker.
+
+### Handling Corruption During Merge
+
+If a source encounters corruption while its cursor is advancing:
+
+*   The `tidesdb_merge_heap_pop()` function detects the corruption (via checksum failures in the block manager).
+*   It returns the corrupted SSTable to the caller for deletion.
+*   The corrupted source is removed from the heap.
+*   The merge continues with the remaining sources.
+*   This ensures that compaction can complete even if one SSTable is damaged, allowing the system to recover by discarding the corrupted data.
+
+### Value Recompression
+
+Large values (those exceeding the value log threshold) flow through compaction rather than being copied byte-for-byte:
+
+*   The system reads the value from the source value log.
+*   It recompresses the value according to the current column family configuration (which may differ from the original compression setting).
+*   It writes the recompressed value to the destination value log.
+*   This allows compression settings to evolve over time without requiring a full database rebuild.
+
+TidesDB's compaction is a sophisticated, multi-faceted algorithm that employs three distinct merge policies—full preemptive merge, dividing merge, and partitioned merge—each optimized for different scenarios within the LSM-tree lifecycle. These policies work in concert with Dynamic Capacity Adaptation (DCA) to automatically scale the tree structure up or down as data volume changes.
+
+The system intelligently selects the appropriate merge strategy based on concrete triggers: Level 1 SSTable accumulation triggers dividing merge, capacity overflow before the dividing level triggers partitioned merge, and capacity overflow at or beyond the dividing level triggers full preemptive merge. The dividing level itself is calculated using a simple formula (`num_levels - 1 - dividing_level_offset`) rather than being inferred from complex bottleneck analysis.
+
+This design allows TidesDB to handle a wide range of workloads efficiently, from steady-state writes to sudden bursts, while maintaining both read and write performance through intelligent data placement and compaction scheduling.
 
 ## Recovery
 
