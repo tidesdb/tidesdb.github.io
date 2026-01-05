@@ -189,7 +189,7 @@ The ordering is critical: fsync before manifest commit ensures the SSTable is du
 
 **Strict validation** · SSTables use `block_manager_validate_last_block(bm, 1)` (strict mode). Any corruption in the last block causes the SSTable to be rejected entirely. This reflects that SSTables are permanent and must be correct.
 
-### L0 Throttling and Backpressure
+### Write Backpressure and Flow Control
 
 When writes arrive faster than flush workers can persist memtables to disk, immutable memtables accumulate in the flush queue. Without throttling, this causes unbounded memory growth. The system implements graduated backpressure based on the L0 immutable queue depth and L1 file count.
 
@@ -197,24 +197,29 @@ Each column family maintains a queue of immutable memtables awaiting flush. When
 
 **Throttling thresholds** · The system monitors two metrics:
 
-1. **L0 queue depth** - number of immutable memtables in the flush queue (configurable threshold, default 10)
-2. **L1 file count** - number of SSTables at level 1 (configurable trigger, default 4)
+1. **L0 queue depth** · number of immutable memtables in the flush queue (configurable threshold, default 10)
+2. **L1 file count** · number of SSTables at level 1 (configurable trigger, default 4)
 
 **Graduated backpressure** · The system applies increasing delays to write operations based on pressure:
 
-**Moderate pressure** (30% of stall threshold or 2× L1 trigger) - Writes sleep for 1ms. This gently slows the write rate without significantly impacting throughput. At 30% of the default threshold (3 immutable memtables), writes experience minimal latency increase.
+**Moderate pressure** (30% of stall threshold or 2× L1 trigger) - Writes sleep for 1ms. This gently slows the write rate without significantly impacting throughput. At 30% of the default threshold (3 immutable memtables), writes experience minimal latency increase. The 1ms delay is calibrated to be ~1000× the cost of a write operation (~1μs), providing flush workers CPU time while remaining barely noticeable in multi-threaded workloads.
 
-**High pressure** (60% of stall threshold or 3× L1 trigger) - Writes sleep for 5ms. This more aggressively reduces write throughput to give flush and compaction workers time to catch up. At 60% of the default threshold (6 immutable memtables), write latency increases noticeably but writes continue.
+**High pressure** (60% of stall threshold or 3× L1 trigger) - Writes sleep for 5ms. This more aggressively reduces write throughput to give flush and compaction workers time to catch up. At 60% of the default threshold (6 immutable memtables), write latency increases noticeably but writes continue. The 5× escalation creates non-linear control response - since flush operations take ~120ms, the 5ms delay gives workers meaningful time to drain the queue.
 
-**Stall** (≥100% of stall threshold) - Writes block completely until the queue drains below the threshold. The system checks queue depth every 10ms, waiting up to 10 seconds before timing out with an error. This prevents memory exhaustion when flush workers cannot keep pace. At the default threshold (10 immutable memtables), all writes stall until flush workers reduce the queue depth.
+**Stall** (≥100% of stall threshold) - Writes block completely until the queue drains below the threshold. The system checks queue depth every 10ms, waiting up to 10 seconds before timing out with an error. This prevents memory exhaustion when flush workers cannot keep pace. At the default threshold (10 immutable memtables), all writes stall until flush workers reduce the queue depth. The 10ms check interval balances responsiveness with syscall overhead.
 
-**Coordination with L1** · The backpressure mechanism considers both L0 queue depth and L1 file count. High L1 file count indicates compaction is falling behind, which will eventually slow flush operations (flush workers must wait for compaction to free space). By throttling writes based on L1 file count, the system prevents cascading backlog.
+**Coordination with L1** · The backpressure mechanism considers both L0 queue depth and L1 file count. High L1 file count indicates compaction is falling behind, which will eventually slow flush operations (flush workers must wait for compaction to free space). By throttling writes based on L1 file count, the system prevents cascading backlog. L1 acts as a leading indicator - throttling occurs before L0 pressure becomes critical.
 
 **Memory protection** · Each immutable memtable holds the full contents of a flushed memtable (default 64MB). With a stall threshold of 10, the system allows up to 640MB of immutable memtables plus the active memtable (64MB) before blocking writes. This bounds memory usage to roughly 704MB per column family under maximum write pressure, preventing out-of-memory conditions.
 
 **Worker coordination** · The throttling mechanism assumes flush workers are making progress. If the queue depth remains at or above the stall threshold for 10 seconds (1000 iterations × 10ms), the system returns an error indicating the flush worker may be stuck. This typically indicates disk I/O failure, insufficient disk space, or a deadlock in the flush path.
 
 **Configuration interaction** · Increasing `write_buffer_size` reduces flush frequency but increases memory usage during stalls. Increasing `l0_queue_stall_threshold` allows more memory usage but provides more buffering for bursty workloads. Increasing flush worker count reduces queue depth under sustained write load. The optimal configuration depends on write patterns, available memory, and disk throughput.
+
+**Design advantage** · The graduated backpressure approach provides smooth degradation 
+rather than traditional binary throttling (normal operation or 
+complete stall), contributing to TidesDB's sustained write 
+performance advantage.
 
 ## Read Path
 
