@@ -425,7 +425,7 @@ This is a specialized, preemptive merge designed for urgent, targeted cleanups. 
 
 ### Dynamic Capacity Adaptation (DCA)
 
-DCA is a separate mechanism from the compaction policies themselves. While the three merge policies determine **how** to merge data, DCA determines **when** to add or remove levels from the LSM-tree structure and continuously recalibrates level capacities to match the actual data distribution.
+DCA is a separate mechanism from compaction. Whilst the three merge modes determine **how** to merge data, DCA determines **when** to add or remove levels from the LSM-tree structure and continuously recalibrates level capacities to match the actual data distribution.
 
 #### The DCA Process
 
