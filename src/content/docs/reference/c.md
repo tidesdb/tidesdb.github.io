@@ -797,6 +797,34 @@ if (tidesdb_iter_seek_for_prev(iter, (uint8_t *)target, strlen(target)) == 0)
 }
 ```
 
+#### Prefix Seeking
+
+Since `tidesdb_iter_seek` positions the iterator at the first key >= target, you can use a prefix as the seek target to efficiently scan all keys sharing that prefix:
+
+```c
+/* Seek to prefix and iterate all matching keys */
+const char *prefix = "user:";
+if (tidesdb_iter_seek(iter, (uint8_t *)prefix, strlen(prefix) + 1) == 0)
+{
+    while (tidesdb_iter_valid(iter))
+    {
+        uint8_t *key = NULL;
+        size_t key_size = 0;
+        tidesdb_iter_key(iter, &key, &key_size);
+        
+        /* Stop when keys no longer match prefix */
+        if (strncmp((char *)key, prefix, strlen(prefix)) != 0) break;
+        
+        /* Process key */
+        printf("Found: %.*s\n", (int)key_size, key);
+        
+        if (tidesdb_iter_next(iter) != TDB_SUCCESS) break;
+    }
+}
+```
+
+This pattern works across both memtables and SSTables. When block indexes are enabled, the seek operation uses binary search to jump directly to the relevant block, making prefix scans efficient even on large datasets.
+
 ## Custom Comparators
 
 TidesDB uses comparators to determine the sort order of keys throughout the entire system: memtables, SSTables, block indexes, and iterators all use the same comparison logic. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
