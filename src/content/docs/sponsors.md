@@ -1,6 +1,6 @@
 ---
-title: TidesDB Development Sponsors
-description: Who is sponsoring TidesDB development?
+title: TidesDB Development Sponsors | Support Open Source Storage Development
+description: Meet the companies and developers sponsoring TidesDB development. Learn how you can sponsor and support TidesDB.
 ---
 
 <style>
