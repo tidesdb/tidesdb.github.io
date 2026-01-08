@@ -699,6 +699,12 @@ input[type="select"]:focus, select:focus {
 	display: block;
 }
 
+.heart-sponsor {
+	background: rgb(192, 45, 35)!important;
+	border: none!important;
+	color: white!important;
+}
+
 @media (max-width: 768px) {
 	.article-image {
 		width: calc(100% + 2rem);
