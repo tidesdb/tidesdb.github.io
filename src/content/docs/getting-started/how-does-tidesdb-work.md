@@ -716,7 +716,7 @@ SSTables are immutable - space isn't reclaimed until compaction completes and ol
 
 ### File Descriptor Usage
 
-Each SSTable uses 2 file descriptors (klog and vlog). With the default 512 open SSTable limit and 1000 total SSTables, the reaper constantly opens and closes files. This causes file descriptor thrashing. Increase the limit or reduce SSTable count through more aggressive compaction.
+Each SSTable uses 2 file descriptors (klog and vlog). When the number of SSTables exceeds the open file limit (default 256), the reaper closes the least recently used files. With many SSTables, this can cause file descriptor thrashing as files are repeatedly opened and closed.  256 files is equivalent to 512 open file descriptors.
 
 ## Internal Components
 

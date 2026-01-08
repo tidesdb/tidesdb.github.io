@@ -104,7 +104,7 @@ tidesdb_config_t config = {
     .num_compaction_threads = 2,           /* Compaction thread pool size (default: 2) */
     .log_level = TDB_LOG_INFO,             /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
-    .max_open_sstables = 512,              /* Max cached SSTable structures (default: 512) */
+    .max_open_sstables = 256,              /* Max cached SSTable structures (default: 256) */
 };
 
 tidesdb_t *db = NULL;
@@ -1062,7 +1062,7 @@ tidesdb_config_t config = {
     .num_compaction_threads = 2,
     .log_level = TDB_LOG_INFO,
     .block_cache_size = 128 * 1024 * 1024,  /* 128MB global block cache (default: 64MB) */
-    .max_open_sstables = 200,               /* LRU cache for 200 SSTable structures (default: 512) */
+    .max_open_sstables = 100,               /* LRU cache for 100 SSTable objects (each SSTable has x2 file descriptors for it's klog and vlog files) (default: 256) */
 };
 
 tidesdb_t *db = NULL;
