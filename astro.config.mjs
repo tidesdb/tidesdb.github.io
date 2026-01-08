@@ -167,6 +167,9 @@ export default defineConfig({
 				},
 				{
 					label: 'Discord Community', link: 'https://discord.gg/tWEmjR66cy',
+				},
+				{
+					label: 'Sponsors', link: 'https://tidesdb.com/sponsors'
 				}
 			],
 		}),
