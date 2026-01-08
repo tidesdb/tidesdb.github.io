@@ -142,6 +142,7 @@ Interested in supporting TidesDB development?  We'd love to have you as a sponso
 
 <!-- sponsors -->
 <ul class="sponsors-list">
+<li>Bruno Schaatsbergen</li>
 <li>Your name here</li>
 <li>..</li>
 </ul>
