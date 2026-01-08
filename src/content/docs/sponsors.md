@@ -17,7 +17,7 @@ description: Meet the companies and developers sponsoring TidesDB development. L
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  border: 1px solid var(--sl-color-gray-5);
+  border: 1px solid var(--sl-color-gray-5)!important;
   border-radius: 8px;
   transition: all 0.3s ease;
   text-decoration: none;
@@ -82,11 +82,51 @@ description: Meet the companies and developers sponsoring TidesDB development. L
 .become-sponsor a:hover {
   opacity: 0.9;
 }
+
+.onetime-sponsors {
+    border: 2px solid gold !important;
+}
+
+.sponsors-list {
+    margin-left: -1.25rem;
+    width: 100%;
+    display: block;
+    float: left;
+    list-style: none;
+}
+
+.sponsors-list li {
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    padding: 1rem;
+}
+
+.become-sponsor {
+    width: 100%;
+    display: block;
+    float: left;
+}
+
 </style>
 
 
 Interested in supporting TidesDB development?  We'd love to have you as a sponsor!
 
+<!-- top tier sponsors -->
+<div class="sponsors-grid">
+  <a href="https://github.com/sponsors/guycipher" class="sponsor-card onetime-sponsors" target="_blank" rel="noopener noreferrer">
+    <div class="sponsor-placeholder">
+      Sponsor TidesDB
+    </div>
+    <div class="sponsor-name">Your Company Here</div>
+  </a>
+
+
+  <!-- we add.. -->
+</div>
+
+<hr/>
+
+<!-- midtier sponsors -->
 <div class="sponsors-grid">
   <a href="https://github.com/sponsors/guycipher" class="sponsor-card" target="_blank" rel="noopener noreferrer">
     <div class="sponsor-placeholder">
@@ -95,16 +135,20 @@ Interested in supporting TidesDB development?  We'd love to have you as a sponso
     <div class="sponsor-name">Your Company Here</div>
   </a>
 
-  <a href="https://github.com/sponsors/guycipher" class="sponsor-card" target="_blank" rel="noopener noreferrer">
-    <div class="sponsor-placeholder">
-      Sponsor TidesDB
-    </div>
-    <div class="sponsor-name">Your Name Here</div>
-  </a>
+  <!-- we add.. -->
+</div>
+
+<hr/>
+
+<!-- sponsors -->
+<ul class="sponsors-list">
+<li>Your name here</li>
+<li>..</li>
+</ul>
 
   <div class="become-sponsor">
     <h3>Become a Sponsor</h3>
     <p>Support TidesDB development and get featured here!</p><br/>
     <a class="heart-sponsor" href="https://github.com/sponsors/guycipher" target="_blank" rel="noopener noreferrer">❤️ Sponsor on GitHub</a>
   </div>
-</div>
+
