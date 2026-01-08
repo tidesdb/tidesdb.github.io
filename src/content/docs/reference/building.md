@@ -602,7 +602,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_MIN_DISK_SPACE` | Minimum free disk space required (bytes) | 104857600 (100MB) |
 | `BENCH_L1_FILE_COUNT_TRIGGER` | L1 file count trigger for compaction | 4 |
 | `BENCH_L0_QUEUE_STALL_THRESHOLD` | L0 queue stall threshold for backpressure | 10 |
-| `BENCH_MAX_OPEN_SSTABLES` | Maximum number of open SSTables | 512 |
+| `BENCH_MAX_OPEN_SSTABLES` | Maximum number of open SSTables | 256 |
 
 ### Key Distribution Patterns
 
