@@ -1067,9 +1067,7 @@ Even if flush fails after retries, data remains in WAL and is recovered on next 
 
 ## Summary
 
-TidesDB v7.1.0 under sync mode demonstrates clear architectural advantages for batched writes, large values, random access patterns, and hot key workloads. The 10x space efficiency advantage persists across all tests, making TidesDB compelling for storage-constrained deployments.
-
-RocksDB maintains advantages for sequential writes, unbatched operations, and delete-heavy workloads. Applications with batch size < 100 or heavy sequential access patterns may benefit from RocksDB.
+The latest minor has shown clear advantages over RocksDB.  The choice is really up to the application, but TidesDB is a solid choice for _most_ workloads.
 
 
 ---
