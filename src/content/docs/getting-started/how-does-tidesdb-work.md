@@ -616,7 +616,7 @@ Four worker pools handle asynchronous operations:
 
 **Sync worker** (1 thread) periodically fsyncs write-ahead logs for column families configured with interval sync mode. It scans all column families, finds the minimum sync interval, sleeps for that duration, and fsyncs all WALs.  This is only run if **any** of the column families during start up are configured with interval sync mode.  If none are configured with interval sync mode, the sync worker is not started.
 
-**Reaper worker** (1 thread) closes unused SSTable file handles when the open file count exceeds the limit (configurable, default 512). It sorts SSTables by last access time (updated atomically on each SSTable open, not on every read) and closes the oldest 25%. With more SSTables than the limit, the reaper runs continuously, causing file descriptor thrashing.
+**Reaper worker** (1 thread) closes unused SSTable file handles when the open SSTable count exceeds the limit (configurable, default 256 SSTables = 512 file descriptors). It sorts SSTables by last access time (updated atomically on each SSTable open, not on every read) and closes the oldest 25%. With more SSTables than the limit, the reaper runs continuously, causing file descriptor thrashing.
 
 ### Work Distribution
 
