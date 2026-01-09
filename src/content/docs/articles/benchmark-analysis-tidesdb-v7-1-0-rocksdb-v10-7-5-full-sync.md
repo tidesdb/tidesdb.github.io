@@ -115,7 +115,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1.0,
+      aspectRatio: 1.2,
       plugins: {
         title: {
           display: true,
