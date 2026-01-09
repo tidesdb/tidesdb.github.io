@@ -723,7 +723,7 @@ Resource utilization showed interesting patterns. TidesDB consumed 38.9% CPU ver
 
 ## Random Write Performance
 
-Random writes are the traditional weak point for LSM-trees, but TidesDB reversed expectations under sync mode: 215.8K ops/sec versus RocksDB's 176.3K ops/sec - a **1.22x advantage**. This is a significant win considering RocksDB can sometimes dominate in random write benchmarks in async mode.
+Random writes are the traditional weak point for LSM-trees, but TidesDB performed well under sync mode: 215.8K ops/sec versus RocksDB's 176.3K ops/sec - a **1.22x advantage**. This mirrors the async mode results where TidesDB also led by 1.18x.
 
 The latency distribution revealed TidesDB's superior consistency: p50 of 2849μs and p99 of 8366μs, with coefficient of variation (CV) of 42.96%. RocksDB showed higher variation in its latency profile under sync mode, suggesting less predictable write completion times.
 
