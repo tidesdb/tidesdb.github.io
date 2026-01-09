@@ -43,7 +43,7 @@ The same philosophy extends to the in-memory skip list. Traditional skip lists u
 
 The result is a system with no central bottlenecks. On a SATA SSD with 8 cores, you're bottlenecked by disk I/O, not by the database. Move to NVMe with 32 cores, and TidesDB's lock-free design lets you saturate that faster storage. Each additional core contributes directly to throughput because there are no locks waiting to be acquired, no threads blocking other threads.
 
-This is why we benchmark on lower-grade hardware. If TidesDB can outperform RocksDB on a SATA SSD, imagine what happens when you remove that I/O constraint. The architecture is ready for it. As always, benchmark for your own use case on your own hardware to determine what storage system is best for you.
+This is why we benchmark on modest hardware. If TidesDB can outperform RocksDB on a SATA SSD, imagine what happens when you remove that I/O constraint. The architecture is ready for it. Your hardware might be too; Give TidesDB a try and share your results.
 
 
 *Thanks for reading!*
