@@ -5,16 +5,16 @@ head:
   - tag: meta
     attrs:
       property: og:image
-      content: https://tidesdb.com/pexels-daniel-dan-47825192-7598913.jpg
+      content: https://tidesdb.com/pexels-erod-photos-1023772446-23439696.jpg
   - tag: meta
     attrs:
       name: twitter:image
-      content: https://tidesdb.com/pexels-daniel-dan-47825192-7598913.jpg
+      content: https://tidesdb.com/pexels-erod-photos-1023772446-23439696.jpg
 ---
 
 <div class="article-image">
 
-![Why We Benchmark on Modest Hardware](/pexels-daniel-dan-47825192-7598913.jpg)
+![Why We Benchmark on Modest Hardware](/pexels-erod-photos-1023772446-23439696.jpg)
 
 </div>
 
@@ -30,9 +30,9 @@ If you have been following the TidesDB benchmarks published regularly, you may h
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 24.04 LTS
 
-Across all benchmarks you'll see the same hardware. We use identical hardware, data, configurations, and operations to ensure fair comparison. So why use lower-grade hardware? The reason is rather simple, we want to establish a baseline.
+Across all benchmarks you'll see the same hardware. We use identical hardware to ensure fair comparison. So why use modest hardware? The reason is rather simple, we want to establish a baseline.
 
-TidesDB is multiplatform, with CI testing across 15+ platform configurations including Linux, macOS, Windows (MSVC and MinGW), FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, OmniOS (Illumos), and PowerPC. By benchmarking on modest hardware, we can show how the system performs relative to the industry standard RocksDB under constrained conditions. If TidesDB performs well on lower-grade hardware, it will perform even better on modern hardware. This has been demonstrated across our benchmarks consistently.
+TidesDB is multiplatform, with CI testing across 15+ platform configurations including Linux, macOS, Windows (MSVC and MinGW), FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, OmniOS (Illumos), and PowerPC. By benchmarking on modest hardware, we can show how the system performs relative to the industry standard RocksDB under constrained conditions. If TidesDB performs well on modest hardware, it will perform even better on modern hardware. This has been demonstrated across our benchmarks consistently.
 
 
 The question that naturally follows is "Why does TidesDB scale so well when you throw better hardware at it?" The answer lies in the architecture. TidesDB's core data structures are designed from the ground up for lock-free concurrency, which means performance scales linearly as you add CPU cores and faster storage.
