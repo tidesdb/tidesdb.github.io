@@ -61,6 +61,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_MEMORY_LIMIT` | `-9` | Operation would exceed memory limits (safety check to prevent OOM) |
 | `TDB_ERR_INVALID_DB` | `-10` | Database handle is invalid (e.g., after close) |
 | `TDB_ERR_UNKNOWN` | `-11` | Unknown or unspecified error |
+| `TDB_ERR_LOCKED` | `-12` | Database is locked by another process |
 
 **Error categories**
 - `TDB_ERR_CORRUPTION` indicates data integrity issues requiring immediate attention

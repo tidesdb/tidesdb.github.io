@@ -676,6 +676,11 @@ input[type="select"]:focus, select:focus {
 	pointer-events: none;
 }
 
+canvas {
+	padding: 0!important;
+	margin: 0!important;
+}
+
 .article-image img {
 	width: 100%;
 	height: 100%;
