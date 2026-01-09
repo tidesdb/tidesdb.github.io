@@ -1077,6 +1077,11 @@ Even if flush fails after retries, data remains in WAL and is recovered on next 
 The latest minor has shown clear advantages over RocksDB.  The choice is really up to the application, but TidesDB is a solid choice for _most_ workloads.
 
 
+*Thanks for reading!*
+
 ---
 
-*Thanks for reading!*
+- GitHub · https://github.com/tidesdb/tidesdb
+- Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
+
+Join the TidesDB Discord for more updates and discussions at https://discord.gg/tWEmjR66cy

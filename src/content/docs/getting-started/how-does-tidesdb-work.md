@@ -457,7 +457,7 @@ Where:
 4.  For each level `i`, apply the formula to calculate the new capacity (`C_i`), with a minimum floor of `write_buffer_size`.
 5.  Update the `capacity` property for that level with the newly calculated value.
 
-This adaptive approach ensures that level capacities remain proportional to the real-world size of data at the bottom of the tree. As the database grows or shrinks, DCA automatically adjusts capacities to maintain optimal compaction timing—preventing both over-provisioned capacities (which cause high read amplification) and under-provisioned capacities (which cause excessive compaction and high write amplification).
+This adaptive approach ensures that level capacities remain proportional to the real-world size of data at the bottom of the tree. As the database grows or shrinks, DCA automatically adjusts capacities to maintain optimal compaction timing - preventing both over-provisioned capacities (which cause high read amplification) and under-provisioned capacities (which cause excessive compaction and high write amplification).
 
 #### Level Addition
 
@@ -535,7 +535,7 @@ All three merge policies share a common merge execution path with slight variati
 
 8.  **Update manifest**
     *   The new SSTables are committed to the manifest file, which tracks which SSTables belong to which levels.
-    *   This operation is atomic—the manifest file is updated in a single write and fsync.
+    *   This operation is atomic - the manifest file is updated in a single write and fsync.
 
 9.  **Delete old SSTables**
     *   The old SSTables from the source and target levels are marked for deletion.
@@ -560,7 +560,7 @@ Large values (those exceeding the value log threshold) flow through compaction r
 *   It writes the recompressed value to the destination value log.
 *   This allows compression settings to evolve over time without requiring a full database rebuild.
 
-TidesDB's compaction is a sophisticated, multi-faceted algorithm that employs three distinct merge policies—full preemptive merge, dividing merge, and partitioned merge—each optimized for different scenarios within the LSM-tree lifecycle. These policies work in concert with Dynamic Capacity Adaptation (DCA) to automatically scale the tree structure up or down as data volume changes.
+TidesDB's compaction is a sophisticated, multi-faceted algorithm that employs three distinct merge policies - full preemptive merge, dividing merge, and partitioned merge - each optimized for different scenarios within the LSM-tree lifecycle. These policies work in concert with Dynamic Capacity Adaptation (DCA) to automatically scale the tree structure up or down as data volume changes.
 
 The system intelligently selects the appropriate merge strategy based on concrete triggers: when the target level equals the dividing level X, it performs a dividing merge; when a level before X cannot accommodate cumulative data, it performs a full preemptive merge; and after the initial merge, if level X remains full, it performs a partitioned merge as a secondary cleanup phase. The dividing level itself is calculated using a simple formula (`num_levels - 1 - dividing_level_offset`) rather than being inferred from complex bottleneck analysis.
 
@@ -691,7 +691,7 @@ The default 1% false positive rate balances memory usage and effectiveness. Lowe
 
 Larger memtables reduce flush frequency but increase recovery time and memory usage. Smaller memtables flush more often (more SSTables, more compaction) but recover faster. The default size is 64MB, which holds roughly 1M small key-value pairs and flushes every few seconds under moderate write load.
 
-**Configuration interaction** · Increasing memtable size to 128MB reduces flush frequency by 2× but also increases L0→L1 write amplification because each flush produces a larger SSTable that takes longer to merge. The optimal size depends on write rate and acceptable recovery time.
+**Configuration interaction** · Increasing memtable size to 128MB reduces flush frequency by 2× but also increases L0->L1 write amplification because each flush produces a larger SSTable that takes longer to merge. The optimal size depends on write rate and acceptable recovery time.
 
 ### Worker Thread Counts
 
