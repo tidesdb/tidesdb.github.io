@@ -59,7 +59,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 
 ## Performance Overview
 
-<div style="max-width: 900px; margin: 40px auto;">
+<div class="chart-container" style="max-width: 900px; margin: 40px auto;">
   <canvas id="radarChart"></canvas>
 </div>
 
@@ -70,10 +70,11 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
   
   const isDarkMode = document.documentElement.classList.contains('dark') || 
                      window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)';
+  const gridColor = isDarkMode ? 'rgba(59, 130, 246, 0.3)' : 'rgba(213, 218, 241, 0.8)';
   
   new Chart(ctx, {
     type: 'radar',
+  
     data: {
       labels: [
         'Sequential Write',
@@ -88,7 +89,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       datasets: [{
         label: 'TidesDB v7.1.0',
         data: [239.0, 215.8, 3460, 58.2, 218.6, 4410, 259.2, 532.0],
-        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        backgroundColor: 'rgba(246, 81, 59, 0.2)',
         borderColor: 'rgba(59, 130, 246, 1)',
         borderWidth: 3,
         pointBackgroundColor: 'rgba(59, 130, 246, 1)',
@@ -114,7 +115,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1.2,
+      aspectRatio: 1.0,
       plugins: {
         title: {
           display: true,
@@ -136,7 +137,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
             color: '#88a0c7ff',
             padding: 20,
             usePointStyle: true,
-            pointStyle: 'circle'
+            pointStyle: 'circle',
           }
         },
         tooltip: {
@@ -193,7 +194,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 })();
 </script>
 
-<div style="max-width: 1200px; margin: 60px auto;">
+<div class="chart-container" style="max-width: 1200px; margin: 60px auto;">
   <canvas id="ratioChart"></canvas>
 </div>
 
@@ -358,11 +359,11 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 })();
 </script>
 
-<div style="max-width: 450px; margin: 60px auto;">
+<div class="chart-container" style="max-width: 450px; margin: 60px auto;">
   <canvas id="summaryChart"></canvas>
 </div>
 
-<div style="max-width: 450px; margin: 60px auto;">
+<div class="chart-container" style="max-width: 450px; margin: 60px auto;">
   <canvas id="spaceComparisonChart"></canvas>
 </div>
 
@@ -520,7 +521,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 })();
 </script>
 
-<div style="max-width: 1200px; margin: 60px auto;">
+<div class="chart-container" style="max-width: 1200px; margin: 60px auto;">
   <canvas id="mixedChart"></canvas>
 </div>
 
