@@ -97,6 +97,7 @@ description: Meet the companies and developers sponsoring TidesDB development. L
 
 .sponsors-list li {
     border-bottom: 1px solid rgba(0,0,0,0.07);
+    font-weight: 600;
     padding: 1rem;
 }
 
