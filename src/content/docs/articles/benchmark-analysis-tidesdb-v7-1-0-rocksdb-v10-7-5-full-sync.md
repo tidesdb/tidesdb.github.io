@@ -376,7 +376,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
     data: {
       labels: ['TidesDB Wins', 'RocksDB Wins', 'Tie'],
       datasets: [{
-        data: [8, 5, 0],
+        data: [9, 4, 0],
         backgroundColor: [
           'rgba(34, 197, 94, 0.8)',
           'rgba(239, 68, 68, 0.8)',
