@@ -146,7 +146,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
-						{ label: 'TidesDB 7 vs RocksDB 10 Under Sync Mode', slug: 'articles/benchmark-analysis-tidesdb-v7-1-0-rocksdb-v10-7-7-full-sync' },
+						{ label: 'TidesDB 7 vs RocksDB 10 Under Sync Mode', slug: 'articles/benchmark-analysis-tidesdb-v7-1-0-rocksdb-v10-7-5-full-sync' },
 						{ label: '1GB Value Observations TidesDB 7 & RocksDB 10', slug: 'articles/1gb-values-rocksdb10-tidesdb7' },
 						{ label: 'Comparative Analysis of TidesDB v7.0.7 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb-v7-0-7-rocksdb-v10-7-5' },
 						{ label: 'Using TidesDB with Java via JExtract', slug: 'articles/using-tidesdb-with-java-via-jextract' },
