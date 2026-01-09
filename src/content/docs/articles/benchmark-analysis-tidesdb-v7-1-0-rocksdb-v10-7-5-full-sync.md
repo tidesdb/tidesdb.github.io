@@ -1322,7 +1322,7 @@ The latest minor has shown clear advantages over RocksDB.  The choice is really 
 *Thanks for reading!*
 
 ---
-_Special thanks you @KevBurnsJr on Reddit for the feedback on the graphing_
+_Special thanks you @KevBurnsJr on Reddit and @lucamuscat for the feedback on the graphing_
 
 - GitHub · https://github.com/tidesdb/tidesdb
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
