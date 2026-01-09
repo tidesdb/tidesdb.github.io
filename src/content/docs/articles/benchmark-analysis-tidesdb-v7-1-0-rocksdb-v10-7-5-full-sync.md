@@ -25,7 +25,7 @@ head:
 
 *published on January 8th, 2026*
 
-In this article we will compare TidesDB v7.1.0 with RocksDB v10.7.5 under sync mode enabled, essentially testing durable writes that guarantee data persistence on disk. This represents a more critical benchmark for production systems where data loss is unacceptable.
+A question that comes up often I see online and in the community is, "How do these engines like TidesDB or RocksDB perform under full sync?", thus in this article we will compare TidesDB against RocksDB with full sync mode enabled, essentially testing durable writes that guarantee data persistence on disk. This represents a more critical benchmark for production systems where data loss is unacceptable.
 
 Unlike our previous benchmarks with sync disabled, these tests measure real-world performance under the constraint of durability. Every write operation must reach stable storage before acknowledging completion. This creates a fundamentally different performance profile where I/O characteristics dominate over CPU efficiency.
 
