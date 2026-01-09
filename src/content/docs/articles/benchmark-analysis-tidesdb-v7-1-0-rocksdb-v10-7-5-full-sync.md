@@ -39,7 +39,7 @@ All benchmarks were executed with _sync mode enabled_ to measure performance und
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
 - 48GB DDR4
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
-- Ubuntu 24
+- Ubuntu 24.04 LTS
 
 **Software Versions**
 - **TidesDB v7.1.0**
@@ -236,7 +236,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
     0.89,  // Sequential Write
     0.89,  // Delete
     0.82,  // Mixed Write
-    1.60   // Zipfian Write
+    0.85   // Zipfian Write
   ];
   
   const colors = ratios.map(r => 
@@ -376,7 +376,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
     data: {
       labels: ['TidesDB Wins', 'RocksDB Wins', 'Tie'],
       datasets: [{
-        data: [9, 4, 0],
+        data: [8, 5, 0],
         backgroundColor: [
           'rgba(34, 197, 94, 0.8)',
           'rgba(239, 68, 68, 0.8)',
@@ -723,7 +723,7 @@ Resource utilization showed interesting patterns. TidesDB consumed 38.9% CPU ver
 
 ## Random Write Performance
 
-Random writes are the traditional weak point for LSM-trees, but TidesDB reversed expectations under sync mode: 215.8K ops/sec versus RocksDB's 176.3K ops/sec - a **1.22x advantage**. This is a significant win considering RocksDB typically dominates random write benchmarks in async mode.
+Random writes are the traditional weak point for LSM-trees, but TidesDB reversed expectations under sync mode: 215.8K ops/sec versus RocksDB's 176.3K ops/sec - a **1.22x advantage**. This is a significant win considering RocksDB can sometimes dominate in random write benchmarks in async mode.
 
 The latency distribution revealed TidesDB's superior consistency: p50 of 2849μs and p99 of 8366μs, with coefficient of variation (CV) of 42.96%. RocksDB showed higher variation in its latency profile under sync mode, suggesting less predictable write completion times.
 
@@ -769,7 +769,7 @@ Delete operations showed RocksDB at 199.9K ops/sec versus TidesDB's 177.5K ops/s
 
 The p99 latency outlier for TidesDB suggests occasional write stalls during delete-heavy workloads under sync mode. This is likely due to compaction triggering during delete operations, creating temporary throughput degradation. The coefficient of variation supports this (106.32% for TidesDB vs 52.29% for RocksDB).
 
-Write amplification for deletes favored TidesDB (0.38x vs 0.23x), indicating fewer bytes written per delete operation. This seems counterintuitive given the throughput disadvantage, but it reflects TidesDB's delete tombstone handling - fewer immediate writes with deferred compaction cleanup.
+Write amplification for deletes showed TidesDB at 0.38x versus RocksDB's 0.23x, indicating RocksDB wrote fewer bytes per delete operation. This seems counterintuitive given the throughput disadvantage, but it reflects TidesDB's delete tombstone handling - fewer immediate writes with deferred compaction cleanup.
 
 Database size after deletes showed TidesDB at 0.89 MB versus RocksDB's 1.71 MB, suggesting TidesDB's compaction eventually reclaims more space from tombstones. Memory usage was comparable (25.45 MB vs 22.86 MB RSS).
 
@@ -869,7 +869,7 @@ Virtual memory allocation showed dramatic differences (TidesDB ~594 MB vs RocksD
 
 ## Iteration Performance
 
-Full iteration throughput favored TidesDB in most scenarios:
+Full iteration throughput showed mixed results, with TidesDB excelling in Zipfian workloads:
 - Sequential writes · 7.06M ops/sec vs 9.81M ops/sec (0.72x)
 - Random writes · 5.54M ops/sec vs 7.12M ops/sec (0.78x)
 - Random reads · 7.70M ops/sec vs 7.39M ops/sec (1.04x)
@@ -995,21 +995,21 @@ for (int q = 1; q <= X && q < num_levels; q++) {
     }
 }
 
-/* three merge strategies based on target level */
-if (target_lvl < X)
-    tidesdb_full_preemptive_merge(cf, 0, target_lvl - 1);
-else if (target_lvl == X)
-    tidesdb_dividing_merge(cf, X - 1);  /* partitioned by largest level boundaries */
+/* three merge strategies based on trigger condition */
+if (l1_sstable_count >= l1_threshold)
+    tidesdb_dividing_merge(cf, X);  /* L1 accumulation triggers dividing merge */
+else if (target_lvl < X)
+    tidesdb_partitioned_merge(cf, target_lvl, X);  /* before X triggers partitioned merge */
 else
-    tidesdb_partitioned_merge(cf, X, z);
+    tidesdb_full_preemptive_merge(cf, target_lvl, target_lvl + 1);  /* at/beyond X triggers full preemptive */
 ```
 
 Dynamic Capacity Adaptation (DCA) · adjusts level capacities based on actual data distribution:
 
 ```c
-/* C[i] = N_L / T^(L-1-i) where N_L = largest level size, T = size ratio */
+/* C[i] = N_L / T^(L-i) where N_L = largest level size, T = size ratio */
 for (int i = 0; i < num_levels - 1; i++) {
-    size_t new_capacity = N_L / pow(level_size_ratio, num_levels - 1 - i);
+    size_t new_capacity = N_L / pow(level_size_ratio, num_levels - i);
     atomic_store(&cf->levels[i]->capacity, new_capacity);
 }
 ```
