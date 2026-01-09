@@ -681,6 +681,17 @@ canvas {
 	margin: 0!important;
 }
 
+/* Chart containers - light transparent background in dark mode */
+:root .chart-container {
+	background: rgba(255, 255, 255, 0.08);
+	border-radius: 12px;
+	padding: 1rem;
+}
+
+:root[data-theme='light'] .chart-container {
+	background: transparent;
+}
+
 .article-image img {
 	width: 100%;
 	height: 100%;
