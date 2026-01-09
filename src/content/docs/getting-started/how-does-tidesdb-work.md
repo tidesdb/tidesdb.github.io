@@ -695,6 +695,12 @@ The default configuration uses 2 flush workers and 2 compaction workers to enabl
 
 ## Operational Considerations
 
+### Concurrency and Process Safety
+
+TidesDB database instances are multi-thread safe and single-process exclusive.
+
+Multiprocess safety · Only one process can open a database directory at a time. The system acquires an exclusive file lock on a lock file named `LOCK` within the database directory during `tidesdb_open()`. The lock is non-blocking - if another process holds the lock, `tidesdb_open()` returns `TDB_ERR_LOCKED` immediately rather than waiting. The implementation uses platform-specific locking primitives: `fcntl()` F_SETLK on macOS/BSD (chosen over `flock()` because fcntl locks are not inherited across `fork()`, preventing child processes from inheriting the parent's lock), `flock()` on older systems without F_OFD_SETLK, and F_OFD_SETLK on Linux 3.15+ for per-file-descriptor semantics. On macOS/BSD, the system additionally writes the owning process's PID to the lock file after acquiring the lock, enabling detection of same-process double-open attempts (since fcntl allows the same process to re-acquire its own lock). The lock is released and the PID cleared during `tidesdb_close()`. On Windows, the system uses `LockFileEx()` with `LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY` for equivalent non-blocking exclusive locking. 
+
 ### Memory Footprint
 
 Per column family:
