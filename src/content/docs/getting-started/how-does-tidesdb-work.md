@@ -622,9 +622,17 @@ Four worker pools handle asynchronous operations:
 
 The database maintains two global work queues: one for flush operations, one for compaction operations. Each work item identifies the target column family. When a memtable exceeds its size threshold, the system enqueues a flush work item containing the column family pointer and immutable memtable. When a level exceeds capacity, it enqueues a compaction work item with the column family and level range.
 
-Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously - worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags to prevent concurrent operations on the same structure: only one flush can run per column family at a time, and only one compaction per column family at a time.
+Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously - worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags (`is_flushing`, `is_compacting`) with compare-and-swap to prevent concurrent operations on the same structure: **only one flush can run per column family at a time**, and **only one compaction per column family at a time**.
 
-This design enables parallelism across column families while avoiding conflicts within a single column family. With N column families and 2 flush workers, flush latency is roughly N/2 × flush_time. The global queue provides natural load balancing - whichever worker finishes first picks up the next item, regardless of which column family it belongs to.
+**Parallelism semantics:**
+- **Cross-CF parallelism** · Multiple flush/compaction workers CAN process different column families in parallel
+- **Within-CF serialization** · A single column family can only have one flush and one compaction running at any time
+- **No intra-CF memtable parallelism** · Even if a CF has multiple immutable memtables queued, they are flushed sequentially (one at a time)
+
+**Thread pool sizing guidance:**
+- **Single column family** · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
+- **Multiple column families** · Set thread counts up to the number of column families. With N column families and M flush workers (where M ≤ N), flush latency is roughly N/M × flush_time. The global queue provides natural load balancing.
+- **Mixed workloads** · If some CFs are write-heavy and others read-heavy, the thread pool automatically prioritizes work from active CFs.
 
 Workers coordinate through thread-safe queues and atomic flags. The main thread enqueues work and returns immediately. Workers process work asynchronously, allowing high write throughput.
 
