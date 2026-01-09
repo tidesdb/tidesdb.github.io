@@ -13,6 +13,7 @@ head:
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-error-bars@4.4.0/build/index.umd.min.js"></script>
 
 <div class="article-image">
 
@@ -777,6 +778,156 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
           ticks: {
             font: {
               size: 12
+            },
+            color: '#b4bfd8ff'
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+
+<div class="chart-container" style="max-width: 1000px; margin: 60px auto;">
+  <canvas id="latencyErrorChart"></canvas>
+</div>
+
+<script>
+(function() {
+  const ctx = document.getElementById('latencyErrorChart');
+  if (!ctx) return;
+  
+  const isDarkMode = document.documentElement.classList.contains('dark') || 
+                     window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  
+  // Workloads for latency comparison
+  const workloads = [
+    'Sequential Write',
+    'Random Write',
+    'Large Value (4KB)',
+    'Small Value (64B)',
+    'Delete',
+    'Batch=1000 Write'
+  ];
+  
+  // Average latency in μs from benchmark results
+  const tidesdbAvg = [3248.41, 3568.94, 13080.32, 3555.08, 4282.89, 1473.11];
+  const rocksdbAvg = [3311.75, 4520.56, 15960.92, 4520.56, 3856.47, 2579.15];
+  
+  // Stddev in μs from benchmark results
+  const tidesdbStddev = [3490.54, 1533.08, 2443.65, 1610.88, 4551.84, 253.58];
+  const rocksdbStddev = [2048.19, 2794.03, 21042.76, 2203.06, 2017.54, 1153.00];
+  
+  // Build data with error bars using chartjs-chart-error-bars format
+  const tidesdbDataWithErrors = tidesdbAvg.map((val, i) => ({
+    y: val,
+    yMin: Math.max(0, val - tidesdbStddev[i]),
+    yMax: val + tidesdbStddev[i]
+  }));
+  
+  const rocksdbDataWithErrors = rocksdbAvg.map((val, i) => ({
+    y: val,
+    yMin: Math.max(0, val - rocksdbStddev[i]),
+    yMax: val + rocksdbStddev[i]
+  }));
+  
+  new Chart(ctx, {
+    type: 'barWithErrorBars',
+    data: {
+      labels: workloads,
+      datasets: [{
+        label: 'TidesDB v7.1.0 Avg Latency (μs)',
+        data: tidesdbDataWithErrors,
+        backgroundColor: 'rgba(174, 199, 232, 0.85)',
+        borderColor: 'rgba(174, 199, 232, 1)',
+        borderWidth: 2,
+        errorBarColor: 'rgba(55, 71, 133, 1)',
+        errorBarWhiskerColor: 'rgba(55, 71, 133, 1)',
+        errorBarLineWidth: 3,
+        errorBarWhiskerLineWidth: 3,
+        errorBarWhiskerSize: 10
+      }, {
+        label: 'RocksDB v10.7.5 Avg Latency (μs)',
+        data: rocksdbDataWithErrors,
+        backgroundColor: 'rgba(255, 187, 120, 0.85)',
+        borderColor: 'rgba(255, 187, 120, 1)',
+        borderWidth: 2,
+        errorBarColor: 'rgba(180, 60, 50, 1)',
+        errorBarWhiskerColor: 'rgba(180, 60, 50, 1)',
+        errorBarLineWidth: 3,
+        errorBarWhiskerLineWidth: 3,
+        errorBarWhiskerSize: 10
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.4,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Write Latency with Standard Deviation',
+          font: {
+            size: 20,
+            weight: 'bold'
+          },
+          color: '#b4bfd8ff',
+          padding: 20
+        },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            font: {
+              size: 14
+            },
+            color: '#88a0c7ff',
+            padding: 20,
+            usePointStyle: true,
+            pointStyle: 'rect'
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const data = context.raw;
+              const stddev = data.yMax - data.y;
+              return context.dataset.label.replace(' Avg Latency (μs)', '') + 
+                     ': ' + data.y.toFixed(0) + ' ± ' + stddev.toFixed(0) + ' μs';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: gridColor
+          },
+          ticks: {
+            font: {
+              size: 11
+            },
+            color: '#b4bfd8ff'
+          }
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Latency (μs) · Error bars show ±1 stddev',
+            font: {
+              size: 14,
+              weight: 'bold'
+            },
+            color: '#b4bfd8ff'
+          },
+          grid: {
+            color: gridColor
+          },
+          ticks: {
+            callback: function(value) {
+              return value.toLocaleString() + ' μs';
             },
             color: '#b4bfd8ff'
           }
