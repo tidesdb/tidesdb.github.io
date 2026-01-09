@@ -194,7 +194,7 @@ tidesdb_column_family_config_t cf_config = {
     .write_buffer_size = 128 * 1024 * 1024,     /* 128MB memtable flush threshold */
     .level_size_ratio = 10,                     /* Level size multiplier (default: 10) */
     .min_levels = 5,                            /* Minimum LSM levels (default: 5) */
-    .dividing_level_offset = 1,                 /* Compaction dividing level offset (default: 1) */
+    .dividing_level_offset = 2,                 /* Compaction dividing level offset (default: 2) */
     .skip_list_max_level = 12,                  /* Skip list max level */
     .skip_list_probability = 0.25f,             /* Skip list probability */
     .compression_algorithm = LZ4_COMPRESSION,   /* LZ4_COMPRESSION, SNAPPY_COMPRESSION, or ZSTD_COMPRESSION */
@@ -1034,40 +1034,34 @@ See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction
 
 ## Thread Pools
 
+TidesDB uses separate thread pools for flush and compaction operations. Understanding the parallelism model is important for optimal configuration.
+
+**Parallelism semantics:**
+- **Cross-CF parallelism** · Multiple flush/compaction workers CAN process different column families in parallel
+- **Within-CF serialization** · A single column family can only have one flush and one compaction running at any time (enforced by atomic `is_flushing` and `is_compacting` flags)
+- **No intra-CF memtable parallelism** · Even if a CF has multiple immutable memtables queued, they are flushed sequentially
+
+**Thread pool sizing guidance:**
+- **Single column family** · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
+- **Multiple column families** · Set thread counts up to the number of column families for maximum parallelism. With N column families and M workers (where M ≤ N), throughput scales linearly.
+
 **Configuration**
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 2,                /* 4 threads for flush operations (default: 2) */
-    .num_compaction_threads = 2,           /* 8 threads for compaction (default: 2) */
-    .log_level = TDB_LOG_INFO,             /* Log level */
-    .block_cache_size = 64 * 1024 * 1024,  /* 64MB block cache */
-    .max_open_sstables = 100,              /* Max open SSTables */
+    .num_flush_threads = 2,                /* Flush thread pool size (default: 2) */
+    .num_compaction_threads = 2,           /* Compaction thread pool size (default: 2) */
+    .log_level = TDB_LOG_INFO,
+    .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
+    .max_open_sstables = 256,              /* LRU cache for SSTable objects (default: 256, each has 2 FDs) */
 };
 
 tidesdb_t *db = NULL;
 tidesdb_open(&config, &db);
 ```
-
-See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and tuning.
 
 :::note
-`max_open_sstables` is a **storage-engine-level** configuration, not a column family configuration. It controls the LRU cache size for SSTable structures. It's set in `tidesdb_config_t` when opening TidesDB.
+`max_open_sstables` is a **storage-engine-level** configuration, not a column family configuration. It controls the LRU cache size for SSTable structures. Each SSTable uses 2 file descriptors (klog + vlog), so 256 SSTables = 512 file descriptors.
 :::
 
-**Configuration**
-```c
-tidesdb_config_t config = {
-    .db_path = "./mydb",
-    .num_flush_threads = 2,
-    .num_compaction_threads = 2,
-    .log_level = TDB_LOG_INFO,
-    .block_cache_size = 128 * 1024 * 1024,  /* 128MB global block cache (default: 64MB) */
-    .max_open_sstables = 100,               /* LRU cache for 100 SSTable objects (each SSTable has x2 file descriptors for it's klog and vlog files) (default: 256) */
-};
-
-tidesdb_t *db = NULL;
-tidesdb_open(&config, &db);
-```
-
-See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#8-concurrency-and-thread-safety) for detailed concurrency model and thread safety information.
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and work distribution.
