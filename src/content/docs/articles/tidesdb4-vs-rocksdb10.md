@@ -1,6 +1,6 @@
 ---
-title: "TidesDB vs RocksDB: Performance Benchmarks"
-description: "Comprehensive performance benchmarks comparing TidesDB v4.0.0 and RocksDB storage engines."
+title: "TidesDB 4 vs RocksDB 10 Performance Analysis"
+description: "Comprehensive performance analysis comparing TidesDB 4 and RocksDB 10 storage engines."
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -8,6 +8,7 @@ description: "Comprehensive performance benchmarks comparing TidesDB v4.0.0 and 
 *by Alex Gaetano Padula*
 
 *published on November 17th, 2025*
+*updated on January 9th, 2026*
 
 <div class="historic">
 <span>!</span>

@@ -59,67 +59,67 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 
 ## Performance Overview
 
-<div class="chart-container" style="max-width: 900px; margin: 40px auto;">
-  <canvas id="radarChart"></canvas>
+<div class="chart-container" style="max-width: 1000px; margin: 40px auto;">
+  <canvas id="throughputChart"></canvas>
 </div>
 
 <script>
 (function() {
-  const ctx = document.getElementById('radarChart');
+  const ctx = document.getElementById('throughputChart');
   if (!ctx) return;
   
   const isDarkMode = document.documentElement.classList.contains('dark') || 
                      window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridColor = isDarkMode ? 'rgba(59, 130, 246, 0.3)' : 'rgba(213, 218, 241, 0.8)';
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  
+  const workloads = [
+    'Random Seek',
+    'Random Read',
+    'Batch Write (1000)',
+    'Range Query (100)',
+    'Sequential Write',
+    'Small Value (64B)',
+    'Random Write',
+    'Zipfian Read',
+    'Mixed Read',
+    'Delete',
+    'Zipfian Write',
+    'Mixed Write',
+    'Large Value (4KB)'
+  ];
+  
+  // TidesDB throughput in K ops/sec
+  const tidesdbData = [4412, 3456, 532, 259, 239, 219, 216, 195, 164, 178, 182, 164, 58.2];
+  // RocksDB throughput in K ops/sec  
+  const rocksdbData = [2755, 3222, 309, 216, 267, 180, 176, 173, 134, 200, 215, 200, 18.7];
   
   new Chart(ctx, {
-    type: 'radar',
-  
+    type: 'bar',
     data: {
-      labels: [
-        'Sequential Write',
-        'Random Write',
-        'Random Read',
-        'Large Value Write',
-        'Small Value Write',
-        'Random Seek',
-        'Range Query',
-        'Batch Write (1000)'
-      ],
+      labels: workloads,
       datasets: [{
         label: 'TidesDB v7.1.0',
-        data: [239.0, 215.8, 3460, 58.2, 218.6, 4410, 259.2, 532.0],
-        backgroundColor: 'rgba(246, 81, 59, 0.2)',
+        data: tidesdbData,
+        backgroundColor: 'rgba(59, 130, 246, 0.8)',
         borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 3,
-        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-        pointBorderColor: '#fff',
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
-        pointRadius: 5,
-        pointHoverRadius: 7
+        borderWidth: 1
       }, {
         label: 'RocksDB v10.7.5',
-        data: [267.4, 176.3, 3220, 18.7, 180.1, 2750, 215.7, 308.9],
-        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        data: rocksdbData,
+        backgroundColor: 'rgba(239, 68, 68, 0.8)',
         borderColor: 'rgba(239, 68, 68, 1)',
-        borderWidth: 3,
-        pointBackgroundColor: 'rgba(239, 68, 68, 1)',
-        pointBorderColor: '#fff',
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgba(239, 68, 68, 1)',
-        pointRadius: 5,
-        pointHoverRadius: 7
+        borderWidth: 1
       }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1.2,
+      aspectRatio: 1.0,
       plugins: {
         title: {
           display: true,
-          text: 'Performance Profile Comparison (K ops/sec)',
+          text: 'Throughput Comparison by Workload',
           font: {
             size: 20,
             weight: 'bold'
@@ -137,53 +137,53 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
             color: '#88a0c7ff',
             padding: 20,
             usePointStyle: true,
-            pointStyle: 'circle',
+            pointStyle: 'rect'
           }
         },
         tooltip: {
           callbacks: {
             label: function(context) {
-              let label = context.dataset.label || '';
-              if (label) {
-                label += ': ';
-              }
-              const value = context.parsed.r;
+              const value = context.parsed.x;
               if (value >= 1000) {
-                label += (value / 1000).toFixed(2) + 'M ops/sec';
-              } else {
-                label += value.toFixed(1) + 'K ops/sec';
+                return context.dataset.label + ': ' + (value / 1000).toFixed(2) + 'M ops/sec';
               }
-              return label;
+              return context.dataset.label + ': ' + value.toFixed(1) + 'K ops/sec';
             }
           }
         }
       },
       scales: {
-        r: {
+        x: {
           beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Throughput (K ops/sec)',
+            font: {
+              size: 14,
+              weight: 'bold'
+            },
+            color: '#b4bfd8ff'
+          },
           grid: {
             color: gridColor
           },
-          angleLines: {
+          ticks: {
+            callback: function(value) {
+              if (value >= 1000) {
+                return (value / 1000).toFixed(1) + 'M';
+              }
+              return value;
+            },
+            color: '#b4bfd8ff'
+          }
+        },
+        y: {
+          grid: {
             color: gridColor
           },
           ticks: {
-            stepSize: 1000,
-            callback: function(value) {
-              if (value >= 1000) {
-                return (value / 1000).toFixed(0) + 'M';
-              }
-              return value + 'K';
-            },
             font: {
-              size: 11
-            },
-            //color: '#b4bfd8ff'
-          },
-          pointLabels: {
-            font: {
-              size: 12,
-              weight: '600'
+              size: 12
             },
             color: '#b4bfd8ff'
           }
@@ -359,168 +359,6 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 })();
 </script>
 
-<div class="chart-container" style="max-width: 450px; margin: 60px auto;">
-  <canvas id="summaryChart"></canvas>
-</div>
-
-<div class="chart-container" style="max-width: 450px; margin: 60px auto;">
-  <canvas id="spaceComparisonChart"></canvas>
-</div>
-
-<script>
-(function() {
-  const ctx = document.getElementById('summaryChart');
-  if (!ctx) return;
-  
-  new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['TidesDB Wins', 'RocksDB Wins', 'Tie'],
-      datasets: [{
-        data: [9, 4, 0],
-        backgroundColor: [
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(156, 163, 175, 0.8)'
-        ],
-        borderColor: [
-          'rgba(34, 197, 94, 1)',
-          'rgba(239, 68, 68, 1)',
-          'rgba(156, 163, 175, 1)'
-        ],
-        borderWidth: 3
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1,
-      plugins: {
-        title: {
-          display: true,
-          text: 'Overall Performance Summary',
-          font: {
-            size: 18,
-            weight: 'bold'
-          },
-          color: '#b4bfd8ff',
-          padding: {
-            top: 10,
-            bottom: 20
-          }
-        },
-        legend: {
-          display: true,
-          position: 'bottom',
-          align: 'center',
-          labels: {
-            font: {
-              size: 13
-            },
-            color: '#b4bfd8ff',
-            padding: 15,
-            boxWidth: 15,
-            boxHeight: 15,
-            generateLabels: function(chart) {
-              const data = chart.data;
-              return data.labels.map((label, i) => ({
-                text: `${label}: ${data.datasets[0].data[i]} workloads`,
-                fillStyle: data.datasets[0].backgroundColor[i],
-                strokeStyle: data.datasets[0].borderColor[i],
-                lineWidth: 2,
-                hidden: false,
-                index: i,
-                fontColor: '#b4bfd8ff'
-              }));
-            }
-          }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              const total = context.dataset.data.reduce((a, b) => a + b, 0);
-              const percentage = ((context.parsed / total) * 100).toFixed(1);
-              return `${context.label}: ${context.parsed} (${percentage}%)`;
-            }
-          }
-        }
-      }
-    }
-  });
-})();
-</script>
-
-<script>
-(function() {
-  const ctx = document.getElementById('spaceComparisonChart');
-  if (!ctx) return;
-  
-  new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['TidesDB Avg DB Size', 'RocksDB Avg DB Size'],
-      datasets: [{
-        data: [1, 10],
-        backgroundColor: [
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(251, 146, 60, 0.8)'
-        ],
-        borderColor: [
-          'rgba(34, 197, 94, 1)',
-          'rgba(251, 146, 60, 1)'
-        ],
-        borderWidth: 3
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1,
-      plugins: {
-        title: {
-          display: true,
-          text: 'Space Efficiency (10x Advantage)',
-          font: {
-            size: 18,
-            weight: 'bold'
-          },
-          color: '#b4bfd8ff',
-          padding: {
-            top: 10,
-            bottom: 20
-          }
-        },
-        legend: {
-          display: true,
-          position: 'bottom',
-          align: 'center',
-          labels: {
-            font: {
-              size: 13
-            },
-            color: '#b4bfd8ff',
-            padding: 15,
-            boxWidth: 15,
-            boxHeight: 15
-          }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              if (context.dataIndex === 0) {
-                return 'TidesDB · 0.10x space amplification';
-              } else {
-                return 'RocksDB · 1.03x space amplification';
-              }
-            }
-          }
-        }
-      }
-    }
-  });
-})();
-</script>
-
 <div class="chart-container" style="max-width: 1200px; margin: 60px auto;">
   <canvas id="mixedChart"></canvas>
 </div>
@@ -537,11 +375,11 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['Sequential', 'Random', 'Large Value', 'Small Value', 'Batch=1000'],
+      labels: ['Sequential', 'Random', 'Large Value', 'Small Value'],
       datasets: [{
         type: 'bar',
         label: 'TidesDB Throughput (K ops/sec)',
-        data: [239.0, 215.8, 58.2, 218.6, 532.0],
+        data: [239.0, 215.8, 58.2, 218.6],
         backgroundColor: 'rgba(59, 130, 246, 0.7)',
         borderColor: 'rgba(59, 130, 246, 1)',
         borderWidth: 2,
@@ -549,7 +387,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       }, {
         type: 'bar',
         label: 'RocksDB Throughput (K ops/sec)',
-        data: [267.4, 176.3, 18.7, 180.1, 308.9],
+        data: [267.4, 176.3, 18.7, 180.1],
         backgroundColor: 'rgba(239, 68, 68, 0.7)',
         borderColor: 'rgba(239, 68, 68, 1)',
         borderWidth: 2,
@@ -557,7 +395,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       }, {
         type: 'line',
         label: 'TidesDB p99 Latency (μs)',
-        data: [4304, 8366, 18165, 7712, null],
+        data: [4304, 8366, 18165, 7712],
         borderColor: 'rgba(168, 85, 247, 1)',
         backgroundColor: 'rgba(168, 85, 247, 0.1)',
         borderWidth: 3,
@@ -568,7 +406,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       }, {
         type: 'line',
         label: 'RocksDB p99 Latency (μs)',
-        data: [4165, 7980, 54921, 7980, null],
+        data: [4165, 7980, 54921, 7980],
         borderColor: 'rgba(236, 72, 153, 1)',
         backgroundColor: 'rgba(236, 72, 153, 0.1)',
         borderWidth: 3,
@@ -651,24 +489,28 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
           }
         },
         y1: {
-          type: 'logarithmic',
+          type: 'linear',
           display: true,
           position: 'right',
+          min: 0,
+          max: 60000,
           title: {
             display: true,
-            text: 'p99 Latency (μs, log scale)',
+            text: 'p99 Latency (μs)',
             font: {
               size: 14,
               weight: 'bold'
             },
-            color: '#b4bfd8ff'
+            color: '#b4bfd8ff',
+            rotation: 270
           },
           grid: {
             drawOnChartArea: false
           },
           ticks: {
+            stepSize: 10000,
             callback: function(value) {
-              return value.toLocaleString() + 'μs';
+              return (value / 1000).toFixed(0) + 'ms';
             },
             color: '#b4bfd8ff'
           }
@@ -687,6 +529,123 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
             color: '#b4bfd8ff'
           },
           ticks: {
+            color: '#b4bfd8ff'
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+
+<div class="chart-container" style="max-width: 1000px; margin: 60px auto;">
+  <canvas id="spaceChart"></canvas>
+</div>
+
+<script>
+(function() {
+  const ctx = document.getElementById('spaceChart');
+  if (!ctx) return;
+  
+  const isDarkMode = document.documentElement.classList.contains('dark') || 
+                     window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  
+  const workloads = [
+    'Large Value (4KB)',
+    'Sequential Write',
+    'Random Write',
+    'Small Value (64B)',
+    'Mixed Workload',
+    'Delete'
+  ];
+  
+  // Database sizes in MB from raw benchmark data
+  const tidesdbSizes = [3.04, 1.13, 1.09, 0.54, 1.10, 0.89];
+  const rocksdbSizes = [41.60, 11.39, 11.39, 5.72, 7.96, 1.71];
+  
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: workloads,
+      datasets: [{
+        label: 'TidesDB Database Size (MB)',
+        data: tidesdbSizes,
+        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+        borderColor: 'rgba(34, 197, 94, 1)',
+        borderWidth: 1
+      }, {
+        label: 'RocksDB Database Size (MB)',
+        data: rocksdbSizes,
+        backgroundColor: 'rgba(251, 146, 60, 0.8)',
+        borderColor: 'rgba(251, 146, 60, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.4,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Space Efficiency · Database Size After Workload',
+          font: {
+            size: 20,
+            weight: 'bold'
+          },
+          color: '#b4bfd8ff',
+          padding: 20
+        },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            font: {
+              size: 14
+            },
+            color: '#88a0c7ff',
+            padding: 20,
+            usePointStyle: true,
+            pointStyle: 'rect'
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return context.dataset.label + ': ' + context.parsed.x.toFixed(2) + ' MB';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Database Size (MB)',
+            font: {
+              size: 14,
+              weight: 'bold'
+            },
+            color: '#b4bfd8ff'
+          },
+          grid: {
+            color: gridColor
+          },
+          ticks: {
+            color: '#b4bfd8ff'
+          }
+        },
+        y: {
+          grid: {
+            color: gridColor
+          },
+          ticks: {
+            font: {
+              size: 12
+            },
             color: '#b4bfd8ff'
           }
         }
@@ -1080,6 +1039,7 @@ The latest minor has shown clear advantages over RocksDB.  The choice is really 
 *Thanks for reading!*
 
 ---
+_Special thanks you @KevBurnsJr on Reddit for the feedback on the graphing_
 
 - GitHub · https://github.com/tidesdb/tidesdb
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
