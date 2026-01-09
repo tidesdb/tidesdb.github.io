@@ -138,7 +138,7 @@ Each transaction receives a snapshot sequence number at begin time. For Read Unc
 
 The snapshot sequence determines which versions the transaction sees: it reads the most recent version with sequence number less than or equal to its snapshot sequence.
 
-At commit time, the system assigns a commit sequence number from a global atomic counter. It writes operations to the write-ahead log, applies them to the active memtable with the commit sequence, and marks the sequence as committed in a fixed-size buffer (hardcoded at 65536 entries). The buffer wraps around: sequence N maps to slot N % 65536. This limits the maximum sequence number gap between oldest active transaction and newest commit to 65536. Long-running transactions may cause commits to stall waiting for buffer space. Readers skip versions whose sequence numbers are not yet marked committed.
+At commit time, the system assigns a commit sequence number from a global atomic counter. It writes operations to the write-ahead log, applies them to the active memtable with the commit sequence, and marks the sequence as committed in a fixed-size circular buffer (hardcoded at 65536 entries). The buffer wraps around: sequence N maps to slot N % 65536. When the buffer wraps, old entries are overwritten, so visibility checks for very old sequences may return incorrect results. In practice, this is acceptable because transactions with sequence numbers more than 65536 behind the current sequence are extremely rare. Readers skip versions whose sequence numbers are not yet marked committed.
 
 ### Multi-Column Family Transactions
 
@@ -341,24 +341,24 @@ The algorithm calculates a **dividing level (X)** that serves as the primary com
 X = num_levels - 1 - dividing_level_offset
 ```
 
-Where `dividing_level_offset` is a configurable parameter (default 1) that controls compaction aggressiveness. A lower offset means more aggressive compaction (merging more frequently into higher levels), while a higher offset defers compaction work.
+Where `dividing_level_offset` is a configurable parameter (default 2) that controls compaction aggressiveness. A lower offset means more aggressive compaction (merging more frequently into higher levels), while a higher offset defers compaction work.
 
-For example, with 7 active levels and the default offset of 1:
+For example, with 7 active levels and the default offset of 2:
 ```
-X = 7 - 1 - 1 = 5
+X = 7 - 1 - 2 = 4
 ```
 
-This means Level 5 serves as the primary merge destination.
+This means Level 4 serves as the primary merge destination.
 
 ### Selecting the Merge Strategy
 
 Based on the compaction trigger and the relationship between the affected level and the dividing level X, the algorithm selects one of three merge strategies:
 
-1.  **If Level 1 exceeds the SSTable threshold** · The system performs a **dividing merge**, merging all levels from 1 through X into level X+1.
+1.  **If target level equals X** · The system performs a **dividing merge**, merging all levels from 1 through X into level X+1. This is the default case when no level before X is overflowing.
 
-2.  **If a level before X exceeds capacity** · The system performs a **partitioned merge**, which is a more targeted, preemptive cleanup designed to prevent cascading compaction pressure.
+2.  **If a level before X cannot accommodate the cumulative data** · The system performs a **full preemptive merge** from level 1 to that target level. This handles cases where intermediate levels are filling up faster than expected.
 
-3.  **If level X or beyond exceeds capacity** · The system performs a **full preemptive merge** of the specific level range that exceeded capacity.
+3.  **After the initial merge, if level X is still full** · The system performs a **partitioned merge** from level X to a computed target level z. This is a secondary cleanup phase that runs after the primary merge completes.
 
 ### The Three Merge Modes
 
@@ -369,7 +369,7 @@ The compaction algorithm employs three distinct merge methods, each optimized fo
 This is the most straightforward merge operation. It combines all SSTables from two adjacent levels into the target level.
 
 *   **When it's used**
-    *   When a level at or beyond the dividing level X exceeds its capacity.
+    *   When a level before the dividing level X cannot accommodate the cumulative data from levels 1 through that level.
     *   As a fallback mechanism by the other merge functions when they cannot determine partitioning boundaries (e.g., when there are no existing SSTables at the target level to use as partition guides).
 
 *   **What it does**
@@ -389,8 +389,8 @@ This is the most straightforward merge operation. It combines all SSTables from 
 This is the standard, large-scale compaction method for maintaining the overall health of the LSM-tree. It is designed to periodically consolidate the upper levels of the tree into a deeper level.
 
 *   **When it's used**
-    *   When Level 1 accumulates the threshold number of SSTables (default 4), indicating that memtable flushes are accumulating faster than they can be absorbed into the tree.
-    *   This is the expected scenario during normal write-heavy workloads.
+    *   When the target level equals the dividing level X, which is the default case when no intermediate level is overflowing.
+    *   This is the expected scenario during normal write-heavy workloads when Level 1 accumulates the threshold number of SSTables (default 4).
 
 *   **What it does**
     *   Merges all levels from Level 1 through the dividing level X into level X+1.
@@ -407,13 +407,13 @@ This is the standard, large-scale compaction method for maintaining the overall 
 
 #### 3. Partitioned Merge
 
-This is a specialized, preemptive merge designed for urgent, targeted cleanups. It addresses a specific scenario where intermediate levels begin to accumulate data unexpectedly.
+This is a specialized merge designed for secondary cleanup after the initial merge phase. It addresses scenarios where the dividing level X remains full after the primary merge operation.
 
 *   **When it's used**
-    *   When a level **before** the dividing level X exceeds its capacity. This indicates a sudden influx of data or a localized hotspot that needs to be handled quickly before it cascades into a larger compaction crisis.
+    *   After the initial merge (dividing or full preemptive), when the dividing level X is still full (its size exceeds its capacity). This is a secondary cleanup phase that addresses remaining pressure at level X.
 
 *   **What it does**
-    *   Performs a merge on a specific range of levels (from the overflowing level to a target level, typically a few levels down) rather than merging all the way from Level 1.
+    *   Performs a merge on a specific range of levels (from level X to a computed target level z) rather than merging all the way from Level 1.
     *   Like `tidesdb_dividing_merge`, it uses the largest level's SSTable key ranges as partition boundaries.
     *   It divides the key space and merges each partition independently, producing smaller output SSTables that each cover a single key range.
     *   This approach is more focused and less resource-intensive than a full dividing merge, allowing the system to relieve pressure in a specific area of the LSM-tree without triggering a full tree-wide compaction.
@@ -453,9 +453,9 @@ Where:
 
 1.  Get the current number of active levels (`L`).
 2.  Identify the largest level and measure its current total size (`N_L`).
-3.  Iterate backwards from the second-to-last level (`L-1`) up to Level 0.
-4.  For each level `i`, apply the formula to calculate the new capacity (`C_i`).
-5.  Update the `max_level_size` property for that level with the newly calculated value.
+3.  Iterate through all levels from Level 0 to Level `L-2` (all levels except the largest).
+4.  For each level `i`, apply the formula to calculate the new capacity (`C_i`), with a minimum floor of `write_buffer_size`.
+5.  Update the `capacity` property for that level with the newly calculated value.
 
 This adaptive approach ensures that level capacities remain proportional to the real-world size of data at the bottom of the tree. As the database grows or shrinks, DCA automatically adjusts capacities to maintain optimal compaction timing—preventing both over-provisioned capacities (which cause high read amplification) and under-provisioned capacities (which cause excessive compaction and high write amplification).
 
@@ -468,10 +468,10 @@ DCA adds a new level when:
 
 **Process**
 
-1.  The system creates a new empty level with capacity calculated as: `previous_largest_capacity × level_size_ratio`.
+1.  The system creates a new empty level with capacity calculated using the formula: `write_buffer_size × T^(level_num-1)`, where `level_num` is the new level's number.
 2.  It atomically increments `num_active_levels` to reflect the new structure.
 3.  Normal compaction then moves data into this new level. **The data is not moved during level addition itself** to avoid complex data migration logic and potential key loss.
-4.  The next `tidesdb_apply_dca()` invocation will recalculate capacities for all levels based on the new level count.
+4.  After the compaction cycle completes, `tidesdb_apply_dca()` is invoked to recalculate capacities for all levels based on actual data distribution.
 
 #### Level Removal
 
@@ -562,7 +562,7 @@ Large values (those exceeding the value log threshold) flow through compaction r
 
 TidesDB's compaction is a sophisticated, multi-faceted algorithm that employs three distinct merge policies—full preemptive merge, dividing merge, and partitioned merge—each optimized for different scenarios within the LSM-tree lifecycle. These policies work in concert with Dynamic Capacity Adaptation (DCA) to automatically scale the tree structure up or down as data volume changes.
 
-The system intelligently selects the appropriate merge strategy based on concrete triggers: Level 1 SSTable accumulation triggers dividing merge, capacity overflow before the dividing level triggers partitioned merge, and capacity overflow at or beyond the dividing level triggers full preemptive merge. The dividing level itself is calculated using a simple formula (`num_levels - 1 - dividing_level_offset`) rather than being inferred from complex bottleneck analysis.
+The system intelligently selects the appropriate merge strategy based on concrete triggers: when the target level equals the dividing level X, it performs a dividing merge; when a level before X cannot accommodate cumulative data, it performs a full preemptive merge; and after the initial merge, if level X remains full, it performs a partitioned merge as a secondary cleanup phase. The dividing level itself is calculated using a simple formula (`num_levels - 1 - dividing_level_offset`) rather than being inferred from complex bottleneck analysis.
 
 This design allows TidesDB to handle a wide range of workloads efficiently, from steady-state writes to sudden bursts, while maintaining both read and write performance through intelligent data placement and compaction scheduling.
 
@@ -622,7 +622,7 @@ Four worker pools handle asynchronous operations:
 
 The database maintains two global work queues: one for flush operations, one for compaction operations. Each work item identifies the target column family. When a memtable exceeds its size threshold, the system enqueues a flush work item containing the column family pointer and immutable memtable. When a level exceeds capacity, it enqueues a compaction work item with the column family and level range.
 
-Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously - worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags to prevent concurrent operations on the same structure: only one flush can run per column family at a time, and only one compaction per level range.
+Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously - worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags to prevent concurrent operations on the same structure: only one flush can run per column family at a time, and only one compaction per column family at a time.
 
 This design enables parallelism across column families while avoiding conflicts within a single column family. With N column families and 2 flush workers, flush latency is roughly N/2 × flush_time. The global queue provides natural load balancing - whichever worker finishes first picks up the next item, regardless of which column family it belongs to.
 
@@ -701,7 +701,7 @@ TidesDB database instances are multi-thread safe and single-process exclusive.
 
 #### Multiprocess safety
 
-Only one process can open a database directory at a time. The system acquires an exclusive file lock on a lock file named `LOCK` within the database directory during `tidesdb_open()`. The lock is non-blocking - if another process holds the lock, `tidesdb_open()` returns `TDB_ERR_LOCKED` immediately rather than waiting. The implementation uses platform-specific locking primitives: `fcntl()` F_SETLK on macOS/BSD (chosen over `flock()` because fcntl locks are not inherited across `fork()`, preventing child processes from inheriting the parent's lock), `flock()` on older systems without F_OFD_SETLK, and F_OFD_SETLK on Linux 3.15+ for per-file-descriptor semantics. On macOS/BSD, the system additionally writes the owning process's PID to the lock file after acquiring the lock, enabling detection of same-process double-open attempts (since fcntl allows the same process to re-acquire its own lock). The lock is released and the PID cleared during `tidesdb_close()`. On Windows, the system uses `LockFileEx()` with `LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY` for equivalent non-blocking exclusive locking. 
+Only one process can open a database directory at a time. The system acquires an exclusive file lock on a lock file named `LOCK` within the database directory during `tidesdb_open()`. The lock is non-blocking - if another process holds the lock, `tidesdb_open()` returns `TDB_ERR_LOCKED` immediately rather than waiting. The implementation uses platform-specific locking primitives: `fcntl()` F_SETLK on macOS/BSD (chosen over `flock()` because fcntl locks are not inherited across `fork()`, preventing child processes from inheriting the parent's lock), `flock()` on older systems without F_OFD_SETLK, and F_OFD_SETLK on Linux 3.15+ for per-file-descriptor semantics. On macOS/BSD, the system additionally writes the owning process's PID to the lock file after acquiring the lock, enabling detection of same-process double-open attempts (since fcntl allows the same process to re-acquire its own lock). The lock is released and the PID cleared during `tidesdb_close()`. On Windows, the system uses `LockFileEx()` with `LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY` for equivalent non-blocking exclusive locking. The lock acquisition includes retry logic (default 3 retries) specifically for `EINTR` errors, which occur when a signal interrupts the locking syscall - this ensures transient signal interruptions don't cause spurious lock failures. 
 
 ### Memory Footprint
 

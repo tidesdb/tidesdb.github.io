@@ -996,21 +996,27 @@ for (int q = 1; q <= X && q < num_levels; q++) {
     }
 }
 
-/* three merge strategies based on trigger condition */
-if (l1_sstable_count >= l1_threshold)
-    tidesdb_dividing_merge(cf, X);  /* L1 accumulation triggers dividing merge */
-else if (target_lvl < X)
-    tidesdb_partitioned_merge(cf, target_lvl, X);  /* before X triggers partitioned merge */
+/* merge strategy selection based on target level vs dividing level X */
+if (target_lvl < X)
+    tidesdb_full_preemptive_merge(cf, 0, target_lvl - 1);  /* level before X can't accommodate */
 else
-    tidesdb_full_preemptive_merge(cf, target_lvl, target_lvl + 1);  /* at/beyond X triggers full preemptive */
+    tidesdb_dividing_merge(cf, X - 1);  /* target equals X (default case) */
+
+/* secondary cleanup: if level X still full after initial merge */
+if (level_x_size >= level_x_capacity)
+    tidesdb_partitioned_merge(cf, X, z);  /* merge from X to computed target z */
 ```
 
 Dynamic Capacity Adaptation (DCA) · adjusts level capacities based on actual data distribution:
 
 ```c
-/* C[i] = N_L / T^(L-i) where N_L = largest level size, T = size ratio */
+/* C[i] = N_L / T^(L-1-i) where N_L = largest level size, T = size ratio */
 for (int i = 0; i < num_levels - 1; i++) {
-    size_t new_capacity = N_L / pow(level_size_ratio, num_levels - i);
+    size_t power = num_levels - 1 - i;
+    size_t divisor = 1;
+    for (size_t p = 0; p < power; p++)
+        divisor *= level_size_ratio;
+    size_t new_capacity = N_L / divisor;
     atomic_store(&cf->levels[i]->capacity, new_capacity);
 }
 ```
