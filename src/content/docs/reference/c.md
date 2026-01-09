@@ -326,7 +326,7 @@ new_config.skip_list_probability = 0.25f;
 new_config.bloom_fpr = 0.001;  /* 0.1% false positive rate */
 new_config.index_sample_ratio = 8;  /* sample 1 in 8 keys */
 
-int persist_to_disk = 1;  /* save to config.cfc */
+int persist_to_disk = 1;  /* save to config.ini */
 if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 {
     printf("Configuration updated successfully\n");
@@ -357,7 +357,7 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 
 **Configuration persistence**
 
-If `persist_to_disk = 1`, changes are saved to `config.cfc` in the column family directory. On restart, the configuration is loaded from this file.
+If `persist_to_disk = 1`, changes are saved to `config.ini` in the column family directory. On restart, the configuration is loaded from this file.
 
 ```c
 /* Save configuration to custom INI file */
