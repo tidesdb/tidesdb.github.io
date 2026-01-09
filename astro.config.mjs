@@ -146,6 +146,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						{ label: 'Why Benchmark on Lowergrade Hardware?', slug: 'articles/why-bench-on-lowergrade-hardware' },
 						{ label: 'TidesDB 7 vs RocksDB 10 Under Sync Mode', slug: 'articles/benchmark-analysis-tidesdb-v7-1-0-rocksdb-v10-7-5-full-sync' },
 						{ label: '1GB Value Observations TidesDB 7 & RocksDB 10', slug: 'articles/1gb-values-rocksdb10-tidesdb7' },
 						{ label: 'Comparative Analysis of TidesDB v7.0.7 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb-v7-0-7-rocksdb-v10-7-5' },
@@ -156,7 +157,7 @@ export default defineConfig({
 						{ label: 'Seek and Range Query Performance · TidesDB v6.1.0 vs RocksDB v10.7.5', slug: 'articles/benchmark-design-range-seek-tidesdb610-rocksdb1075' },
 						{ label: 'Design Decisions and Performance Analysis of TidesDB v6.0.1 & RocksDB v10.7.5', slug: 'articles/benchmark-design-analysis-tidesdb601-rocksdb1075' },
 						{ label: 'Comparative Analysis of TidesDB v6 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb6-rocksdb1075' },
-						{ label: 'TidesDB vs RocksDB: Which Storage Engine is Faster?', slug: 'articles/tidesdb-vs-rocksdb' },
+						{ label: 'TidesDB 4 vs RocksDB 10 Performance Analysis', slug: 'articles/tidesdb4-vs-rocksdb10' },
 					],
 				},
 				{
