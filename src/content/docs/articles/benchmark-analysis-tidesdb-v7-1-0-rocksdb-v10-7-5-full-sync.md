@@ -93,6 +93,10 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
   // RocksDB throughput in K ops/sec  
   const rocksdbData = [2755, 3222, 309, 216, 267, 180, 176, 173, 134, 200, 215, 200, 18.7];
   
+  // CV (Coefficient of Variation) data from benchmarks - lower is more consistent
+  // TidesDB CV%: [529.48, 730.14, 17.22, 93.22, 107.45, 45.31, 42.96, 90.60, 54.77, 106.32, 50.17, 54.77, 18.68]
+  // RocksDB CV%: [127.88, 137.09, 44.72, 53.41, 61.81, 48.73, 42.13, 108.75, 46.77, 52.29, 108.75, 46.77, 131.86]
+  
   new Chart(ctx, {
     type: 'bar',
     data: {
@@ -100,15 +104,15 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       datasets: [{
         label: 'TidesDB v7.1.0',
         data: tidesdbData,
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 1
+        backgroundColor: 'rgba(174, 199, 232, 0.85)',
+        borderColor: 'rgba(174, 199, 232, 1)',
+        borderWidth: 2
       }, {
         label: 'RocksDB v10.7.5',
         data: rocksdbData,
-        backgroundColor: 'rgba(239, 68, 68, 0.8)',
-        borderColor: 'rgba(239, 68, 68, 1)',
-        borderWidth: 1
+        backgroundColor: 'rgba(255, 187, 120, 0.85)',
+        borderColor: 'rgba(255, 187, 120, 1)',
+        borderWidth: 2
       }]
     },
     options: {
@@ -240,18 +244,19 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
     0.85   // Zipfian Write
   ];
   
+  // Matplotlib pastel colors for ratio chart
   const colors = ratios.map(r => 
-    r >= 1.5 ? 'rgba(34, 197, 94, 0.8)' :    // Strong green
-    r >= 1.1 ? 'rgba(59, 130, 246, 0.8)' :   // Blue
-    r >= 0.95 ? 'rgba(156, 163, 175, 0.8)' : // Gray (tie)
-    'rgba(239, 68, 68, 0.8)'                 // Red (RocksDB wins)
+    r >= 1.5 ? 'rgba(152, 223, 138, 0.85)' :    // Pastel green - strong TidesDB win
+    r >= 1.1 ? 'rgba(174, 199, 232, 0.85)' :    // Pastel blue - TidesDB advantage
+    r >= 0.95 ? 'rgba(199, 199, 199, 0.85)' :   // Gray (tie)
+    'rgba(255, 152, 150, 0.85)'                 // Pastel red (RocksDB wins)
   );
   
   const borderColors = ratios.map(r => 
-    r >= 1.5 ? 'rgba(34, 197, 94, 1)' :
-    r >= 1.1 ? 'rgba(59, 130, 246, 1)' :
-    r >= 0.95 ? 'rgba(156, 163, 175, 1)' :
-    'rgba(239, 68, 68, 1)'
+    r >= 1.5 ? 'rgba(152, 223, 138, 1)' :
+    r >= 1.1 ? 'rgba(174, 199, 232, 1)' :
+    r >= 0.95 ? 'rgba(199, 199, 199, 1)' :
+    'rgba(255, 152, 150, 1)'
   );
   
   new Chart(ctx, {
@@ -380,24 +385,24 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
         type: 'bar',
         label: 'TidesDB Throughput (K ops/sec)',
         data: [239.0, 215.8, 58.2, 218.6],
-        backgroundColor: 'rgba(59, 130, 246, 0.7)',
-        borderColor: 'rgba(59, 130, 246, 1)',
+        backgroundColor: 'rgba(174, 199, 232, 0.85)',
+        borderColor: 'rgba(174, 199, 232, 1)',
         borderWidth: 2,
         yAxisID: 'y'
       }, {
         type: 'bar',
         label: 'RocksDB Throughput (K ops/sec)',
         data: [267.4, 176.3, 18.7, 180.1],
-        backgroundColor: 'rgba(239, 68, 68, 0.7)',
-        borderColor: 'rgba(239, 68, 68, 1)',
+        backgroundColor: 'rgba(255, 187, 120, 0.85)',
+        borderColor: 'rgba(255, 187, 120, 1)',
         borderWidth: 2,
         yAxisID: 'y'
       }, {
         type: 'line',
         label: 'TidesDB p99 Latency (μs)',
         data: [4304, 8366, 18165, 7712],
-        borderColor: 'rgba(168, 85, 247, 1)',
-        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+        borderColor: 'rgba(197, 176, 213, 1)',
+        backgroundColor: 'rgba(197, 176, 213, 0.2)',
         borderWidth: 3,
         pointRadius: 6,
         pointHoverRadius: 8,
@@ -407,8 +412,8 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
         type: 'line',
         label: 'RocksDB p99 Latency (μs)',
         data: [4165, 7980, 54921, 7980],
-        borderColor: 'rgba(236, 72, 153, 1)',
-        backgroundColor: 'rgba(236, 72, 153, 0.1)',
+        borderColor: 'rgba(247, 182, 210, 1)',
+        backgroundColor: 'rgba(247, 182, 210, 0.2)',
         borderWidth: 3,
         pointRadius: 6,
         pointHoverRadius: 8,
@@ -571,15 +576,15 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       datasets: [{
         label: 'TidesDB Database Size (MB)',
         data: tidesdbSizes,
-        backgroundColor: 'rgba(34, 197, 94, 0.8)',
-        borderColor: 'rgba(34, 197, 94, 1)',
-        borderWidth: 1
+        backgroundColor: 'rgba(152, 223, 138, 0.85)',
+        borderColor: 'rgba(152, 223, 138, 1)',
+        borderWidth: 2
       }, {
         label: 'RocksDB Database Size (MB)',
         data: rocksdbSizes,
-        backgroundColor: 'rgba(251, 146, 60, 0.8)',
-        borderColor: 'rgba(251, 146, 60, 1)',
-        borderWidth: 1
+        backgroundColor: 'rgba(255, 187, 120, 0.85)',
+        borderColor: 'rgba(255, 187, 120, 1)',
+        borderWidth: 2
       }]
     },
     options: {
@@ -635,6 +640,133 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
             color: gridColor
           },
           ticks: {
+            color: '#b4bfd8ff'
+          }
+        },
+        y: {
+          grid: {
+            color: gridColor
+          },
+          ticks: {
+            font: {
+              size: 12
+            },
+            color: '#b4bfd8ff'
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+
+<div class="chart-container" style="max-width: 1000px; margin: 60px auto;">
+  <canvas id="cvChart"></canvas>
+</div>
+
+<script>
+(function() {
+  const ctx = document.getElementById('cvChart');
+  if (!ctx) return;
+  
+  const isDarkMode = document.documentElement.classList.contains('dark') || 
+                     window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  
+  // Workloads with CV data from benchmark results
+  const workloads = [
+    'Large Value (4KB)',
+    'Batch=1000 Write',
+    'Random Write',
+    'Small Value (64B)',
+    'Zipfian Write',
+    'Delete',
+    'Sequential Write',
+    'Mixed Write'
+  ];
+  
+  // CV (Coefficient of Variation) -- lower is more consistent/predictable
+  // From raw benchmark data -- Latency (CV): X%
+  const tidesdbCV = [18.68, 17.22, 42.96, 45.31, 50.17, 106.32, 107.45, 54.77];
+  const rocksdbCV = [131.86, 44.72, 42.13, 48.73, 108.75, 52.29, 61.81, 46.77];
+  
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: workloads,
+      datasets: [{
+        label: 'TidesDB v7.1.0 CV%',
+        data: tidesdbCV,
+        backgroundColor: 'rgba(174, 199, 232, 0.85)',
+        borderColor: 'rgba(174, 199, 232, 1)',
+        borderWidth: 2
+      }, {
+        label: 'RocksDB v10.7.5 CV%',
+        data: rocksdbCV,
+        backgroundColor: 'rgba(255, 187, 120, 0.85)',
+        borderColor: 'rgba(255, 187, 120, 1)',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.4,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Latency Consistency · Coefficient of Variation (Lower = More Predictable)',
+          font: {
+            size: 20,
+            weight: 'bold'
+          },
+          color: '#b4bfd8ff',
+          padding: 20
+        },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            font: {
+              size: 14
+            },
+            color: '#88a0c7ff',
+            padding: 20,
+            usePointStyle: true,
+            pointStyle: 'rect'
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const cv = context.parsed.x;
+              let consistency = cv < 30 ? 'Very Consistent' : cv < 60 ? 'Consistent' : cv < 100 ? 'Variable' : 'Highly Variable';
+              return context.dataset.label.replace(' CV%', '') + ': ' + cv.toFixed(1) + '% (' + consistency + ')';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          max: 150,
+          title: {
+            display: true,
+            text: 'Coefficient of Variation (%) · Lower = More Predictable Latency',
+            font: {
+              size: 14,
+              weight: 'bold'
+            },
+            color: '#b4bfd8ff'
+          },
+          grid: {
+            color: gridColor
+          },
+          ticks: {
+            callback: function(value) {
+              return value + '%';
+            },
             color: '#b4bfd8ff'
           }
         },
