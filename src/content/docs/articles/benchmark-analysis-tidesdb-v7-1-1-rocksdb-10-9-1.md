@@ -651,48 +651,46 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
 </script>
 
 <div class="chart-container" style="max-width: 1000px; margin: 60px auto;">
-  <canvas id="cvChart"></canvas>
+  <canvas id="p99Chart"></canvas>
 </div>
 
 <script>
 (function() {
-  const ctx = document.getElementById('cvChart');
+  const ctx = document.getElementById('p99Chart');
   if (!ctx) return;
   
   const isDarkMode = document.documentElement.classList.contains('dark') || 
                      window.matchMedia('(prefers-color-scheme: dark)').matches;
   const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
   
-  // Workloads with CV data from benchmark results
+  // Workloads with P99 latency data from benchmark results
   const workloads = [
-    'Large Value (4KB)',
-    'Sequential Write',
-    'Random Write',
-    'Small Value (64B)',
-    'Zipfian Write',
-    'Delete (batch=1000)',
-    'Mixed Write',
-    'Batch=1000 Write'
+    'Random Read',
+    'Sequential Seek',
+    'Random Seek',
+    'Zipfian Seek',
+    'Zipfian Mixed GET',
+    'Range 100-key'
   ];
   
-  // CV (Coefficient of Variation) -- lower is more consistent/predictable
-  // From raw benchmark data -- Latency (CV): X%
-  const tidesdbCV = [307.06, 148.52, 1140.25, 2573.50, 109.10, 27.19, 750.88, 1128.04];
-  const rocksdbCV = [190.31, 381.25, 397.73, 1137.26, 22.09, 74.29, 104.10, 353.33];
+  // P99 Latency (μs) -- lower is better tail latency
+  // From raw benchmark data -- Latency (p99): X μs
+  const tidesdbP99 = [8, 2, 7, 2, 4, 64];
+  const rocksdbP99 = [13, 8, 18, 27, 10, 51];
   
   new Chart(ctx, {
     type: 'bar',
     data: {
       labels: workloads,
       datasets: [{
-        label: 'TidesDB v7.1.1 CV%',
-        data: tidesdbCV,
+        label: 'TidesDB v7.1.1 P99 (μs)',
+        data: tidesdbP99,
         backgroundColor: 'rgba(174, 199, 232, 0.85)',
         borderColor: 'rgba(174, 199, 232, 1)',
         borderWidth: 2
       }, {
-        label: 'RocksDB v10.9.1 CV%',
-        data: rocksdbCV,
+        label: 'RocksDB v10.9.1 P99 (μs)',
+        data: rocksdbP99,
         backgroundColor: 'rgba(255, 187, 120, 0.85)',
         borderColor: 'rgba(255, 187, 120, 1)',
         borderWidth: 2
@@ -706,7 +704,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       plugins: {
         title: {
           display: true,
-          text: 'Latency Consistency · Coefficient of Variation (Lower = More Predictable)',
+          text: 'P99 Tail Latency · What 99% of Users Experience (Lower = Better)',
           font: {
             size: 20,
             weight: 'bold'
@@ -730,9 +728,8 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
         tooltip: {
           callbacks: {
             label: function(context) {
-              const cv = context.parsed.x;
-              let consistency = cv < 30 ? 'Very Consistent' : cv < 60 ? 'Consistent' : cv < 100 ? 'Variable' : 'Highly Variable';
-              return context.dataset.label.replace(' CV%', '') + ': ' + cv.toFixed(1) + '% (' + consistency + ')';
+              const p99 = context.parsed.x;
+              return context.dataset.label.replace(' (μs)', '') + ': ' + p99 + 'μs';
             }
           }
         }
@@ -740,10 +737,9 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
       scales: {
         x: {
           beginAtZero: true,
-          max: 2800,
           title: {
             display: true,
-            text: 'Coefficient of Variation (%) · Lower = More Predictable Latency',
+            text: 'P99 Latency (μs) · Lower = Better Tail Latency',
             font: {
               size: 14,
               weight: 'bold'
@@ -755,7 +751,7 @@ You can find the **benchtool** source code <a href="https://github.com/tidesdb/b
           },
           ticks: {
             callback: function(value) {
-              return value + '%';
+              return value + 'μs';
             },
             color: '#b4bfd8ff'
           }
