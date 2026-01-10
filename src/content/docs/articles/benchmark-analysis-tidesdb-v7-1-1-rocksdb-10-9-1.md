@@ -5,11 +5,11 @@ head:
   - tag: meta
     attrs:
       property: og:image
-      content: https://tidesdb.com/pexels-walter-cunha-2158705182-35585413.jpg
+      content: https://tidesdb.com/pexels-pok-rie-33563-33963.jpg
   - tag: meta
     attrs:
       name: twitter:image
-      content: https://tidesdb.com/pexels-walter-cunha-2158705182-35585413.jpg
+      content: https://tidesdb.com/pexels-pok-rie-33563-33963.jpg
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -17,7 +17,7 @@ head:
 
 <div class="article-image">
 
-![TidesDB 7.1.1 vs RocksDB 10.9.1 Benchmark](/pexels-walter-cunha-2158705182-35585413.jpg)
+![TidesDB 7.1.1 vs RocksDB 10.9.1 Benchmark](/pexels-pok-rie-33563-33963.jpg)
 
 </div>
 
