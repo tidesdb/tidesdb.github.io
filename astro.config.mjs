@@ -146,6 +146,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						{ label: 'Administering TidesDB with Admintool', slug: 'articles/administering-tidesdb-with-admintool' },
 						{ label: 'TidesDB 7.1.1 vs RocksDB 10.9.1', slug: 'articles/benchmark-analysis-tidesdb-v7-1-1-rocksdb-10-9-1' },
 						{ label: 'Why We Benchmark on Modest Hardware?', slug: 'articles/why-bench-on-modest-hardware' },
 						{ label: 'TidesDB 7 vs RocksDB 10 Under Sync Mode', slug: 'articles/benchmark-analysis-tidesdb-v7-1-0-rocksdb-v10-7-5-full-sync' },
