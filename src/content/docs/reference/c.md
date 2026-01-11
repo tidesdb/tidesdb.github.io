@@ -210,7 +210,7 @@ tidesdb_column_family_config_t cf_config = {
     .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
     .l1_file_count_trigger = 4,                 /* L1 file count trigger for compaction (default: 4) */
-    .l0_queue_stall_threshold = 10              /* L0 queue stall threshold (default: 10) */
+    .l0_queue_stall_threshold = 20              /* L0 queue stall threshold (default: 20) */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -309,7 +309,45 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 - Memtable size in bytes
 - Number of LSM levels
 - Per-level SSTable count and total size
-- Full column family configuration
+- Full column family configuration (via `stats->config`)
+
+### Block Cache Statistics
+
+Get statistics for the global block cache (shared across all column families).
+
+```c
+tidesdb_cache_stats_t cache_stats;
+if (tidesdb_get_cache_stats(db, &cache_stats) == 0)
+{
+    if (cache_stats.enabled)
+    {
+        printf("Cache enabled: yes\n");
+        printf("Total entries: %zu\n", cache_stats.total_entries);
+        printf("Total bytes: %.2f MB\n", cache_stats.total_bytes / (1024.0 * 1024.0));
+        printf("Hits: %lu\n", cache_stats.hits);
+        printf("Misses: %lu\n", cache_stats.misses);
+        printf("Hit rate: %.1f%%\n", cache_stats.hit_rate * 100.0);
+        printf("Partitions: %zu\n", cache_stats.num_partitions);
+    }
+    else
+    {
+        printf("Cache enabled: no (block_cache_size = 0)\n");
+    }
+}
+```
+
+**Cache statistics include**
+- `enabled` · Whether block cache is active (0 if `block_cache_size` was set to 0)
+- `total_entries` · Number of cached blocks
+- `total_bytes` · Total memory used by cached blocks
+- `hits` · Number of cache hits (blocks served from memory)
+- `misses` · Number of cache misses (blocks read from disk)
+- `hit_rate` · Hit rate as a decimal (0.0 to 1.0)
+- `num_partitions` · Number of cache partitions (scales with CPU cores)
+
+:::note[Block Cache]
+The block cache is a database-level resource shared across all column families. It caches deserialized klog blocks to avoid repeated disk I/O and deserialization. Configure cache size via `config.block_cache_size` when opening the database. Set to 0 to disable caching.
+:::
 
 ### Updating Column Family Configuration
 
@@ -354,6 +392,10 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 - `block_index_prefix_len` · Cannot change block index structure
 - `l1_file_count_trigger` · Cannot change compaction trigger
 - `l0_queue_stall_threshold` · Cannot change backpressure threshold
+
+:::note[Backpressure Defaults]
+The default `l0_queue_stall_threshold` is 20. The default `l1_file_count_trigger` is 4.
+:::
 
 **Configuration persistence**
 
@@ -934,7 +976,7 @@ cf_config.sync_mode = TDB_SYNC_NONE;
 
 /* TDB_SYNC_INTERVAL - Balanced performance with periodic background syncing */
 cf_config.sync_mode = TDB_SYNC_INTERVAL;
-cf_config.sync_interval_us = 1000000;  /* Sync every 1 second (1,000,000 microseconds) */
+cf_config.sync_interval_us = 128000;  /* Sync every 128ms (default) */
 
 /* TDB_SYNC_FULL - Most durable (fsync on every write) */
 cf_config.sync_mode = TDB_SYNC_FULL;
@@ -955,6 +997,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
         - Configurable sync interval via `sync_interval_us` (microseconds)
         - Structural operations (flush, compaction, WAL rotation) always enforce durability
         - At most `sync_interval_us` worth of data at risk on crash
+        - **Mid-durability correctness**: When memtables rotate, the WAL receives an escalated fsync before entering the flush queue. Sorted run creation and merge operations always propagate full sync to block managers regardless of sync mode.
 
 - **TDB_SYNC_FULL** · Fsync on every write operation (slowest, most durable)
     - Best for · Critical data requiring maximum durability
@@ -969,13 +1012,13 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 cf_config.sync_mode = TDB_SYNC_INTERVAL;
 cf_config.sync_interval_us = 100000;
 
-/* Sync every 1 second (balanced default) */
+/* Sync every 128ms (default) */
+cf_config.sync_mode = TDB_SYNC_INTERVAL;
+cf_config.sync_interval_us = 128000;
+
+/* Sync every 1 second (higher throughput, more data at risk) */
 cf_config.sync_mode = TDB_SYNC_INTERVAL;
 cf_config.sync_interval_us = 1000000;
-
-/* Sync every 5 seconds (higher throughput, more data at risk) */
-cf_config.sync_mode = TDB_SYNC_INTERVAL;
-cf_config.sync_interval_us = 5000000;
 ```
 
 :::tip[Structural Operations]
@@ -990,7 +1033,7 @@ This ensures the database structure remains consistent even if user data syncing
 
 ## Compaction
 
-TidesDB performs automatic background compaction when L0 reaches the configured threshold (default: 4 SSTables). However, you can manually trigger compaction for specific scenarios.
+TidesDB performs automatic background compaction when L1 reaches the configured file count trigger (default: 4 SSTables). However, you can manually trigger compaction for specific scenarios.
 
 ### Manual Compaction
 
