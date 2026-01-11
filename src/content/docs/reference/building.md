@@ -568,7 +568,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_NUM_SEEK_OPS` | Number of iterator seek operations | 100 |
 | `BENCH_KEY_SIZE` | Key size in bytes | 16 |
 | `BENCH_VALUE_SIZE` | Value size in bytes | 100 |
-| `BENCH_NUM_THREADS` | Number of concurrent threads | 4 |
+| `BENCH_NUM_THREADS` | Number of concurrent threads | 8 |
 | `BENCH_KEY_PATTERN` | Key distribution pattern | "random" |
 | `BENCH_CF_NAME` | Column family name | "benchmark_cf" |
 | `BENCH_DB_PATH` | Directory path | "benchmark_db" |
@@ -601,7 +601,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_KLOG_VALUE_THRESHOLD` | Key-log value separation threshold (bytes) | 4096 (4KB) |
 | `BENCH_MIN_DISK_SPACE` | Minimum free disk space required (bytes) | 104857600 (100MB) |
 | `BENCH_L1_FILE_COUNT_TRIGGER` | L1 file count trigger for compaction | 4 |
-| `BENCH_L0_QUEUE_STALL_THRESHOLD` | L0 queue stall threshold for backpressure | 10 |
+| `BENCH_L0_QUEUE_STALL_THRESHOLD` | L0 queue stall threshold for backpressure | 10 (benchmark default; runtime default is 20) |
 | `BENCH_MAX_OPEN_SSTABLES` | Maximum number of open SSTables | 256 |
 
 ### Key Distribution Patterns

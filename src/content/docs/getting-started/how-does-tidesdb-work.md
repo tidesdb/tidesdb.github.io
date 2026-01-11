@@ -165,7 +165,7 @@ A transaction buffers operations in memory until commit. At commit time:
 5. It marks the commit sequence as committed in the status buffer
 6. It checks if any memtable exceeds its size threshold
 
-The transaction uses hash-based deduplication (simple multiplicative hash: `hash = hash * 31 + key[i]`) to apply only the final operation for each key. This is a fast non-cryptographic hash - collisions are possible but rare, and would cause the transaction to write both operations to the memtable (skip list handles duplicates correctly). This optimization reduces memtable size when a transaction modifies the same key multiple times.
+The transaction uses hash-based deduplication (simple multiplicative hash: `hash = hash * 31 + key[i]`) to apply only the final operation for each key. The hash table is dynamically sized based on transaction size (2× the number of operations, minimum 1024 slots) to reduce collisions for large write batches. This is a fast non-cryptographic hash - collisions are possible but rare, and would cause the transaction to write both operations to the memtable (skip list handles duplicates correctly). This optimization reduces memtable size when a transaction modifies the same key multiple times.
 
 ### Memtable Flush
 
@@ -197,20 +197,20 @@ Each column family maintains a queue of immutable memtables awaiting flush. When
 
 **Throttling thresholds** · The system monitors two metrics:
 
-1. **L0 queue depth** · number of immutable memtables in the flush queue (configurable threshold, default 10)
+1. **L0 queue depth** · number of immutable memtables in the flush queue (configurable threshold, default 20)
 2. **L1 file count** · number of SSTables at level 1 (configurable trigger, default 4)
 
 **Graduated backpressure** · The system applies increasing delays to write operations based on pressure:
 
-**Moderate pressure** (30% of stall threshold or 2× L1 trigger) - Writes sleep for 1ms. This gently slows the write rate without significantly impacting throughput. At 30% of the default threshold (3 immutable memtables), writes experience minimal latency increase. The 1ms delay is calibrated to be ~1000× the cost of a write operation (~1μs), providing flush workers CPU time while remaining barely noticeable in multi-threaded workloads.
+**Moderate pressure** (50% of stall threshold or 3× L1 trigger) - Writes sleep for 0.5ms. This gently slows the write rate without significantly impacting throughput. At 50% of the default threshold (10 immutable memtables), writes experience minimal latency increase. The 0.5ms delay provides flush workers CPU time while remaining barely noticeable in multi-threaded workloads.
 
-**High pressure** (60% of stall threshold or 3× L1 trigger) - Writes sleep for 5ms. This more aggressively reduces write throughput to give flush and compaction workers time to catch up. At 60% of the default threshold (6 immutable memtables), write latency increases noticeably but writes continue. The 5× escalation creates non-linear control response - since flush operations take ~120ms, the 5ms delay gives workers meaningful time to drain the queue.
+**High pressure** (80% of stall threshold or 4× L1 trigger) - Writes sleep for 2ms. This more aggressively reduces write throughput to give flush and compaction workers time to catch up. At 80% of the default threshold (16 immutable memtables), write latency increases noticeably but writes continue. The 4× escalation creates non-linear control response - since flush operations take ~120ms, the 2ms delay gives workers meaningful time to drain the queue.
 
-**Stall** (≥100% of stall threshold) - Writes block completely until the queue drains below the threshold. The system checks queue depth every 10ms, waiting up to 10 seconds before timing out with an error. This prevents memory exhaustion when flush workers cannot keep pace. At the default threshold (10 immutable memtables), all writes stall until flush workers reduce the queue depth. The 10ms check interval balances responsiveness with syscall overhead.
+**Stall** (≥100% of stall threshold) - Writes block completely until the queue drains below the threshold. The system checks queue depth every 10ms, waiting up to 10 seconds before timing out with an error. This prevents memory exhaustion when flush workers cannot keep pace. At the default threshold (20 immutable memtables), all writes stall until flush workers reduce the queue depth. The 10ms check interval balances responsiveness with syscall overhead.
 
 **Coordination with L1** · The backpressure mechanism considers both L0 queue depth and L1 file count. High L1 file count indicates compaction is falling behind, which will eventually slow flush operations (flush workers must wait for compaction to free space). By throttling writes based on L1 file count, the system prevents cascading backlog. L1 acts as a leading indicator - throttling occurs before L0 pressure becomes critical.
 
-**Memory protection** · Each immutable memtable holds the full contents of a flushed memtable (default 64MB). With a stall threshold of 10, the system allows up to 640MB of immutable memtables plus the active memtable (64MB) before blocking writes. This bounds memory usage to roughly 704MB per column family under maximum write pressure, preventing out-of-memory conditions.
+**Memory protection** · Each immutable memtable holds the full contents of a flushed memtable (default 64MB). With a stall threshold of 20, the system allows up to 1.28GB of immutable memtables plus the active memtable (64MB) before blocking writes. This bounds memory usage to roughly 1.34GB per column family under maximum write pressure, preventing out-of-memory conditions.
 
 **Worker coordination** · The throttling mechanism assumes flush workers are making progress. If the queue depth remains at or above the stall threshold for 10 seconds (1000 iterations × 10ms), the system returns an error indicating the flush worker may be stuck. This typically indicates disk I/O failure, insufficient disk space, or a deadlock in the flush path.
 
@@ -285,6 +285,8 @@ The block index enables fast key lookups by mapping key ranges to file offsets. 
 5. If no exact match, return the last block where `min_key <= search_key`
 
 This ensures the search always starts from the correct block, avoiding false negatives when keys fall between indexed blocks.
+
+**Early Termination** · When a block index successfully identifies the target block, the point read path enables early termination. If the key is not found in the indexed block, the search stops immediately rather than scanning subsequent blocks. Since blocks are sorted, the key cannot exist in later blocks if it wasn't in the block the index pointed to. This optimization significantly reduces I/O for negative lookups and keys near block boundaries.
 
 **Serialization** · The index serializes compactly using delta encoding for file positions (varints) and raw prefix bytes. Format: `varint(count)`, `varint(prefix_len)`, delta-encoded file positions, min key prefixes, max key prefixes. This achieves ~50% space savings compared to storing absolute positions.
 
@@ -616,6 +618,8 @@ Four worker pools handle asynchronous operations:
 
 **Sync worker** (1 thread) periodically fsyncs write-ahead logs for column families configured with interval sync mode. It scans all column families, finds the minimum sync interval, sleeps for that duration, and fsyncs all WALs.  This is only run if **any** of the column families during start up are configured with interval sync mode.  If none are configured with interval sync mode, the sync worker is not started.
 
+**Mid-durability correctness** · Column families configured with `TDB_SYNC_INTERVAL` propagate full sync to block managers during structural operations. When a memtable becomes immutable (rotation), the system escalates an fsync on the WAL to ensure durability before the memtable enters the flush queue. During sorted run creation and merge operations, block managers always receive explicit fsync calls regardless of the column family's sync mode. This ensures correct durability guarantees for interval-based syncing while maintaining the performance benefits of batched syncs for normal writes.
+
 **Reaper worker** (1 thread) closes unused SSTable file handles when the open SSTable count exceeds the limit (configurable, default 256 SSTables = 512 file descriptors). It sorts SSTables by last access time (updated atomically on each SSTable open, not on every read) and closes the oldest 25%. With more SSTables than the limit, the reaper runs continuously, causing file descriptor thrashing.
 
 ### Work Distribution
@@ -724,7 +728,7 @@ For a column family with 10M keys across 100 SSTables using defaults: ~12MB bloo
 
 ### Compaction Lag
 
-Writes can outpace compaction if the write rate exceeds the compaction throughput. The system applies backpressure: when L0 exceeds 10 SSTables (configurable), writes stall until compaction catches up. This prevents unbounded memory growth but can cause write latency spikes.
+Writes can outpace compaction if the write rate exceeds the compaction throughput. The system applies backpressure: when L0 exceeds 20 immutable memtables (configurable via `l0_queue_stall_threshold`), writes stall until flush workers catch up. This prevents unbounded memory growth but can cause write latency spikes.
 
 ### Disk Space
 
@@ -749,6 +753,8 @@ TidesDB's internal components are designed as reusable, well-tested modules with
 The block manager provides a lock-free, append-only file abstraction with atomic reference counting and checksumming. Each file begins with an 8-byte header (3-byte magic "TDB", 1-byte version, 4-byte padding). Blocks consist of a header (4-byte size, 4-byte xxHash32 checksum), data, and footer (4-byte size duplicate, 4-byte magic "BTDB") for fast backward validation.
 
 **Lock-free concurrency** · Writers use `pread`/`pwrite` for position-independent I/O, allowing concurrent reads and writes without locks. These POSIX functions are abstracted through `compat.h` for cross-platform support (Windows uses `ReadFile`/`WriteFile` with `OVERLAPPED` structures). The file size is tracked atomically in memory to avoid syscalls. Blocks use atomic reference counting - callers must call `block_manager_block_release()` when done, and blocks free when refcount reaches zero. Durability operations use `fdatasync` (also abstracted via `compat.h`).
+
+**Single syscall optimization** · Block reads are optimized to use a single `pread` syscall for blocks up to 64KB. The system reads header and data together into a stack buffer, then copies to the final allocation only if the block is valid. For larger blocks, a second read fetches remaining data. This reduces syscall overhead on the hot read path.
 
 **Cursor abstraction** · Block manager cursors enable sequential and random access. Cursors maintain current position and can move forward, backward, or jump to specific offsets. The `cursor_read_partial()` operation reads only the first N bytes of a block, useful for reading headers without loading large values.
 
@@ -819,9 +825,13 @@ The skip list provides a lock-free, multi-versioned ordered map with MVCC suppor
 
 **Lock-free updates** · Insert operations use optimistic concurrency - traverse to find position, create new node, then atomically CAS the forward pointers. If CAS fails (concurrent modification), retry from the beginning. The implementation uses atomic operations for all pointer updates and supports up to 1000 CAS attempts before failing.
 
+**Stack allocation optimization** · The hot path `skip_list_put_with_seq()` uses stack-allocated update arrays for skip lists with max_level < 64, eliminating malloc/free overhead. This covers virtually all practical configurations since 64 levels can index 2^64 entries.
+
 **Multi-version storage** · Each key maintains a version chain. New writes prepend a version to the chain using atomic CAS on the version list head. Readers traverse the version chain to find the appropriate version for their snapshot sequence. Tombstones are represented as versions with the DELETED flag set.
 
-**Bidirectional traversal** · Nodes store both forward and backward pointers at each level. Forward pointers enable ascending iteration, backward pointers enable descending iteration. The backward pointers are stored in the same array as forward pointers: `forward[max_level+1+level]`.
+**Bidirectional traversal** · Nodes store both forward and backward pointers at each level. Forward pointers enable ascending iteration, backward pointers enable descending iteration. The backward pointers are stored in the same array as forward pointers: `forward[max_level+1+level]`. This enables O(1) access to the last element via `skip_list_cursor_goto_last()` and `skip_list_get_max_key()` using the tail sentinel's backward pointer.
+
+**Cached time** · Skip lists can be created with `skip_list_new_with_comparator_and_cached_time()` which accepts a pointer to an externally-maintained cached time value. This avoids repeated `time()` syscalls during iteration and lookups when checking TTL expiration. TidesDB maintains a global `cached_current_time` updated by the reaper thread and refreshed before compaction and flush operations.
 
 **Custom comparators** · The skip list supports pluggable comparator functions with context pointers. TidesDB uses this for column families with different key orderings (memcmp, lexicographic, uint64, int64, custom).
 
