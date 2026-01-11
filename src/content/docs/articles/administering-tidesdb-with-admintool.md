@@ -176,17 +176,17 @@ This is where Admintool really shines. Being able to inspect SSTables directly w
 ```
 admintool(/data/mydb)> sstable-list users
 SSTables in 'users':
-  00001.klog (4194304 bytes)
-  00002.klog (8388608 bytes)
-  00003.klog (2097152 bytes)
+  L1_1001.klog (4194304 bytes)
+  L1_1002.klog (8388608 bytes)
+  L2_1003.klog (2097152 bytes)
 (3 SSTables)
 ```
 
 ### SSTable Information
 
 ```
-admintool(/data/mydb)> sstable-info /data/mydb/users/00001.klog
-SSTable: /data/mydb/users/00001.klog
+admintool(/data/mydb)> sstable-info /data/mydb/users/L1_1001.klog
+SSTable: /data/mydb/users/L1_1001.klog
   File Size: 4194304 bytes
   Block Count: 128
   Last Modified: 1704067200
@@ -199,7 +199,7 @@ SSTable: /data/mydb/users/00001.klog
 The `sstable-dump` command shows you exactly what's inside:
 
 ```
-admintool(/data/mydb)> sstable-dump /data/mydb/users/00001.klog 10
+admintool(/data/mydb)> sstable-dump /data/mydb/users/L1_1001.klog 10
 SSTable Entries (limit: 10):
 1) [blk:0] seq=1 key="user:1001" value="{"name":"alice"}"
 2) [blk:0] seq=2 key="user:1002" value="{"name":"bob"}"
@@ -218,10 +218,10 @@ Notice the flags:
 For entries with vlog references, use `sstable-dump-full` to retrieve the actual values:
 
 ```
-admintool(/data/mydb)> sstable-dump-full /data/mydb/users/00001.klog /data/mydb/users/00001.vlog 10
+admintool(/data/mydb)> sstable-dump-full /data/mydb/users/L1_1001.klog /data/mydb/users/L1_1001.vlog 10
 SSTable Full Dump (limit: 10):
-  KLog: /data/mydb/users/00001.klog
-  VLog: /data/mydb/users/00001.vlog
+  KLog: /data/mydb/users/L1_1001.klog
+  VLog: /data/mydb/users/L1_1001.vlog
 
 1) [blk:0] [VLOG:8192] seq=12 key="user:1004" value="{"name":"david","profile":"..."}"
 
@@ -233,8 +233,8 @@ SSTable Full Dump (limit: 10):
 For a high-level overview of an SSTable's contents:
 
 ```
-admintool(/data/mydb)> sstable-stats /data/mydb/users/00001.klog
-SSTable Statistics: /data/mydb/users/00001.klog
+admintool(/data/mydb)> sstable-stats /data/mydb/users/L1_1001.klog
+SSTable Statistics: /data/mydb/users/L1_1001.klog
   File Size: 4194304 bytes (4.00 MB)
   Block Count: 128
   Total Entries: 50000
@@ -253,7 +253,7 @@ This is useful for understanding the composition of your data, how many deletes 
 If you just want to see the key distribution:
 
 ```
-admintool(/data/mydb)> sstable-keys /data/mydb/users/00001.klog 10
+admintool(/data/mydb)> sstable-keys /data/mydb/users/L1_1001.klog 10
 SSTable Keys (limit: 10):
 1) "user:1001"
 2) "user:1002"
@@ -270,8 +270,8 @@ Key Range: "user:1001" to "user:1005"
 To verify data integrity:
 
 ```
-admintool(/data/mydb)> sstable-checksum /data/mydb/users/00001.klog
-Verifying checksums: /data/mydb/users/00001.klog
+admintool(/data/mydb)> sstable-checksum /data/mydb/users/L1_1001.klog
+Verifying checksums: /data/mydb/users/L1_1001.klog
   File Size: 4194304 bytes
 
 Checksum Verification Results:
@@ -296,8 +296,8 @@ Checksum Verification Results:
 TidesDB uses bloom filters to avoid unnecessary disk reads. You can inspect their effectiveness:
 
 ```
-admintool(/data/mydb)> bloom-stats /data/mydb/users/00001.klog
-Bloom Filter Statistics: /data/mydb/users/00001.klog
+admintool(/data/mydb)> bloom-stats /data/mydb/users/L1_1001.klog
+Bloom Filter Statistics: /data/mydb/users/L1_1001.klog
   Serialized Size: 65536 bytes
   Filter Size (m): 524288 bits (64.00 KB)
   Hash Functions (k): 7
@@ -318,16 +318,16 @@ The Write-Ahead Log is critical for durability. Admintool lets you inspect it di
 ```
 admintool(/data/mydb)> wal-list users
 WAL files in 'users':
-  00001.log (1048576 bytes)
-  00002.log (524288 bytes)
+  wal_0.log (1048576 bytes)
+  wal_1.log (524288 bytes)
 (2 WAL files)
 ```
 
 ### WAL Information
 
 ```
-admintool(/data/mydb)> wal-info /data/mydb/users/00001.log
-WAL: /data/mydb/users/00001.log
+admintool(/data/mydb)> wal-info /data/mydb/users/wal_0.log
+WAL: /data/mydb/users/wal_0.log
   File Size: 1048576 bytes
   Block Count (entries): 5000
   Last Modified: 1704067200
@@ -336,7 +336,7 @@ WAL: /data/mydb/users/00001.log
 ### Dumping WAL Entries
 
 ```
-admintool(/data/mydb)> wal-dump /data/mydb/users/00001.log 10
+admintool(/data/mydb)> wal-dump /data/mydb/users/wal_0.log 10
 WAL Entries (limit: 10):
 1) [PUT] seq=1 key="user:1001" value="{"name":"alice"}"
 2) [PUT] seq=2 key="user:1002" value="{"name":"bob"}"
@@ -351,8 +351,8 @@ WAL Entries (limit: 10):
 To check WAL integrity:
 
 ```
-admintool(/data/mydb)> wal-verify /data/mydb/users/00001.log
-Verifying WAL: /data/mydb/users/00001.log
+admintool(/data/mydb)> wal-verify /data/mydb/users/wal_0.log
+Verifying WAL: /data/mydb/users/wal_0.log
   File Size: 1048576 bytes
   Valid Entries: 5000
   Corrupted Entries: 0
