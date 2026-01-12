@@ -165,7 +165,7 @@ A transaction buffers operations in memory until commit. At commit time:
 5. It marks the commit sequence as committed in the status buffer
 6. It checks if any memtable exceeds its size threshold
 
-The transaction uses hash-based deduplication (simple multiplicative hash: `hash = hash * 31 + key[i]`) to apply only the final operation for each key. The hash table is dynamically sized based on transaction size (2× the number of operations, minimum 1024 slots) to reduce collisions for large write batches. This is a fast non-cryptographic hash - collisions are possible but rare, and would cause the transaction to write both operations to the memtable (skip list handles duplicates correctly). This optimization reduces memtable size when a transaction modifies the same key multiple times.
+The transaction uses hash-based deduplication to apply only the final operation for each key. The hash table is dynamically sized based on transaction size (2× the number of operations, minimum 1024 slots) to reduce collisions for large write batches. This is a fast non-cryptographic hash - collisions are possible but rare, and would cause the transaction to write both operations to the memtable (skip list handles duplicates correctly). This optimization reduces memtable size when a transaction modifies the same key multiple times.
 
 ### Memtable Flush
 
