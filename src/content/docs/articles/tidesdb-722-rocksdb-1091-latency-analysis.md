@@ -14,7 +14,7 @@ What I found was there were 2 main causes of the latency:
 1. Skip List
 2. Clock Cache
 
-Perfing both components I found that we could utilize inline comparisons in skip list, also we could utilize prefetching.  I also thought the same regarding the clock cache.  I implemented these optimizations we went down nearly 75% of the latency for both components.
+Perfing both components I found that we could utilize inline comparisons in skip list, also we could utilize prefetching.  I also thought the same regarding the clock cache.  I implemented these optimizations we went down nearly 65% of the latency for both components.
 
 This translated to very performance improvements, across the board.
 
