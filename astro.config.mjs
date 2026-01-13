@@ -146,6 +146,8 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						
+						{ label: 'TidesDB 7.2.2 and RocksDB 10.9.1 Latency Analysis', slug: 'articles/tidesdb-722-rocksdb-1091-latency-analysis' },
 						{ label: 'Analysis of TidesDB 7.2.1 and RocksDB 10.9.1', slug: 'articles/analysis-tidesdb721-rocksdb1091' },
 						{ label: 'Administering TidesDB with Admintool', slug: 'articles/administering-tidesdb-with-admintool' },
 						{ label: 'TidesDB 7.1.1 vs RocksDB 10.9.1', slug: 'articles/benchmark-analysis-tidesdb-v7-1-1-rocksdb-10-9-1' },
