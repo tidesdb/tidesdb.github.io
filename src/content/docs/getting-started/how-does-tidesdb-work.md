@@ -40,7 +40,7 @@ The database organizes data into column families. Each column family is an indep
 This isolation allows different column families to use different compression algorithms, comparators, and tuning parameters within the same database instance.
 
 
-
+<br/><br/>
 A column family maintains:
 
 - One active memtable for new writes
