@@ -715,6 +715,15 @@ canvas {
 	display: block;
 }
 
+
+.small-article-image {
+	width: 228px;
+	height: 400px;
+	float: left;
+	margin-right: 1rem;
+	margin-bottom: 5px;
+}
+
 .heart-sponsor {
 	background: rgb(192, 45, 35)!important;
 	border: none!important;
