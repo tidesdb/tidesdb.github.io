@@ -1,6 +1,6 @@
 ---
-title: "The Process of Building TidesDB"
-description: "The journey to building TidesDB"
+title: "From Building Houses to Storage Engines"
+description: "The journey of how TidesDB came to be."
 head:
   - tag: meta
     attrs:
@@ -25,7 +25,14 @@ I get asked pretty regularly about my process for getting to the point of coming
 
 </div>
 
-It all starts when I was a child. I got my first computer, I was obsessed. I would take it apart, rebuild it, and try to understand how it worked. I did this with most electronics I had as a kid. This naturally led me to the world of programming. My first language was Visual Basic and I was rather young at the time, I think I was 12 or 13 years old. After that I got into C, C++, and all kinds of languages and frameworks through the years. I'm just a naturally curious person and I love getting deep into things and understanding how they work. Programming has always been an escape for me, hours fly by and I don't even notice.  It's a passion and absolute joy.  In the toughest times, I would always find solace in programming.  Unfortunatly for me I had a tough time growing up and it wasn't easy to go to school due to internal family issues. I had to start working very young, my first job I would do coat check with my father, I remember then working with my uncle in construction, I grew a very strong work ethic and drive to succeed during those times.  I've worked many careers in my life and even during all those times I always programmed, whether it was a web app I thought was cool like GIFSOM which was an early GIF social network, or a website or application for a client working freelance.  I've worked many jobs, I've been a carpenter, I've been a train conductor, I've cooked food at restaurants.  I've done a lot, and I've learned and continue to learn.  Life is all about experiences, learning, growing, and sometimes jumping into hard situations for me.
+It all starts when I was a child. I got my first computer, I was obsessed. I would take it apart, rebuild it, and try to understand how it worked. I did this with most electronics I had as a kid. This naturally led me to the world of programming. My first language was Visual Basic and I was rather young at the time, I think I was 12 or 13 years old. After that I got into C, C++, and all kinds of languages and frameworks through the years. I'm just a naturally curious person and I love getting deep into things and understanding how they work. Programming has always been an escape for me, hours fly by and I don't even notice.  It's a passion and absolute joy.  In the toughest times, I would always find solace in programming.  
+
+Unfortunately for me I had a tough time growing up and it wasn't easy to go to school due to internal family issues. I had to start working very young, my first job I would do coat check with my father, I remember then working with my uncle in construction, I grew a very strong work ethic and drive to succeed during those times.  
+
+
+<img width="128" style="float: left; margin-right: 10px;" src="/alex-carpenter.jpeg" alt="Alex Gaetano Padula Carpenter" />
+
+I've worked many careers in my life and even during all those times I always programmed, whether it was a web app I thought was cool like GIFSOM which was an early GIF social network, or a website or application for a client working freelance.  I've worked many jobs, I've been a carpenter, I've been a train conductor, I've cooked food at restaurants.  I've done a lot, and I've learned and continue to learn.  Life is all about experiences, learning, growing, and sometimes jumping into hard situations for me.
 
 A few years ago I started to tinker with storage systems. I wrote _so many_ naive and rather good implementations from basic n-ary disk storage, to btrees, to even a <a href="https://github.com/fairymq" target="_blank">distributed message queue</a>. I even wrote <a href="https://github.com/cursusdb/cursusdb" target="_blank">CursusDB</a>, which is a distributed in-memory document database with real time capabilities. This was one of my first storage systems I ever wrote, and it wasn't that great but I learned so much just from building from first principles. I got curious about how could I store data on disk? How could I allow for better concurrency? Parallelism? Protocols? Replication? Sharding? So many questions sprung up. 
 
