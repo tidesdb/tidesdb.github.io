@@ -125,7 +125,7 @@ The system provides five isolation levels:
 **Serializable** implements serializable snapshot isolation (SSI). The system tracks read-write conflicts:
 
 1. Each transaction maintains a read set (arrays of CF pointers, keys, key sizes, sequence numbers)
-2. Creates a hash table (`tidesdb_read_set_hash_t`) using xxHash for O(1) conflict detection
+2. Creates a hash table (`tidesdb_read_set_hash_t`) using xxHash for O(1) conflict detection when the read set exceeds `TDB_TXN_READ_HASH_THRESHOLD` (64 reads)
 3. At commit, checks all concurrent transactions: if transaction T reads key K that another transaction T' writes, sets `T.has_rw_conflict_out = 1` and `T'.has_rw_conflict_in = 1`
 4. If both flags are set (transaction is a pivot in dangerous structure), aborts
 
@@ -138,7 +138,7 @@ Each transaction receives a snapshot sequence number at begin time. For Read Unc
 
 The snapshot sequence determines which versions the transaction sees: it reads the most recent version with sequence number less than or equal to its snapshot sequence.
 
-At commit time, the system assigns a commit sequence number from a global atomic counter. It writes operations to the write-ahead log, applies them to the active memtable with the commit sequence, and marks the sequence as committed in a fixed-size circular buffer (hardcoded at 65536 entries). The buffer wraps around: sequence N maps to slot N % 65536. When the buffer wraps, old entries are overwritten, so visibility checks for very old sequences may return incorrect results. In practice, this is acceptable because transactions with sequence numbers more than 65536 behind the current sequence are extremely rare. Readers skip versions whose sequence numbers are not yet marked committed.
+At commit time, the system assigns a commit sequence number from a global atomic counter. It writes operations to the write-ahead log, applies them to the active memtable with the commit sequence, and marks the sequence as committed in a fixed-size circular buffer (defined by `TDB_COMMIT_STATUS_BUFFER_SIZE`, currently 65536 entries). The buffer wraps around: sequence N maps to slot N % 65536. When the buffer wraps, old entries are overwritten, so visibility checks for very old sequences may return incorrect results. In practice, this is acceptable because transactions with sequence numbers more than 65536 behind the current sequence are extremely rare. Readers skip versions whose sequence numbers are not yet marked committed.
 
 ### Multi-Column Family Transactions
 
@@ -165,7 +165,7 @@ A transaction buffers operations in memory until commit. At commit time:
 5. It marks the commit sequence as committed in the status buffer
 6. It checks if any memtable exceeds its size threshold
 
-The transaction uses hash-based deduplication to apply only the final operation for each key. The hash table is dynamically sized based on transaction size (2× the number of operations, minimum 1024 slots) to reduce collisions for large write batches. This is a fast non-cryptographic hash - collisions are possible but rare, and would cause the transaction to write both operations to the memtable (skip list handles duplicates correctly). This optimization reduces memtable size when a transaction modifies the same key multiple times.
+The transaction uses hash-based deduplication to apply only the final operation for each key. The hash table is created lazily when the transaction exceeds `TDB_TXN_DEDUP_SKIP_THRESHOLD` (8 operations) and is sized at `TDB_TXN_DEDUP_HASH_MULTIPLIER` (2×) the number of operations with a minimum of `TDB_TXN_DEDUP_MIN_HASH_SIZE` (64 slots). This is a fast non-cryptographic hash - collisions are possible but rare, and would cause the transaction to write both operations to the memtable (skip list handles duplicates correctly). This optimization reduces memtable size when a transaction modifies the same key multiple times.
 
 ### Memtable Flush
 
@@ -216,10 +216,7 @@ Each column family maintains a queue of immutable memtables awaiting flush. When
 
 **Configuration interaction** · Increasing `write_buffer_size` reduces flush frequency but increases memory usage during stalls. Increasing `l0_queue_stall_threshold` allows more memory usage but provides more buffering for bursty workloads. Increasing flush worker count reduces queue depth under sustained write load. The optimal configuration depends on write patterns, available memory, and disk throughput.
 
-**Design advantage** · The graduated backpressure approach provides smooth degradation 
-rather than traditional binary throttling (normal operation or 
-complete stall), contributing to TidesDB's sustained write 
-performance advantage.
+**Design advantage** · The graduated backpressure approach provides smooth degradation rather than traditional binary throttling (normal operation or complete stall), contributing to TidesDB's sustained write performance advantage.
 
 ## Read Path
 
@@ -253,7 +250,7 @@ The bloom filter (default 1% FPR) and block index are optional optimizations con
 
 **Bloom filter false positive cost** · A false positive requires: (1) bloom filter check (memory access), (2) block index lookup (likely cache miss = disk read), (3) block read and deserialize (cache miss = disk read), (4) binary search block (memory). That's 2 disk reads for a key that doesn't exist. With 1% FPR and high query rate, this adds significant I/O.
 
-The block cache uses a clock eviction policy with reference counting. Multiple readers share cached blocks without copying. The clock hand skips blocks with refcount > 1 (actively in use). When the cache evicts a block, it decrements the reference count; the block frees when the count reaches zero.
+The block cache uses a clock eviction policy with reference bits. Multiple readers share cached blocks without copying. The clock hand checks each entry's `ref_bit`: if `ref_bit == 0`, the entry is evicted; if `ref_bit > 0`, it is cleared to 0 (second chance) and the hand moves on. Readers increment `ref_bit` when accessing an entry, protecting it from eviction during use.
 
 <br/>
 
@@ -272,7 +269,7 @@ The block index enables fast key lookups by mapping key ranges to file offsets. 
 - `max_key_prefixes` · Last key prefix of each indexed block
 - `file_positions` · File offset where each block starts
 
-**Sparse Sampling** · The `index_sample_ratio` (default 1) controls how many blocks to index. A ratio of 1 indexes every block; a ratio of 10 indexes every 10th block. Sparse indexing reduces memory usage at the cost of potentially scanning multiple blocks on lookup.
+**Sparse Sampling** · The `index_sample_ratio` (configurable via `TDB_DEFAULT_INDEX_SAMPLE_RATIO`, default 1) controls how many blocks to index. A ratio of 1 indexes every block; a ratio of 10 indexes every 10th block. Sparse indexing reduces memory usage at the cost of potentially scanning multiple blocks on lookup.
 
 **Prefix Compression** · Keys are stored as fixed-length prefixes (default 16 bytes, configurable via `block_index_prefix_len`). Keys shorter than the prefix length are zero-padded. This trades precision for space - keys with identical prefixes may require scanning multiple blocks to disambiguate.
 
@@ -620,7 +617,7 @@ Four worker pools handle asynchronous operations:
 
 **Mid-durability correctness** · Column families configured with `TDB_SYNC_INTERVAL` propagate full sync to block managers during structural operations. When a memtable becomes immutable (rotation), the system escalates an fsync on the WAL to ensure durability before the memtable enters the flush queue. During sorted run creation and merge operations, block managers always receive explicit fsync calls regardless of the column family's sync mode. This ensures correct durability guarantees for interval-based syncing while maintaining the performance benefits of batched syncs for normal writes.
 
-**Reaper worker** (1 thread) closes unused SSTable file handles when the open SSTable count exceeds the limit (configurable, default 256 SSTables = 512 file descriptors). It sorts SSTables by last access time (updated atomically on each SSTable open, not on every read) and closes the oldest 25%. With more SSTables than the limit, the reaper runs continuously, causing file descriptor thrashing.
+**Reaper worker** (1 thread) closes unused SSTable file handles when the open SSTable count exceeds the limit (configurable via `max_open_sstables`, default 256 SSTables = 512 file descriptors). It sorts SSTables by last access time (updated atomically on each SSTable open, not on every read) and closes the oldest `TDB_SSTABLE_REAPER_EVICT_RATIO` (25%). The reaper sleeps for `TDB_SSTABLE_REAPER_SLEEP_US` (100ms) between checks. With more SSTables than the limit, the reaper runs continuously, causing file descriptor thrashing.
 
 ### Work Distribution
 
@@ -649,7 +646,13 @@ Functions return integer error codes. Zero indicates success; negative values in
 - `TDB_ERR_NOT_FOUND` (-3): key not found
 - `TDB_ERR_IO` (-4): I/O error
 - `TDB_ERR_CORRUPTION` (-5): data corruption detected
+- `TDB_ERR_EXISTS` (-6): resource already exists
 - `TDB_ERR_CONFLICT` (-7): transaction conflict
+- `TDB_ERR_TOO_LARGE` (-8): key or value too large
+- `TDB_ERR_MEMORY_LIMIT` (-9): memory limit exceeded
+- `TDB_ERR_INVALID_DB` (-10): invalid database handle
+- `TDB_ERR_UNKNOWN` (-11): unknown error
+- `TDB_ERR_LOCKED` (-12): database is locked by another process
 
 More status codes can be seen in the [C reference](/reference/c) section.
 
@@ -809,7 +812,7 @@ The clock cache implements a partitioned, lock-free cache with hybrid hash table
 
 **Lock-free operations** · Entries use atomic state machines (EMPTY, WRITING, VALID, DELETING). Get operations are fully lock-free: hash to partition, probe hash index for slot, atomically load entry, set ref_bit, return pointer. Put operations claim a slot by advancing the CLOCK hand until finding an entry with ref_bit=0 and state=VALID, then atomically transition to WRITING.
 
-**Zero-copy reads** · `clock_cache_get_zero_copy()` returns a pointer to cached data without copying. The CLOCK hand skips entries with ref_bit=1 (actively in use). Callers must call `clock_cache_release()` to clear the ref_bit when done.
+**Zero-copy reads** · `clock_cache_get_zero_copy()` returns a pointer to cached data without copying. The CLOCK hand gives entries with ref_bit > 0 a second chance by clearing the bit to 0 and moving on; entries with ref_bit == 0 are evicted. Callers must call `clock_cache_release()` to decrement the ref_bit when done.
 
 **Integration** · TidesDB uses the clock cache for deserialized klog blocks. Cache keys are "cf_name:sstable_id:block_offset". On cache hit, the system increments the ref_bit and returns the cached block without disk I/O or deserialization. Multiple readers share the same cached block. The zero-copy design eliminates memory allocation on the hot read path.
 
@@ -823,9 +826,9 @@ The clock cache implements a partitioned, lock-free cache with hybrid hash table
 
 The skip list provides a lock-free, multi-versioned ordered map with MVCC support. Each key has a linked list of versions, newest first. Versions store sequence numbers, values, TTL, and tombstone flags. The skip list uses probabilistic leveling (default p=0.25, max_level=12) for O(log n) average search time.
 
-**Lock-free updates** · Insert operations use optimistic concurrency - traverse to find position, create new node, then atomically CAS the forward pointers. If CAS fails (concurrent modification), retry from the beginning. The implementation uses atomic operations for all pointer updates and supports up to 1000 CAS attempts before failing.
+**Lock-free updates** · Insert operations use optimistic concurrency - traverse to find position, create new node, then atomically CAS the forward pointers. If CAS fails (concurrent modification), retry from the beginning. The implementation uses atomic operations for all pointer updates and supports up to `SKIP_LIST_MAX_CAS_ATTEMPTS` (1000) CAS attempts before failing.
 
-**Stack allocation optimization** · The hot path `skip_list_put_with_seq()` uses stack-allocated update arrays for skip lists with max_level < 64, eliminating malloc/free overhead. This covers virtually all practical configurations since 64 levels can index 2^64 entries.
+**Stack allocation optimization** · The hot path `skip_list_put_with_seq()` uses stack-allocated update arrays for skip lists with max_level < 64, eliminating malloc/free overhead. This covers virtually all practical configurations since 64 levels can index 2^64 entries. The default configuration uses `skip_list_max_level = 12` and `skip_list_probability = 0.25`.
 
 **Multi-version storage** · Each key maintains a version chain. New writes prepend a version to the chain using atomic CAS on the version list head. Readers traverse the version chain to find the appropriate version for their snapshot sequence. Tombstones are represented as versions with the DELETED flag set.
 
