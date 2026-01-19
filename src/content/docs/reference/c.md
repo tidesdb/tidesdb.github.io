@@ -172,6 +172,38 @@ Logs are written to **stderr** with timestamps:
 ./your_program 2> tidesdb.log  # Redirect stderr to file
 ```
 
+### Backup
+
+`tidesdb_backup` creates an on-disk snapshot of an open database without blocking normal reads/writes.
+
+```c
+int tidesdb_backup(tidesdb_t *db, char *dir);
+```
+
+**Usage**
+```c
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
+
+if (tidesdb_backup(db, "./mydb_backup") != 0)
+{
+    fprintf(stderr, "Backup failed\n");
+}
+```
+
+**Behavior**
+- Requires `dir` to be a non-existent directory or an empty directory; returns `TDB_ERR_EXISTS` if not empty.
+- Does not copy the `LOCK` file, so the backup can be opened normally.
+- Two-phase copy approach:
+  - Copies immutable files first (SSTables listed in the manifest plus metadata/config files) and skips WALs.
+  - Forces memtable flushes, waits for flush/compaction queues to drain, then copies any remaining files
+    (including WALs and updated manifests). Existing SSTables already copied are not recopied.
+- Database stays open and usable during backup; no exclusive lock is taken on the source directory.
+
+**Notes**
+- The backup represents the database state after the final flush/compaction drain.
+- If you need a quiesced backup window, you can pause writes at the application level before calling this API.
+
 ## Column Family Operations
 
 ### Creating a Column Family
