@@ -146,6 +146,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						{ label: 'TidesDB v7.3.0 & RocksDB v10.9.1 Benchmark Analysis', slug: 'articles/benchmark-analysis-tidesdb-v7-3-0-rocksdb-v10-9-1' },
 						{ label: 'From Building Houses to Storage Engines', slug: 'articles/from-building-houses-to-storage-engines' },
 						{ label: 'TidesDB v7.2.3 & RocksDB v10.9.1 Benchmark Analysis', slug: 'articles/benchmark-analysis-tidesdb-v7-2-3-rocksdb-v10-9-1' },
 						{ label: 'TidesDB 7.2.2 and RocksDB 10.9.1 Latency Analysis', slug: 'articles/tidesdb-722-rocksdb-1091-latency-analysis' },
