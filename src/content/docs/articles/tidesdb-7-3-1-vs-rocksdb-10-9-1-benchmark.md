@@ -1,6 +1,6 @@
 ---
-title: "Benchmark Report on TidesDB v7.3.1 & RocksDB v10.9.1"
-description: "Comparing TidesDB v7.3.1 and RocksDB v10.9.1 performance on various workloads."
+title: "TidesDB v7.3.1 vs RocksDB v10.9.1 Performance Benchmark"
+description: "In-depth performance benchmark comparing TidesDB v7.3.1 and RocksDB v10.9.1 across real-world workloads, measuring throughput, latency, and efficiency."
 head:
   - tag: meta
     attrs:
@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![Benchmark Report on TidesDB v7.3.1 & RocksDB v10.9.1](/pexels-elia-clerici-282848-912107.jpg)
+![TidesDB v7.3.1 vs RocksDB v10.9.1 Performance Benchmark](/pexels-elia-clerici-282848-912107.jpg)
 
 </div>
 
@@ -29,6 +29,10 @@ You can find the complete benchmark report below in 2 formats:
 - [Text](/tidesdb-v7-3-1-rocksdb-v10-9-1.txt)
 
 You can find the source for the benchtool <a href="https://github.com/tidesdb/benchtool">here</a>.
+
+Test environment: 
+
+- Intel i7-11700K (16 cores), 46GB RAM, Linux 6.2.0, sync disabled, Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 
 ## Engine Comparison
 
@@ -142,17 +146,16 @@ TidesDB 7.3.1 outperforms RocksDB 10.9.1 across the board:
 | Write amplification | 1.08x | 1.44x | **25% less I/O** |
 | Database size | 111 MB | 207 MB | **47% smaller** |
 
-The key takeaways:
+The key takeaways are
 
-1. **Throughput**: TidesDB delivers 1.4x to 2.7x higher throughput depending on workload.
+1. TidesDB delivers 1.4x to 2.7x higher throughput depending on workload.
 
-2. **Tail latency**: RocksDB shows occasional latency spikes up to 181ms (likely from compaction). TidesDB's worst case is 4ms.
+2. RocksDB shows occasional latency spikes up to 181ms (likely from compaction). TidesDB's worst case is 4ms.
 
-3. **PUT consistency**: TidesDB shows lower CV on PUT operations (109% vs 265%), indicating more predictable write performance.
+3. TidesDB shows lower CV on PUT operations (109% vs 265%), indicating more predictable write performance.
 
-4. **Efficiency**: Lower write amplification and smaller on-disk footprint.
+4. TidesDB show's consistently lower write amplification and smaller on-disk footprint.
 
-Test environment: Intel i7-11700K (16 cores), 46GB RAM, Linux 6.2.0, sync disabled.
 
 *Thanks for reading!*
 
