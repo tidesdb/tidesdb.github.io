@@ -381,6 +381,76 @@ if (tidesdb_get_cache_stats(db, &cache_stats) == 0)
 The block cache is a database-level resource shared across all column families. It caches deserialized klog blocks to avoid repeated disk I/O and deserialization. Configure cache size via `config.block_cache_size` when opening the database. Set to 0 to disable caching.
 :::
 
+### Compression Algorithms
+
+TidesDB supports multiple compression algorithms to reduce storage footprint and I/O bandwidth. Compression is applied to both klog (key-log) and vlog (value-log) blocks before writing to disk.
+
+**Available Algorithms**
+
+- **`NO_COMPRESSION`** · No compression (value: 0)
+  - Raw data written directly to disk
+  - **Use case** · Pre-compressed data, maximum write throughput, CPU-constrained environments
+
+- **`LZ4_COMPRESSION`** · LZ4 standard compression (value: 2, **default**)
+  - Fast compression and decompression with good compression ratios
+  - **Use case** · General purpose, balanced performance and compression
+  - **Performance** · ~500 MB/s compression, ~2000 MB/s decompression (typical)
+
+- **`LZ4_FAST_COMPRESSION`** · LZ4 fast mode (value: 4)
+  - Faster compression than standard LZ4 with slightly lower compression ratio
+  - Uses acceleration factor of 2
+  - **Use case** · Write-heavy workloads prioritizing speed over compression ratio
+  - **Performance** · Higher compression throughput than standard LZ4
+
+- **`ZSTD_COMPRESSION`** · Zstandard compression (value: 3)
+  - Best compression ratio with moderate speed (compression level 1)
+  - **Use case** · Storage-constrained environments, archival data, read-heavy workloads
+  - **Performance** · ~400 MB/s compression, ~1000 MB/s decompression (typical)
+
+- **`SNAPPY_COMPRESSION`** · Snappy compression (value: 1)
+  - Fast compression with moderate compression ratios
+  - **Availability** · Not available on SunOS/Illumos/OmniOS platforms
+  - **Use case** · Legacy compatibility, platforms where Snappy is preferred
+
+**Configuration Example**
+
+```c
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+
+/* Use LZ4 compression (default) */
+cf_config.compression_algorithm = LZ4_COMPRESSION;
+
+/* Use Zstandard for better compression ratio */
+cf_config.compression_algorithm = ZSTD_COMPRESSION;
+
+/* Use LZ4 fast mode for maximum write throughput */
+cf_config.compression_algorithm = LZ4_FAST_COMPRESSION;
+
+/* Disable compression */
+cf_config.compression_algorithm = NO_COMPRESSION;
+
+tidesdb_create_column_family(db, "my_cf", &cf_config);
+```
+
+**Important Notes**
+
+- Compression algorithm **cannot be changed** after column family creation without corrupting existing SSTables
+- Compression is applied at the block level (both klog and vlog blocks)
+- Decompression happens automatically during reads
+- Block cache stores **decompressed** blocks to avoid repeated decompression overhead
+- Different column families can use different compression algorithms
+
+**Choosing a Compression Algorithm**
+
+| Workload | Recommended Algorithm | Rationale |
+|----------|----------------------|-----------|
+| General purpose | `LZ4_COMPRESSION` | Best balance of speed and compression |
+| Write-heavy | `LZ4_FAST_COMPRESSION` | Minimize CPU overhead on writes |
+| Storage-constrained | `ZSTD_COMPRESSION` | Maximum compression ratio |
+| Read-heavy | `ZSTD_COMPRESSION` | Reduce I/O bandwidth, decompression is fast |
+| Pre-compressed data | `NO_COMPRESSION` | Avoid double compression overhead |
+| CPU-constrained | `NO_COMPRESSION` or `LZ4_FAST_COMPRESSION` | Minimize CPU usage |
+
 ### Updating Column Family Configuration
 
 Update runtime-safe configuration settings. Configuration changes are applied to new operations only.

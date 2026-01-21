@@ -146,6 +146,7 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						{ label: 'Benchmark Report on TidesDB v7.3.1 & RocksDB v10.9.1', slug: 'articles/benchmark-report-tidesdb-v7-3-1-rocksdb-v10-9-1' },
 						{ label: 'TidesDB v7.3.0 & RocksDB v10.9.1 Benchmark Analysis', slug: 'articles/benchmark-analysis-tidesdb-v7-3-0-rocksdb-v10-9-1' },
 						{ label: 'From Building Houses to Storage Engines', slug: 'articles/from-building-houses-to-storage-engines' },
 						{ label: 'TidesDB v7.2.3 & RocksDB v10.9.1 Benchmark Analysis', slug: 'articles/benchmark-analysis-tidesdb-v7-2-3-rocksdb-v10-9-1' },
