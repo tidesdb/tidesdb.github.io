@@ -146,7 +146,7 @@ TidesDB 7.3.1 outperforms RocksDB 10.9.1 across:
 | Write amplification | 1.08x | 1.44x | **25% less I/O** |
 | Database size | 111 MB | 207 MB | **47% smaller** |
 
-The key takeaways are
+The key takeaways are:
 
 1. TidesDB delivers 1.4x to 2.7x higher throughput depending on workload.
 
