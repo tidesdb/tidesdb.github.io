@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![Benchmark Report on TidesDB 7.3.1 & RocksDB 10.9.1](/pexels-elia-clerici-282848-912107.jpg)
+![Benchmark Report on TidesDB v7.3.1 & RocksDB v10.9.1](/pexels-elia-clerici-282848-912107.jpg)
 
 </div>
 
