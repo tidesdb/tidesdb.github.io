@@ -132,7 +132,7 @@ Write, read, and space amplification factors. Lower amplification means more eff
 
 ## Summary
 
-TidesDB 7.3.1 outperforms RocksDB 10.9.1 across the board:
+TidesDB 7.3.1 outperforms RocksDB 10.9.1 across:
 
 | Metric | TidesDB | RocksDB | Difference |
 |--------|---------|---------|------------|
