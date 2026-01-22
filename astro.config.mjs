@@ -141,6 +141,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Building & Benchmarking', slug: 'reference/building' },
 						{ label: 'C API Reference', slug: 'reference/c' },
+						{ label: 'GO API Reference', slug: 'reference/go' },
 					],
 				},
 				{
