@@ -141,14 +141,14 @@ export default defineConfig({
 					items: [
 						{ label: 'Building & Benchmarking', slug: 'reference/building' },
 						{ label: 'C API Reference', slug: 'reference/c' },
+						{ label: 'C++ API Reference', slug: 'reference/cplusplus' },
+						{ label: 'C# API Reference', slug: 'reference/csharp' },
 						{ label: 'GO API Reference', slug: 'reference/go' },
 						{ label: 'Python API Reference', slug: 'reference/python' },
 						{ label: 'Java API Reference', slug: 'reference/java' },
 						{ label: 'Rust API Reference', slug: 'reference/rust' },
-						{ label: 'TypeScript API Reference', slug: 'reference/ts' },
-						{ label: 'C# API Reference', slug: 'reference/cs' },
+						{ label: 'TypeScript API Reference', slug: 'reference/typescript' },
 						{ label: 'Lua API Reference', slug: 'reference/lua' },
-						{ label: 'C++ API Reference', slug: 'reference/cpp' },
 					],
 				},
 				{
