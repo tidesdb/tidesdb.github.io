@@ -69,7 +69,7 @@ Each sorted string table (SSTable) consists of two files: a key log (.klog) and 
 
 </div>
 
-The key log uses a block-based format. Each block (fixed at 64KB) contains multiple entries serialized with variable-length integer encoding. Blocks compress independently using LZ4, Zstd, or Snappy. The key log ends with three auxiliary structures: a block index for binary search, a bloom filter for negative lookups, and a metadata block with SSTable statistics.
+The key log uses a block-based format. Each block (fixed at 64KB) contains multiple entries serialized with variable-length integer encoding. Blocks compress independently using LZ4, LZ4-FAST, Zstd, or Snappy. The key log ends with three auxiliary structures: a block index for binary search, a bloom filter for negative lookups, and a metadata block with SSTable statistics.
 
 
 ### File Format
@@ -526,7 +526,7 @@ All three merge policies share a common merge execution path with slight variati
     *   Data is written in blocks (fixed size 64KB).
     *   Values exceeding the configured threshold (default 512 bytes) are written to the value log (.vlog), while the key log (.klog) stores only the file offset.
     *   Values smaller than the threshold are stored inline in the key log.
-    *   Blocks are optionally compressed using the column family's configured compression algorithm (LZ4, Zstd, or Snappy).
+    *   Blocks are optionally compressed using the column family's configured compression algorithm (LZ4, LZ4-FAST, Zstd, or Snappy).
 
 7.  **Finalize SSTables**
     *   After all data is written, the system appends auxiliary structures to each key log: a block index for fast lookups, a bloom filter for negative lookups (if enabled), and a metadata block with SSTable statistics.

@@ -370,9 +370,39 @@ TidesDB provides several CMake options to customize the build:
 |--------|-------------|----------|
 | `TIDESDB_WITH_SANITIZER` | Enable address/undefined behavior sanitizers | `OFF` |
 | `TIDESDB_BUILD_TESTS` | Build test suite | `ON` |
-| `BUILD_SHARED_LIBS` | Build shared libraries instead of static | `ON` |
+| `BUILD_SHARED_LIBS` | Build shared libraries instead of static | `ON` (Unix), `OFF` (Windows) |
 | `ENABLE_READ_PROFILING` | Enable read profiling instrumentation | `OFF` |
-| `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | `Release` |
+| `TIDESDB_WITH_MIMALLOC` | Use mimalloc as the memory allocator | `OFF` |
+| `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | (unset) |
+
+### Mimalloc Memory Allocator
+
+TidesDB optionally supports [mimalloc](https://github.com/microsoft/mimalloc), Microsoft's high-performance memory allocator. When enabled, mimalloc replaces the standard malloc/free at link time, providing improved allocation performance for memory-intensive workloads.
+
+**Enabling mimalloc**
+
+```bash
+# Linux/macOS with vcpkg
+cmake -S . -B build -DTIDESDB_WITH_MIMALLOC=ON
+
+# Windows with vcpkg
+cmake -S . -B build -DTIDESDB_WITH_MIMALLOC=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+```
+
+**Requirements**
+- mimalloc is installed via vcpkg as an optional feature
+- On Windows, vcpkg manifest mode automatically installs mimalloc when the option is enabled
+- No code changes required -- mimalloc overrides standard allocators at link time
+
+**When to use mimalloc**
+- High-throughput workloads with frequent allocations
+- Multi-threaded applications (mimalloc has excellent thread-local caching)
+- Memory-constrained environments (mimalloc has lower fragmentation)
+
+**Performance impact**
+- Typical improvement: 5-15% reduction in allocation overhead
+- Best results with many small allocations (skip list nodes, block buffers)
+- Minimal overhead when disabled (default)
 
 ### Read Profiling
 
@@ -587,7 +617,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_SKIP_LIST_MAX_LEVEL` | Skip list max level | 12 |
 | `BENCH_SKIP_LIST_PROBABILITY` | Skip list probability | 0.25 |
 | `BENCH_ENABLE_COMPRESSION` | Enable compression (0=off, 1=on) | 1 |
-| `BENCH_COMPRESSION_ALGORITHM` | Compression algorithm | LZ4_COMPRESSION |
+| `BENCH_COMPRESSION_ALGORITHM` | Compression algorithm | TDB_COMPRESS_LZ4 |
 | `BENCH_ENABLE_BLOOM_FILTER` | Enable bloom filter (0=off, 1=on) | 1 |
 | `BENCH_BLOOM_FILTER_FP_RATE` | Bloom filter false positive rate | 0.01 |
 | `BENCH_ENABLE_BLOCK_INDEXES` | Enable block indexes | 1 |
@@ -687,14 +717,17 @@ cmake --build build
 
 #### Testing Different Compression Algorithms
 ```bash
-# LZ4 (fastest)
-cmake -B build -DBENCH_COMPRESSION_ALGORITHM=COMPRESS_LZ4
+# LZ4 (default, good balance)
+cmake -B build -DBENCH_COMPRESSION_ALGORITHM=TDB_COMPRESS_LZ4
+
+# LZ4 Fast (fastest compression)
+cmake -B build -DBENCH_COMPRESSION_ALGORITHM=TDB_COMPRESS_LZ4_FAST
 
 # Snappy (balanced)
-cmake -B build -DBENCH_COMPRESSION_ALGORITHM=COMPRESS_SNAPPY
+cmake -B build -DBENCH_COMPRESSION_ALGORITHM=TDB_COMPRESS_SNAPPY
 
-# Zstandard (best compression)
-cmake -B build -DBENCH_COMPRESSION_ALGORITHM=COMPRESS_ZSTD
+# Zstandard (best compression ratio)
+cmake -B build -DBENCH_COMPRESSION_ALGORITHM=TDB_COMPRESS_ZSTD
 ```
 
 ### Benchmark Output
