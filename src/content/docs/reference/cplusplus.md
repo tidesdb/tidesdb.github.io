@@ -37,7 +37,7 @@ cmake --build build
 ### Opening and Closing a Database
 
 ```cpp
-#include <tidesdb/tidesdb.hpp>
+#include <tidesdb.hpp>
 #include <iostream>
 
 int main() {
