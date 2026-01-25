@@ -155,6 +155,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{ 
+							label: 'TidesSQL - A Write and Space Optimized MySQL Fork', 
+							link: 'articles/tidesql-a-write-and-space-optimized-mysql-fork' 
+						},
+						{ 
 							label: 'TidesDB v7.3.1 vs RocksDB v10.9.1 Performance Benchmark', 
 							link: 'articles/tidesdb-7-3-1-vs-rocksdb-10-9-1-benchmark' 
 						},
