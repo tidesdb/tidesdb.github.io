@@ -229,7 +229,7 @@ tidesdb_column_family_config_t cf_config = {
     .dividing_level_offset = 2,                 /* Compaction dividing level offset (default: 2) */
     .skip_list_max_level = 12,                  /* Skip list max level */
     .skip_list_probability = 0.25f,             /* Skip list probability */
-    .compression_algorithm = LZ4_COMPRESSION,   /* LZ4_COMPRESSION, SNAPPY_COMPRESSION, or ZSTD_COMPRESSION */
+    .compression_algorithm = TDB_COMPRESS_LZ4,   /* TDB_COMPRESS_LZ4, TDB_COMPRESS_LZ4_FAST, TDB_COMPRESS_ZSTD, TDB_COMPRESS_SNAPPY, or TDB_COMPRESS_NONE */
     .enable_bloom_filter = 1,                   /* Enable bloom filters */
     .bloom_fpr = 0.01,                          /* 1% false positive rate */
     .enable_block_indexes = 1,                  /* Enable compact block indexes */
@@ -274,6 +274,29 @@ if (tidesdb_drop_column_family(db, "my_cf") != 0)
     return -1;
 }
 ```
+
+### Renaming a Column Family
+
+Atomically rename a column family and its underlying directory. The operation waits for any in-progress flush or compaction to complete before renaming.
+
+```c
+if (tidesdb_rename_column_family(db, "old_name", "new_name") != 0)
+{
+    return -1;
+}
+```
+
+**Behavior**
+- Waits for any in-progress flush or compaction to complete
+- Atomically renames the column family directory on disk
+- Updates all internal paths (SSTables, manifest, config)
+- Thread-safe with proper locking
+
+**Return values**
+- `TDB_SUCCESS` · Rename completed successfully
+- `TDB_ERR_NOT_FOUND` · Column family with `old_name` doesn't exist
+- `TDB_ERR_EXISTS` · Column family with `new_name` already exists
+- `TDB_ERR_IO` · Failed to rename directory on disk
 
 ### Getting a Column Family
 
@@ -387,27 +410,27 @@ TidesDB supports multiple compression algorithms to reduce storage footprint and
 
 **Available Algorithms**
 
-- **`NO_COMPRESSION`** · No compression (value: 0)
+- **`TDB_COMPRESS_NONE`** · No compression (value: 0)
   - Raw data written directly to disk
   - **Use case** · Pre-compressed data, maximum write throughput, CPU-constrained environments
 
-- **`LZ4_COMPRESSION`** · LZ4 standard compression (value: 2, **default**)
+- **`TDB_COMPRESS_LZ4`** · LZ4 standard compression (value: 2, **default**)
   - Fast compression and decompression with good compression ratios
   - **Use case** · General purpose, balanced performance and compression
   - **Performance** · ~500 MB/s compression, ~2000 MB/s decompression (typical)
 
-- **`LZ4_FAST_COMPRESSION`** · LZ4 fast mode (value: 4)
+- **`TDB_COMPRESS_LZ4_FAST`** · LZ4 fast mode (value: 4)
   - Faster compression than standard LZ4 with slightly lower compression ratio
   - Uses acceleration factor of 2
   - **Use case** · Write-heavy workloads prioritizing speed over compression ratio
   - **Performance** · Higher compression throughput than standard LZ4
 
-- **`ZSTD_COMPRESSION`** · Zstandard compression (value: 3)
+- **`TDB_COMPRESS_ZSTD`** · Zstandard compression (value: 3)
   - Best compression ratio with moderate speed (compression level 1)
   - **Use case** · Storage-constrained environments, archival data, read-heavy workloads
   - **Performance** · ~400 MB/s compression, ~1000 MB/s decompression (typical)
 
-- **`SNAPPY_COMPRESSION`** · Snappy compression (value: 1)
+- **`TDB_COMPRESS_SNAPPY`** · Snappy compression (value: 1)
   - Fast compression with moderate compression ratios
   - **Availability** · Not available on SunOS/Illumos/OmniOS platforms
   - **Use case** · Legacy compatibility, platforms where Snappy is preferred
@@ -418,16 +441,16 @@ TidesDB supports multiple compression algorithms to reduce storage footprint and
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 
 /* Use LZ4 compression (default) */
-cf_config.compression_algorithm = LZ4_COMPRESSION;
+cf_config.compression_algorithm = TDB_COMPRESS_LZ4;
 
 /* Use Zstandard for better compression ratio */
-cf_config.compression_algorithm = ZSTD_COMPRESSION;
+cf_config.compression_algorithm = TDB_COMPRESS_ZSTD;
 
 /* Use LZ4 fast mode for maximum write throughput */
-cf_config.compression_algorithm = LZ4_FAST_COMPRESSION;
+cf_config.compression_algorithm = TDB_COMPRESS_LZ4_FAST;
 
 /* Disable compression */
-cf_config.compression_algorithm = NO_COMPRESSION;
+cf_config.compression_algorithm = TDB_COMPRESS_NONE;
 
 tidesdb_create_column_family(db, "my_cf", &cf_config);
 ```
@@ -444,12 +467,12 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 
 | Workload | Recommended Algorithm | Rationale |
 |----------|----------------------|-----------|
-| General purpose | `LZ4_COMPRESSION` | Best balance of speed and compression |
-| Write-heavy | `LZ4_FAST_COMPRESSION` | Minimize CPU overhead on writes |
-| Storage-constrained | `ZSTD_COMPRESSION` | Maximum compression ratio |
-| Read-heavy | `ZSTD_COMPRESSION` | Reduce I/O bandwidth, decompression is fast |
-| Pre-compressed data | `NO_COMPRESSION` | Avoid double compression overhead |
-| CPU-constrained | `NO_COMPRESSION` or `LZ4_FAST_COMPRESSION` | Minimize CPU usage |
+| General purpose | `TDB_COMPRESS_LZ4` | Best balance of speed and compression |
+| Write-heavy | `TDB_COMPRESS_LZ4_FAST` | Minimize CPU overhead on writes |
+| Storage-constrained | `TDB_COMPRESS_ZSTD` | Maximum compression ratio |
+| Read-heavy | `TDB_COMPRESS_ZSTD` | Reduce I/O bandwidth, decompression is fast |
+| Pre-compressed data | `TDB_COMPRESS_NONE` | Avoid double compression overhead |
+| CPU-constrained | `TDB_COMPRESS_NONE` or `TDB_COMPRESS_LZ4_FAST` | Minimize CPU usage |
 
 ### Updating Column Family Configuration
 
@@ -1136,6 +1159,37 @@ This ensures the database structure remains consistent even if user data syncing
 ## Compaction
 
 TidesDB performs automatic background compaction when L1 reaches the configured file count trigger (default: 4 SSTables). However, you can manually trigger compaction for specific scenarios.
+
+### Checking Flush/Compaction Status
+
+Check if a column family currently has flush or compaction operations in progress.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+/* Check if flushing is in progress */
+if (tidesdb_is_flushing(cf))
+{
+    printf("Flush in progress\n");
+}
+
+/* Check if compaction is in progress */
+if (tidesdb_is_compacting(cf))
+{
+    printf("Compaction in progress\n");
+}
+```
+
+**Use cases**
+- **Graceful shutdown** · Wait for background operations to complete before closing
+- **Maintenance windows** · Check if operations are running before triggering manual compaction
+- **Monitoring** · Track background operation status for observability
+- **Testing** · Verify flush/compaction behavior in unit tests
+
+**Return values**
+- `1` · Operation is in progress
+- `0` · No operation in progress (or invalid column family)
 
 ### Manual Compaction
 
