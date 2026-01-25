@@ -155,7 +155,7 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{ 
-							label: 'TidesSQL - A Write and Space Optimized MySQL Fork', 
+							label: 'TideSQL - A Write and Space Optimized MySQL Fork', 
 							link: 'articles/tidesql-a-write-and-space-optimized-mysql-fork' 
 						},
 						{ 
