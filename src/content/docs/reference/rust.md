@@ -405,6 +405,12 @@ fn main() -> tidesdb::Result<()> {
 
     println!("Number of Levels: {}", stats.num_levels);
     println!("Memtable Size: {} bytes", stats.memtable_size);
+    println!("Total Keys: {}", stats.total_keys);
+    println!("Total Data Size: {} bytes", stats.total_data_size);
+    println!("Average Key Size: {:.2} bytes", stats.avg_key_size);
+    println!("Average Value Size: {:.2} bytes", stats.avg_value_size);
+    println!("Read Amplification: {:.2}", stats.read_amp);
+    println!("Hit Rate: {:.1}%", stats.hit_rate * 100.0);
 
     for (i, (size, count)) in stats.level_sizes.iter()
         .zip(stats.level_num_sstables.iter())
@@ -464,6 +470,27 @@ fn main() -> tidesdb::Result<()> {
 }
 ```
 
+### Renaming Column Families
+
+Atomically rename a column family and its underlying directory:
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("old_name", ColumnFamilyConfig::default())?;
+
+    // Rename column family (waits for flush/compaction to complete)
+    db.rename_column_family("old_name", "new_name")?;
+
+    // Access with new name
+    let cf = db.get_column_family("new_name")?;
+
+    Ok(())
+}
+```
+
 ### Compaction
 
 #### Manual Compaction
@@ -497,6 +524,91 @@ fn main() -> tidesdb::Result<()> {
 
     // Manually trigger memtable flush (Queues sorted run for L1)
     cf.flush_memtable()?;
+
+    Ok(())
+}
+```
+
+#### Checking Flush/Compaction Status
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let cf = db.get_column_family("my_cf")?;
+
+    // Check if operations are in progress
+    if cf.is_flushing() {
+        println!("Flush operation in progress");
+    }
+
+    if cf.is_compacting() {
+        println!("Compaction operation in progress");
+    }
+
+    Ok(())
+}
+```
+
+### Database Backup
+
+```rust
+use tidesdb::{TidesDB, Config};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+
+    // Create a backup to the specified directory
+    db.backup("./mydb_backup")?;
+
+    Ok(())
+}
+```
+
+### Runtime Configuration Updates
+
+Update column family configuration at runtime:
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig, CompressionAlgorithm};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let cf = db.get_column_family("my_cf")?;
+
+    // Create new configuration
+    let new_config = ColumnFamilyConfig::new()
+        .write_buffer_size(256 * 1024 * 1024)
+        .compression_algorithm(CompressionAlgorithm::Zstd);
+
+    // Update runtime config (persist_to_disk = true to save changes)
+    cf.update_runtime_config(&new_config, true)?;
+
+    Ok(())
+}
+```
+
+### INI Configuration Files
+
+Load and save column family configurations from/to INI files:
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    // Load configuration from INI file
+    let cf_config = ColumnFamilyConfig::load_from_ini("config.ini", "my_column_family")?;
+
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", cf_config.clone())?;
+
+    // Save configuration to INI file
+    cf_config.save_to_ini("config_backup.ini", "my_column_family")?;
 
     Ok(())
 }
