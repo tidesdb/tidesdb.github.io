@@ -15,10 +15,6 @@ You **must** have the TidesDB shared C library installed on your system.  You ca
 
 ## Installation
 
-```bash
-pip install tidesdb
-```
-
 Or install from source:
 
 ```bash
