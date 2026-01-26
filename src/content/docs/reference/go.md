@@ -84,6 +84,23 @@ func main() {
 }
 ```
 
+### Backup
+
+Create an on-disk snapshot of an open database without blocking normal reads/writes.
+
+```go
+err := db.Backup("./mydb_backup")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Behavior**
+- Requires the backup directory to be non-existent or empty
+- Does not copy the LOCK file, so the backup can be opened normally
+- Database stays open and usable during backup
+- The backup represents the database state after the final flush/compaction drain
+
 ### Creating and Dropping Column Families
 
 Column families are isolated key-value stores with independent configuration.
@@ -116,6 +133,17 @@ if err != nil {
 }
 
 err = db.DropColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Renaming a Column Family
+
+Atomically rename a column family and its underlying directory. The operation waits for any in-progress flush or compaction to complete before renaming.
+
+```go
+err := db.RenameColumnFamily("old_name", "new_name")
 if err != nil {
     log.Fatal(err)
 }
@@ -382,6 +410,12 @@ if err != nil {
 
 fmt.Printf("Number of Levels: %d\n", stats.NumLevels)
 fmt.Printf("Memtable Size: %d bytes\n", stats.MemtableSize)
+fmt.Printf("Total Keys: %d\n", stats.TotalKeys)
+fmt.Printf("Total Data Size: %d bytes\n", stats.TotalDataSize)
+fmt.Printf("Avg Key Size: %.2f bytes\n", stats.AvgKeySize)
+fmt.Printf("Avg Value Size: %.2f bytes\n", stats.AvgValueSize)
+fmt.Printf("Read Amplification: %.2f\n", stats.ReadAmp)
+fmt.Printf("Hit Rate: %.2f%%\n", stats.HitRate * 100)
 
 if stats.Config != nil {
     fmt.Printf("Write Buffer Size: %d\n", stats.Config.WriteBufferSize)
@@ -437,6 +471,58 @@ if err != nil {
 }
 ```
 
+#### Checking Flush/Compaction Status
+
+Check if a column family currently has flush or compaction operations in progress.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Check if flushing is in progress
+if cf.IsFlushing() {
+    fmt.Println("Flush in progress")
+}
+
+// Check if compaction is in progress
+if cf.IsCompacting() {
+    fmt.Println("Compaction in progress")
+}
+```
+
+### Updating Runtime Configuration
+
+Update runtime-safe configuration settings for a column family. Changes apply to new operations only.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+newConfig := tidesdb.DefaultColumnFamilyConfig()
+newConfig.WriteBufferSize = 256 * 1024 * 1024  // 256MB
+newConfig.SkipListMaxLevel = 16
+newConfig.BloomFPR = 0.001  // 0.1% false positive rate
+
+// Update config and persist to disk
+err = cf.UpdateRuntimeConfig(newConfig, true)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Updatable settings** (safe to change at runtime):
+- `WriteBufferSize` -- Memtable flush threshold
+- `SkipListMaxLevel` -- Skip list level for new memtables
+- `SkipListProbability` -- Skip list probability for new memtables
+- `BloomFPR` -- False positive rate for new SSTables
+- `IndexSampleRatio` -- Index sampling ratio for new SSTables
+- `SyncMode` -- Durability mode
+- `SyncIntervalUs` -- Sync interval in microseconds
+
 ### Sync Modes
 
 Control the durability vs performance tradeoff.
@@ -468,6 +554,7 @@ TidesDB supports multiple compression algorithms:
 cfConfig := tidesdb.DefaultColumnFamilyConfig()
 
 cfConfig.CompressionAlgorithm = tidesdb.NoCompression     
+cfConfig.CompressionAlgorithm = tidesdb.SnappyCompression  
 cfConfig.CompressionAlgorithm = tidesdb.LZ4Compression    
 cfConfig.CompressionAlgorithm = tidesdb.LZ4FastCompression 
 cfConfig.CompressionAlgorithm = tidesdb.ZstdCompression   
