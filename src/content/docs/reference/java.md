@@ -252,7 +252,35 @@ Stats stats = cf.getStats();
 
 System.out.println("Number of levels: " + stats.getNumLevels());
 System.out.println("Memtable size: " + stats.getMemtableSize());
+System.out.println("Total keys: " + stats.getTotalKeys());
+System.out.println("Total data size: " + stats.getTotalDataSize());
+System.out.println("Average key size: " + stats.getAvgKeySize());
+System.out.println("Average value size: " + stats.getAvgValueSize());
+System.out.println("Read amplification: " + stats.getReadAmp());
+System.out.println("Hit rate: " + stats.getHitRate());
+
+// Per-level statistics
+long[] levelSizes = stats.getLevelSizes();
+int[] levelSSTables = stats.getLevelNumSSTables();
+long[] levelKeyCounts = stats.getLevelKeyCounts();
 ```
+
+**Stats Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `numLevels` | int | Number of LSM levels |
+| `memtableSize` | long | Current memtable size in bytes |
+| `levelSizes` | long[] | Size of each level in bytes |
+| `levelNumSSTables` | int[] | Number of SSTables at each level |
+| `levelKeyCounts` | long[] | Number of keys per level |
+| `totalKeys` | long | Total keys across memtable and all SSTables |
+| `totalDataSize` | long | Total data size (klog + vlog) in bytes |
+| `avgKeySize` | double | Average key size in bytes |
+| `avgValueSize` | double | Average value size in bytes |
+| `readAmp` | double | Read amplification (point lookup cost multiplier) |
+| `hitRate` | double | Cache hit rate (0.0 if cache disabled) |
+| `config` | ColumnFamilyConfig | Column family configuration |
 
 ### Getting Cache Statistics
 
