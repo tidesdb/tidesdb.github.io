@@ -363,27 +363,21 @@ Delete operations in LSM-trees write tombstones, which must later be compacted a
 
 Delete performance is roughly equivalent, with RocksDB slightly faster on raw throughput but TidesDB showing lower write amplification.
 
-## Regular vs mimalloc
+## mimalloc vs Regular Allocator
 
-I ran the same benchmarks with TidesDB using both the standard system allocator (report #1) and mimalloc (report #2). The results show mimalloc provides consistent performance improvements:
+I ran the same benchmarks with TidesDB using mimalloc (report #1, `-DTIDESDB_WITH_MIMALLOC=ON`) and the standard system allocator (report #2, `-DTIDESDB_WITH_MIMALLOC=OFF`):
 
-| Workload | Regular Allocator | mimalloc | Improvement |
-|----------|-------------------|----------|-------------|
-| Sequential Write | 6,365,356 ops/sec | 7,115,164 ops/sec | **+11.8%** |
-| Random Write | 2,255,283 ops/sec | 2,522,416 ops/sec | **+11.8%** |
-| Mixed PUT | 2,655,514 ops/sec | 2,833,870 ops/sec | **+6.7%** |
-| Mixed GET | 1,478,610 ops/sec | 1,603,626 ops/sec | **+8.5%** |
-| Zipfian PUT | 3,050,739 ops/sec | 3,142,460 ops/sec | **+3.0%** |
-| Zipfian GET | 3,042,708 ops/sec | 3,161,078 ops/sec | **+3.9%** |
-| Large Value (4KB) | 323,680 ops/sec | 368,453 ops/sec | **+13.8%** |
-| Small Value (64B) | 1,827,301 ops/sec | 1,995,834 ops/sec | **+9.2%** |
-| Delete | 2,871,484 ops/sec | 3,023,002 ops/sec | **+5.3%** |
-
-**Key takeaways:**
-- mimalloc provides **5-14% performance improvement** across most workloads
-- Largest gains on large value writes (+13.8%) and sequential/random writes (+11.8%)
-- Consistent improvements across both read and write operations
-- TidesDB remains stable with both allocators (unlike RocksDB which crashed with jemalloc)
+| Workload | mimalloc (Report #1) | Regular Allocator (Report #2) | Difference |
+|----------|----------------------|-------------------------------|------------|
+| Sequential Write | 6,365,356 ops/sec | 7,115,164 ops/sec | Regular +11.8% |
+| Random Write | 2,255,283 ops/sec | 2,522,416 ops/sec | Regular +11.8% |
+| Mixed PUT | 2,655,514 ops/sec | 2,833,870 ops/sec | Regular +6.7% |
+| Mixed GET | 1,478,610 ops/sec | 1,603,626 ops/sec | Regular +8.5% |
+| Zipfian PUT | 3,050,739 ops/sec | 3,142,460 ops/sec | Regular +3.0% |
+| Zipfian GET | 3,042,708 ops/sec | 3,161,078 ops/sec | Regular +3.9% |
+| Large Value (4KB) | 323,680 ops/sec | 368,453 ops/sec | Regular +13.8% |
+| Small Value (64B) | 1,827,301 ops/sec | 1,995,834 ops/sec | Regular +9.2% |
+| Delete | 2,871,484 ops/sec | 3,023,002 ops/sec | Regular +5.3% |
 
 <canvas id="allocatorChart" style="max-height: 400px;"></canvas>
 
@@ -391,20 +385,20 @@ I ran the same benchmarks with TidesDB using both the standard system allocator 
 new Chart(document.getElementById('allocatorChart'), {
   type: 'bar',
   data: {
-    labels: ['Sequential Write', 'Random Write', 'Large Value', 'Small Value', 'Mixed PUT'],
+    labels: ['Sequential Write', 'Random Write', 'Mixed PUT', 'Mixed GET', 'Large Value', 'Small Value'],
     datasets: [
       {
-        label: 'Regular Allocator',
-        data: [6365356, 2255283, 323680, 1827301, 2655514],
-        backgroundColor: 'rgba(156, 163, 175, 0.8)',
-        borderColor: 'rgba(156, 163, 175, 1)',
+        label: 'mimalloc (Report #1)',
+        data: [6365356, 2255283, 2655514, 1478610, 323680, 1827301],
+        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+        borderColor: 'rgba(59, 130, 246, 1)',
         borderWidth: 1
       },
       {
-        label: 'mimalloc',
-        data: [7115164, 2522416, 368453, 1995834, 2833870],
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgba(59, 130, 246, 1)',
+        label: 'Regular Allocator (Report #2)',
+        data: [7115164, 2522416, 2833870, 1603626, 368453, 1995834],
+        backgroundColor: 'rgba(156, 163, 175, 0.8)',
+        borderColor: 'rgba(156, 163, 175, 1)',
         borderWidth: 1
       }
     ]
@@ -412,7 +406,7 @@ new Chart(document.getElementById('allocatorChart'), {
   options: {
     responsive: true,
     plugins: {
-      title: { display: true, text: 'TidesDB: Regular Allocator vs mimalloc (ops/sec)' },
+      title: { display: true, text: 'TidesDB: mimalloc vs Regular Allocator (ops/sec)' },
       legend: { position: 'top' }
     },
     scales: {
@@ -424,6 +418,13 @@ new Chart(document.getElementById('allocatorChart'), {
   }
 });
 </script>
+
+The regular allocator shows higher numbers in this run. This could be due to system warm-up effects, caching, background processes, or other environmental factors between runs. The difference is likely not significant enough to draw conclusions about allocator performance without more controlled testing on an isolated system say.
+
+**Key takeaways**
+- TidesDB remains stable with both allocators
+- Performance is consistent between runs with minor variations (5-14%)
+- TidesDB shows no stability issues with either allocator (unlike RocksDB which crashed with jemalloc)
 
 ## Summary
 
