@@ -104,6 +104,9 @@ db.createColumnFamily('my_cf', {
 
 // Drop a column family
 db.dropColumnFamily('my_cf');
+
+// Rename a column family atomically
+db.renameColumnFamily('old_name', 'new_name');
 ```
 
 ### CRUD Operations
@@ -254,6 +257,70 @@ iter.free();
 txn.free();
 ```
 
+#### Seek to Specific Key
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const txn = db.beginTransaction();
+const iter = txn.newIterator(cf);
+
+// Seek to first key >= target
+iter.seek(Buffer.from('user:1000'));
+
+if (iter.isValid()) {
+  console.log(`Found: ${iter.key().toString()}`);
+}
+
+iter.free();
+txn.free();
+```
+
+#### Seek for Previous
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const txn = db.beginTransaction();
+const iter = txn.newIterator(cf);
+
+// Seek to last key <= target
+iter.seekForPrev(Buffer.from('user:2000'));
+
+while (iter.isValid()) {
+  console.log(`Key: ${iter.key().toString()}`);
+  iter.prev();
+}
+
+iter.free();
+txn.free();
+```
+
+#### Prefix Scanning
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const txn = db.beginTransaction();
+const iter = txn.newIterator(cf);
+
+const prefix = 'user:';
+iter.seek(Buffer.from(prefix));
+
+while (iter.isValid()) {
+  const key = iter.key().toString();
+  
+  // Stop when keys no longer match prefix
+  if (!key.startsWith(prefix)) break;
+  
+  console.log(`Found: ${key}`);
+  iter.next();
+}
+
+iter.free();
+txn.free();
+```
+
 ### Getting Column Family Statistics
 
 Retrieve detailed statistics about a column family.
@@ -265,6 +332,17 @@ const stats = cf.getStats();
 
 console.log(`Number of Levels: ${stats.numLevels}`);
 console.log(`Memtable Size: ${stats.memtableSize} bytes`);
+console.log(`Total Keys: ${stats.totalKeys}`);
+console.log(`Total Data Size: ${stats.totalDataSize} bytes`);
+console.log(`Average Key Size: ${stats.avgKeySize} bytes`);
+console.log(`Average Value Size: ${stats.avgValueSize} bytes`);
+console.log(`Read Amplification: ${stats.readAmp}`);
+console.log(`Cache Hit Rate: ${stats.hitRate}`);
+
+// Per-level statistics
+for (let i = 0; i < stats.numLevels; i++) {
+  console.log(`Level ${i + 1}: ${stats.levelNumSSTables[i]} SSTables, ${stats.levelSizes[i]} bytes, ${stats.levelKeyCounts[i]} keys`);
+}
 
 if (stats.config) {
   console.log(`Write Buffer Size: ${stats.config.writeBufferSize}`);
@@ -285,6 +363,21 @@ for (const name of cfList) {
 }
 ```
 
+### Backup
+
+Create an on-disk backup of the database without blocking reads/writes.
+
+```typescript
+// Backup to a directory (must be non-existent or empty)
+db.backup('./mydb_backup');
+```
+
+**Behavior**
+- Requires the backup directory to be non-existent or empty
+- Does not copy the `LOCK` file, so the backup can be opened normally
+- Database stays open and usable during backup
+- The backup represents the database state after all pending flushes complete
+
 ### Compaction
 
 #### Manual Compaction
@@ -304,6 +397,60 @@ const cf = db.getColumnFamily('my_cf');
 // Manually trigger memtable flush (queues memtable for sorted run to disk (L1))
 cf.flushMemtable();
 ```
+
+#### Checking Flush/Compaction Status
+
+Check if a column family has background operations in progress.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+// Check if flushing is in progress
+if (cf.isFlushing()) {
+  console.log('Flush in progress');
+}
+
+// Check if compaction is in progress
+if (cf.isCompacting()) {
+  console.log('Compaction in progress');
+}
+```
+
+**Use cases**
+- **Graceful shutdown** -- Wait for background operations to complete before closing
+- **Maintenance windows** -- Check if operations are running before triggering manual compaction
+- **Monitoring** -- Track background operation status for observability
+
+### Updating Runtime Configuration
+
+Update runtime-safe configuration settings. Changes apply to new operations only.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+// Update configuration (changes apply to new operations)
+cf.updateRuntimeConfig({
+  writeBufferSize: 256 * 1024 * 1024,  // 256MB
+  skipListMaxLevel: 16,
+  skipListProbability: 0.25,
+  bloomFpr: 0.001,  // 0.1% false positive rate
+  indexSampleRatio: 8,  // sample 1 in 8 keys
+  syncMode: SyncMode.Interval,
+  syncIntervalUs: 100000,  // 100ms
+}, true);  // persist to disk (config.ini)
+```
+
+**Updatable settings** (safe to change at runtime):
+- `writeBufferSize` -- Memtable flush threshold
+- `skipListMaxLevel` -- Skip list level for new memtables
+- `skipListProbability` -- Skip list probability for new memtables
+- `bloomFpr` -- False positive rate for new SSTables
+- `indexSampleRatio` -- Index sampling ratio for new SSTables
+- `syncMode` -- Durability mode
+- `syncIntervalUs` -- Sync interval in microseconds
+
+**Non-updatable settings** (would corrupt existing data):
+- `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`
 
 ### Sync Modes
 
@@ -467,6 +614,17 @@ function main() {
     console.log('\nColumn Family Statistics:');
     console.log(`  Number of Levels: ${stats.numLevels}`);
     console.log(`  Memtable Size: ${stats.memtableSize} bytes`);
+    console.log(`  Total Keys: ${stats.totalKeys}`);
+    console.log(`  Read Amplification: ${stats.readAmp}`);
+
+    // Check background operation status
+    console.log(`\nBackground Operations:`);
+    console.log(`  Flushing: ${cf.isFlushing()}`);
+    console.log(`  Compacting: ${cf.isCompacting()}`);
+
+    // Create a backup
+    db.backup('./example_db_backup');
+    console.log('\nBackup created successfully');
 
     // Cleanup
     db.dropColumnFamily('users');
@@ -529,10 +687,10 @@ const cacheStats = db.getCacheStats();
 
 console.log(`Cache enabled: ${cacheStats.enabled}`);
 console.log(`Total entries: ${cacheStats.totalEntries}`);
-console.log(`Total bytes: ${cacheStats.totalBytes}`);
+console.log(`Total bytes: ${(cacheStats.totalBytes / (1024 * 1024)).toFixed(2)} MB`);
 console.log(`Hits: ${cacheStats.hits}`);
 console.log(`Misses: ${cacheStats.misses}`);
-console.log(`Hit rate: ${cacheStats.hitRate}`);
+console.log(`Hit rate: ${(cacheStats.hitRate * 100).toFixed(1)}%`);
 console.log(`Partitions: ${cacheStats.numPartitions}`);
 ```
 
