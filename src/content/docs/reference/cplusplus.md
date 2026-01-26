@@ -37,7 +37,7 @@ cmake --build build
 ### Opening and Closing a Database
 
 ```cpp
-#include <tidesdb.hpp>
+#include <tidesdb/tidesdb.hpp>
 #include <iostream>
 
 int main() {
@@ -238,6 +238,20 @@ auto stats = cf.getStats();
 
 std::cout << "Number of Levels: " << stats.numLevels << std::endl;
 std::cout << "Memtable Size: " << stats.memtableSize << " bytes" << std::endl;
+std::cout << "Total Keys: " << stats.totalKeys << std::endl;
+std::cout << "Total Data Size: " << stats.totalDataSize << " bytes" << std::endl;
+std::cout << "Average Key Size: " << stats.avgKeySize << " bytes" << std::endl;
+std::cout << "Average Value Size: " << stats.avgValueSize << " bytes" << std::endl;
+std::cout << "Read Amplification: " << stats.readAmp << std::endl;
+std::cout << "Cache Hit Rate: " << stats.hitRate << std::endl;
+
+// Per-level statistics
+for (int i = 0; i < stats.numLevels; ++i) {
+    std::cout << "Level " << i << ": "
+              << stats.levelNumSSTables[i] << " SSTables, "
+              << stats.levelSizes[i] << " bytes, "
+              << stats.levelKeyCounts[i] << " keys" << std::endl;
+}
 
 if (stats.config.has_value()) {
     std::cout << "Write Buffer Size: " << stats.config->writeBufferSize << std::endl;
@@ -245,6 +259,20 @@ if (stats.config.has_value()) {
     std::cout << "Bloom Filter: " << (stats.config->enableBloomFilter ? "enabled" : "disabled") << std::endl;
 }
 ```
+
+**Statistics Fields**
+- `numLevels` -- Number of LSM levels
+- `memtableSize` -- Current memtable size in bytes
+- `levelSizes` -- Total bytes per level
+- `levelNumSSTables` -- Number of SSTables per level
+- `totalKeys` -- Total number of keys across memtable and all SSTables
+- `totalDataSize` -- Total data size (klog + vlog) across all SSTables
+- `avgKeySize` -- Average key size in bytes
+- `avgValueSize` -- Average value size in bytes
+- `levelKeyCounts` -- Number of keys per level
+- `readAmp` -- Read amplification (point lookup cost multiplier)
+- `hitRate` -- Cache hit rate (0.0 if cache disabled)
+- `config` -- Column family configuration (optional)
 
 ### Listing Column Families
 
@@ -256,6 +284,20 @@ for (const auto& name : cfList) {
     std::cout << "  - " << name << std::endl;
 }
 ```
+
+### Renaming a Column Family
+
+Atomically rename a column family and its underlying directory.
+
+```cpp
+db.renameColumnFamily("old_name", "new_name");
+```
+
+**Behavior**
+- Waits for any in-progress flush or compaction to complete
+- Atomically renames the column family directory on disk
+- Updates all internal paths (SSTables, manifest, config)
+- Thread-safe with proper locking
 
 ### Compaction
 
@@ -276,6 +318,100 @@ auto cf = db.getColumnFamily("my_cf");
 // Manually trigger memtable flush (Queues sorted run for L1)
 cf.flushMemtable(); 
 ```
+
+#### Checking Flush/Compaction Status
+
+Check if a column family currently has flush or compaction operations in progress.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+if (cf.isFlushing()) {
+    std::cout << "Flush in progress" << std::endl;
+}
+
+if (cf.isCompacting()) {
+    std::cout << "Compaction in progress" << std::endl;
+}
+```
+
+**Use cases**
+- Graceful shutdown -- Wait for background operations to complete before closing
+- Maintenance windows -- Check if operations are running before triggering manual compaction
+- Monitoring -- Track background operation status for observability
+
+### Updating Runtime Configuration
+
+Update runtime-safe configuration settings without restarting the database.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+auto newConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+newConfig.writeBufferSize = 256 * 1024 * 1024;  // 256MB
+newConfig.skipListMaxLevel = 16;
+newConfig.bloomFPR = 0.001;  // 0.1% false positive rate
+
+bool persistToDisk = true;  // Save to config.ini
+cf.updateRuntimeConfig(newConfig, persistToDisk);
+```
+
+**Updatable settings** (safe to change at runtime):
+- `writeBufferSize` -- Memtable flush threshold
+- `skipListMaxLevel` -- Skip list level for new memtables
+- `skipListProbability` -- Skip list probability for new memtables
+- `bloomFPR` -- False positive rate for new SSTables
+- `indexSampleRatio` -- Index sampling ratio for new SSTables
+- `syncMode` -- Durability mode
+- `syncIntervalUs` -- Sync interval in microseconds
+
+**Non-updatable settings** (would corrupt existing data):
+- `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`
+
+### Backup
+
+Create an on-disk snapshot of an open database without blocking normal reads/writes.
+
+```cpp
+db.backup("./mydb_backup");
+```
+
+**Behavior**
+- Requires `dir` to be a non-existent directory or an empty directory
+- Does not copy the `LOCK` file, so the backup can be opened normally
+- Two-phase copy approach:
+  - Copies immutable files first (SSTables listed in the manifest plus metadata/config files)
+  - Forces memtable flushes, waits for flush/compaction queues to drain, then copies remaining files
+- Database stays open and usable during backup
+
+### Block Cache Statistics
+
+Get statistics for the global block cache (shared across all column families).
+
+```cpp
+auto cacheStats = db.getCacheStats();
+
+if (cacheStats.enabled) {
+    std::cout << "Cache enabled: yes" << std::endl;
+    std::cout << "Total entries: " << cacheStats.totalEntries << std::endl;
+    std::cout << "Total bytes: " << cacheStats.totalBytes << std::endl;
+    std::cout << "Hits: " << cacheStats.hits << std::endl;
+    std::cout << "Misses: " << cacheStats.misses << std::endl;
+    std::cout << "Hit rate: " << (cacheStats.hitRate * 100.0) << "%" << std::endl;
+    std::cout << "Partitions: " << cacheStats.numPartitions << std::endl;
+} else {
+    std::cout << "Cache disabled (block_cache_size = 0)" << std::endl;
+}
+```
+
+**Cache statistics fields**
+- `enabled` -- Whether block cache is active
+- `totalEntries` -- Number of cached blocks
+- `totalBytes` -- Total memory used by cached blocks
+- `hits` -- Number of cache hits
+- `misses` -- Number of cache misses
+- `hitRate` -- Hit rate as a decimal (0.0 to 1.0)
+- `numPartitions` -- Number of cache partitions
 
 ### Sync Modes
 
@@ -304,10 +440,13 @@ TidesDB supports multiple compression algorithms:
 ```cpp
 auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 
-cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::None;
-cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::LZ4;
-cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::LZ4Fast;
-cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::Zstd;
+cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::None;     // No compression
+cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::LZ4;      // LZ4 standard (default)
+cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::LZ4Fast;  // LZ4 fast mode
+cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::Zstd;     // Zstandard
+#ifndef __sun
+cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::Snappy;   // Snappy (not available on SunOS)
+#endif
 
 db.createColumnFamily("my_cf", cfConfig);
 ```
@@ -460,9 +599,107 @@ txn.put(cf, "key2", "value2", -1);
 // Rollback to savepoint -- key2 is discarded, key1 remains
 txn.rollbackToSavepoint("sp1");
 
+// Release a savepoint without rolling back
+txn.releaseSavepoint("sp1");
+
 // Commit -- only key1 is written
 txn.commit();
 ```
+
+**Savepoint API**
+- `savepoint(name)` -- Create a savepoint
+- `rollbackToSavepoint(name)` -- Rollback to savepoint
+- `releaseSavepoint(name)` -- Release savepoint without rolling back
+
+## Multi-Column-Family Transactions
+
+TidesDB supports atomic transactions across multiple column families with true all-or-nothing semantics.
+
+```cpp
+auto usersCf = db.getColumnFamily("users");
+auto ordersCf = db.getColumnFamily("orders");
+
+auto txn = db.beginTransaction();
+
+// Write to users CF
+txn.put(usersCf, "user:1000", "John Doe", -1);
+
+// Write to orders CF
+txn.put(ordersCf, "order:5000", "user:1000|product:A", -1);
+
+// Atomic commit across both CFs
+txn.commit();
+```
+
+**Multi-CF guarantees**
+- Either all CFs commit or none do (atomic)
+- Automatically detected when operations span multiple CFs
+- Uses global sequence numbers for atomic ordering
+
+## Default Configuration
+
+Get default configurations for database and column families.
+
+```cpp
+// Get default database configuration
+auto defaultDbConfig = tidesdb::TidesDB::defaultConfig();
+defaultDbConfig.dbPath = "./mydb";
+tidesdb::TidesDB db(defaultDbConfig);
+
+// Get default column family configuration
+auto defaultCfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+db.createColumnFamily("my_cf", defaultCfConfig);
+```
+
+## Configuration Persistence
+
+Load and save column family configuration from/to INI files.
+
+```cpp
+// Load configuration from INI file
+auto config = tidesdb::ColumnFamilyConfig::loadFromIni("config.ini", "my_cf");
+db.createColumnFamily("my_cf", config);
+
+// Save configuration to INI file
+auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+cfConfig.writeBufferSize = 128 * 1024 * 1024;
+tidesdb::ColumnFamilyConfig::saveToIni("config.ini", "my_cf", cfConfig);
+```
+
+## Custom Comparators
+
+Register custom comparators for controlling key sort order.
+
+```cpp
+// Define a custom comparator function
+int myReverseCompare(const uint8_t* key1, size_t key1_size,
+                     const uint8_t* key2, size_t key2_size, void* ctx) {
+    (void)ctx;
+    int result = memcmp(key1, key2, std::min(key1_size, key2_size));
+    if (result == 0) {
+        return (key1_size < key2_size) ? 1 : (key1_size > key2_size) ? -1 : 0;
+    }
+    return -result;  // Reverse order
+}
+
+// Register the comparator
+db.registerComparator("reverse", myReverseCompare);
+
+// Use in column family
+auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+cfConfig.comparatorName = "reverse";
+db.createColumnFamily("reverse_cf", cfConfig);
+```
+
+**Built-in comparators**
+- `"memcmp"` (default) -- Binary byte-by-byte comparison
+- `"lexicographic"` -- Null-terminated string comparison
+- `"uint64"` -- Unsigned 64-bit integer comparison
+- `"int64"` -- Signed 64-bit integer comparison
+- `"reverse"` -- Reverse binary comparison
+- `"case_insensitive"` -- Case-insensitive ASCII comparison
+
+**Important**: Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
 
 ## Testing
 
