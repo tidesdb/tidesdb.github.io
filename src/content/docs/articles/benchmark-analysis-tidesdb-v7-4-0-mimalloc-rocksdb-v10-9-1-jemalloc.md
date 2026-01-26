@@ -365,7 +365,7 @@ Delete performance is roughly equivalent, with RocksDB slightly faster on raw th
 
 ## Regular vs mimalloc
 
-We ran the same benchmarks with TidesDB using both the standard system allocator (report #1) and mimalloc (report #2). The results show mimalloc provides consistent performance improvements:
+I ran the same benchmarks with TidesDB using both the standard system allocator (report #1) and mimalloc (report #2). The results show mimalloc provides consistent performance improvements:
 
 | Workload | Regular Allocator | mimalloc | Improvement |
 |----------|-------------------|----------|-------------|
