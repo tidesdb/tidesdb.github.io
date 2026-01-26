@@ -156,7 +156,7 @@ export default defineConfig({
 					items: [
 						{ 
 							label: 'Benchmark Analysis on TidesDB v7.4.0(mimalloc) & RocksDB v10.9.1 (jemalloc)', 
-							link: 'articles/benchmark-analysis-tidesdb-v7-4-0-rocksdb-v10-9-1-mimalloc-jemalloc' 
+							link: 'articles/benchmark-analysis-tidesdb-v7-4-0-mimalloc-rocksdb-v10-9-1-jemalloc' 
 						},
 						{ 
 							label: 'TideSQL - A Write and Space Optimized MySQL Fork', 
