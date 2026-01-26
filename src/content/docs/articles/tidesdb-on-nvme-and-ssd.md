@@ -1,0 +1,117 @@
+---
+title: "TidesDB on NVMe and SSD"
+description: "TidesDB benchtool results on NVMe and SSD."
+head:
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://tidesdb.com/pexels-pixabay-270572
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: https://tidesdb.com/pexels-pixabay-270572
+---
+
+<div class="article-image">
+
+![TidesDB on NVMe and SSD](/pexels-pixabay-270572.jpg)
+
+</div>
+
+
+*by Alex Gaetano Padula*  
+*published on January 26th, 2026*
+
+Recently, a contributor to TidesDB, <a href="https://github.com/dhoard">@dhoard</a>, ran a set of benchtool experiments on his NVMe disks. He reported is findings in our <a href="https://discord.gg/tWEmjR66cy">Discord</a> and I decided to compare to my SSD runs as their running the same <a href="https://github.com/tidesdb/benchtool/tree/master">benchtool</a> runners.  Thus, the results are directly comparable.
+
+The results clearly show a shift in usualbottlenecks rather than just raw speedups.
+
+---
+
+## Memory footprint vs DB size
+
+![Memory footprint vs DB size](/public/jan26-tidesdb-on-nvme-ssd/memory_vs_db_size.png)
+
+Across both NVMe and SSD runs, memory usage scales predictably with database size. There is no evidence of memory blow-up when moving to NVMe.
+
+This indicates that improved performance on NVMe is not coming from increased caching or buffering, but from faster storage interaction. The layering between storage, cache, and execution remains intact.
+
+---
+
+## Read latency distributions (p50 / p95 / p99)
+
+![GET latency distribution](/public/jan26-tidesdb-on-nvme-ssd/latency_distribution_get.png)
+
+NVMe reduces median read latency, but the more important effect is on the tail. Both p95 and p99 latencies are lower compared to SSD.
+
+This suggests NVMe primarily reduces long tail events in the read path. Fewer slow operations translate into tighter latency distributions and more predictable performance.
+
+---
+
+## Iterator vs GET sensitivity to storage
+
+![Iterator vs GET](/public/jan26-tidesdb-on-nvme-ssd/iterator_vs_get.png)
+
+Iterator workloads benefit more from NVMe than GETs.
+
+These paths are more sensitive to storage latency, and NVMe disproportionately improves them.
+
+The result is higher iterator throughput and lower variance under NVMe.
+
+---
+
+## Throughput vs thread count (scaling behavior)
+
+![Throughput vs threads](/public/jan26-tidesdb-on-nvme-ssd/throughput_vs_threads.png)
+
+On SSD, throughput plateaus early as thread count increases. The system becomes I/O-bound before CPU resources are fully utilized.
+
+On NVMe, throughput continues to scale with additional threads. This indicates a bottleneck shift from storage to CPU and coordination, which is the desired regime for modern systems.
+
+---
+
+## Disk bytes written vs logical bytes (write amplification)
+
+![Disk vs logical writes](/public/jan26-tidesdb-on-nvme-ssd/disk_vs_logical_writes.png)
+
+Higher throughput on NVMe does not come at the cost of increased write amplification.
+
+Physical disk writes track logical writes closely in both environments. NVMe enables faster progress through the same work, not more work.
+
+This confirms that performance gains are not due to hidden I/O debt.
+
+---
+
+## Per-workload behavior
+
+![Per-workload throughput](/public/jan26-tidesdb-on-nvme-ssd/per_workload_throughput.png)
+
+Different workloads respond differently to faster storage.
+
+Read-heavy and seek-heavy workloads benefit the most from NVMe, while write and delete workloads see more modest gains. This reflects the different sensitivity of execution paths to storage latency.
+
+The system does not behave uniformly, which is expected and healthy.
+
+---
+
+## Summary
+
+The primary effect of NVMe on TidesDB is not raw speed, but _changing where the system spends time_.
+
+- Tail latencies are reduced
+- Iterator and metadata-heavy paths improve significantly
+- Scaling shifts from I/O-bound to CPU-bound
+- Resource utilization remains stable and predictable
+- Write amplification stays low
+
+These results suggest that TidesDB benefits from NVMe in a structurally sound way, without compromising efficiency or correctness.
+
+---
+
+You can download the CSV files used in this analysis here:  
+- [NVMe results](/public/nvme-jan-26-article.csv)  
+- [SSD results](/public/non-nvme-jan-26-article.csv)
+
+---
+
+Thank you again to <a href="https://github.com/dhoard">@dhoard</a> for running and sharing these benchmark results.

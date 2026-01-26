@@ -155,6 +155,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{ 
+							label: 'TidesDB on NVMe and SSD', 
+							link: 'articles/tidesdb-on-nvme-and-ssd' 
+						},
+						{ 
 							label: 'Benchmark Analysis on TidesDB v7.4.0(mimalloc) & RocksDB v10.9.1 (jemalloc)', 
 							link: 'articles/benchmark-analysis-tidesdb-v7-4-0-mimalloc-rocksdb-v10-9-1-jemalloc' 
 						},
