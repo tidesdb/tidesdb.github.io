@@ -379,7 +379,47 @@ I ran the same benchmarks with TidesDB using mimalloc (report #1, `-DTIDESDB_WIT
 | Small Value (64B) | 1,827,301 ops/sec | 1,995,834 ops/sec | Regular +9.2% |
 | Delete | 2,871,484 ops/sec | 3,023,002 ops/sec | Regular +5.3% |
 
- The regular allocator shows higher numbers in this run. This could be due to system warm-up effects, caching, background processes, or other environmental factors between runs. The difference is likely not significant enough to draw conclusions about allocator performance without more controlled testing on an isolated system say.
+<canvas id="allocatorChart" style="max-height: 400px;"></canvas>
+
+<script>
+new Chart(document.getElementById('allocatorChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Sequential Write', 'Random Write', 'Mixed PUT', 'Mixed GET', 'Large Value', 'Small Value'],
+    datasets: [
+      {
+        label: 'mimalloc (Report #1)',
+        data: [6365356, 2255283, 2655514, 1478610, 323680, 1827301],
+        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 1
+      },
+      {
+        label: 'Regular Allocator (Report #2)',
+        data: [7115164, 2522416, 2833870, 1603626, 368453, 1995834],
+        backgroundColor: 'rgba(156, 163, 175, 0.8)',
+        borderColor: 'rgba(156, 163, 175, 1)',
+        borderWidth: 1
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      title: { display: true, text: 'TidesDB: mimalloc vs Regular Allocator (ops/sec)' },
+      legend: { position: 'top' }
+    },
+    scales: {
+      y: { 
+        beginAtZero: true,
+        title: { display: true, text: 'Operations per Second' }
+      }
+    }
+  }
+});
+</script>
+
+The regular allocator shows higher numbers in this run. This could be due to system warm-up effects, caching, background processes, or other environmental factors between runs. The difference is likely not significant enough to draw conclusions about allocator performance without more controlled testing on an isolated system say.
 
 **Key takeaways**
 - TidesDB remains stable with both allocators
