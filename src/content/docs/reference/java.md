@@ -35,7 +35,7 @@ sudo cmake --install build
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-java</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
@@ -90,6 +90,12 @@ db.createColumnFamily("custom_cf", customConfig);
 
 // Drop column family
 db.dropColumnFamily("my_cf");
+
+// List all column families
+String[] cfNames = db.listColumnFamilies();
+for (String name : cfNames) {
+    System.out.println("Column family: " + name);
+}
 ```
 
 ### Working with Transactions
@@ -268,6 +274,56 @@ cf.compact();
 
 // Flush memtable to disk
 cf.flushMemtable();
+
+// Check if operations are in progress
+boolean flushing = cf.isFlushing();
+boolean compacting = cf.isCompacting();
+```
+
+### Updating Runtime Configuration
+
+Update runtime-safe configuration settings for a column family:
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+ColumnFamilyConfig newConfig = ColumnFamilyConfig.builder()
+    .writeBufferSize(256 * 1024 * 1024)  // 256MB
+    .skipListMaxLevel(16)
+    .bloomFPR(0.001)  // 0.1% false positive rate
+    .syncMode(SyncMode.SYNC_INTERVAL)
+    .syncIntervalUs(100000)  // 100ms
+    .build();
+
+// Update config and persist to disk
+cf.updateRuntimeConfig(newConfig, true);
+```
+
+**Updatable settings** (safe to change at runtime):
+- `writeBufferSize` - Memtable flush threshold
+- `skipListMaxLevel` - Skip list level for new memtables
+- `skipListProbability` - Skip list probability for new memtables
+- `bloomFPR` - False positive rate for new SSTables
+- `indexSampleRatio` - Index sampling ratio for new SSTables
+- `syncMode` - Durability mode
+- `syncIntervalUs` - Sync interval in microseconds
+
+### Database Backup
+
+Create an on-disk snapshot without blocking normal reads/writes:
+
+```java
+// Backup to a directory (must be non-existent or empty)
+db.backup("./mydb_backup");
+```
+
+### Renaming Column Families
+
+Atomically rename a column family:
+
+```java
+// Waits for any in-progress flush/compaction to complete
+db.renameColumnFamily("old_name", "new_name");
 ```
 
 ### Transaction Isolation Levels
@@ -295,16 +351,25 @@ Savepoints allow partial rollback within a transaction:
 try (Transaction txn = db.beginTransaction()) {
     txn.put(cf, "key1".getBytes(), "value1".getBytes());
     
+    // Create savepoint
     txn.savepoint("sp1");
     txn.put(cf, "key2".getBytes(), "value2".getBytes());
     
     // Rollback to savepoint -- key2 is discarded, key1 remains
     txn.rollbackToSavepoint("sp1");
     
+    // Or release savepoint without rolling back
+    // txn.releaseSavepoint("sp1");
+    
     // Commit -- only key1 is written
     txn.commit();
 }
 ```
+
+**Savepoint API:**
+- `savepoint(name)` - Create a savepoint
+- `rollbackToSavepoint(name)` - Rollback to savepoint
+- `releaseSavepoint(name)` - Release savepoint without rolling back
 
 ## Configuration Options
 
@@ -323,16 +388,62 @@ try (Transaction txn = db.beginTransaction()) {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `writeBufferSize` | long | 64MB | Write buffer size |
-| `levelSizeRatio` | long | 10 | Level size ratio |
-| `minLevels` | int | 4 | Minimum number of levels |
-| `compressionAlgorithm` | CompressionAlgorithm | NO_COMPRESSION | Compression algorithm |
-| `enableBloomFilter` | boolean | false | Enable bloom filter |
-| `bloomFPR` | double | 0.01 | Bloom filter false positive rate |
-| `enableBlockIndexes` | boolean | false | Enable block indexes |
-| `syncMode` | SyncMode | SYNC_NONE | Sync mode for durability |
-| `syncIntervalUs` | long | 0 | Sync interval in microseconds |
-| `defaultIsolationLevel` | IsolationLevel | READ_COMMITTED | Default isolation level |
+| `writeBufferSize` | long | 128MB | Memtable flush threshold |
+| `levelSizeRatio` | long | 10 | Level size multiplier |
+| `minLevels` | int | 5 | Minimum LSM levels |
+| `dividingLevelOffset` | int | 2 | Compaction dividing level offset |
+| `klogValueThreshold` | long | 512 | Values > threshold go to vlog |
+| `compressionAlgorithm` | CompressionAlgorithm | LZ4_COMPRESSION | Compression algorithm |
+| `enableBloomFilter` | boolean | true | Enable bloom filters |
+| `bloomFPR` | double | 0.01 | Bloom filter false positive rate (1%) |
+| `enableBlockIndexes` | boolean | true | Enable compact block indexes |
+| `indexSampleRatio` | int | 1 | Sample every block for index |
+| `blockIndexPrefixLen` | int | 16 | Block index prefix length |
+| `syncMode` | SyncMode | SYNC_FULL | Sync mode for durability |
+| `syncIntervalUs` | long | 1000000 | Sync interval (1 second, for SYNC_INTERVAL) |
+| `comparatorName` | String | "" | Custom comparator name (empty = memcmp) |
+| `skipListMaxLevel` | int | 12 | Skip list max level |
+| `skipListProbability` | float | 0.25 | Skip list probability |
+| `defaultIsolationLevel` | IsolationLevel | READ_COMMITTED | Default transaction isolation |
+| `minDiskSpace` | long | 100MB | Minimum disk space required |
+| `l1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
+| `l0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
+
+### Compression Algorithms
+
+| Algorithm | Value | Description |
+|-----------|-------|-------------|
+| `NO_COMPRESSION` | 0 | No compression |
+| `SNAPPY_COMPRESSION` | 1 | Snappy compression |
+| `LZ4_COMPRESSION` | 2 | LZ4 standard compression (default) |
+| `ZSTD_COMPRESSION` | 3 | Zstandard compression (best ratio) |
+| `LZ4_FAST_COMPRESSION` | 4 | LZ4 fast mode (higher throughput) |
+
+### Sync Modes
+
+| Mode | Description |
+|------|-------------|
+| `SYNC_NONE` | No explicit sync, relies on OS page cache (fastest) |
+| `SYNC_FULL` | Fsync on every write (most durable) |
+| `SYNC_INTERVAL` | Periodic background syncing at configurable intervals |
+
+### Error Codes
+
+| Code | Value | Description |
+|------|-------|-------------|
+| `ERR_SUCCESS` | 0 | Operation completed successfully |
+| `ERR_MEMORY` | -1 | Memory allocation failed |
+| `ERR_INVALID_ARGS` | -2 | Invalid arguments passed |
+| `ERR_NOT_FOUND` | -3 | Key not found |
+| `ERR_IO` | -4 | I/O operation failed |
+| `ERR_CORRUPTION` | -5 | Data corruption detected |
+| `ERR_EXISTS` | -6 | Resource already exists |
+| `ERR_CONFLICT` | -7 | Transaction conflict detected |
+| `ERR_TOO_LARGE` | -8 | Key or value size exceeds maximum |
+| `ERR_MEMORY_LIMIT` | -9 | Memory limit exceeded |
+| `ERR_INVALID_DB` | -10 | Database handle is invalid |
+| `ERR_UNKNOWN` | -11 | Unknown error |
+| `ERR_LOCKED` | -12 | Database is locked |
 
 ## Testing
 
