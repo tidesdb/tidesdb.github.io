@@ -363,7 +363,7 @@ Delete operations in LSM-trees write tombstones, which must later be compacted a
 
 Delete performance is roughly equivalent, with RocksDB slightly faster on raw throughput but TidesDB showing lower write amplification.
 
-## TidesDB Allocator Comparison: Regular vs mimalloc
+## Regular vs mimalloc
 
 We ran the same benchmarks with TidesDB using both the standard system allocator (report #1) and mimalloc (report #2). The results show mimalloc provides consistent performance improvements:
 
@@ -453,7 +453,7 @@ new Chart(document.getElementById('allocatorChart'), {
 
 ### Stability Note
 
-During our benchmarking, RocksDB experienced crashes when using jemalloc as the allocator. This is not an isolated incident - in previous benchmark runs, RocksDB also crashed with ASAN (AddressSanitizer) enabled and even with the standard system allocator. TidesDB completed all benchmark runs without any crashes or stability issues across all allocator configurations.
+During our benchmarking, RocksDB experienced crashes when using jemalloc as the allocator. This is not an isolated incident - in previous benchmark runs, RocksDB also crashed with ASAN (AddressSanitizer) enabled and even with the standard system allocator. TidesDB completed all benchmark runs without any crashes or stability issues across all allocator configurations.  This is common through my benchmarking experience with RocksDB.
 
 TidesDB v7.4.0 demonstrates strong performance across both write and read workloads compared to RocksDB v10.9.1. 
 
