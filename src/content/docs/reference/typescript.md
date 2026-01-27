@@ -16,7 +16,20 @@ You **must** have the TidesDB shared C library installed on your system.  You ca
 ### Installation
 
 ```bash
-npm install tidesdb
+npm install git+https://github.com/tidesdb/tidesdb-node.git
+```
+
+Or clone and install locally:
+
+```bash
+git clone https://github.com/tidesdb/tidesdb-node.git
+cd tidesdb-node
+npm install
+npm run build
+npm link
+
+# In your project directory
+npm link tidesdb
 ```
 
 ### Custom Installation Paths

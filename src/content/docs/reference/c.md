@@ -106,6 +106,7 @@ tidesdb_config_t config = {
     .log_level = TDB_LOG_INFO,             /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
     .max_open_sstables = 256,              /* Max cached SSTable structures (default: 256) */
+    .log_to_file = 0,                      /* Write logs to file instead of stderr (default: 0) */
 };
 
 tidesdb_t *db = NULL;
@@ -156,7 +157,7 @@ tidesdb_config_t config = {
 ```
 
 **Output format**
-Logs are written to **stderr** with timestamps:
+Logs are written to **stderr** by default with timestamps:
 ```
 [HH:MM:SS.mmm] [LEVEL] filename:line: message
 ```
@@ -167,9 +168,27 @@ Logs are written to **stderr** with timestamps:
 [22:58:00.456] [INFO] tidesdb.c:9478: Block clock cache created with max_bytes=64.00 MB
 ```
 
-**Redirect to file**
+**Log to file**
+
+Enable `log_to_file` to write logs to a `LOG` file in the database directory instead of stderr:
+
+```c
+tidesdb_config_t config = {
+    .db_path = "./mydb",
+    .log_level = TDB_LOG_DEBUG,
+    .log_to_file = 1  /* Write to ./mydb/LOG instead of stderr */
+};
+
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
+/* Logs are now written to ./mydb/LOG */
+```
+
+The log file is opened in append mode and uses line buffering for real-time logging. If the log file cannot be opened, logging falls back to default.
+
+**Redirect stderr to file (alternative)**
 ```bash
-./your_program 2> tidesdb.log  # Redirect stderr to file
+./your_program 2> tidesdb.log  # Redirect std output to file
 ```
 
 ### Backup

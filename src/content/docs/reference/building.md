@@ -373,6 +373,7 @@ TidesDB provides several CMake options to customize the build:
 | `BUILD_SHARED_LIBS` | Build shared libraries instead of static | `ON` (Unix), `OFF` (Windows) |
 | `ENABLE_READ_PROFILING` | Enable read profiling instrumentation | `OFF` |
 | `TIDESDB_WITH_MIMALLOC` | Use mimalloc as the memory allocator | `OFF` |
+| `TIDESDB_WITH_TCMALLOC` | Use tcmalloc as the memory allocator | `OFF` |
 | `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | (unset) |
 
 ### Mimalloc Memory Allocator
@@ -403,6 +404,45 @@ cmake -S . -B build -DTIDESDB_WITH_MIMALLOC=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\s
 - Typical improvement: 5-15% reduction in allocation overhead
 - Best results with many small allocations (skip list nodes, block buffers)
 - Minimal overhead when disabled (default)
+
+### TCMalloc Memory Allocator
+
+TidesDB optionally supports [tcmalloc](https://github.com/google/tcmalloc) (Thread-Caching Malloc), Google's high-performance memory allocator from gperftools. Like mimalloc, tcmalloc replaces the standard malloc/free at link time, providing improved allocation performance especially for multi-threaded workloads.
+
+**Enabling tcmalloc**
+
+```bash
+# Linux/macOS
+cmake -S . -B build -DTIDESDB_WITH_TCMALLOC=ON
+
+# Windows with vcpkg
+cmake -S . -B build -DTIDESDB_WITH_TCMALLOC=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+```
+
+**Installing tcmalloc**
+
+```bash
+# Linux (Debian/Ubuntu)
+sudo apt install libgoogle-perftools-dev
+
+# macOS (Homebrew)
+brew install gperftools
+
+# Windows (vcpkg)
+vcpkg install gperftools:x64-windows
+```
+
+**When to use tcmalloc**
+- High-throughput multi-threaded workloads
+- Applications with many small allocations
+- When you need detailed heap profiling (gperftools includes profiling tools)
+
+**Performance impact**
+- Typical improvement: 5-20% reduction in allocation overhead for multi-threaded code
+- Excellent thread-local caching reduces lock contention
+- Minimal overhead when disabled (default)
+
+**Note:** You cannot enable both mimalloc and tcmalloc simultaneously. Choose one based on your workload characteristics.
 
 ### Read Profiling
 
