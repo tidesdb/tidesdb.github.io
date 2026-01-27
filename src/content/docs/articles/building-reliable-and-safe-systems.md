@@ -90,7 +90,7 @@ The same principle applies to the block manager, the cache, the queues, the refe
 
 When every commit passes 8,700+ tests across fifteen platforms, you can refactor with confidence. Want to optimize the skip list level selection? Change it, push, wait for CI. If all 8,700+ tests pass, the optimization is safe. Want to experiment with a different compaction strategy? Try it. The tests will catch correctness issues.
 
-This enables rapid iteration. TidesDB has gone through seven major versions in two years, with each version bringing significant architectural improvements. Version 4 had basic LSM-tree implementation. Version 6 added seek and range query optimization. Version 7 introduced Spooky compaction with Dynamic Capacity Adaptation, full lock-free concurrency, and improved crash recovery. Each change was validated by thousands of tests across diverse platforms.
+This enables rapid iteration. TidesDB has gone through seven major versions in 2+ years, with each version bringing significant architectural improvements and optimizations. Each change was validated by thousands of tests across diverse platforms.
 
 The testing infrastructure is what makes this pace possible. Without it, each change would require manual testing on multiple platforms, regression checks, careful code review. With it, the CI system provides immediate feedback on correctness.
 
