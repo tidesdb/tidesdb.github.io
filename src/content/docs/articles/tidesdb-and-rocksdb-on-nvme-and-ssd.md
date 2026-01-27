@@ -110,7 +110,7 @@ Overall, the NVMe results reinforce the earlier conclusions TidesDB benefits str
 
 ![NVMe GET latency vs throughput](/jan26-tidesdb-on-nvme-ssd/nvme_get_latency_vs_throughput.png)
 
-This plot shows the tradeoff surface for point reads (GET): each point is a benchmark run, with lower latency and higher throughput preferred. On NVMe, both engines move into a less I/O-bound regime, and the separation between engines becomes visible as a latency/throughput frontier.
+This plot shows the tradeoff surface for point reads (GET) - each point is a benchmark run, with lower latency and higher throughput preferred. On NVMe, both engines move into a less I/O-bound regime, and the separation between engines becomes visible as a latency/throughput frontier.
 
 ![NVMe PUT latency vs throughput](/jan26-tidesdb-on-nvme-ssd/nvme_put_latency_vs_throughput.png)
 
@@ -118,7 +118,7 @@ For writes (PUT), NVMe reduces stalls and tightens the latency/throughput spread
 
 ![NVMe tail latency summary](/jan26-tidesdb-on-nvme-ssd/nvme_tail_latency_p50_p95_p99.png)
 
-Tail latency (p95/p99) provides a better signal than averages when background work (flush/compaction) is active. This summary compares p50/p95/p99 for both GET and PUT across the same NVMe run, making tail behavior easy to audit.
+Tail latency (p95/p99) provides a better signal than averages when background work (flush/compaction) is active. This summary compares p50/p95/p99 for both GET and PUT across the same NVMe run.
 
 ## Summary
 
@@ -134,23 +134,23 @@ These results suggest that TidesDB benefits from NVMe in a structurally sound wa
 
 ---
 
-**Hardware**
+**Environments**
 
-**(SSD ENV)**
+**(SSD)**
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
 - 48GB DDR4
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
 
-**(NVMe ENV)**
+**(NVMe)**
 - Ryzen 7 7700
 - 128GB RAM
 - NVMe WD_BLACK SN850X 1000GB
 - Ubuntu 24.04.3 LTS
 
 **Software Versions**
-- **TidesDB v7.4.0**
-- **RocksDB v10.9.1**
+- TidesDB v7.4.0
+- RocksDB v10.9.1
 
 ---
 
