@@ -94,7 +94,7 @@ This enables rapid iteration. TidesDB has gone through seven major versions in 2
 
 The testing infrastructure is what makes this pace possible. Without it, each change would require manual testing on multiple platforms, regression checks, careful code review. With it, the CI system provides immediate feedback on correctness.
 
-## The Standard We Set
+## The Measure of Platform Capability and Portability
 
 Most databases test on three platforms
 - Linux x64
