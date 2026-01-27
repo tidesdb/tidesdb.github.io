@@ -107,6 +107,7 @@ tidesdb_config_t config = {
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
     .max_open_sstables = 256,              /* Max cached SSTable structures (default: 256) */
     .log_to_file = 0,                      /* Write logs to file instead of stderr (default: 0) */
+    .log_truncation_at = 24 * (1024*1024), /* Log file truncation size (default: 24MB), 0 = no truncation */
 };
 
 tidesdb_t *db = NULL;
