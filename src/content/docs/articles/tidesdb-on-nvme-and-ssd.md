@@ -119,8 +119,8 @@ These results suggest that TidesDB benefits from NVMe in a structurally sound wa
 **(NVMe ENV)**
 - Ryzen 7 7700
 - 128GB RAM
-- NVMe (getting more info on details)
-- (getting more info on OS)
+- NVMe WD_BLACK SN850X 1000GB
+- Ubuntu 24.04.3 LTS
 
 **Software Versions**
 - **TidesDB v7.4.0**
