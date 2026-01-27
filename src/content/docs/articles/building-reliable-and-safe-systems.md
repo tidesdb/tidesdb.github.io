@@ -96,7 +96,12 @@ The testing infrastructure is what makes this pace possible. Without it, each ch
 
 ## The Standard We Set
 
-Most databases test on three platforms: Linux x64, Windows x64, macOS x64. Some add ARM. Very few test on BSD variants or Illumos. Almost none test on PowerPC or RISC-V. Even fewer test cross-platform portability by creating a database on one architecture and reading it on another.
+Most databases test on three platforms
+- Linux x64
+- Windows x64
+- macOS x64. 
+
+Some add ARM. Very few test on BSD variants or Illumos. Almost none test on PowerPC or RISC-V. Even fewer test cross-platform portability by creating a database on one architecture and reading it on another.
 
 TidesDB tests on all of them. Not because users demand it (most will deploy on Linux x64), but because thorough testing across diverse platforms catches bugs that would otherwise slip through. The big-endian PowerPC test catches serialization bugs. The 32-bit x86 test catches integer overflow issues. The RISC-V test catches alignment problems. The BSD tests catch POSIX compliance issues. The Windows tests catch platform abstraction bugs.
 
