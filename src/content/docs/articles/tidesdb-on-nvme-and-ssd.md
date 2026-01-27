@@ -30,7 +30,7 @@ The results clearly show a shift in usualbottlenecks rather than just raw speedu
 
 ## Memory footprint vs DB size
 
-![Memory footprint vs DB size](/public/jan26-tidesdb-on-nvme-ssd/memory_vs_db_size.png)
+![Memory footprint vs DB size](/jan26-tidesdb-on-nvme-ssd/memory_vs_db_size.png)
 
 Across both NVMe and SSD runs, memory usage scales predictably with database size. There is no evidence of memory blow-up when moving to NVMe.
 
@@ -40,7 +40,7 @@ This indicates that improved performance on NVMe is not coming from increased ca
 
 ## Read latency distributions (p50 / p95 / p99)
 
-![GET latency distribution](/public/jan26-tidesdb-on-nvme-ssd/latency_distribution_get.png)
+![GET latency distribution](/jan26-tidesdb-on-nvme-ssd/latency_distribution_get.png)
 
 NVMe reduces median read latency, but the more important effect is on the tail. Both p95 and p99 latencies are lower compared to SSD.
 
@@ -50,7 +50,7 @@ This suggests NVMe primarily reduces long tail events in the read path. Fewer sl
 
 ## Iterator vs GET sensitivity to storage
 
-![Iterator vs GET](/public/jan26-tidesdb-on-nvme-ssd/iterator_vs_get.png)
+![Iterator vs GET](/jan26-tidesdb-on-nvme-ssd/iterator_vs_get.png)
 
 Iterator workloads benefit more from NVMe than GETs.
 
@@ -62,7 +62,7 @@ The result is higher iterator throughput and lower variance under NVMe.
 
 ## Throughput vs thread count (scaling behavior)
 
-![Throughput vs threads](/public/jan26-tidesdb-on-nvme-ssd/throughput_vs_threads.png)
+![Throughput vs threads](/jan26-tidesdb-on-nvme-ssd/throughput_vs_threads.png)
 
 On SSD, throughput plateaus early as thread count increases. The system becomes I/O-bound before CPU resources are fully utilized.
 
@@ -72,7 +72,7 @@ On NVMe, throughput continues to scale with additional threads. This indicates a
 
 ## Disk bytes written vs logical bytes (write amplification)
 
-![Disk vs logical writes](/public/jan26-tidesdb-on-nvme-ssd/disk_vs_logical_writes.png)
+![Disk vs logical writes](/jan26-tidesdb-on-nvme-ssd/disk_vs_logical_writes.png)
 
 Higher throughput on NVMe does not come at the cost of increased write amplification.
 
@@ -84,7 +84,7 @@ This confirms that performance gains are not due to hidden I/O debt.
 
 ## Per-workload behavior
 
-![Per-workload throughput](/public/jan26-tidesdb-on-nvme-ssd/per_workload_throughput.png)
+![Per-workload throughput](/jan26-tidesdb-on-nvme-ssd/per_workload_throughput.png)
 
 Different workloads respond differently to faster storage.
 
@@ -108,9 +108,28 @@ These results suggest that TidesDB benefits from NVMe in a structurally sound wa
 
 ---
 
+**Hardware**
+
+**(SSD ENV)**
+- Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
+- 48GB DDR4
+- Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
+- Ubuntu 23.04 x86_64 6.2.0-39-generic
+
+**(NVMe ENV)**
+- Ryzen 7 7700
+- 128GB RAM
+- NVMe (getting more info on details)
+- (getting more info on OS)
+
+**Software Versions**
+- **TidesDB v7.4.0**
+
+---
+
 You can download the CSV files used in this analysis here:  
-- [NVMe results](/public/nvme-jan-26-article.csv)  
-- [SSD results](/public/non-nvme-jan-26-article.csv)
+- [NVMe results](/nvme-jan-26-article.csv)  
+- [SSD results](/non-nvme-jan-26-article.csv)
 
 ---
 
