@@ -134,21 +134,21 @@ These results suggest that TidesDB benefits from NVMe in a structurally sound wa
 
 ---
 
-**Environments**
+#### Environments
 
-**(SSD)**
+**SSD**
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
 - 48GB DDR4
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
 
-**(NVMe)**
+**NVMe**
 - Ryzen 7 7700
 - 128GB RAM
 - NVMe WD_BLACK SN850X 1000GB
 - Ubuntu 24.04.3 LTS
 
-**Software Versions**
+**Software versions used**
 - TidesDB v7.4.0
 - RocksDB v10.9.1
 
