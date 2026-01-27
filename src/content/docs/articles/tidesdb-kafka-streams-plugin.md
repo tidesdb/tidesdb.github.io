@@ -26,7 +26,7 @@ head:
 
 Kafka Streams is powerful. The default state store, RocksDB, is battle-tested. But what if you could do better?
 
-We're releasing the TidesDB Kafka Streams plugin - a drop-in replacement for RocksDB that brings TidesDB's lock-free architecture to your streaming applications.
+Today we've dropped the TidesDB Kafka Streams plugin - a drop-in replacement for RocksDB that brings TidesDB's lock-free and adaptive architecture to your streaming applications.
 
 ## Why Switch?
 
