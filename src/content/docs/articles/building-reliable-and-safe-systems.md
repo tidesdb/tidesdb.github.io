@@ -5,16 +5,16 @@ head:
   - tag: meta
     attrs:
       property: og:image
-      content: https://tidesdb.com/pexels-alexapopovich-9510503.jpg
+      content: https://tidesdb.com/pexels-ann-h-45017-3482441.jpg
   - tag: meta
     attrs:
       name: twitter:image
-      content: https://tidesdb.com/pexels-alexapopovich-9510503.jpg
+      content: https://tidesdb.com/pexels-ann-h-45017-3482441.jpg
 ---
 
 <div class="article-image">
 
-![Building Reliable and Safe Systems](/pexels-alexapopovich-9510503.jpg)
+![Building Reliable and Safe Systems](/pexels-ann-h-45017-3482441.jpg)
 
 </div>
 
