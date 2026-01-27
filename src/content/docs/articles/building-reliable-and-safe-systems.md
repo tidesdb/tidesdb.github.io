@@ -55,6 +55,14 @@ Every commit to TidesDB triggers 30 independent CI workflows. Let me break down 
 - tcmalloc (Google's thread-caching allocator)
 _Over time, I plan more allocator variants, not pluggable because I like verifying and testing each allocator variant before making accessible to users_
 
+**Sanitizer Coverage**
+- AddressSanitizer (ASan) - Detects memory errors: use-after-free, buffer overflows, memory leaks, heap corruption
+- UndefinedBehaviorSanitizer (UBSan) - Catches undefined behavior: signed integer overflow, invalid shifts, null pointer dereference, unaligned memory access
+- Enabled on all Linux, macOS, BSD, and Illumos builds
+- MSVC builds use strict warning levels instead (ASan support can be unstable on Windows)
+- Every commit runs through sanitizers across multiple platforms catching memory safety issues before they reach production
+
+
 **Cross-Platform Portability Verification**
 - Create database on Linux x64
 - Verify it works correctly on Windows MSVC x64, Windows MSVC x86, Windows MinGW x64, Windows MinGW x86, macOS x64, macOS x86, and Linux x86
