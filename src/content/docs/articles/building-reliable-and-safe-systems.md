@@ -38,7 +38,7 @@ This is why most databases stick to a handful of platforms. Supporting one platf
 
 Every commit to TidesDB triggers 30 independent CI workflows. Let me break down what that actually means.
 
-**Platform Coverage:**
+**Platform Coverage**
 - Linux (x64, x86, PowerPC 32-bit, RISC-V 64-bit)
 - FreeBSD 15.0 x64
 - NetBSD 10.1 x64
@@ -49,12 +49,13 @@ Every commit to TidesDB triggers 30 independent CI workflows. Let me break down 
 - Windows MinGW (x64, x86)
 - macOS (x64, x86, PowerPC G5 running 10.6.8)
 
-**Memory Allocator Variants:**
+**Memory Allocator Variants**
 - System default allocator
 - mimalloc (Microsoft's high-performance allocator)
 - tcmalloc (Google's thread-caching allocator)
+_Over time, I plan more allocator variants, not pluggable because I like verifying and testing each allocator variant before making accessible to users_
 
-**Cross-Platform Portability Verification:**
+**Cross-Platform Portability Verification**
 - Create database on Linux x64
 - Verify it works correctly on Windows MSVC x64, Windows MSVC x86, Windows MinGW x64, Windows MinGW x86, macOS x64, macOS x86, and Linux x86
 - Proves file format is truly portable across architectures and operating systems
@@ -115,7 +116,6 @@ This is what it takes to build systems you can trust with data that cannot be lo
 
 ---
 
-**Links**
 - GitHub · https://github.com/tidesdb/tidesdb
 - Design deep-dive · https://tidesdb.com/getting-started/how-does-tidesdb-work
 - View CI status · https://github.com/tidesdb/tidesdb/actions
