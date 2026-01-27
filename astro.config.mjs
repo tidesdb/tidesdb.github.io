@@ -155,6 +155,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{ 
+							label: 'Building Reliable and Safe Systems', 
+							link: 'articles/building-reliable-and-safe-systems' 
+						},
+						{ 
 							label: 'TidesDB for Kafka Streams - Drop-in RocksDB Replacement', 
 							link: 'articles/tidesdb-kafka-streams-plugin' 
 						},
