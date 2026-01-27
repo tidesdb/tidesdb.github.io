@@ -155,6 +155,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{ 
+							label: 'TidesDB for Kafka Streams - Drop-in RocksDB Replacement', 
+							link: 'articles/tidesdb-kafka-streams-plugin' 
+						},
+						{ 
 							label: 'TidesDB & RocksDB on NVMe and SSD', 
 							link: 'articles/tidesdb-and-rocksdb-on-nvme-and-ssd' 
 						},
