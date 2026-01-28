@@ -59,7 +59,7 @@ Finally, for 4KB values, glibc and mimalloc have similar p99 (~2.13–2.15 ms) w
 
 Across these benchmarks, allocator choice affects TidesDB performance in specific scenarios, most notably under contention and with moderate payload sizes, but remains secondary to batching and overall workload structure. glibc stays competitive and often leads at higher thread counts, tcmalloc performs well under contention but shows weaker tail latency for mid-sized values, and mimalloc favors batch-heavy workloads but degrades at very large batch sizes. 
 
-In practice, tuning column family and database configuration and workload patterns provides larger gains than changing allocators alone, although allocator choice can still shift performance in high-concurrency operation.
+In practice, tuning column family, database configuration, and workload patterns yields larger gains than changing allocators alone, though allocator choice can still affect high-concurrency performance.
 
 *Thanks for reading!*
 
