@@ -1,6 +1,6 @@
 ---
 title: "TidesDB Differences with glibc, mimalloc, tcmalloc"
-description: "An article on differences between TidesDB and glibc, mimalloc, tcmalloc"
+description: "An article on differences running TidesDB with glibc, mimalloc, tcmalloc"
 head:
   - tag: meta
     attrs:
