@@ -71,7 +71,7 @@ In practice, tuning column family, database configuration, and workload patterns
 
 ---
 
-You can find the raw reports below
+You can find the raw reports below:
 - [glibc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./glibc_results.csv)
 - [mimalloc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./mimalloc_results.csv)
 - [tcmalloc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./tcmalloc_results.csv)
