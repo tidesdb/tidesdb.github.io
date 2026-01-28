@@ -140,9 +140,9 @@ export default defineConfig({
 					label: 'Reference',
 					items: [
 						{ label: 'Building & Benchmarking', slug: 'reference/building' },
-						{ label: 'C API Reference', slug: 'reference/c' },
+						{ label: 'C API Reference', link: 'reference/c' },
 						{ label: 'C++ API Reference', slug: 'reference/cplusplus' },
-						{ label: 'C# API Reference', slug: 'reference/csharp' },
+						{ label: 'C# API Reference', link: 'reference/csharp' },
 						{ label: 'GO API Reference', slug: 'reference/go' },
 						{ label: 'Python API Reference', slug: 'reference/python' },
 						{ label: 'Java API Reference', slug: 'reference/java' },
