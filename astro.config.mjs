@@ -154,6 +154,10 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+						{
+							label: 'TidesDB Differences with glibc, mimalloc, tcmalloc',
+							link: 'articles/tidesdb-differences-with-glibc-mimalloc-tcmalloc'
+						},
 						{ 
 							label: 'Building Reliable and Safe Systems', 
 							link: 'articles/building-reliable-and-safe-systems' 
