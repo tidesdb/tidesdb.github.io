@@ -76,3 +76,7 @@ You can find the raw reports below
 - [mimalloc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./mimalloc_results.csv)
 - [tcmalloc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./tcmalloc_results.csv)
 
+Raw plain text results (more thorough):
+- [glibc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./glibc_results.txt)
+- [mimalloc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./mimalloc_results.txt)
+- [tcmalloc results](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./tcmalloc_results.txt)
