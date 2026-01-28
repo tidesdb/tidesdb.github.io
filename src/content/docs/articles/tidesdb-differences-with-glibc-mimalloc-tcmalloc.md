@@ -52,6 +52,9 @@ Second plot, under explicit contention, the differences are clearer at higher th
 Next, batching dominates throughput, with a large gain when moving from batch=1 to batch=100. The peak is around batch=100, where mimalloc is highest (~3.81M ops/s), followed by tcmalloc (~3.64M) and glibc (~3.41M). At batch=1000, performance drops a bit for all, but tcmalloc holds up best (~3.17M) while mimalloc falls most (~2.78M). Interestingly, batching appears more impactful than allocator choice, but allocator can shift the peak and the drop-off.
 
 **Peak RSS vs threads (churn_small PUT)**
+
+![batch size vs PUT throughput (t8)](/tidesdb-differences-with-glibc-mimalloc-tcmalloc./tidesdb_allocator_plot_5.png)
+
 This plot shows peak resident memory (RSS) during the small-value churn write workload as thread count increases. At 1 thread, all allocators are similar (~550–560 MB). As concurrency rises, glibc stays consistently lower, while mimalloc trends higher at 4–16 threads and tcmalloc peaks around 8 threads. Overall, allocator choice can shift the memory footprint by a few tens of megabytes under churn-heavy concurrency, but the differences remain modest relative to the workload’s baseline memory use.
 
 **Large value PUT p99 tail latency (t8)**
