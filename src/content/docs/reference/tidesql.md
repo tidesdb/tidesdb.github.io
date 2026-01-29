@@ -124,10 +124,10 @@ maria_declare_plugin(tidesdb)
   PLUGIN_LICENSE_GPL,
   tidesdb_init_func,       /* Plugin Init */
   tidesdb_done_func,       /* Plugin Deinit */
-  0x0704,                  /* version: 7.4 */
+  0x0704,                  /* version: 7.4+ */
   NULL,                    /* status variables */
   tidesdb_system_variables,/* system variables */
-  "7.4.0",                 /* version string */
+  "7.4.2",                 /* version string */
   MariaDB_PLUGIN_MATURITY_STABLE  /* maturity */
 }
 maria_declare_plugin_end;

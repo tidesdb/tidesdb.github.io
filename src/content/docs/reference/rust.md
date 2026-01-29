@@ -13,13 +13,50 @@ If you want to download the source of this document, you can find it [here](http
 
 You **must** have the TidesDB shared C library installed on your system. You can find the installation instructions [here](/reference/building/#_top).
 
-### Installation
+### Building from GitHub
 
-Add `tidesdb` to your `Cargo.toml`:
+To build the library directly from the GitHub repository:
+
+```bash
+# Clone the repository
+git clone https://github.com/tidesdb/tidesdb-rust.git
+cd tidesdb-rust
+
+# Build the library
+cargo build --release
+
+# Run tests
+cargo test -- --test-threads=1
+
+# Install locally (optional)
+cargo install --path .
+```
+
+**Using as a local dependency**
+
+You can reference the local build in your project's `Cargo.toml`:
 
 ```toml
 [dependencies]
-tidesdb = "0.2"
+tidesdb = { path = "/path/to/tidesdb-rust" }
+```
+
+**Using directly from GitHub**
+
+You can also add the dependency directly from GitHub:
+
+```toml
+[dependencies]
+tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git" }
+
+# Or pin to a specific branch
+tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git", branch = "main" }
+
+# Or pin to a specific tag/version
+tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git", tag = "v0.2.0" }
+
+# Or pin to a specific commit
+tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git", rev = "abc123" }
 ```
 
 ### Custom Installation Paths
