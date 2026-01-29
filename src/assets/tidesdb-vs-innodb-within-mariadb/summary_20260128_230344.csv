@@ -1,0 +1,7 @@
+engine,test,threads,table_size,tps,qps,latency_avg_ms,latency_p95_ms,latency_max_ms,total_time_s
+InnoDB,oltp_read_only_batched,4,100000,282680,4522880,0.85,1.12,11.24,60.0024
+InnoDB,oltp_write_only_batched,4,100000,135262,811572,1.77,2.03,354.40,60.0024
+InnoDB,oltp_read_write_batched,4,100000,105780,2115600,2.27,2.30,109.78,60.0029
+TidesDB,oltp_read_only_batched,4,100000,107993,1727888,2.22,2.61,5.74,60.0028
+TidesDB,oltp_write_only_batched,4,100000,156839,941034,1.53,1.70,23.92,60.0024
+TidesDB,oltp_read_write_batched,4,100000,57417,1149328,4.18,5.09,43.99,60.0056

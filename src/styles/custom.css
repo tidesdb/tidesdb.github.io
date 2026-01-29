@@ -702,6 +702,11 @@ canvas {
 	will-change: transform;
 }
 
+.ob-bottom {
+	object-fit: cover;
+	object-position: bottom;
+}
+
 .article-image:hover img {
 	transform: scale(1.15);
 }

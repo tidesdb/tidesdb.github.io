@@ -1,0 +1,13 @@
+engine,operation,row_count,duration_ms,ops_per_sec
+InnoDB,Sequential INSERT,500,91.62,5555.55
+InnoDB,Bulk INSERT (txn),500,44.71,12500.00
+InnoDB,Point SELECT,500,49.82,12500.00
+InnoDB,Full Table Scan (x100),100,34.88,3333.33
+InnoDB,UPDATE,500,95.50,5555.55
+InnoDB,DELETE,500,912.47,549.45
+TidesDB,Sequential INSERT,500,48.68,12500.00
+TidesDB,Bulk INSERT (txn),500,43.56,12500.00
+TidesDB,Point SELECT,500,83.44,6250.00
+TidesDB,Full Table Scan (x100),100,34.14,3333.33
+TidesDB,UPDATE,500,99.30,5555.55
+TidesDB,DELETE,500,95.27,5555.55
