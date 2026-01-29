@@ -144,6 +144,8 @@ If you are looking to experiment with a high write-throughput engine inside Mari
 
 *Shout out to @theseyan for the feedback on grammar.*
 
+---
+
 **Raw Data**
 - <a href="/tidesdb-vs-innodb-within-mariadb/tidesdb_innodb_benchmark_concurrent_results_100000.csv" download>tidesdb_innodb_benchmark_concurrent_results_100000.csv</a>
 - <a href="/tidesdb-vs-innodb-within-mariadb/tidesdb_innodb_benchmark_results_500.csv" download>tidesdb_innodb_benchmark_results_500.csv</a> 
