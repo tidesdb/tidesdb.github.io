@@ -99,7 +99,7 @@ brew install cmake zstd lz4 snappy
 
 # Build (Homebrew is auto-detected)
 cmake -S . -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 #### Option 2 · MacPorts
@@ -111,7 +111,7 @@ sudo port install cmake zstd lz4 snappy
 
 # Build with MacPorts prefix
 cmake -S . -B build -DMACOS_DEPENDENCY_PREFIX=/opt/local -DUSE_HOMEBREW=OFF
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 #### Option 3 · pkgsrc
@@ -123,7 +123,7 @@ pkgin install cmake zstd lz4 snappy
 
 # Build with pkgsrc prefix
 cmake -S . -B build -DMACOS_DEPENDENCY_PREFIX=/usr/pkg -DUSE_HOMEBREW=OFF
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 #### Option 4 · Fink
@@ -135,7 +135,7 @@ fink install cmake zstd lz4 snappy
 
 # Build with Fink prefix
 cmake -S . -B build -DMACOS_DEPENDENCY_PREFIX=/sw -DUSE_HOMEBREW=OFF
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 :::note[Custom Paths]
@@ -178,7 +178,7 @@ sudo pkg install cmake pkgconf liblz4 zstd snappy
 
 # Build
 cmake -S . -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 #### OpenBSD
@@ -188,7 +188,7 @@ sudo pkg_add cmake gmake lz4 zstd snappy pkgconf
 
 # Build
 cmake -S . -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 #### NetBSD
@@ -198,7 +198,7 @@ sudo pkgin install cmake lz4 zstd snappy
 
 # Build
 cmake -S . -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 #### DragonFlyBSD
@@ -208,7 +208,7 @@ sudo pkg install cmake lz4 zstd snappy
 
 # Build
 cmake -S . -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 ### Illumos/OmniOS/Solaris
@@ -221,7 +221,7 @@ sudo pkg install cmake lz4 zstd
 
 # Build
 cmake -S . -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 ### PowerPC (32-bit)
@@ -245,7 +245,7 @@ cmake -S . -B build \
   -DCMAKE_SYSTEM_PROCESSOR=powerpc
 
 # Build
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 ## Building
@@ -259,7 +259,7 @@ By default, TidesDB builds with optimizations enabled and debugging features dis
 
 ```bash
 rm -rf build && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake --build build --clean-first --verbose
 cmake --install build
 
 # On linux run ldconfig to update the shared library cache
@@ -274,7 +274,7 @@ rm -rf build && cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Debug \
   -DTIDESDB_WITH_SANITIZER=ON \
   -DENABLE_READ_PROFILING=ON
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 #### Minimal Build (No Tests)
@@ -285,7 +285,7 @@ rm -rf build && cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DTIDESDB_BUILD_TESTS=OFF \
   -DBUILD_SHARED_LIBS=OFF
-cmake --build build
+cmake --build build --clean-first --verbose
 cmake --install build
 ```
 
@@ -312,7 +312,7 @@ Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
 cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_C_COMPILER=gcc -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
 
 # Build (Debug or Release)
-cmake --build build --config Release
+cmake --build build --clean-first --verbose --config Release
 
 # Run tests
 cd build
@@ -334,7 +334,7 @@ Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
 cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
 
 # Build (Debug or Release)
-cmake --build build --config Release
+cmake --build build --clean-first --verbose --config Release
 
 # Run tests
 cd build
@@ -453,7 +453,7 @@ TidesDB includes optional read profiling instrumentation to analyze read perform
 ```bash
 # Development build with profiling
 cmake -B build -DENABLE_READ_PROFILING=ON -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
+cmake --build build --clean-first --verbose
 ```
 
 **For production builds**, profiling is automatically disabled:
@@ -612,7 +612,7 @@ TidesDB includes a comprehensive benchmark suite with fully configurable paramet
 ```bash
 # Build and run with defaults
 cmake -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ./build/tidesdb_bench
 ```
 
@@ -710,7 +710,7 @@ cmake -B build -DBENCH_KEY_PATTERN=zipfian
 #### Small Workload (Default)
 ```bash
 cmake -B build
-cmake --build build
+cmake --build build --clean-first --verbose
 ./build/tidesdb_bench
 ```
 
@@ -722,7 +722,7 @@ cmake -B build \
   -DBENCH_NUM_THREADS=4 \
   -DBENCH_KEY_PATTERN=random
 
-cmake --build build
+cmake --build build --clean-first --verbose
 ./build/tidesdb_bench
 ```
 
@@ -736,7 +736,7 @@ cmake -B build \
   -DBENCH_NUM_THREADS=8 \
   -DBENCH_KEY_PATTERN=zipfian
 
-cmake --build build
+cmake --build build --clean-first --verbose
 ./build/tidesdb_bench
 ```
 
@@ -751,7 +751,7 @@ cmake -B build \
   -DBENCH_ENABLE_BLOOM_FILTER=0 \
   -DBENCH_KEY_PATTERN=sequential
 
-cmake --build build
+cmake --build build --clean-first --verbose
 ./build/tidesdb_bench
 ```
 
