@@ -136,7 +136,7 @@ TidesDB favors write-heavy workloads, space efficiency benefiting from its LSM-t
 
 InnoDB excels in read-heavy and mixed workloads, delivering higher throughput and lower latency in those scenarios.
 
-If you are looking to experiment with a high write-throughput engine inside MariaDB, TidesDB is worth evaluating. For read-heavy transactional workloads, InnoDB remains a strong.
+If you are looking to experiment with a high write-throughput engine inside MariaDB, TidesDB is worth evaluating. For read-heavy transactional workloads, InnoDB remains a strong default contender.
 
 ---
 
@@ -153,3 +153,5 @@ If you are looking to experiment with a high write-throughput engine inside Mari
 - <a href="/tidesdb-vs-innodb-within-mariadb/TidesDB_oltp_read_only_batched_20260128_230344.txt" download>TidesDB_oltp_read_only_batched_20260128_230344.txt</a> 
 - <a href="/tidesdb-vs-innodb-within-mariadb/TidesDB_oltp_read_write_batched_20260128_230344.txt" download>TidesDB_oltp_read_write_batched_20260128_230344.txt</a> 
 - <a href="/tidesdb-vs-innodb-within-mariadb/TidesDB_oltp_write_only_batched_20260128_230344.txt" download>TidesDB_oltp_write_only_batched_20260128_230344.txt</a> 
+
+Thank you @theseyan for the feedback on grammar.
