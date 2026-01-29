@@ -15,13 +15,6 @@ You **must** have the TidesDB shared C library installed on your system. You can
 
 ### Installation
 
-**NuGet Package** (coming soon)
-```bash
-dotnet add package TidesDB
-```
-
-Or clone and build locally:
-
 ```bash
 git clone https://github.com/tidesdb/tidesdb-cs.git
 cd tidesdb-cs
