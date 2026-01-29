@@ -149,11 +149,16 @@ export default defineConfig({
 						{ label: 'Rust API Reference', slug: 'reference/rust' },
 						{ label: 'TypeScript API Reference', slug: 'reference/typescript' },
 						{ label: 'Lua API Reference', slug: 'reference/lua' },
+						{ label: 'TideSQL Reference', slug: 'reference/tidesql' },
 					],
 				},
 				{
 					label: 'Articles',
 					items: [
+						{
+							label: 'TidesDB vs InnoDB within MariaDB',
+							link: 'articles/tidesdb-vs-innodb-within-mariadb'
+						},
 						{
 							label: 'TidesDB Differences with glibc, mimalloc, tcmalloc',
 							link: 'articles/tidesdb-differences-with-glibc-mimalloc-tcmalloc'
