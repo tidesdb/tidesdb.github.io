@@ -1,0 +1,9 @@
+engine,operation,row_count,threads,duration_ms,total_ops_per_sec,ops_per_thread
+InnoDB,Concurrent SELECT,100000,4,1497.79,67114.09,16778.52
+InnoDB,Concurrent UPDATE,100000,4,18603.08,5376.34,1344.08
+InnoDB,Concurrent INSERT,100000,4,11302.85,8849.55,2212.38
+InnoDB,Mixed Workload,100000,4,6047.86,16556.29,4139.07
+TidesDB,Concurrent SELECT,100000,4,2801.00,35714.28,8928.57
+TidesDB,Concurrent UPDATE,100000,4,5819.41,17211.70,4302.92
+TidesDB,Concurrent INSERT,100000,4,1970.12,50761.42,12690.35
+TidesDB,Mixed Workload,100000,4,5429.16,18450.18,4612.54
