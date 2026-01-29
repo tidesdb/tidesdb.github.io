@@ -142,6 +142,8 @@ If you are looking to experiment with a high write-throughput engine inside Mari
 
 *Thanks for reading!*
 
+*Shout out to @theseyan for the feedback on grammar.
+
 **Raw Data**
 - <a href="/tidesdb-vs-innodb-within-mariadb/tidesdb_innodb_benchmark_concurrent_results_100000.csv" download>tidesdb_innodb_benchmark_concurrent_results_100000.csv</a>
 - <a href="/tidesdb-vs-innodb-within-mariadb/tidesdb_innodb_benchmark_results_500.csv" download>tidesdb_innodb_benchmark_results_500.csv</a> 
@@ -153,5 +155,3 @@ If you are looking to experiment with a high write-throughput engine inside Mari
 - <a href="/tidesdb-vs-innodb-within-mariadb/TidesDB_oltp_read_only_batched_20260128_230344.txt" download>TidesDB_oltp_read_only_batched_20260128_230344.txt</a> 
 - <a href="/tidesdb-vs-innodb-within-mariadb/TidesDB_oltp_read_write_batched_20260128_230344.txt" download>TidesDB_oltp_read_write_batched_20260128_230344.txt</a> 
 - <a href="/tidesdb-vs-innodb-within-mariadb/TidesDB_oltp_write_only_batched_20260128_230344.txt" download>TidesDB_oltp_write_only_batched_20260128_230344.txt</a> 
-
-Thank you @theseyan for the feedback on grammar.
