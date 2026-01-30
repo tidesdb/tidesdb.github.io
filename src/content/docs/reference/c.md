@@ -7,6 +7,14 @@ If you want to download the source of this document, you can find it [here](http
 
 <hr/>
 
+
+<details>
+<summary>Want to watch a dedicated how-to video?</summary>
+
+<iframe style="height: 420px;!important" width="720" height="420px" src="https://www.youtube.com/embed/uDIygMZTcLI?si=Axt_HSCFk8w8AKWx" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+</details>
+
 ## Overview
 
 TidesDB is designed to provide a simple and intuitive C API for all your embedded storage needs.  This document is complete reference for the C API covering database operations, transactions, column families, iterators and more.
