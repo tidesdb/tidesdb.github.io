@@ -362,6 +362,21 @@ Or run tests directly
 ./build/tidesdb_tests
 ```
 
+## Consolidated Include
+
+After building, TidesDB creates a consolidated include directory in the build tree for easy consumption. This allows you to use:
+
+```c
+#include <tidesdb/tidesdb.h>
+```
+
+With the compiler flag:
+```bash
+-I<build_dir>/include
+```
+
+All public headers (from `src/` and `external/`) plus the generated `tidesdb_version.h` are copied to `<build_dir>/include/tidesdb/`.
+
 ## Build Options
 
 TidesDB provides several CMake options to customize the build:
