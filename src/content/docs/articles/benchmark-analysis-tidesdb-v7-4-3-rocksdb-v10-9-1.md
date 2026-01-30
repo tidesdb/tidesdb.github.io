@@ -1,6 +1,6 @@
 ---
 title: "Benchmark Analysis on TidesDB v7.4.3 & RocksDB v10.9.1"
-description: "Performance benchmarks comparing TidesDB v7.4.3 and RocksDB v10.9.1 on write, read, and mixed workloads with default glibc allocator."
+description: "Performance benchmarks comparing TidesDB v7.4.3 and RocksDB v10.9.1 on write, read, and mixed workloads with default glibc allocator on Linux."
 head:
   - tag: meta
     attrs:
