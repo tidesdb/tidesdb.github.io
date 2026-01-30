@@ -7,6 +7,13 @@ If you want to download the source of this document, you can find it [here](http
 
 <hr/>
 
+<details>
+<summary>Want to watch a presentation instead?</summary>
+
+<iframe style="height: 420px;!important" width="720" height="420" src="https://www.youtube.com/embed/7HROlAaiGVQ?si=uPNih8INjLamlvNG" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+</details>
+
 ## Introduction
 
 TidesDB is an embeddable key-value storage engine built on log-structured merge trees (LSM trees). LSM trees optimize for write-heavy workloads by batching writes in memory and flushing sorted runs to disk. This trades write amplification (data written multiple times during compaction) for improved write throughput and sequential I/O patterns. The fundamental tradeoff: writes are fast but reads must search multiple sorted files.
