@@ -224,6 +224,9 @@ export default defineConfig({
 				},
 				{
 					label: 'Sponsors', link: 'https://tidesdb.com/sponsors'
+				},
+				{
+					label: 'Licensing', link: '/licensing'
 				}
 			],
 		}),
