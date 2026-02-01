@@ -150,3 +150,4 @@ That's it for now!
 
 To download the raw benchmark data, click [here](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/benchmark-data.zip).
 
+To learn about TideSQL, click [here](/reference/tidesql/).
