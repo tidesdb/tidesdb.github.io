@@ -20,7 +20,7 @@ head:
 
 *by <a href="https://alexpadula.com">Alex Gaetano Padula</a>*
 
-*published on Feb 1st, 2026*
+*published on February 1st, 2026*
 
 Micro optimizations! I find myself almost every day performance testing components and different configurations to identify opportunities for optimization and then applying them. This includes optimizing for throughput, lower latency, space efficiency, and other aspects of performance. In this patch, I focused on reducing syscalls and CPU cycles, improving fast paths for comparisons, and enhancing cache locality. I worked on the bloom filter, the block manager skip list, and the core read paths within TidesDB.
 

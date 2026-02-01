@@ -20,7 +20,7 @@ head:
 
 *by <a href="https://alexpadula.com">Alex Gaetano Padula</a>*
 
-*published on Feb 1st, 2026*
+*published on February 1st, 2026*
 
 Hey everyone, today <a href="https://github.com/tidesdb/tidesql">TideSQL v1.0.0</a> was released; the first major release of the pluggable <a href="https://mariadb.org">MariaDB</a> engine built on TidesDB!
 
