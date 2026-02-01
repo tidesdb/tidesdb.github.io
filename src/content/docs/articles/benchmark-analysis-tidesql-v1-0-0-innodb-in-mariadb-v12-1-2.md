@@ -37,7 +37,7 @@ Of course I had to do some benchmarks and in this article I'll share the results
 
 The scripts used for benchmarking can be found in the <a href="https://github.com/tidesdb/tidesql/tree/master/bench">bench</a> directory of the TideSQL repository.  The 2 scripts ran were `run_benchmark_procedures.sh` and `run_benchmark_extended.sh`.
 
-I would honestly benchmark your workload before making any decisions, but I hope this gives you some insight into the performance characteristics of TidesDB and InnoDB. Also consider TidesDB's plugin engine is still in it's early stages and there is **a lot of room for improvement**.
+I would honestly benchmark your workload before making any decisions, but I hope this gives you some insight into the performance characteristics of TidesDB and InnoDB. Also consider TidesDB's plugin engine is still in it's early stages and there is **a lot of room for improvement**.  One more piece benchmarks are run with sync on, this is the default for TidesDB and InnoDB (in MariaDB).
 
 With that said, let's dive into the results.
 
