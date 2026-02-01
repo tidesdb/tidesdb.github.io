@@ -127,7 +127,7 @@ maria_declare_plugin(tidesdb)
   0x0704,                  /* version: 7.4+ */
   NULL,                    /* status variables */
   tidesdb_system_variables,/* system variables */
-  "7.4.2",                 /* version string */
+  "7.4.4",                 /* version string */
   MariaDB_PLUGIN_MATURITY_STABLE  /* maturity */
 }
 maria_declare_plugin_end;
@@ -195,6 +195,28 @@ class ha_tidesdb: public handler
   uchar *current_key;
   size_t current_key_len;
   size_t current_key_capacity;    /* Pre-allocated capacity */
+
+  /* Bulk insert state */
+  bool bulk_insert_active;
+  tidesdb_txn_t *bulk_txn;
+  ha_rows bulk_insert_rows;
+
+  /* Performance optimizations */
+  bool skip_dup_check;            /* Skip redundant duplicate key check */
+  uchar *pack_buffer;             /* Buffer pooling for pack_row() */
+  size_t pack_buffer_capacity;
+  Item *pushed_idx_cond;          /* Index Condition Pushdown */
+  uint pushed_idx_cond_keyno;
+  bool keyread_only;              /* Index-only scan mode */
+  bool txn_read_only;             /* Track read-only transactions */
+  uchar *idx_key_buffer;          /* Buffer pooling for build_index_key() */
+  size_t idx_key_buffer_capacity;
+
+  /* Secondary index scan state */
+  tidesdb_iter_t *index_iter;
+  uchar *index_key_buf;
+  uint index_key_len;
+  uint index_key_buf_capacity;
   ...
 };
 ```
@@ -219,7 +241,8 @@ ulonglong table_flags() const
          HA_CAN_EXPORT |              /* Supports transportable tablespaces */
          HA_CAN_ONLINE_BACKUPS |      /* Supports online backup */
          HA_CONCURRENT_OPTIMIZE |     /* OPTIMIZE doesn't block */
-         HA_CAN_RTREEKEYS;            /* Supports spatial indexes via Z-order */
+         HA_CAN_RTREEKEYS |          /* Supports spatial indexes via Z-order */
+         HA_TABLE_SCAN_ON_INDEX;     /* Can scan table via index (covering scans) */
 }
 ```
 
@@ -289,9 +312,18 @@ typedef struct st_tidesdb_share {
   uint spatial_key_nr[TIDESDB_MAX_INDEXES];  /* Key number for each spatial index */
   uint num_spatial_indexes;
 
-  /* Foreign key constraints */
+  /* Foreign key constraints on this table (child FKs) */
   TIDESDB_FK fk[TIDESDB_MAX_FK];
   uint num_fk;
+
+  /* Tables that reference this table (parent FKs) -- for DELETE/UPDATE checks */
+  char referencing_tables[TIDESDB_MAX_FK][256];      /* "db.table" format */
+  int referencing_fk_rules[TIDESDB_MAX_FK];          /* delete_rule for each referencing FK */
+  uint referencing_fk_cols[TIDESDB_MAX_FK][16];      /* FK column indices in child table */
+  uint referencing_fk_col_count[TIDESDB_MAX_FK];     /* Number of FK columns per reference */
+  size_t referencing_fk_offsets[TIDESDB_MAX_FK][16]; /* Byte offset of each FK col in child row */
+  size_t referencing_fk_lengths[TIDESDB_MAX_FK][16]; /* Byte length of each FK column */
+  uint num_referencing;
 
   /* Change buffer for secondary index updates */
   struct {
@@ -300,7 +332,7 @@ typedef struct st_tidesdb_share {
     pthread_mutex_t mutex;
   } change_buffer;
 
-  /* Tablespace state */
+  /* Tablespace state -- for DISCARD/IMPORT TABLESPACE */
   bool tablespace_discarded;
 } TIDESDB_SHARE;
 ```
