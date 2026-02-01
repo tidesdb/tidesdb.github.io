@@ -84,7 +84,7 @@ Create Table: CREATE TABLE `users` (
 
 ## Feature Comparison
 
-| Feature | TidesDB | MyRocks | InnoDB |
+| Feature | TideSQL | MyRocks | InnoDB |
 |---------|:-------:|:-------:|:------:|
 | Storage Structure | LSM-tree | LSM-tree | B+tree |
 | ACID Transactions | ✓ | ✓ | ✓ |
