@@ -33,6 +33,8 @@ I ran the benchmarks using `tidesdb_rocksdb.sh` within the <a href="https://gith
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
 - TidesDB v7.4.3
 - RocksDB v10.9.1
+- GCC (glibc)
+
 
 
 **Gains from v7.4.3**
