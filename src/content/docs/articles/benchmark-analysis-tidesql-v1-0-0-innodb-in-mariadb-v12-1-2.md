@@ -27,8 +27,7 @@ Of course I had to do some benchmarks and in this article I'll share the results
 - 48GB DDR4
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
-- TidesDB v7.4.3
-- RocksDB v10.9.1
+- TidesDB v7.4.4
 - GCC (glibc)
 
 

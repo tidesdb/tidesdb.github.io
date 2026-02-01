@@ -31,7 +31,7 @@ I ran the benchmarks using `tidesdb_rocksdb.sh` within the <a href="https://gith
 - 48GB DDR4
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
-- TidesDB v7.4.3
+- TidesDB v7.4.3 & v7.4.4
 - RocksDB v10.9.1
 - GCC (glibc)
 
