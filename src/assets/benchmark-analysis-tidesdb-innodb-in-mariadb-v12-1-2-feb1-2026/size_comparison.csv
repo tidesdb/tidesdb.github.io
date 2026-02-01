@@ -1,0 +1,7 @@
+engine,metric,value,unit
+InnoDB,table_size,12582912,bytes
+InnoDB,table_size_mb,12.00,MB
+InnoDB,logical_size,1300000,bytes
+TidesDB,table_size,2484846,bytes
+TidesDB,table_size_mb,2.36,MB
+TidesDB,logical_size,1300000,bytes

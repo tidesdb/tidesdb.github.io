@@ -1,0 +1,8 @@
+engine,metric,value,description
+InnoDB,space_amplification,9.67,Space used / logical data
+TidesDB,space_amplification,1.91,Space used / logical data
+InnoDB,write_amplification,0,Physical size / logical writes
+InnoDB,point_lookup_latency_ms,.078,Average point lookup latency
+InnoDB,range_scan_latency_ms,.841,Average range scan latency
+TidesDB,point_lookup_latency_ms,.144,Average point lookup latency
+TidesDB,range_scan_latency_ms,1.664,Average range scan latency
