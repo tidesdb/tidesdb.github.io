@@ -9,7 +9,7 @@ If you want to download the source of this document, you can find it [here](http
 
 ## Overview
 
-TidesDB is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
+TideSQL is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
 
 ---
 
