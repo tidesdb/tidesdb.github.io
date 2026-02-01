@@ -1,0 +1,82 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    TidesDB vs InnoDB Extended Benchmark Results
+═══════════════════════════════════════════════════════════════════════════════
+
+Test Configuration:
+  Row Count:          50000
+  Concurrency Levels: 1 2 4 8
+  Latency Sample:     100
+  Date:               Sun Feb  1 03:06:47 AM EST 2026
+
+───────────────────────────────────────────────────────────────────────────────
+SIZE COMPARISON
+───────────────────────────────────────────────────────────────────────────────
+engine   metric         value     unit
+InnoDB   table_size     12582912  bytes
+InnoDB   table_size_mb  12.00     MB
+InnoDB   logical_size   1300000   bytes
+TidesDB  table_size     2484846   bytes
+TidesDB  table_size_mb  2.36      MB
+TidesDB  logical_size   1300000   bytes
+
+───────────────────────────────────────────────────────────────────────────────
+LATENCY DISTRIBUTION (milliseconds)
+───────────────────────────────────────────────────────────────────────────────
+engine   operation  count  avg_ms  min_ms  max_ms  p50_ms  p95_ms  p99_ms
+InnoDB   INSERT     100    0.61    0.062   44.613  0.068   0.399   44.613
+InnoDB   SELECT     100    0.07    0.063   0.194   0.066   0.083   0.194
+InnoDB   UPDATE     100    0.30    0.159   0.843   0.281   0.432   0.843
+TidesDB  INSERT     100    0.07    0.056   0.396   0.062   0.072   0.396
+TidesDB  SELECT     100    0.21    0.184   0.544   0.197   0.275   0.544
+TidesDB  UPDATE     100    0.21    0.188   0.474   0.206   0.251   0.474
+
+───────────────────────────────────────────────────────────────────────────────
+CONCURRENCY SCALING (ops/sec)
+───────────────────────────────────────────────────────────────────────────────
+engine   operation  threads  row_count  ops_per_sec  duration_ms
+InnoDB   SELECT     1        50000      25000.00     43.48
+InnoDB   UPDATE     1        50000      10000.00     108.30
+InnoDB   INSERT     1        50000      25000.00     42.36
+InnoDB   MIXED      1        50000      12500.00     83.65
+InnoDB   SELECT     2        50000      50000.00     49.88
+InnoDB   UPDATE     2        50000      28571.42     72.49
+InnoDB   INSERT     2        50000      50000.00     44.82
+InnoDB   MIXED      2        50000      25000.00     80.44
+InnoDB   SELECT     4        50000      66666.66     60.85
+InnoDB   UPDATE     4        50000      50000.00     83.50
+InnoDB   INSERT     4        50000      80000.00     53.80
+InnoDB   MIXED      4        50000      50000.00     80.96
+InnoDB   SELECT     8        50000      114285.71    72.36
+InnoDB   UPDATE     8        50000      80000.00     102.94
+InnoDB   INSERT     8        50000      114285.71    74.12
+InnoDB   MIXED      8        50000      61538.46     134.46
+TidesDB  SELECT     1        50000      5882.35      177.22
+TidesDB  UPDATE     1        50000      5555.55      181.77
+TidesDB  INSERT     1        50000      33333.33     39.96
+TidesDB  MIXED      1        50000      6250.00      161.97
+TidesDB  SELECT     2        50000      11764.70     176.51
+TidesDB  UPDATE     2        50000      7142.85      282.50
+TidesDB  INSERT     2        50000      50000.00     41.43
+TidesDB  MIXED      2        50000      10000.00     205.43
+TidesDB  SELECT     4        50000      20000.00     203.32
+TidesDB  UPDATE     4        50000      6666.66      603.42
+TidesDB  INSERT     4        50000      66666.66     65.14
+TidesDB  MIXED      4        50000      13333.33     307.16
+TidesDB  SELECT     8        50000      30769.23     262.09
+TidesDB  UPDATE     8        50000      6557.37      1224.71
+TidesDB  INSERT     8        50000      50000.00     166.34
+TidesDB  MIXED      8        50000      16000.00     500.09
+
+───────────────────────────────────────────────────────────────────────────────
+AMPLIFICATION METRICS
+───────────────────────────────────────────────────────────────────────────────
+engine   metric                   value  description
+InnoDB   space_amplification      9.67   Space used / logical data
+TidesDB  space_amplification      1.91   Space used / logical data
+InnoDB   write_amplification      0      Physical size / logical writes
+InnoDB   point_lookup_latency_ms  .078   Average point lookup latency
+InnoDB   range_scan_latency_ms    .841   Average range scan latency
+TidesDB  point_lookup_latency_ms  .144   Average point lookup latency
+TidesDB  range_scan_latency_ms    1.664  Average range scan latency
+
+═══════════════════════════════════════════════════════════════════════════════

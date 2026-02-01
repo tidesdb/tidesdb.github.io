@@ -1,0 +1,9 @@
+pattern,operation,innodb_ops,tidesdb_ops,ratio,winner
+batch,INSERT,65263.08,60902.08,.93,InnoDB
+random,READ,28242.68,9689.85,.34,InnoDB
+random,UPDATE,6088.65,5841.76,.95,InnoDB
+sequential,INSERT,6267.20,32196.37,5.13,TidesDB
+sequential,READ,28584.50,10038.08,.35,InnoDB
+sequential,UPDATE,4191.30,5917.18,1.41,TidesDB
+zipfian,READ,26766.74,9576.62,.35,InnoDB
+zipfian,UPDATE,6253.09,5624.44,.89,InnoDB
