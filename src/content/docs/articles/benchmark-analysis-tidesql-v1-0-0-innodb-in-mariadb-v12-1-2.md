@@ -18,6 +18,10 @@ head:
 
 </div>
 
+*by <a href="https://alexpadula.com">Alex Gaetano Padula</a>*
+
+*published on Feb 1st, 2026*
+
 Hey everyone, today <a href="https://github.com/tidesdb/tidesql">TideSQL v1.0.0</a> was released; the first major release of the pluggable <a href="https://mariadb.org">MariaDB</a> engine built on TidesDB!
 
 Of course I had to do some benchmarks and in this article I'll share the results of my analysis comparing TidesDB with <a href="https://en.wikipedia.org/wiki/InnoDB">InnoDB</a> in MariaDB v12.1.2.
@@ -146,3 +150,4 @@ That's it for now!
 
 To download the raw benchmark data, click [here](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/benchmark-data.zip).
 
+To learn about TideSQL, click [here](/reference/tidesql/).
