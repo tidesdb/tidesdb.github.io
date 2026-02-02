@@ -26,7 +26,7 @@ SHOW ENGINES\G
 ```sql
       Engine: TidesDB
      Support: YES
-     Comment: TidesDB LSM-based storage engine with ACID transactions
+     Comment: TidesDB LSMB+ storage engine with ACID transactions
 Transactions: YES
           XA: YES
   Savepoints: YES
