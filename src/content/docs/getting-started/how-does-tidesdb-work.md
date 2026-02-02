@@ -78,6 +78,50 @@ Each sorted string table (SSTable) consists of two files: a key log (.klog) and 
 
 The key log uses a block-based format. Each block (fixed at 64KB) contains multiple entries serialized with variable-length integer encoding. Blocks compress independently using LZ4, LZ4-FAST, Zstd, or Snappy. The key log ends with three auxiliary structures: a block index for binary search, a bloom filter for negative lookups, and a metadata block with SSTable statistics.
 
+### B+tree Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. Enable this with `use_btree=1` in the column family configuration. The B+tree stores all key-value entries exclusively in leaf nodes, with internal nodes containing only separator keys and child pointers for navigation. Leaf nodes are doubly-linked via `prev_offset` and `next_offset` pointers, enabling O(1) bidirectional traversal. The tree is immutable after construction - bulk-loaded from sorted memtable data during flush and never modified afterward.
+
+During construction, the builder accumulates entries in a pending leaf until it reaches the target node size (default 64KB). When full, the leaf is serialized and written to disk. After all leaves are written, internal nodes are built level-by-level from separator keys extracted from each child's first key. A backpatching pass then updates each leaf's `prev_offset` and `next_offset` pointers to their final values. For compressed nodes, the leaf links are stored in a header before the compressed data, allowing the backpatch to update them without decompressing and recompressing the entire node.
+
+Point lookups traverse from root to leaf using binary search at each internal node to select the correct child, then binary search within the leaf to locate the key. This yields O(log N) complexity where N is the number of nodes, compared to potentially scanning multiple 64KB blocks in the block-based format. Range scans use cursors that hold a reference to the current leaf node, advancing through entries before following the `next_offset` link to load the next leaf. Backward iteration follows `prev_offset` links similarly.
+
+The B+tree format excels at point lookups and range scans with seeks. Point lookups benefit from O(log N) tree traversal versus potentially scanning multiple 64KB blocks in the block-based format. Range scans with `seek()` navigate directly to the target key position rather than scanning sequentially. Workloads with many small-to-medium SSTables see the most improvement, as each SSTable's hot nodes remain cached independently. The block-based format remains preferable for sequential full-table scans and write-heavy workloads where B+tree metadata overhead during flush is less desirable.
+
+When `block_cache_size` is configured, TidesDB creates a dedicated clock cache for B+tree nodes. Frequently accessed nodes remain in memory as fully deserialized structures, avoiding repeated disk reads and deserialization overhead. Cache keys combine the SSTable ID and node offset to ensure uniqueness across tables. On eviction, the callback frees the node's memory via arena destruction. Cached nodes use arena allocation - all node memory (keys, values, metadata) is allocated from a single arena, enabling O(1) bulk deallocation when the node is evicted. When an SSTable is closed or deleted, all its cached nodes are invalidated by prefix scan to prevent stale references.
+
+Large values exceeding the configured threshold (default 512 bytes) are written to the value log, with the leaf entry storing only the vlog offset. Nodes compress independently using LZ4, LZ4-FAST, or Zstd. When bloom filters are enabled, they are checked before tree traversal - a negative result skips the B+tree lookup entirely, which is critical for LSM-trees where most SSTables won't contain the requested key. SSTable metadata persists three additional fields for B+tree format: root offset, first leaf offset, and last leaf offset, which are restored when reopening the SSTable.
+
+**Serialization optimizations** · The B+tree uses several techniques to minimize serialized node size:
+
+- **Varint encoding** · Metadata fields (entry counts, key sizes, value sizes, vlog offsets) use LEB128-style variable-length integers. Small values (< 128) require only one byte; the full 64-bit range needs at most ten bytes. This typically saves 50-70% on metadata overhead compared to fixed-width integers.
+
+- **Prefix compression** · Keys within a leaf node share common prefixes with their predecessors. Each key stores only its suffix, with the prefix length encoded as a varint. During deserialization, keys are reconstructed by copying the prefix from the previous key. For sorted string keys with common prefixes (e.g., "user:1001", "user:1002"), this achieves 60-80% key size reduction.
+
+- **Key indirection table** · Each leaf node contains a table of 2-byte offsets pointing to each key's position within the node. This enables O(1) random access to any key during binary search without scanning through variable-length prefix-compressed keys sequentially.
+
+- **Delta sequence encoding** · Sequence numbers within a leaf are stored as signed deltas from a base sequence number (the minimum in the node). Since entries in a leaf typically have similar sequence numbers, deltas are small and compress well with varint encoding. TTL values use zigzag encoding for efficient signed integer representation.
+
+- **Child offset deltas** · Internal nodes store child offsets as signed deltas from a base offset. Since child nodes are typically written sequentially, deltas are small positive values that compress efficiently.
+
+**Leaf node format:**
+```
+[type:1][num_entries:varint][prev_offset:8][next_offset:8]
+[key_offsets_table: num_entries × 2 bytes]
+[base_seq:varint]
+[entries: prefix_len:varint, suffix_len:varint, value_size:varint,
+          vlog_offset:varint, seq_delta:signed_varint, ttl:signed_varint, flags:1]
+[keys: prefix-compressed suffixes]
+[values: inline values only]
+```
+
+**Internal node format:**
+```
+[type:1][num_keys:varint][base_offset:8]
+[child_offset_deltas: signed_varint × (num_keys + 1)]
+[key_sizes: varint × num_keys]
+[separator_keys: raw key bytes]
+```
 
 ### File Format
 
@@ -821,7 +865,7 @@ The clock cache implements a partitioned, lock-free cache with hybrid hash table
 
 **Zero-copy reads** · `clock_cache_get_zero_copy()` returns a pointer to cached data without copying. The CLOCK hand gives entries with ref_bit > 0 a second chance by clearing the bit to 0 and moving on; entries with ref_bit == 0 are evicted. Callers must call `clock_cache_release()` to decrement the ref_bit when done.
 
-**Integration** · TidesDB uses the clock cache for deserialized klog blocks. Cache keys are "cf_name:sstable_id:block_offset". On cache hit, the system increments the ref_bit and returns the cached block without disk I/O or deserialization. Multiple readers share the same cached block. The zero-copy design eliminates memory allocation on the hot read path.
+**Integration** · When `block_cache_size` is configured, TidesDB creates two independent clock caches: one for deserialized klog blocks (block-based format) and one for deserialized B+tree nodes. The block cache uses keys formatted as "cf_name:sstable_id:block_offset", while the B+tree node cache uses "sstable_id:node_offset". Each cache has its own eviction callback - the block cache frees reference-counted block structures, while the B+tree cache frees deserialized node structures. On cache hit, the system increments the ref_bit and returns the cached data without disk I/O or deserialization. Multiple readers share the same cached entries. The zero-copy design eliminates memory allocation on the hot read path. When an SSTable is closed or deleted, its B+tree node cache entries are invalidated by prefix to prevent use-after-free.
 
 ### Skip List
 
