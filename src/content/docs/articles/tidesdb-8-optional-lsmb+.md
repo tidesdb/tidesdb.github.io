@@ -85,4 +85,6 @@ For raw data:
 For benchtool runner used:
 - [tidesdb_btree_comparison.sh](https://github.com/tidesdb/benchtool/blob/master/tidesdb_btree_comparison.sh)
 
-TidesDB 8: https://github.com/tidesdb/tidesdb/releases/tag/v8.0.0
+TidesDB 8: 
+
+https://github.com/tidesdb/tidesdb/releases/tag/v8.0.0
