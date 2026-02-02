@@ -22,7 +22,7 @@ head:
 
 *published on February 1st, 2026*
 
-So over the past year let's say I've experimented a lot.  I mean a lot.  I experimented with a btree layer in the past in a project I was working on called <a href="https://github.com/wildcatdb/wildcatdb">WildcatDB</a>.  Over time writing TidesDB, I've thought about ways we can add an optional klog persisted index that would utilize a B+Tree structure to improve read performance.  Though obviously an LSM-tree has many levels and files, this can greatly improve read performance, as we will soon see below.  I've been working on this for a bit on and off but decided to spend time and get it right and implemented for TidesDB 8.  With that in this article we will be going over the performance differences, you can read more about the B+tree implemented in the <a href="/getting-started/how-does-tidesdb-work">design doc</a> if ya want.
+So over the past year let's say I've experimented a lot.  I mean a lot.  I experimented with a btree layer in the past in a project I was working on called <a target="_blank" href="https://github.com/wildcatdb/wildcat">WildcatDB</a>.  Over time writing TidesDB, I've thought about ways we can add an optional klog persisted index that would utilize a B+Tree structure to improve read performance.  Though obviously an LSM-tree has many levels and files, this can greatly improve read performance, as we will soon see below.  I've been working on this for a bit on and off but decided to spend time and get it right and implemented for TidesDB 8.  With that in this article we will be going over the performance differences, you can read more about the B+tree implemented in the <a target="_blank" href="/getting-started/how-does-tidesdb-work">design doc</a> if ya want.
 
 **Environment**
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
@@ -76,6 +76,8 @@ The B+tree-backed KLog preserves sequential write performance, improves random a
 *Thanks for reading!*
 
 --
+
+Thank you to @KevBurnsJr on reddit for his review and feedback on this article!
 
 For raw data:
 
