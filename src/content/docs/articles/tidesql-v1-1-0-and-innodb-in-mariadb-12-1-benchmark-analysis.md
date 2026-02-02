@@ -22,7 +22,7 @@ head:
 
 *published on February 2nd, 2026*
 
-I'm always hard at work!  With the latest TidesDB 8 release I dove into TideSQL to get it up to par.  TideSQL now uses the LSMB+ by default though this can be configured.  I ran a few sysbench tests to compare the performance of <a href="https://github.com/tidesdb/tidesql/releases/tag/v1.1.0">TideSQL v1.1.0</a> with InnoDB in MariaDB 12.1.
+I'm always hard at work!  With the latest TidesDB 8 release I dove into TideSQL to get it up to par. <a target="_blank" href="/reference/tidesql/">TideSQL</a> now uses the LSMB+ by default though this can be configured.  I ran a few sysbench tests to compare the performance of <a target="_blank" href="https://github.com/tidesdb/tidesql/releases/tag/v1.1.0">TideSQL v1.1.0</a> with InnoDB in MariaDB 12.1.
 
 The environment used for the benchmark was:
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
