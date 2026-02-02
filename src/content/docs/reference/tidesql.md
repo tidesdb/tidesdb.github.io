@@ -9,7 +9,7 @@ If you want to download the source of this document, you can find it [here](http
 
 ## Overview
 
-TideSQL is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
+TideSQL is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture with optional B+tree format for point lookups. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
 
 ---
 
@@ -41,7 +41,7 @@ CREATE TABLE users (
   email VARCHAR(100),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_name (name)
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 INSERT INTO users (name, email) VALUES 
   ('Alice', 'alice@example.com'),
@@ -77,7 +77,7 @@ Create Table: CREATE TABLE `users` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_name` (`name`(63))
-) ENGINE=TidesDB DEFAULT CHARSET=utf8mb4
+) ENGINE=TIDESDB DEFAULT CHARSET=utf8mb4
 ```
 
 ---
@@ -86,7 +86,7 @@ Create Table: CREATE TABLE `users` (
 
 | Feature | TideSQL | MyRocks | InnoDB |
 |---------|:-------:|:-------:|:------:|
-| Storage Structure | LSM-tree | LSM-tree | B+tree |
+| Storage Structure | LSMB+ | LSM-tree | B+tree |
 | ACID Transactions | ✓ | ✓ | ✓ |
 | MVCC | ✓ | ✓ | ✓ |
 | Compression | ✓ (5 algorithms) | ✓ | ✓ |
@@ -120,14 +120,14 @@ maria_declare_plugin(tidesdb)
   &tidesdb_storage_engine,
   "TidesDB",
   "TidesDB Authors",
-  "TidesDB LSM-based storage engine with ACID transactions",
+  "TidesDB LSMB+ storage engine with ACID transactions",
   PLUGIN_LICENSE_GPL,
   tidesdb_init_func,       /* Plugin Init */
   tidesdb_done_func,       /* Plugin Deinit */
-  0x0704,                  /* version: 7.4+ */
+  0x0110,                  /* version: 1.1.0 */
   NULL,                    /* status variables */
   tidesdb_system_variables,/* system variables */
-  "7.4.4",                 /* version string */
+  "1.1.0",                 /* version string */
   MariaDB_PLUGIN_MATURITY_STABLE  /* maturity */
 }
 maria_declare_plugin_end;
@@ -217,6 +217,9 @@ class ha_tidesdb: public handler
   uchar *index_key_buf;
   uint index_key_len;
   uint index_key_buf_capacity;
+
+  /* DS-MRR (Disk-Sweep Multi-Range Read) implementation */
+  DsMrr_impl m_ds_mrr;
   ...
 };
 ```
@@ -243,6 +246,19 @@ ulonglong table_flags() const
          HA_CONCURRENT_OPTIMIZE |     /* OPTIMIZE doesn't block */
          HA_CAN_RTREEKEYS |          /* Supports spatial indexes via Z-order */
          HA_TABLE_SCAN_ON_INDEX;     /* Can scan table via index (covering scans) */
+}
+```
+
+### Index Flags
+
+```cpp
+ulong index_flags(uint inx, uint part, bool all_parts) const
+{
+  return HA_READ_NEXT |      /* Can read next in index order */
+         HA_READ_PREV |      /* Can read previous in index order */
+         HA_READ_ORDER |     /* Returns records in index order */
+         HA_READ_RANGE |     /* Can read ranges */
+         HA_KEYREAD_ONLY;    /* Supports covering index scans (keyread optimization) */
 }
 ```
 
@@ -495,6 +511,88 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 +--------------------------------------------------------------+
 ```
 
+### Keyread Optimization (Covering Index)
+
+When a query only needs columns that are part of an index, TidesDB can satisfy
+the query directly from the index without fetching the full row. This is called
+a "covering index" or "keyread" optimization.
+
+```cpp
+/* In index_next(), index_read_map(), index_next_same() */
+if (keyread_only)
+{
+    KEY *key_info = &table->key_info[active_index];
+    uint idx_restore_len = key_info->key_length;
+
+    /* Clear the record buffer first */
+    memset(buf, 0, table->s->reclength);
+
+    /* Restore the index columns using MariaDB's key_restore() */
+    key_restore(buf, idx_key, key_info, idx_restore_len);
+
+    /* Also restore the primary key portion (appended after index columns) */
+    if (table->s->primary_key != MAX_KEY)
+    {
+        KEY *pk_info = &table->key_info[table->s->primary_key];
+        key_restore(buf, idx_key + idx_restore_len, pk_info, pk_len);
+    }
+
+    DBUG_RETURN(0);  /* Skip expensive PK lookup! */
+}
+```
+
+This optimization significantly improves performance for queries like:
+```sql
+SELECT id, name FROM users WHERE name = 'Alice';  -- Uses index on (name)
+```
+
+### Multi-Range Read (DS-MRR)
+
+TidesDB implements the DS-MRR (Disk-Sweep Multi-Range Read) interface for
+efficient batch key lookups. This is particularly beneficial for:
+- Range scans with multiple ranges
+- Batched Key Access (BKA) joins
+- Secondary index lookups that need PK fetch
+
+```cpp
+/* MRR interface methods */
+int multi_range_read_init(RANGE_SEQ_IF *seq, void *seq_init_param,
+                          uint n_ranges, uint mode, HANDLER_BUFFER *buf);
+int multi_range_read_next(range_id_t *range_info);
+ha_rows multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
+                                    void *seq_init_param, uint n_ranges,
+                                    uint *bufsz, uint *flags, ha_rows limit,
+                                    Cost_estimate *cost);
+ha_rows multi_range_read_info(uint keyno, uint n_ranges, uint keys,
+                              uint key_parts, uint *bufsz, uint *flags,
+                              Cost_estimate *cost);
+```
+
+DS-MRR benefits for TidesDB (LSM-tree):
+- Sorting keys before lookup improves block cache hit rate
+- Batching secondary index → PK lookups reduces transaction overhead
+- Key-ordered access is more efficient for LSM merge iterators
+
+### Handler Cloning
+
+TidesDB supports handler cloning for parallel operations:
+
+```cpp
+handler *ha_tidesdb::clone(const char *name, MEM_ROOT *mem_root)
+{
+    /* Use base class clone - TidesDB handlers share TIDESDB_SHARE */
+    handler *new_handler = handler::clone(name, mem_root);
+    if (new_handler)
+        new_handler->set_optimizer_costs(ha_thd());
+    return new_handler;
+}
+```
+
+Handler cloning enables:
+- DS-MRR - Uses two handlers (index scan + rnd_pos)
+- Parallel query execution - Multiple handlers for concurrent scans
+- WITHOUT OVERLAPS - Unique hash key lookups
+
 ---
 
 ## 6. Secondary Indexes
@@ -555,6 +653,7 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 | `tidesdb_dividing_level_offset` | 2 | Compaction dividing level offset |
 | `tidesdb_l1_file_count_trigger` | 4 | L1 file count trigger for compaction |
 | `tidesdb_l0_queue_stall_threshold` | 20 | L0 queue stall threshold for backpressure |
+| `tidesdb_use_btree` | TRUE | Use B+tree format for column families (faster point lookups) |
 
 ### Compression & Bloom Filters
 
@@ -619,9 +718,110 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 | `tidesdb_ft_min_word_len` | 4 | Minimum word length for fulltext indexing |
 | `tidesdb_ft_max_word_len` | 84 | Maximum word length for fulltext indexing |
 
+### B+tree Format Option
+
+TidesDB supports an optional B+tree format for column families (enabled by default).
+This provides faster point lookups compared to the standard block-based format:
+
+| Format | Point Lookup | Range Scan | Write |
+|--------|-------------|------------|-------|
+| B+tree | O(log N) | O(log N + K) | Slightly slower |
+| Block-based | O(log B) + O(log E) | O(N) sequential | Faster |
+
+Enable/disable via system variable:
+```sql
+SET GLOBAL tidesdb_use_btree = ON;  -- Default: ON
+```
+
 ---
 
-## 9. XA Transaction Support
+## 9. Optimizer Cost Model
+
+TidesDB provides accurate cost estimates to the MariaDB optimizer based on
+LSM-tree architecture characteristics.
+
+### Engine-Level Cost Constants
+
+TidesDB registers LSM-tree specific optimizer costs via `update_optimizer_costs`:
+
+```cpp
+static void tidesdb_update_optimizer_costs(OPTIMIZER_COSTS *costs)
+{
+    /* With bloom filters, point lookups are efficient */
+    if (tidesdb_enable_bloom_filter)
+    {
+        costs->key_lookup_cost = 0.0008;  /* Slightly higher than B-tree */
+        costs->row_lookup_cost = 0.0010;
+    }
+    else
+    {
+        costs->key_lookup_cost = 0.0020;  /* Higher without bloom filters */
+        costs->row_lookup_cost = 0.0025;
+    }
+    
+    /* Merge iterator overhead for sequential access */
+    costs->key_next_find_cost = 0.00012;
+    costs->row_next_find_cost = 0.00015;
+    
+    /* 80% cache hit rate assumed */
+    costs->disk_read_ratio = 0.20;
+}
+```
+
+| Cost Variable | TidesDB Value | Notes |
+|--------------|---------------|-------|
+| `key_lookup_cost` | 0.0008 | With bloom filters |
+| `row_lookup_cost` | 0.0010 | Row fetch after key |
+| `key_next_find_cost` | 0.00012 | Merge iterator overhead |
+| `disk_read_ratio` | 0.20 | 80% block cache hit rate |
+
+### scan_time() - Full Table Scan Cost
+
+```cpp
+IO_AND_CPU_COST ha_tidesdb::scan_time()
+{
+    /* Factors considered:
+     * 1. Merge iterator overhead: O(log S) per row where S = number of sources
+     * 2. Cache effectiveness: hit_rate reduces I/O cost
+     * 3. Vlog indirection: large values (>512 bytes) require extra seeks
+     * 4. B+tree vs block-based format overhead
+     */
+    double merge_overhead = 1.0 + (log2((double)total_sources) * 0.05);
+    double cache_factor = 1.0 - (hit_rate * 0.9);
+    double vlog_overhead = (avg_value_size > 512) ? 1.3 : 1.0;
+    double format_factor = use_btree ? 1.02 : 1.0;
+
+    cost.io = num_blocks * merge_overhead * cache_factor * vlog_overhead * format_factor;
+    cost.cpu = total_keys * 0.001 * merge_overhead;
+}
+```
+
+### read_time() - Index/Point Lookup Cost
+
+```cpp
+IO_AND_CPU_COST ha_tidesdb::read_time(uint index, uint ranges, ha_rows rows)
+{
+    /* Factors considered:
+     * 1. Read amplification from LSM levels
+     * 2. Bloom filter benefit: 1% FPR eliminates 99% of negative lookups
+     * 3. B+tree height for point lookups
+     * 4. Secondary index double-lookup overhead (index CF → main CF)
+     * 5. Vlog indirection for large values
+     */
+    double bloom_benefit = enable_bloom_filter ? 
+                           (0.3 + (fpr * num_levels)) : 1.0;
+    double format_factor = use_btree ? 
+                           (0.2 + (btree_height * 0.15)) : 1.0;
+    double secondary_idx_factor = (index != primary_key) ? 2.0 : 1.0;
+
+    cost.io = (ranges * seek_cost * cache_factor * secondary_idx_factor) +
+              (rows * row_fetch_cost * vlog_factor * secondary_idx_factor);
+}
+```
+
+---
+
+## 10. XA Transaction Support
 
 TidesDB supports distributed transactions via the XA protocol:
 
@@ -641,7 +841,7 @@ Implementation:
 
 ---
 
-## 10. Partitioning
+## 11. Partitioning
 
 TidesDB supports MariaDB's native partitioning via `ha_partition`. Each partition
 maps to a separate TidesDB column family.
@@ -654,7 +854,7 @@ CREATE TABLE sales (
   region VARCHAR(20),
   amount DECIMAL(10,2),
   PRIMARY KEY (id, region)
-) ENGINE=TidesDB
+) ENGINE=TIDESDB
 PARTITION BY LIST COLUMNS (region) (
   PARTITION p_east VALUES IN ('NY', 'NJ'),
   PARTITION p_west VALUES IN ('CA', 'WA')
@@ -682,7 +882,7 @@ Supported partition types:
 
 ---
 
-## 11. TTL (Time-To-Live)
+## 12. TTL (Time-To-Live)
 
 Rows can expire automatically using a `_ttl` column. The value specifies
 the number of seconds until expiration.
@@ -692,7 +892,7 @@ CREATE TABLE sessions (
   id INT PRIMARY KEY,
   data VARCHAR(100),
   _ttl INT
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 INSERT INTO sessions VALUES (1, 'session data', 3600);  -- expires in 1 hour
 INSERT INTO sessions VALUES (2, 'permanent', 0);        -- never expires
@@ -711,7 +911,7 @@ TidesDB's background reaper thread removes expired rows during compaction.
 
 ---
 
-## 12. Encryption
+## 13. Encryption
 
 TidesDB integrates with MariaDB's encryption service for data-at-rest encryption.
 
@@ -746,7 +946,7 @@ The encryption uses AES-256-CBC with a random IV per row. Format:
 
 ---
 
-## 13. Foreign Keys
+## 14. Foreign Keys
 
 TidesDB stores foreign key definitions in MariaDB's data dictionary and
 enforces referential integrity on DML operations.
@@ -757,14 +957,14 @@ enforces referential integrity on DML operations.
 CREATE TABLE parent (
   id INT PRIMARY KEY,
   name VARCHAR(50)
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 CREATE TABLE child (
   id INT PRIMARY KEY,
   parent_id INT,
   value VARCHAR(50),
   FOREIGN KEY (parent_id) REFERENCES parent(id) ON DELETE CASCADE
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 SHOW CREATE TABLE child\G
 ```
@@ -778,7 +978,7 @@ Create Table: CREATE TABLE `child` (
   `value` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `parent_id` (`parent_id`)
-) ENGINE=TidesDB
+) ENGINE=TIDESDB
 ```
 
 Supported referential actions:
@@ -788,7 +988,7 @@ Supported referential actions:
 
 ---
 
-## 14. Online DDL
+## 15. Online DDL
 
 TidesDB supports online ALTER TABLE for index operations:
 
@@ -810,7 +1010,7 @@ ALTER TABLE users DROP INDEX idx_email;
 
 ---
 
-## 15. Handler Methods
+## 16. Handler Methods
 
 ### Table Lifecycle
 
@@ -899,9 +1099,40 @@ int ha_tidesdb::rename_table(const char *from, const char *to)
 | `external_lock()` | Begin/end transaction |
 | `start_stmt()` | Statement-level savepoint |
 
+### Bulk Insert Optimization
+
+TidesDB optimizes bulk inserts with:
+- Single transaction for all rows (avoids per-row commit overhead)
+- Skip duplicate key checks during bulk insert
+- Intermediate commits every 10,000 rows to avoid transaction log overflow
+
+```cpp
+void ha_tidesdb::start_bulk_insert(ha_rows rows, uint flags)
+{
+    bulk_insert_rows = rows;
+    bulk_insert_count = 0;
+    skip_dup_check = true;
+    
+    /* Use THD transaction if in multi-statement, else create own */
+    tidesdb_txn_t *thd_txn = get_thd_txn(thd, tidesdb_hton);
+    if (thd_txn)
+        bulk_txn = thd_txn;
+    else
+        tidesdb_txn_begin(tidesdb_instance, &bulk_txn);
+}
+
+/* In write_row(): intermediate commit every BULK_COMMIT_THRESHOLD rows */
+if (bulk_insert_count >= BULK_COMMIT_THRESHOLD)  // 10,000
+{
+    tidesdb_txn_commit(bulk_txn);
+    tidesdb_txn_begin(tidesdb_instance, &bulk_txn);
+    bulk_insert_count = 0;
+}
+```
+
 ---
 
-## 16. Configuration Reference
+## 17. Configuration Reference
 
 View all TidesDB variables:
 
@@ -955,10 +1186,11 @@ SHOW VARIABLES LIKE 'tidesdb%';
 | `tidesdb_default_isolation` | read_committed | Transaction isolation level |
 | `tidesdb_enable_bloom_filter` | ON | Bloom filters for point lookups |
 | `tidesdb_enable_encryption` | OFF | Data-at-rest encryption |
+| `tidesdb_use_btree` | ON | B+tree format for faster point lookups |
 
 ---
 
-## 17. Engine Status
+## 18. Engine Status
 
 View TidesDB runtime statistics and configuration:
 
@@ -1049,7 +1281,40 @@ TTL
 
 ---
 
-## 18. Transaction Conflict Handling
+## 19. Scalability & Lock-Free Operations
+
+TidesDB is designed for high concurrency with minimal lock contention. The plugin
+uses atomic operations where possible to match TidesDB's lockless internal architecture.
+
+### Hidden Primary Key Counter
+
+For tables without an explicit primary key, TidesDB generates hidden 8-byte keys.
+The counter uses lock-free atomic increment for scalability:
+
+```cpp
+/* Lock-free atomic increment for hidden PK */
+ulonglong pk_val = my_atomic_add64_explicit(
+    (volatile int64 *)&share->hidden_pk_value, 1,
+    MY_MEMORY_ORDER_RELAXED) + 1;
+```
+
+### Locking Strategy
+
+| Resource | Lock Type | Purpose |
+|----------|-----------|---------|
+| Hidden PK counter | Atomic | Lock-free increment |
+| Auto-increment | Mutex | Gap reservation |
+| Table share | Mutex | Metadata access |
+| Change buffer | Mutex | Batch secondary index updates |
+
+TidesDB's internal components are lockless:
+- Skip lists (memtables) - Lock-free CAS for updates
+- Block manager - Atomic offset allocation
+- Clock cache - Lock-free state machines
+
+---
+
+## 20. Transaction Conflict Handling
 
 TidesDB uses optimistic concurrency control (OCC) with MVCC. When concurrent
 transactions modify the same rows, conflicts are detected at commit time.
@@ -1080,27 +1345,8 @@ When a conflict occurs, TidesDB returns `HA_ERR_LOCK_DEADLOCK` which tells
 MariaDB to retry the transaction. This is the standard mechanism for handling
 optimistic concurrency conflicts.
 
----
-
-## 19. Performance Benchmarks
-
-Sysbench OLTP benchmarks comparing TidesDB and InnoDB (100K rows, 4 threads, 60s):
-
-| Test | Engine | TPS | QPS | Latency avg | Latency p95 | Latency max |
-|------|--------|-----|-----|-------------|-------------|-------------|
-| Read-Only | InnoDB | 282,680 | 4,522,880 | 0.85ms | 1.12ms | 11.24ms |
-| Read-Only | TidesDB | 107,993 | 1,727,888 | 2.22ms | 2.61ms | 5.74ms |
-| Write-Only | InnoDB | 135,262 | 811,572 | 1.77ms | 2.03ms | 354.40ms |
-| Write-Only | **TidesDB** | **156,839** | **941,034** | **1.53ms** | **1.70ms** | **23.92ms** |
-| Read-Write | InnoDB | 105,780 | 2,115,600 | 2.27ms | 2.30ms | 109.78ms |
-| Read-Write | TidesDB | 57,417 | 1,149,328 | 4.18ms | 5.09ms | 43.99ms |
-
----
-
-For write-heavy workloads with high insert rates, TidesDB offers better
-performance than B-tree engines while maintaining mostly full SQL compatibility.
 
 --- 
 You can find the source for the TideSQL project [here](https://github.com/tidesdb/tidesql).
 
-For detailed benchmarks against InnoDB, see [here](/articles/tidesdb-vs-innodb-within-mariadb).
+For detailed benchmarks against InnoDB, see [here](/articles/tidesql-v1-1-0-and-innodb-in-mariadb-12-1-benchmark-analysis).
