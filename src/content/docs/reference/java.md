@@ -88,10 +88,8 @@ ColumnFamilyConfig customConfig = ColumnFamilyConfig.builder()
 
 db.createColumnFamily("custom_cf", customConfig);
 
-// Drop column family
 db.dropColumnFamily("my_cf");
 
-// List all column families
 String[] cfNames = db.listColumnFamilies();
 for (String name : cfNames) {
     System.out.println("Column family: " + name);
@@ -259,13 +257,20 @@ System.out.println("Average value size: " + stats.getAvgValueSize());
 System.out.println("Read amplification: " + stats.getReadAmp());
 System.out.println("Hit rate: " + stats.getHitRate());
 
+// B+tree statistics (only populated if useBtree=true)
+if (stats.isUseBtree()) {
+    System.out.println("B+tree total nodes: " + stats.getBtreeTotalNodes());
+    System.out.println("B+tree max height: " + stats.getBtreeMaxHeight());
+    System.out.println("B+tree avg height: " + stats.getBtreeAvgHeight());
+}
+
 // Per-level statistics
 long[] levelSizes = stats.getLevelSizes();
 int[] levelSSTables = stats.getLevelNumSSTables();
 long[] levelKeyCounts = stats.getLevelKeyCounts();
 ```
 
-**Stats Fields:**
+**Stats Fields**
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -280,6 +285,10 @@ long[] levelKeyCounts = stats.getLevelKeyCounts();
 | `avgValueSize` | double | Average value size in bytes |
 | `readAmp` | double | Read amplification (point lookup cost multiplier) |
 | `hitRate` | double | Cache hit rate (0.0 if cache disabled) |
+| `useBtree` | boolean | Whether column family uses B+tree klog format |
+| `btreeTotalNodes` | long | Total B+tree nodes (only if useBtree=true) |
+| `btreeMaxHeight` | int | Maximum B+tree height (only if useBtree=true) |
+| `btreeAvgHeight` | double | Average B+tree height (only if useBtree=true) |
 | `config` | ColumnFamilyConfig | Column family configuration |
 
 ### Getting Cache Statistics
@@ -354,6 +363,50 @@ Atomically rename a column family:
 db.renameColumnFamily("old_name", "new_name");
 ```
 
+### B+tree KLog Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
+
+```java
+// Create column family with B+tree klog format
+ColumnFamilyConfig btreeConfig = ColumnFamilyConfig.builder()
+    .writeBufferSize(128 * 1024 * 1024)
+    .compressionAlgorithm(CompressionAlgorithm.LZ4_COMPRESSION)
+    .enableBloomFilter(true)
+    .useBtree(true)  // Enable B+tree klog format
+    .build();
+
+db.createColumnFamily("btree_cf", btreeConfig);
+
+// Use normally - all operations work the same
+ColumnFamily cf = db.getColumnFamily("btree_cf");
+
+try (Transaction txn = db.beginTransaction()) {
+    txn.put(cf, "key".getBytes(), "value".getBytes());
+    txn.commit();
+}
+
+// Check B+tree stats
+Stats stats = cf.getStats();
+if (stats.isUseBtree()) {
+    System.out.println("B+tree nodes: " + stats.getBtreeTotalNodes());
+    System.out.println("B+tree max height: " + stats.getBtreeMaxHeight());
+    System.out.println("B+tree avg height: " + stats.getBtreeAvgHeight());
+}
+```
+
+**When to use B+tree klog format:**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Tradeoffs:**
+- Slightly higher write amplification during flush
+- Larger metadata overhead per node
+- Block-based format may be faster for sequential scans
+
+**Important:** `useBtree` cannot be changed after column family creation.
+
 ### Transaction Isolation Levels
 
 ```java
@@ -411,6 +464,8 @@ try (Transaction txn = db.beginTransaction()) {
 | `logLevel` | LogLevel | INFO | Logging level |
 | `blockCacheSize` | long | 64MB | Block cache size in bytes |
 | `maxOpenSSTables` | long | 256 | Maximum open SSTable files |
+| `logToFile` | boolean | false | Write logs to file instead of stderr |
+| `logTruncationAt` | long | 24MB | Log file truncation size (0 = no truncation) |
 
 ### Column Family Configuration
 
@@ -436,6 +491,7 @@ try (Transaction txn = db.beginTransaction()) {
 | `minDiskSpace` | long | 100MB | Minimum disk space required |
 | `l1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `l0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
+| `useBtree` | boolean | false | Use B+tree format for klog (faster point lookups) |
 
 ### Compression Algorithms
 

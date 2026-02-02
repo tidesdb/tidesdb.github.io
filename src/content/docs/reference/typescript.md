@@ -77,6 +77,8 @@ const db = TidesDB.open({
   logLevel: LogLevel.Info,
   blockCacheSize: 64 * 1024 * 1024,
   maxOpenSSTables: 256,
+  logToFile: false,           // Write logs to file instead of stderr
+  logTruncationAt: 24 * 1024 * 1024,  // Log file truncation size (24MB), 0 = no truncation
 });
 
 console.log('Database opened successfully');
@@ -113,9 +115,9 @@ db.createColumnFamily('my_cf', {
   syncMode: SyncMode.Interval,
   syncIntervalUs: 128000,
   defaultIsolationLevel: IsolationLevel.ReadCommitted,
+  useBtree: false,  // Use B+tree format for klog (default: false = block-based)
 });
 
-// Drop a column family
 db.dropColumnFamily('my_cf');
 
 // Rename a column family atomically
@@ -357,6 +359,13 @@ for (let i = 0; i < stats.numLevels; i++) {
   console.log(`Level ${i + 1}: ${stats.levelNumSSTables[i]} SSTables, ${stats.levelSizes[i]} bytes, ${stats.levelKeyCounts[i]} keys`);
 }
 
+// B+tree statistics (only populated if useBtree=true)
+if (stats.useBtree) {
+  console.log(`B+tree Total Nodes: ${stats.btreeTotalNodes}`);
+  console.log(`B+tree Max Height: ${stats.btreeMaxHeight}`);
+  console.log(`B+tree Avg Height: ${stats.btreeAvgHeight}`);
+}
+
 if (stats.config) {
   console.log(`Write Buffer Size: ${stats.config.writeBufferSize}`);
   console.log(`Compression: ${stats.config.compressionAlgorithm}`);
@@ -430,9 +439,9 @@ if (cf.isCompacting()) {
 ```
 
 **Use cases**
-- **Graceful shutdown** -- Wait for background operations to complete before closing
-- **Maintenance windows** -- Check if operations are running before triggering manual compaction
-- **Monitoring** -- Track background operation status for observability
+- Graceful shutdown -- Wait for background operations to complete before closing
+- Maintenance windows -- Check if operations are running before triggering manual compaction
+- Monitoring -- Track background operation status for observability
 
 ### Updating Runtime Configuration
 
@@ -463,7 +472,7 @@ cf.updateRuntimeConfig({
 - `syncIntervalUs` -- Sync interval in microseconds
 
 **Non-updatable settings** (would corrupt existing data):
-- `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`
+- `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
 
 ### Sync Modes
 
@@ -512,6 +521,45 @@ db.createColumnFamily('zstd_cf', {
   compressionAlgorithm: CompressionAlgorithm.ZstdCompression,
 });
 ```
+
+### B+tree KLog Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
+
+```typescript
+// Create column family with B+tree klog format
+db.createColumnFamily('btree_cf', {
+  useBtree: true,
+  enableBloomFilter: true,
+  bloomFpr: 0.01,
+});
+
+// Check if column family uses B+tree klog format
+const cf = db.getColumnFamily('btree_cf');
+const stats = cf.getStats();
+
+console.log(`Uses B+tree: ${stats.useBtree}`);
+if (stats.useBtree) {
+  console.log(`B+tree Total Nodes: ${stats.btreeTotalNodes}`);
+  console.log(`B+tree Max Height: ${stats.btreeMaxHeight}`);
+  console.log(`B+tree Avg Height: ${stats.btreeAvgHeight}`);
+}
+```
+
+**Characteristics**
+- Point lookups -- O(log N) tree traversal with binary search at each node
+- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
+- Compression -- Nodes compress independently using the same algorithms (LZ4, Zstd, etc.)
+
+**When to use B+tree klog format**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Important notes**
+- `useBtree` **cannot be changed** after column family creation
+- Different column families can use different formats
 
 ## Error Handling
 
@@ -588,7 +636,6 @@ function main() {
 
     const cf = db.getColumnFamily('users');
 
-    // Write data
     const txn = db.beginTransaction();
 
     txn.put(cf, Buffer.from('user:1'), Buffer.from('Alice'), -1);
@@ -601,7 +648,7 @@ function main() {
     txn.commit();
     txn.free();
 
-    // Read data
+
     const readTxn = db.beginTransaction();
 
     const value = readTxn.get(cf, Buffer.from('user:1'));

@@ -36,18 +36,15 @@ db.create_column_family("users", config)
 
 cf = db.get_column_family("users")
 
-# Write data in a transaction
 with db.begin_txn() as txn:
     txn.put(cf, b"user:1", b"Alice")
     txn.put(cf, b"user:2", b"Bob")
     txn.commit()
 
-# Read data
 with db.begin_txn() as txn:
     value = txn.get(cf, b"user:1")
     print(f"user:1 = {value.decode()}")
 
-# Iterate over all entries
 with db.begin_txn() as txn:
     with txn.new_iterator(cf) as it:
         it.seek_to_first()
@@ -75,6 +72,8 @@ config = tidesdb.Config(
     log_level=tidesdb.LogLevel.LOG_INFO,
     block_cache_size=64 * 1024 * 1024,  # 64MB
     max_open_sstables=256,
+    log_to_file=False,                   # Write logs to file instead of stderr
+    log_truncation_at=24 * 1024 * 1024,  # Log file truncation size (24MB)
 )
 db = tidesdb.TidesDB(config)
 
@@ -116,10 +115,14 @@ print(f"Avg key size: {stats.avg_key_size:.2f}, Avg value size: {stats.avg_value
 print(f"Read amplification: {stats.read_amp:.2f}, Hit rate: {stats.hit_rate:.2%}")
 print(f"Keys per level: {stats.level_key_counts}")
 
-# Rename column family
+# B+tree klog stats (only populated if use_btree=True)
+if stats.use_btree:
+    print(f"B+tree total nodes: {stats.btree_total_nodes}")
+    print(f"B+tree max height: {stats.btree_max_height}")
+    print(f"B+tree avg height: {stats.btree_avg_height:.2f}")
+
 db.rename_column_family("my_cf", "new_cf")
 
-# Drop column family
 db.drop_column_family("new_cf")
 ```
 
@@ -137,7 +140,6 @@ try:
     
     txn.delete(cf, b"key2")
     
-    # Commit transaction
     txn.commit()
 except tidesdb.TidesDBError as e:
     txn.rollback()
@@ -170,11 +172,11 @@ with db.begin_txn() as txn:
 txn = db.begin_txn_with_isolation(tidesdb.IsolationLevel.SERIALIZABLE)
 
 # Available levels
-# - READ_UNCOMMITTED: Sees all data including uncommitted changes
-# - READ_COMMITTED: Sees only committed data (default)
-# - REPEATABLE_READ: Consistent snapshot, phantom reads possible
-# - SNAPSHOT: Write-write conflict detection
-# - SERIALIZABLE: Full read-write conflict detection (SSI)
+# - READ_UNCOMMITTED -- Sees all data including uncommitted changes
+# - READ_COMMITTED -- Sees only committed data (default)
+# - REPEATABLE_READ -- Consistent snapshot, phantom reads possible
+# - SNAPSHOT -- Write-write conflict detection
+# - SERIALIZABLE -- Full read-write conflict detection (SSI)
 ```
 
 ### Savepoints
@@ -227,7 +229,7 @@ with db.begin_txn() as txn:
 ### Maintenance Operations
 
 ```python
-# Manual compaction
+# Manual compaction (queues compaction)
 cf.compact()
 
 # Manual memtable flush (sorted run to L1)
@@ -273,17 +275,48 @@ new_config.sync_mode = tidesdb.SyncMode.SYNC_FULL
 cf.update_runtime_config(new_config, persist_to_disk=True)
 
 # Updatable settings (safe to change at runtime):
-# - write_buffer_size: Memtable flush threshold
-# - skip_list_max_level: Skip list level for new memtables
-# - skip_list_probability: Skip list probability for new memtables
-# - bloom_fpr: False positive rate for new SSTables
-# - index_sample_ratio: Index sampling ratio for new SSTables
-# - sync_mode: Durability mode
-# - sync_interval_us: Sync interval in microseconds
+# -- write_buffer_size: Memtable flush threshold
+# -- skip_list_max_level: Skip list level for new memtables
+# -- skip_list_probability: Skip list probability for new memtables
+# -- bloom_fpr: False positive rate for new SSTables
+# -- index_sample_ratio: Index sampling ratio for new SSTables
+# -- sync_mode: Durability mode
+# -- sync_interval_us: Sync interval in microseconds
 
 # Save config to custom INI file
 tidesdb.save_config_to_ini("custom_config.ini", "my_cf", new_config)
 ```
+
+### B+tree KLog Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
+
+```python
+config = tidesdb.default_column_family_config()
+config.use_btree = True  # Enable B+tree klog format
+
+db.create_column_family("btree_cf", config)
+```
+
+**Characteristics:**
+- Point lookups: O(log N) tree traversal with binary search at each node
+- Range scans: Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable: Tree is bulk-loaded from sorted memtable data during flush
+- Compression: Nodes compress independently using the same algorithms
+
+**When to use B+tree klog format:**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Tradeoffs:**
+- Slightly higher write amplification during flush
+- Larger metadata overhead per node
+- Block-based format may be faster for sequential scans
+
+:::note
+`use_btree` **cannot be changed** after column family creation. Different column families can use different formats.
+:::
 
 ### Compression Algorithms
 
@@ -322,12 +355,14 @@ import tidesdb
 # Available log levels
 config = tidesdb.Config(
     db_path="./mydb",
-    log_level=tidesdb.LogLevel.LOG_DEBUG,   # Detailed diagnostic info
-    # log_level=tidesdb.LogLevel.LOG_INFO,  # General info (default)
-    # log_level=tidesdb.LogLevel.LOG_WARN,  # Warnings only
-    # log_level=tidesdb.LogLevel.LOG_ERROR, # Errors only
-    # log_level=tidesdb.LogLevel.LOG_FATAL, # Critical errors only
-    # log_level=tidesdb.LogLevel.LOG_NONE,  # Disable logging
+    log_level=tidesdb.LogLevel.LOG_DEBUG,    # Detailed diagnostic info
+    # log_level=tidesdb.LogLevel.LOG_INFO,   # General info (default)
+    # log_level=tidesdb.LogLevel.LOG_WARN,   # Warnings only
+    # log_level=tidesdb.LogLevel.LOG_ERROR,  # Errors only
+    # log_level=tidesdb.LogLevel.LOG_FATAL,  # Critical errors only
+    # log_level=tidesdb.LogLevel.LOG_NONE,   # Disable logging
+    log_to_file=True,                        # Write to ./mydb/LOG instead of stderr
+    log_truncation_at=24 * 1024 * 1024,      # Truncate log file at 24MB (0 = no truncation)
 )
 ```
 
@@ -339,7 +374,7 @@ All available configuration options for column families:
 config = tidesdb.default_column_family_config()
 
 # Memory and LSM structure
-config.write_buffer_size = 64 * 1024 * 1024  # Memtable flush threshold (default: 64MB)
+config.write_buffer_size = 64 * 1024 * 1024   # Memtable flush threshold (default: 64MB)
 config.level_size_ratio = 10                  # Level size multiplier (default: 10)
 config.min_levels = 5                         # Minimum LSM levels (default: 5)
 config.dividing_level_offset = 2              # Compaction dividing level offset (default: 2)
@@ -379,6 +414,9 @@ config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
 # Compaction triggers
 config.l1_file_count_trigger = 4              # L1 file count trigger (default: 4)
 config.l0_queue_stall_threshold = 20          # L0 queue stall threshold (default: 20)
+
+# B+tree klog format (optional)
+config.use_btree = False                      # Use B+tree klog format (default: False)
 ```
 
 ### Custom Comparators

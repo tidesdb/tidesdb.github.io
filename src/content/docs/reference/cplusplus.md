@@ -82,6 +82,7 @@ cfConfig.enableBlockIndexes = true;
 cfConfig.syncMode = tidesdb::SyncMode::Interval;
 cfConfig.syncIntervalUs = 128000;
 cfConfig.defaultIsolationLevel = tidesdb::IsolationLevel::ReadCommitted;
+cfConfig.useBtree = false;  // Use block-based format (default), set true for B+tree klog format
 
 db.createColumnFamily("my_cf", cfConfig);
 
@@ -245,6 +246,13 @@ std::cout << "Average Value Size: " << stats.avgValueSize << " bytes" << std::en
 std::cout << "Read Amplification: " << stats.readAmp << std::endl;
 std::cout << "Cache Hit Rate: " << stats.hitRate << std::endl;
 
+// B+tree stats (only populated if useBtree=true)
+if (stats.useBtree) {
+    std::cout << "B+tree Total Nodes: " << stats.btreeTotalNodes << std::endl;
+    std::cout << "B+tree Max Height: " << stats.btreeMaxHeight << std::endl;
+    std::cout << "B+tree Avg Height: " << stats.btreeAvgHeight << std::endl;
+}
+
 // Per-level statistics
 for (int i = 0; i < stats.numLevels; ++i) {
     std::cout << "Level " << i << ": "
@@ -272,6 +280,10 @@ if (stats.config.has_value()) {
 - `levelKeyCounts` -- Number of keys per level
 - `readAmp` -- Read amplification (point lookup cost multiplier)
 - `hitRate` -- Cache hit rate (0.0 if cache disabled)
+- `useBtree` -- Whether column family uses B+tree klog format
+- `btreeTotalNodes` -- Total B+tree nodes across all SSTables (only if `useBtree=true`)
+- `btreeMaxHeight` -- Maximum tree height across all SSTables (only if `useBtree=true`)
+- `btreeAvgHeight` -- Average tree height across all SSTables (only if `useBtree=true`)
 - `config` -- Column family configuration (optional)
 
 ### Listing Column Families
@@ -306,7 +318,7 @@ db.renameColumnFamily("old_name", "new_name");
 ```cpp
 auto cf = db.getColumnFamily("my_cf");
 
-// Manually trigger compaction 
+// Manually trigger compaction (queues)
 cf.compact();
 ```
 
@@ -348,7 +360,7 @@ Update runtime-safe configuration settings without restarting the database.
 auto cf = db.getColumnFamily("my_cf");
 
 auto newConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
-newConfig.writeBufferSize = 256 * 1024 * 1024;  // 256MB
+newConfig.writeBufferSize = 256 * 1024 * 1024;  
 newConfig.skipListMaxLevel = 16;
 newConfig.bloomFPR = 0.001;  // 0.1% false positive rate
 
@@ -366,7 +378,7 @@ cf.updateRuntimeConfig(newConfig, persistToDisk);
 - `syncIntervalUs` -- Sync interval in microseconds
 
 **Non-updatable settings** (would corrupt existing data):
-- `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`
+- `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
 
 ### Backup
 
@@ -451,6 +463,37 @@ cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::Snappy;   // Snap
 db.createColumnFamily("my_cf", cfConfig);
 ```
 
+### B+tree KLog Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal rather than linear block scanning.
+
+```cpp
+auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+cfConfig.useBtree = true;  // Enable B+tree klog format
+
+db.createColumnFamily("btree_cf", cfConfig);
+```
+
+**Characteristics**
+- Point lookups -- O(log N) tree traversal with binary search at each node
+- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
+- Compression -- Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
+- Large values -- Values exceeding `klogValueThreshold` are stored in vlog, same as block-based format
+- Bloom filter -- Works identically - checked before tree traversal
+
+**When to use B+tree klog format**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Tradeoffs**
+- Slightly higher write amplification during flush (building tree structure)
+- Larger metadata overhead per node compared to block-based format
+- Block-based format may be faster for sequential scans of entire SSTables
+
+**Important**: `useBtree` **cannot be changed** after column family creation. Different column families can use different formats.
+
 ## Error Handling
 
 The C++ wrapper uses exceptions for error handling. All errors throw `tidesdb::Exception`.
@@ -514,7 +557,6 @@ int main() {
 
         auto cf = db.getColumnFamily("users");
 
-        // Write data
         {
             auto txn = db.beginTransaction();
             txn.put(cf, "user:1", "Alice", -1);
@@ -526,7 +568,6 @@ int main() {
             txn.commit();
         }
 
-        // Read data
         {
             auto txn = db.beginTransaction();
             auto value = txn.get(cf, "user:1");
@@ -534,7 +575,6 @@ int main() {
             std::cout << "user:1 = " << valueStr << std::endl;
         }
 
-        // Iterate
         {
             auto txn = db.beginTransaction();
             auto iter = txn.newIterator(cf);
@@ -555,6 +595,7 @@ int main() {
         std::cout << "\nColumn Family Statistics:" << std::endl;
         std::cout << "  Number of Levels: " << stats.numLevels << std::endl;
         std::cout << "  Memtable Size: " << stats.memtableSize << " bytes" << std::endl;
+        std::cout << "  Uses B+tree: " << (stats.useBtree ? "yes" : "no") << std::endl;
 
         db.dropColumnFamily("users");
 

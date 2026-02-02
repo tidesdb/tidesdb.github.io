@@ -98,9 +98,9 @@ db.CreateColumnFamily("my_cf", new ColumnFamilyConfig
     SyncMode = SyncMode.Interval,
     SyncIntervalUs = 128000,
     DefaultIsolationLevel = IsolationLevel.ReadCommitted,
+    UseBtree = false, // Use B+tree format for klog (default: false = block-based)
 });
 
-// Drop a column family
 db.DropColumnFamily("my_cf");
 ```
 
@@ -316,11 +316,25 @@ var stats = cf.GetStats();
 
 Console.WriteLine($"Number of Levels: {stats.NumLevels}");
 Console.WriteLine($"Memtable Size: {stats.MemtableSize} bytes");
+Console.WriteLine($"Total Keys: {stats.TotalKeys}");
+Console.WriteLine($"Total Data Size: {stats.TotalDataSize} bytes");
+Console.WriteLine($"Avg Key Size: {stats.AvgKeySize:F1} bytes");
+Console.WriteLine($"Avg Value Size: {stats.AvgValueSize:F1} bytes");
+Console.WriteLine($"Read Amplification: {stats.ReadAmp:F2}");
+Console.WriteLine($"Cache Hit Rate: {stats.HitRate * 100:F1}%");
 
 // Per-level statistics
 for (int i = 0; i < stats.NumLevels; i++)
 {
-    Console.WriteLine($"Level {i + 1}: {stats.LevelNumSstables[i]} SSTables, {stats.LevelSizes[i]} bytes");
+    Console.WriteLine($"Level {i + 1}: {stats.LevelNumSstables[i]} SSTables, {stats.LevelSizes[i]} bytes, {stats.LevelKeyCounts[i]} keys");
+}
+
+// B+tree stats (only populated if UseBtree=true)
+if (stats.UseBtree)
+{
+    Console.WriteLine($"B+tree Total Nodes: {stats.BtreeTotalNodes}");
+    Console.WriteLine($"B+tree Max Height: {stats.BtreeMaxHeight}");
+    Console.WriteLine($"B+tree Avg Height: {stats.BtreeAvgHeight:F2}");
 }
 ```
 
@@ -409,7 +423,40 @@ db.CreateColumnFamily("zstd_cf", new ColumnFamilyConfig
 {
     CompressionAlgorithm = CompressionAlgorithm.Zstd,
 });
+
+db.CreateColumnFamily("snappy_cf", new ColumnFamilyConfig
+{
+    CompressionAlgorithm = CompressionAlgorithm.Snappy, // Not available on SunOS/Illumos/OmniOS
+});
 ```
+
+### B+tree KLog Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
+
+```csharp
+using TidesDB;
+
+// Enable B+tree klog format for faster point lookups
+db.CreateColumnFamily("btree_cf", new ColumnFamilyConfig
+{
+    UseBtree = true,
+    CompressionAlgorithm = CompressionAlgorithm.Lz4,
+    EnableBloomFilter = true,
+});
+```
+
+**When to use B+tree klog format**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Tradeoffs**
+- Slightly higher write amplification during flush
+- Larger metadata overhead per node
+- Block-based format may be faster for sequential scans
+
+**Important:** `UseBtree` cannot be changed after column family creation.
 
 ## Error Handling
 
@@ -483,7 +530,6 @@ try
 
     var cf = db.GetColumnFamily("users")!;
 
-    // Write data
     using (var txn = db.BeginTransaction())
     {
         txn.Put(cf, Encoding.UTF8.GetBytes("user:1"), Encoding.UTF8.GetBytes("Alice"), -1);
@@ -496,7 +542,6 @@ try
         txn.Commit();
     }
 
-    // Read data
     using (var txn = db.BeginTransaction())
     {
         var value = txn.Get(cf, Encoding.UTF8.GetBytes("user:1"));
@@ -522,7 +567,6 @@ try
     Console.WriteLine($"  Number of Levels: {stats.NumLevels}");
     Console.WriteLine($"  Memtable Size: {stats.MemtableSize} bytes");
 
-    // Cleanup
     db.DropColumnFamily("users");
 }
 catch (TidesDBException ex)
@@ -661,3 +705,25 @@ using TidesDB;
 | `MinDiskSpace` | ulong | 100MB | Minimum disk space required |
 | `L1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `L0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
+| `UseBtree` | bool | false | Use B+tree format for klog |
+
+### Column Family Statistics (Stats)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `NumLevels` | int | Number of LSM levels |
+| `MemtableSize` | ulong | Current memtable size in bytes |
+| `LevelSizes` | ulong[] | Array of per-level total sizes |
+| `LevelNumSstables` | int[] | Array of per-level SSTable counts |
+| `LevelKeyCounts` | ulong[] | Array of per-level key counts |
+| `Config` | ColumnFamilyConfig? | Full column family configuration |
+| `TotalKeys` | ulong | Total keys across memtable and all SSTables |
+| `TotalDataSize` | ulong | Total data size (klog + vlog) in bytes |
+| `AvgKeySize` | double | Estimated average key size in bytes |
+| `AvgValueSize` | double | Estimated average value size in bytes |
+| `ReadAmp` | double | Read amplification factor (point lookup cost) |
+| `HitRate` | double | Block cache hit rate (0.0 to 1.0) |
+| `UseBtree` | bool | Whether column family uses B+tree klog format |
+| `BtreeTotalNodes` | ulong | Total B+tree nodes (only if UseBtree=true) |
+| `BtreeMaxHeight` | uint | Maximum tree height (only if UseBtree=true) |
+| `BtreeAvgHeight` | double | Average tree height (only if UseBtree=true) |
