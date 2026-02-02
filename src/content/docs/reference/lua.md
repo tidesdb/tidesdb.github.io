@@ -98,18 +98,44 @@ cf_config.enable_block_indexes = true
 cf_config.sync_mode = tidesdb.SyncMode.SYNC_INTERVAL
 cf_config.sync_interval_us = 128000
 cf_config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
+cf_config.use_btree = false  -- Use B+tree format for klog (default: false)
 
 db:create_column_family("my_cf", cf_config)
 
 db:drop_column_family("my_cf")
 ```
 
+### B+tree KLog Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal rather than linear block scanning.
+
+```lua
+local cf_config = tidesdb.default_column_family_config()
+cf_config.use_btree = true  -- Enable B+tree klog format
+
+db:create_column_family("btree_cf", cf_config)
+```
+
+**Characteristics**
+- Point lookups -- O(log N) tree traversal with binary search at each node
+- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
+- Compression -- Nodes compress independently using the same algorithms
+
+**When to use B+tree klog format**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Important notes**
+- `use_btree` **cannot be changed** after column family creation
+- Different column families can use different formats
+
 ### Renaming Column Families
 
 Atomically rename a column family and its underlying directory. The operation waits for any in-progress flush or compaction to complete before renaming.
 
 ```lua
--- Rename column family
 db:rename_column_family("old_name", "new_name")
 
 -- Data is preserved after rename
@@ -292,11 +318,19 @@ for i, size in ipairs(stats.level_sizes) do
         i, size, stats.level_num_sstables[i], stats.level_key_counts[i]))
 end
 
+-- B+tree stats (only populated if use_btree=true)
+if stats.use_btree then
+    print(string.format("B+tree Total Nodes: %d", stats.btree_total_nodes))
+    print(string.format("B+tree Max Height: %d", stats.btree_max_height))
+    print(string.format("B+tree Avg Height: %.2f", stats.btree_avg_height))
+end
+
 if stats.config then
     print(string.format("Write Buffer Size: %d", stats.config.write_buffer_size))
     print(string.format("Compression: %d", stats.config.compression_algorithm))
     print(string.format("Bloom Filter: %s", tostring(stats.config.enable_bloom_filter)))
     print(string.format("Sync Mode: %d", stats.config.sync_mode))
+    print(string.format("Use B+tree: %s", tostring(stats.config.use_btree)))
 end
 ```
 
@@ -312,6 +346,10 @@ end
 - `avg_value_size` -- Average value size in bytes
 - `read_amp` -- Read amplification (point lookup cost multiplier)
 - `hit_rate` -- Cache hit rate (0.0 if cache disabled)
+- `use_btree` -- Whether column family uses B+tree klog format
+- `btree_total_nodes` -- Total B+tree nodes across all SSTables (only if use_btree=true)
+- `btree_max_height` -- Maximum tree height across all SSTables (only if use_btree=true)
+- `btree_avg_height` -- Average tree height across all SSTables (only if use_btree=true)
 - `config` -- Column family configuration
 
 ### Getting Block Cache Statistics
@@ -493,7 +531,7 @@ cf:update_runtime_config(new_config, true)
 - `sync_interval_us` -- Sync interval in microseconds
 
 **Non-updatable settings** (would corrupt existing data):
-- `compression_algorithm`, `enable_block_indexes`, `enable_bloom_filter`, `comparator_name`, `level_size_ratio`, `klog_value_threshold`, `min_levels`, `dividing_level_offset`, `block_index_prefix_len`, `l1_file_count_trigger`, `l0_queue_stall_threshold`
+- `compression_algorithm`, `enable_block_indexes`, `enable_bloom_filter`, `comparator_name`, `level_size_ratio`, `klog_value_threshold`, `min_levels`, `dividing_level_offset`, `block_index_prefix_len`, `l1_file_count_trigger`, `l0_queue_stall_threshold`, `use_btree`
 
 ### Configuration File Operations
 

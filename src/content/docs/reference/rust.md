@@ -147,7 +147,8 @@ fn main() -> tidesdb::Result<()> {
         .enable_block_indexes(true)
         .sync_mode(SyncMode::Interval)
         .sync_interval_us(128000)
-        .default_isolation_level(IsolationLevel::ReadCommitted);
+        .default_isolation_level(IsolationLevel::ReadCommitted)
+        .use_btree(false); // Use block-based format (default)
 
     db.create_column_family("custom_cf", cf_config)?;
 
@@ -456,9 +457,37 @@ fn main() -> tidesdb::Result<()> {
         println!("Level {}: {} SSTables, {} bytes", i + 1, count, size);
     }
 
+    // B+tree stats (only populated if use_btree=true)
+    if stats.use_btree {
+        println!("B+tree Total Nodes: {}", stats.btree_total_nodes);
+        println!("B+tree Max Height: {}", stats.btree_max_height);
+        println!("B+tree Avg Height: {:.2}", stats.btree_avg_height);
+    }
+
     Ok(())
 }
 ```
+
+**Statistics Fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `num_levels` | `i32` | Number of LSM levels |
+| `memtable_size` | `usize` | Current memtable size in bytes |
+| `level_sizes` | `Vec<usize>` | Array of per-level total sizes |
+| `level_num_sstables` | `Vec<i32>` | Array of per-level SSTable counts |
+| `level_key_counts` | `Vec<u64>` | Array of per-level key counts |
+| `config` | `Option<ColumnFamilyConfig>` | Column family configuration |
+| `total_keys` | `u64` | Total keys across memtable and all SSTables |
+| `total_data_size` | `u64` | Total data size (klog + vlog) in bytes |
+| `avg_key_size` | `f64` | Estimated average key size in bytes |
+| `avg_value_size` | `f64` | Estimated average value size in bytes |
+| `read_amp` | `f64` | Read amplification factor (point lookup cost) |
+| `hit_rate` | `f64` | Block cache hit rate (0.0 to 1.0) |
+| `use_btree` | `bool` | Whether column family uses B+tree KLog format |
+| `btree_total_nodes` | `u64` | Total B+tree nodes across all SSTables |
+| `btree_max_height` | `u32` | Maximum tree height across all SSTables |
+| `btree_avg_height` | `f64` | Average tree height across all SSTables |
 
 ### Getting Cache Statistics
 
@@ -717,6 +746,91 @@ fn main() -> tidesdb::Result<()> {
 }
 ```
 
+### B+tree KLog Format
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig, CompressionAlgorithm};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+
+    // Create column family with B+tree klog format
+    let cf_config = ColumnFamilyConfig::new()
+        .use_btree(true)
+        .compression_algorithm(CompressionAlgorithm::Lz4);
+
+    db.create_column_family("btree_cf", cf_config)?;
+
+    // Create column family with block-based format (default)
+    let cf_config = ColumnFamilyConfig::new()
+        .use_btree(false);
+
+    db.create_column_family("block_cf", cf_config)?;
+
+    Ok(())
+}
+```
+
+**B+tree Characteristics**
+- Point lookups -- O(log N) tree traversal with binary search at each node
+- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
+- Compression -- Nodes compress independently using the same algorithms
+
+**When to use B+tree klog format**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Tradeoffs**
+- Slightly higher write amplification during flush (building tree structure)
+- Larger metadata overhead per node compared to block-based format
+- Block-based format may be faster for sequential scans of entire SSTables
+
+:::note
+`use_btree` **cannot be changed** after column family creation. Different column families can use different formats.
+:::
+
+## Column Family Configuration Reference
+
+All available `ColumnFamilyConfig` builder methods:
+
+| Method | Type | Default | Description |
+|--------|------|---------|-------------|
+| `write_buffer_size(size)` | `usize` | 64MB | Memtable flush threshold in bytes |
+| `level_size_ratio(ratio)` | `usize` | 10 | Level size multiplier |
+| `min_levels(levels)` | `i32` | 5 | Minimum LSM levels |
+| `dividing_level_offset(offset)` | `i32` | 2 | Compaction dividing level offset |
+| `klog_value_threshold(threshold)` | `usize` | 512 | Values > threshold go to vlog |
+| `compression_algorithm(algo)` | `CompressionAlgorithm` | Lz4 | Compression algorithm |
+| `enable_bloom_filter(enable)` | `bool` | true | Enable bloom filters |
+| `bloom_fpr(fpr)` | `f64` | 0.01 | Bloom filter false positive rate |
+| `enable_block_indexes(enable)` | `bool` | true | Enable compact block indexes |
+| `index_sample_ratio(ratio)` | `i32` | 1 | Sample every N blocks for index |
+| `block_index_prefix_len(len)` | `i32` | 16 | Block index prefix length |
+| `sync_mode(mode)` | `SyncMode` | Full | Durability mode |
+| `sync_interval_us(interval)` | `u64` | 128000 | Sync interval (for Interval mode) |
+| `comparator_name(name)` | `&str` | "memcmp" | Key comparator name |
+| `skip_list_max_level(level)` | `i32` | 12 | Skip list max level |
+| `skip_list_probability(prob)` | `f32` | 0.25 | Skip list probability |
+| `default_isolation_level(level)` | `IsolationLevel` | ReadCommitted | Default transaction isolation |
+| `min_disk_space(space)` | `u64` | 100MB | Minimum disk space required |
+| `l1_file_count_trigger(trigger)` | `i32` | 4 | L1 file count trigger for compaction |
+| `l0_queue_stall_threshold(threshold)` | `i32` | 20 | L0 queue stall threshold |
+| `use_btree(enable)` | `bool` | false | Use B+tree format for klog |
+
+**Non-updatable settings** (cannot be changed after column family creation):
+- `compression_algorithm`, `enable_block_indexes`, `enable_bloom_filter`
+- `comparator_name`, `level_size_ratio`, `klog_value_threshold`
+- `min_levels`, `dividing_level_offset`, `block_index_prefix_len`
+- `l1_file_count_trigger`, `l0_queue_stall_threshold`, `use_btree`
+
+**Updatable at runtime** (via `update_runtime_config`):
+- `write_buffer_size`, `skip_list_max_level`, `skip_list_probability`
+- `bloom_fpr`, `index_sample_ratio`, `sync_mode`, `sync_interval_us`
+
 ## Error Handling
 
 TidesDB uses a custom `Result` type with detailed error information:
@@ -800,7 +914,6 @@ fn main() -> tidesdb::Result<()> {
 
     let cf = db.get_column_family("users")?;
 
-    // Write data
     {
         let txn = db.begin_transaction()?;
 
@@ -817,7 +930,6 @@ fn main() -> tidesdb::Result<()> {
         txn.commit()?;
     }
 
-    // Read data
     {
         let txn = db.begin_transaction()?;
 
@@ -825,7 +937,6 @@ fn main() -> tidesdb::Result<()> {
         println!("user:1 = {}", String::from_utf8_lossy(&value));
     }
 
-    // Iterate over all entries
     {
         let txn = db.begin_transaction()?;
         let mut iter = txn.new_iterator(&cf)?;
@@ -862,8 +973,6 @@ use tidesdb::{TidesDB, Config, IsolationLevel};
 
 fn main() -> tidesdb::Result<()> {
     let db = TidesDB::open(Config::new("./mydb"))?;
-
-    // Begin transaction with specific isolation level
     let txn = db.begin_transaction_with_isolation(IsolationLevel::ReadCommitted)?;
 
     // Use transaction...
@@ -896,7 +1005,6 @@ fn main() -> tidesdb::Result<()> {
 
     txn.put(&cf, b"key1", b"value1", -1)?;
 
-    // Create savepoint
     txn.savepoint("sp1")?;
 
     txn.put(&cf, b"key2", b"value2", -1)?;

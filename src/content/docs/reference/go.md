@@ -72,6 +72,8 @@ func main() {
         LogLevel:             tidesdb.LogInfo,
         BlockCacheSize:       64 * 1024 * 1024, 
         MaxOpenSSTables:      256,
+        LogToFile:            false,              // Write logs to file instead of stderr
+        LogTruncationAt:      24 * 1024 * 1024,   // Log file truncation size (24MB default)
     }
     
     db, err := tidesdb.Open(config)
@@ -126,6 +128,13 @@ cfConfig.EnableBlockIndexes = true
 cfConfig.SyncMode = tidesdb.SyncInterval
 cfConfig.SyncIntervalUs = 128000                  
 cfConfig.DefaultIsolationLevel = tidesdb.IsolationReadCommitted
+cfConfig.DividingLevelOffset = 2                  // Compaction dividing level offset
+cfConfig.KlogValueThreshold = 512                 // Values > 512 bytes go to vlog
+cfConfig.BlockIndexPrefixLen = 16                 // Block index prefix length
+cfConfig.MinDiskSpace = 100 * 1024 * 1024         // Minimum disk space required (100MB)
+cfConfig.L1FileCountTrigger = 4                   // L1 file count trigger for compaction
+cfConfig.L0QueueStallThreshold = 20               // L0 queue stall threshold
+cfConfig.UseBtree = 0                             // Use B+tree format for klog (0 = block-based)
 
 err = db.CreateColumnFamily("my_cf", cfConfig)
 if err != nil {
@@ -393,6 +402,71 @@ for iter.Valid() {
 }
 ```
 
+#### Seek Operations
+
+Seek to a specific key or key range without scanning from the beginning.
+
+```go
+iter, err := txn.NewIterator(cf)
+if err != nil {
+    log.Fatal(err)
+}
+defer iter.Free()
+
+// Seek to first key >= target
+err = iter.Seek([]byte("user:1000"))
+if err != nil {
+    log.Fatal(err)
+}
+
+if iter.Valid() {
+    key, _ := iter.Key()
+    fmt.Printf("Found: %s\n", key)
+}
+
+// Seek to last key <= target (for reverse iteration)
+err = iter.SeekForPrev([]byte("user:2000"))
+if err != nil {
+    log.Fatal(err)
+}
+
+for iter.Valid() {
+    key, _ := iter.Key()
+    fmt.Printf("Reverse: %s\n", key)
+    iter.Prev()
+}
+```
+
+#### Prefix Seeking
+
+```go
+iter, err := txn.NewIterator(cf)
+if err != nil {
+    log.Fatal(err)
+}
+defer iter.Free()
+
+prefix := []byte("user:")
+err = iter.Seek(prefix)
+if err != nil {
+    log.Fatal(err)
+}
+
+for iter.Valid() {
+    key, _ := iter.Key()
+    
+    // Stop when keys no longer match prefix
+    if !bytes.HasPrefix(key, prefix) {
+        break
+    }
+    
+    value, _ := iter.Value()
+    fmt.Printf("%s = %s\n", key, value)
+    
+    iter.Next()
+}
+```
+
 ### Getting Column Family Statistics
 
 Retrieve detailed statistics about a column family.
@@ -417,13 +491,81 @@ fmt.Printf("Avg Value Size: %.2f bytes\n", stats.AvgValueSize)
 fmt.Printf("Read Amplification: %.2f\n", stats.ReadAmp)
 fmt.Printf("Hit Rate: %.2f%%\n", stats.HitRate * 100)
 
+// B+tree statistics (only populated if UseBtree=1)
+if stats.UseBtree {
+    fmt.Printf("B+tree Total Nodes: %d\n", stats.BtreeTotalNodes)
+    fmt.Printf("B+tree Max Height: %d\n", stats.BtreeMaxHeight)
+    fmt.Printf("B+tree Avg Height: %.2f\n", stats.BtreeAvgHeight)
+}
+
+// Per-level statistics
+for i := 0; i < stats.NumLevels; i++ {
+    fmt.Printf("Level %d: %d SSTables, %d bytes, %d keys\n",
+        i+1, stats.LevelNumSSTables[i], stats.LevelSizes[i], stats.LevelKeyCounts[i])
+}
+
 if stats.Config != nil {
     fmt.Printf("Write Buffer Size: %d\n", stats.Config.WriteBufferSize)
     fmt.Printf("Compression: %d\n", stats.Config.CompressionAlgorithm)
     fmt.Printf("Bloom Filter: %v\n", stats.Config.EnableBloomFilter)
     fmt.Printf("Sync Mode: %d\n", stats.Config.SyncMode)
+    fmt.Printf("Use B+tree: %d\n", stats.Config.UseBtree)
 }
 ```
+
+**Stats Fields**
+| Field | Type | Description |
+|-------|------|-------------|
+| `NumLevels` | `int` | Number of LSM levels |
+| `MemtableSize` | `uint64` | Current memtable size in bytes |
+| `LevelSizes` | `[]uint64` | Array of per-level total sizes |
+| `LevelNumSSTables` | `[]int` | Array of per-level SSTable counts |
+| `LevelKeyCounts` | `[]uint64` | Array of per-level key counts |
+| `Config` | `*ColumnFamilyConfig` | Full column family configuration |
+| `TotalKeys` | `uint64` | Total keys across memtable and all SSTables |
+| `TotalDataSize` | `uint64` | Total data size (klog + vlog) in bytes |
+| `AvgKeySize` | `float64` | Estimated average key size in bytes |
+| `AvgValueSize` | `float64` | Estimated average value size in bytes |
+| `ReadAmp` | `float64` | Read amplification factor |
+| `HitRate` | `float64` | Block cache hit rate (0.0 to 1.0) |
+| `UseBtree` | `bool` | Whether column family uses B+tree klog format |
+| `BtreeTotalNodes` | `uint64` | Total B+tree nodes across all SSTables |
+| `BtreeMaxHeight` | `uint32` | Maximum tree height across all SSTables |
+| `BtreeAvgHeight` | `float64` | Average tree height across all SSTables |
+
+### Getting Block Cache Statistics
+
+Get statistics for the global block cache (shared across all column families).
+
+```go
+cacheStats, err := db.GetCacheStats()
+if err != nil {
+    log.Fatal(err)
+}
+
+if cacheStats.Enabled {
+    fmt.Printf("Cache enabled: yes\n")
+    fmt.Printf("Total entries: %d\n", cacheStats.TotalEntries)
+    fmt.Printf("Total bytes: %.2f MB\n", float64(cacheStats.TotalBytes) / (1024.0 * 1024.0))
+    fmt.Printf("Hits: %d\n", cacheStats.Hits)
+    fmt.Printf("Misses: %d\n", cacheStats.Misses)
+    fmt.Printf("Hit rate: %.1f%%\n", cacheStats.HitRate * 100.0)
+    fmt.Printf("Partitions: %d\n", cacheStats.NumPartitions)
+} else {
+    fmt.Printf("Cache enabled: no (BlockCacheSize = 0)\n")
+}
+```
+
+**CacheStats Fields**
+| Field | Type | Description |
+|-------|------|-------------|
+| `Enabled` | `bool` | Whether block cache is active |
+| `TotalEntries` | `uint64` | Number of cached blocks |
+| `TotalBytes` | `uint64` | Total memory used by cached blocks |
+| `Hits` | `uint64` | Number of cache hits |
+| `Misses` | `uint64` | Number of cache misses |
+| `HitRate` | `float64` | Hit rate as a decimal (0.0 to 1.0) |
+| `NumPartitions` | `uint64` | Number of cache partitions |
 
 ### Listing Column Families
 
@@ -507,7 +649,6 @@ newConfig.WriteBufferSize = 256 * 1024 * 1024  // 256MB
 newConfig.SkipListMaxLevel = 16
 newConfig.BloomFPR = 0.001  // 0.1% false positive rate
 
-// Update config and persist to disk
 err = cf.UpdateRuntimeConfig(newConfig, true)
 if err != nil {
     log.Fatal(err)
@@ -766,8 +907,71 @@ err = txn.Put(cf, []byte("key2"), []byte("value2"), -1)
 // Rollback to savepoint -- key2 is discarded, key1 remains
 err = txn.RollbackToSavepoint("sp1")
 
+// Or release savepoint without rolling back
+err = txn.ReleaseSavepoint("sp1")
+
 // Commit -- only key1 is written
 err = txn.Commit()
+```
+
+**Savepoint API**
+- `Savepoint(name string)` -- Create a savepoint
+- `RollbackToSavepoint(name string)` -- Rollback to savepoint
+- `ReleaseSavepoint(name string)` -- Release savepoint without rolling back
+
+## B+tree KLog Format
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format.
+
+```go
+cfConfig := tidesdb.DefaultColumnFamilyConfig()
+cfConfig.UseBtree = 1  // Enable B+tree klog format
+
+err := db.CreateColumnFamily("btree_cf", cfConfig)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Characteristics**
+- Point lookups -- O(log N) tree traversal with binary search at each node
+- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
+
+**When to use B+tree klog format**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Important**: `UseBtree` cannot be changed after column family creation.
+
+## Log Levels
+
+TidesDB provides structured logging with multiple severity levels.
+
+```go
+config := tidesdb.Config{
+    DBPath:   "./mydb",
+    LogLevel: tidesdb.LogDebug,  
+}
+```
+
+**Available Log Levels**
+- `LogDebug` -- Detailed diagnostic information
+- `LogInfo` -- General informational messages (default)
+- `LogWarn` -- Warning messages for potential issues
+- `LogError` -- Error messages for failures
+- `LogFatal` -- Critical errors that may cause shutdown
+- `LogNone` -- Disable all logging
+
+**Log to file**
+```go
+config := tidesdb.Config{
+    DBPath:          "./mydb",
+    LogLevel:        tidesdb.LogDebug,
+    LogToFile:       true,                    // Write to ./mydb/LOG instead of stderr
+    LogTruncationAt: 24 * 1024 * 1024,        // Truncate log file at 24MB
+}
 ```
 
 ## Testing
@@ -781,4 +985,7 @@ go test -v -run TestOpenClose
 
 # Run with race detector
 go test -race -v
+
+# Run B+tree test
+go test -v -run TestBtreeColumnFamily
 ```

@@ -526,7 +526,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 - Block cache stores **decompressed** blocks to avoid repeated decompression overhead
 - Different column families can use different compression algorithms
 
-### B+tree Format (Optional)
+### B+tree KLog Format (Optional)
 
 Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree format offers faster point lookups through O(log N) tree traversal rather than linear block scanning.
 
@@ -540,12 +540,12 @@ tidesdb_create_column_family(db, "btree_cf", &cf_config);
 ```
 
 **Characteristics**
-- **Point lookups** · O(log N) tree traversal with binary search at each node, compared to potentially scanning multiple 64KB blocks in block-based format
-- **Range scans** · Doubly-linked leaf nodes enable efficient bidirectional iteration
-- **Immutable** · Tree is bulk-loaded from sorted memtable data during flush and never modified afterward
-- **Compression** · Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
-- **Large values** · Values exceeding `klog_value_threshold` are stored in vlog, same as block-based format
-- **Bloom filter** · Works identically - checked before tree traversal to skip lookups for absent keys
+- Point lookups · O(log N) tree traversal with binary search at each node, compared to potentially scanning multiple 64KB blocks in block-based format
+- Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable · Tree is bulk-loaded from sorted memtable data during flush and never modified afterward
+- Compression · Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
+- Large values · Values exceeding `klog_value_threshold` are stored in vlog, same as block-based format
+- Bloom filter · Works identically - checked before tree traversal to skip lookups for absent keys
 
 **When to use B+tree format**
 - Read-heavy workloads with frequent point lookups
