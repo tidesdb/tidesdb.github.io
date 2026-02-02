@@ -80,7 +80,7 @@ Standard deviation of latency in microseconds. Lower values indicate more consis
 
 <img src="/graphs/tidesdb-v7-3-1-rocksdb-v10-9-1_workload_comparison.png" alt="Workload Comparison" width="100%">
 
-Performance comparison across different workload types: delete, mixed, range, read, seek, and write. TidesDB leads in all workload categories.
+Performance comparison across different workload types delete, mixed, range, read, seek, and write. TidesDB leads in all workload categories.
 
 ## Key Pattern Comparison
 
