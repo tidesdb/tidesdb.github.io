@@ -688,6 +688,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_L1_FILE_COUNT_TRIGGER` | L1 file count trigger for compaction | 4 |
 | `BENCH_L0_QUEUE_STALL_THRESHOLD` | L0 queue stall threshold for backpressure | 10 (benchmark default; runtime default is 20) |
 | `BENCH_MAX_OPEN_SSTABLES` | Maximum number of open SSTables | 256 |
+| `BENCH_USE_BTREE` | Use B+tree format for klog instead of block-based (0=off, 1=on) | 0 |
 
 ### Key Distribution Patterns
 
@@ -765,6 +766,18 @@ cmake -B build \
   -DBENCH_ENABLE_COMPRESSION=0 \
   -DBENCH_ENABLE_BLOOM_FILTER=0 \
   -DBENCH_KEY_PATTERN=sequential
+
+cmake --build build --clean-first --verbose
+./build/tidesdb_bench
+```
+
+#### B+tree Format Benchmark
+```bash
+# Enable B+tree format for klog (faster point lookups, O(log N) tree traversal)
+cmake -B build \
+  -DBENCH_USE_BTREE=1 \
+  -DBENCH_NUM_OPERATIONS=100000 \
+  -DBENCH_KEY_PATTERN=random
 
 cmake --build build --clean-first --verbose
 ./build/tidesdb_bench

@@ -270,7 +270,8 @@ tidesdb_column_family_config_t cf_config = {
     .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
     .l1_file_count_trigger = 4,                 /* L1 file count trigger for compaction (default: 4) */
-    .l0_queue_stall_threshold = 20              /* L0 queue stall threshold (default: 20) */
+    .l0_queue_stall_threshold = 20,             /* L0 queue stall threshold (default: 20) */
+    .use_btree = 0                              /* Use B+tree format for klog (default: 0 = block-based) */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -372,11 +373,26 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 {
     printf("Memtable Size: %zu bytes\n", stats->memtable_size);
     printf("Number of Levels: %d\n", stats->num_levels);
+    printf("Total Keys: %" PRIu64 "\n", stats->total_keys);
+    printf("Total Data Size: %" PRIu64 " bytes\n", stats->total_data_size);
+    printf("Avg Key Size: %.1f bytes\n", stats->avg_key_size);
+    printf("Avg Value Size: %.1f bytes\n", stats->avg_value_size);
+    printf("Read Amplification: %.2f\n", stats->read_amp);
+    printf("Cache Hit Rate: %.1f%%\n", stats->hit_rate * 100.0);
     
     for (int i = 0; i < stats->num_levels; i++)
     {
-        printf("Level %d: %d SSTables, %zu bytes\n", 
-               i + 1, stats->level_num_sstables[i], stats->level_sizes[i]);
+        printf("Level %d: %d SSTables, %zu bytes, %" PRIu64 " keys\n", 
+               i + 1, stats->level_num_sstables[i], stats->level_sizes[i],
+               stats->level_key_counts[i]);
+    }
+    
+    /* B+tree stats (only populated if use_btree=1) */
+    if (stats->use_btree)
+    {
+        printf("B+tree Total Nodes: %" PRIu64 "\n", stats->btree_total_nodes);
+        printf("B+tree Max Height: %u\n", stats->btree_max_height);
+        printf("B+tree Avg Height: %.2f\n", stats->btree_avg_height);
     }
     
     /* Access configuration */
@@ -389,10 +405,29 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 ```
 
 **Statistics include**
-- Memtable size in bytes
-- Number of LSM levels
-- Per-level SSTable count and total size
-- Full column family configuration (via `stats->config`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `num_levels` | `int` | Number of LSM levels |
+| `memtable_size` | `size_t` | Current memtable size in bytes |
+| `level_sizes` | `size_t*` | Array of per-level total sizes |
+| `level_num_sstables` | `int*` | Array of per-level SSTable counts |
+| `level_key_counts` | `uint64_t*` | Array of per-level key counts |
+| `config` | `tidesdb_column_family_config_t*` | Full column family configuration |
+| `total_keys` | `uint64_t` | Total keys across memtable and all SSTables |
+| `total_data_size` | `uint64_t` | Total data size (klog + vlog) in bytes |
+| `avg_key_size` | `double` | Estimated average key size in bytes |
+| `avg_value_size` | `double` | Estimated average value size in bytes |
+| `read_amp` | `double` | Read amplification factor (point lookup cost) |
+| `hit_rate` | `double` | Block cache hit rate (0.0 to 1.0) |
+| `use_btree` | `int` | Whether column family uses B+tree format |
+| `btree_total_nodes` | `uint64_t` | Total B+tree nodes across all SSTables |
+| `btree_max_height` | `uint32_t` | Maximum tree height across all SSTables |
+| `btree_avg_height` | `double` | Average tree height across all SSTables |
+
+:::tip[B+tree Statistics]
+The B+tree stats (`btree_total_nodes`, `btree_max_height`, `btree_avg_height`) are only populated when `use_btree=1` in the column family configuration. These provide insight into the index structure overhead and lookup depth.
+:::
 
 ### Block Cache Statistics
 
@@ -491,6 +526,42 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 - Block cache stores **decompressed** blocks to avoid repeated decompression overhead
 - Different column families can use different compression algorithms
 
+### B+tree Format (Optional)
+
+Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree format offers faster point lookups through O(log N) tree traversal rather than linear block scanning.
+
+**Enabling B+tree format**
+
+```c
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+cf_config.use_btree = 1;  /* Enable B+tree format */
+
+tidesdb_create_column_family(db, "btree_cf", &cf_config);
+```
+
+**Characteristics**
+- **Point lookups** · O(log N) tree traversal with binary search at each node, compared to potentially scanning multiple 64KB blocks in block-based format
+- **Range scans** · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- **Immutable** · Tree is bulk-loaded from sorted memtable data during flush and never modified afterward
+- **Compression** · Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
+- **Large values** · Values exceeding `klog_value_threshold` are stored in vlog, same as block-based format
+- **Bloom filter** · Works identically - checked before tree traversal to skip lookups for absent keys
+
+**When to use B+tree format**
+- Read-heavy workloads with frequent point lookups
+- Workloads where read latency is more important than write throughput
+- Large SSTables where block scanning becomes expensive
+
+**Tradeoffs**
+- Slightly higher write amplification during flush (building tree structure)
+- Larger metadata overhead per node compared to block-based format
+- Block-based format may be faster for sequential scans of entire SSTables
+
+**Important notes**
+- `use_btree` **cannot be changed** after column family creation
+- Different column families can use different formats (some B+tree, some block-based)
+- Both formats support the same compression algorithms and bloom filters
+
 **Choosing a Compression Algorithm**
 
 | Workload | Recommended Algorithm | Rationale |
@@ -545,6 +616,7 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 - `block_index_prefix_len` · Cannot change block index structure
 - `l1_file_count_trigger` · Cannot change compaction trigger
 - `l0_queue_stall_threshold` · Cannot change backpressure threshold
+- `use_btree` · Cannot change klog format after creation
 
 :::note[Backpressure Defaults]
 The default `l0_queue_stall_threshold` is 20. The default `l1_file_count_trigger` is 4.

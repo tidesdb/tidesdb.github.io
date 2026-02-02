@@ -156,6 +156,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Benchmark Analysis on TidesDB 8 (Optional LSM-B+)',
+							link: 'articles/tidesdb-8-optional-lsmb'
+						},
+						{
 							label: 'Benchmark Analysis on TidesDB (TideSQL v1.0.0) & InnoDB within MariaDB v12.1.2',
 							link: 'articles/benchmark-analysis-tidesql-v1-0-0-innodb-in-mariadb-v12-1-2'
 						},
