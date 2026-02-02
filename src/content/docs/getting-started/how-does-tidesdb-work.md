@@ -937,7 +937,6 @@ The manifest tracks SSTable metadata in a simple text format with reader-writer 
 
 </div>
 
-
 The `compat.h` header isolates all platform-specific code, enabling TidesDB to run on Windows (MSVC, MinGW), macOS, Linux, BSD variants, and Solaris/Illumos without changes to the core implementation. I/O operations (`pread`/`pwrite`, `fdatasync`) map to Windows equivalents (`ReadFile`/`WriteFile` with `OVERLAPPED`, `FlushFileBuffers`). Atomics use C11 `stdatomic.h` on modern compilers or Windows `Interlocked*` functions on older MSVC. Threading uses POSIX `pthread` (pthreads-win32 on MSVC, native on MinGW). File system operations (`opendir`/`readdir`) map to Windows `FindFirstFile`/`FindNextFile`. Semaphores use Windows APIs on MSVC, native `semaphore.h` elsewhere. Type definitions handle platform differences (`off_t`, `ssize_t`, format specifiers). Performance hints (`PREFETCH_READ`, `LIKELY`, `UNLIKELY`) use compiler intrinsics where available. Every source file includes `compat.h` first. The abstraction layer has zero runtime overhead - all macros and inline functions compile to native platform calls.
 
 ## Testing and Quality Assurance

@@ -43,12 +43,12 @@ This plot shows that moving KLogs to a B+tree does not penalize the sequential w
 ## Steady-state GET / SEEK / RANGE throughput
 ![Steady-state GET / SEEK / RANGE throughput](/tidesdb-8-optional-lsmb+/plotB_read_seek_range_throughput.png)
 
-This figure captures the core architectural win. For point lookups and seeks, the B+tree-backed KLog is orders of magnitude faster than the block layout: ~160x for GET and ~17x for SEEK. The B+tree changes the performance class of reads.
+This figure captures the core architectural win. For point lookups and seeks, the B+tree-backed KLog is orders of magnitude faster than the block layout ~160x for GET and ~17x for SEEK. The B+tree changes the performance class of reads.
 
 ## PUT tail latency (p95 with p99 markers)
 ![PUT tail latency (p95 with p99 markers)](/tidesdb-8-optional-lsmb+/plotC_put_latency_tail.png)
 
-In random, mixed, and populate phases, p95 latency drops by roughly 30–40%, and p99 follows the same trend. The exception is range-populate, where B+tree p95 is worse, consistent with its lower PUT throughput there. 
+In random, mixed, and populate phases, p95 latency drops by roughly 30–40%, and p99 follows the same trend. The exception is range-populate, where B+tree p95 is worse, consistent with its lower PUT throughput there, but not too concerning.
 
 ## Read / seek / range tail latency (log scale)
 ![Read / seek / range tail latency (log scale)](/tidesdb-8-optional-lsmb+/plotD2_read_seek_range_latency_log.png)
