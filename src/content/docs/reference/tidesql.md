@@ -191,7 +191,7 @@ class ha_tidesdb: public handler
   uchar *row_buffer;
   uint row_buffer_len;
 
-  /* Current row position (for rnd_pos) - pre-allocated buffer */
+  /* Current row position (for rnd_pos) -- pre-allocated buffer */
   uchar *current_key;
   size_t current_key_len;
   size_t current_key_capacity;    /* Pre-allocated capacity */
@@ -580,7 +580,7 @@ TidesDB supports handler cloning for parallel operations:
 ```cpp
 handler *ha_tidesdb::clone(const char *name, MEM_ROOT *mem_root)
 {
-    /* Use base class clone - TidesDB handlers share TIDESDB_SHARE */
+    /* Use base class clone -- TidesDB handlers share TIDESDB_SHARE */
     handler *new_handler = handler::clone(name, mem_root);
     if (new_handler)
         new_handler->set_optimizer_costs(ha_thd());
@@ -589,9 +589,9 @@ handler *ha_tidesdb::clone(const char *name, MEM_ROOT *mem_root)
 ```
 
 Handler cloning enables:
-- DS-MRR - Uses two handlers (index scan + rnd_pos)
-- Parallel query execution - Multiple handlers for concurrent scans
-- WITHOUT OVERLAPS - Unique hash key lookups
+- DS-MRR · Uses two handlers (index scan + rnd_pos)
+- Parallel query execution · Multiple handlers for concurrent scans
+- WITHOUT OVERLAPS · Unique hash key lookups
 
 ---
 
@@ -775,7 +775,7 @@ static void tidesdb_update_optimizer_costs(OPTIMIZER_COSTS *costs)
 | `key_next_find_cost` | 0.00012 | Merge iterator overhead |
 | `disk_read_ratio` | 0.20 | 80% block cache hit rate |
 
-### scan_time() - Full Table Scan Cost
+### scan_time() · Full Table Scan Cost
 
 ```cpp
 IO_AND_CPU_COST ha_tidesdb::scan_time()
@@ -796,7 +796,7 @@ IO_AND_CPU_COST ha_tidesdb::scan_time()
 }
 ```
 
-### read_time() - Index/Point Lookup Cost
+### read_time() · Index/Point Lookup Cost
 
 ```cpp
 IO_AND_CPU_COST ha_tidesdb::read_time(uint index, uint ranges, ha_rows rows)
@@ -1308,9 +1308,9 @@ ulonglong pk_val = my_atomic_add64_explicit(
 | Change buffer | Mutex | Batch secondary index updates |
 
 TidesDB's internal components are lockless:
-- Skip lists (memtables) - Lock-free CAS for updates
-- Block manager - Atomic offset allocation
-- Clock cache - Lock-free state machines
+- Skip lists (memtables) · Lock-free CAS for updates
+- Block manager · Atomic offset allocation
+- Clock cache · Lock-free state machines
 
 ---
 
@@ -1332,7 +1332,7 @@ static int tidesdb_commit(THD *thd, bool all)
 
     if (ret == TDB_ERR_CONFLICT)
     {
-      /* Transaction conflict - tell MySQL to retry */
+      /* Transaction conflict -- tell MySQL to retry */
       return HA_ERR_LOCK_DEADLOCK;
     }
     ...
