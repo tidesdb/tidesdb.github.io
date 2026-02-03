@@ -90,7 +90,7 @@ The B+tree format excels at point lookups and range scans with seeks. Point look
 
 When `block_cache_size` is configured, TidesDB creates a dedicated clock cache for B+tree nodes. Frequently accessed nodes remain in memory as fully deserialized structures, avoiding repeated disk reads and deserialization overhead. Cache keys combine the SSTable ID and node offset to ensure uniqueness across tables. On eviction, the callback frees the node's memory via arena destruction. Cached nodes use arena allocation - all node memory (keys, values, metadata) is allocated from a single arena, enabling O(1) bulk deallocation when the node is evicted. When an SSTable is closed or deleted, all its cached nodes are invalidated by prefix scan to prevent stale references.
 
-Large values exceeding the configured threshold (default 512 bytes) are written to the value log, with the leaf entry storing only the vlog offset. Nodes compress independently using LZ4, LZ4-FAST, or Zstd. When bloom filters are enabled, they are checked before tree traversal - a negative result skips the B+tree lookup entirely, which is critical for LSM-trees where most SSTables won't contain the requested key. SSTable metadata persists three additional fields for B+tree format: root offset, first leaf offset, and last leaf offset, which are restored when reopening the SSTable.
+Large values exceeding the configured threshold (default 512 bytes) are written to the value log, with the leaf entry storing only the vlog offset. Nodes compress independently using LZ4, LZ4-FAST, or Zstd. When bloom filters are enabled, they are checked before tree traversal - a negative result skips the B+tree lookup entirely, which is critical for LSM-trees where most SSTables won't contain the requested key. SSTable metadata persists five additional fields for B+tree format: root offset, first leaf offset, last leaf offset, node count, and tree height, which are restored when reopening the SSTable.
 
 **Serialization optimizations** · The B+tree uses several techniques to minimize serialized node size:
 
@@ -102,7 +102,7 @@ Large values exceeding the configured threshold (default 512 bytes) are written 
 
 - **Delta sequence encoding** · Sequence numbers within a leaf are stored as signed deltas from a base sequence number (the minimum in the node). Since entries in a leaf typically have similar sequence numbers, deltas are small and compress well with varint encoding. TTL values use zigzag encoding for efficient signed integer representation.
 
-- **Child offset deltas** · Internal nodes store child offsets as signed deltas from a base offset. Since child nodes are typically written sequentially, deltas are small positive values that compress efficiently.
+- **Child offset deltas** · Internal nodes store child offsets as cumulative signed deltas - each offset is encoded as the difference from the previous child's offset, starting from a base offset (the first child). Since child nodes are typically written sequentially, deltas are small positive values that compress efficiently.
 
 **Leaf node format:**
 ```
