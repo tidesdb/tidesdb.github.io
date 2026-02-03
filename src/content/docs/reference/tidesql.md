@@ -139,7 +139,8 @@ The handlerton connects MariaDB's transaction coordinator to TidesDB:
 
 ```c
 tidesdb_hton->create = tidesdb_create_handler;
-tidesdb_hton->flags = HTON_CLOSE_CURSORS_AT_COMMIT;
+tidesdb_hton->flags = HTON_CLOSE_CURSORS_AT_COMMIT |
+                      HTON_SUPPORTS_EXTENDED_KEYS;
 tidesdb_hton->commit = tidesdb_commit;
 tidesdb_hton->rollback = tidesdb_rollback;
 tidesdb_hton->show_status = tidesdb_show_status;
@@ -158,6 +159,12 @@ tidesdb_hton->rollback_by_xid = tidesdb_rollback_by_xid;
 
 /* Partitioning */
 tidesdb_hton->partition_flags = tidesdb_partition_flags;
+
+/* LSM-tree specific optimizer costs */
+tidesdb_hton->update_optimizer_costs = tidesdb_update_optimizer_costs;
+
+/* Consistent snapshot support */
+tidesdb_hton->start_consistent_snapshot = tidesdb_start_consistent_snapshot;
 ```
 
 ---
@@ -244,8 +251,15 @@ ulonglong table_flags() const
          HA_CAN_EXPORT |              /* Supports transportable tablespaces */
          HA_CAN_ONLINE_BACKUPS |      /* Supports online backup */
          HA_CONCURRENT_OPTIMIZE |     /* OPTIMIZE doesn't block */
-         HA_CAN_RTREEKEYS |          /* Supports spatial indexes via Z-order */
-         HA_TABLE_SCAN_ON_INDEX;     /* Can scan table via index (covering scans) */
+         HA_CAN_RTREEKEYS |           /* Supports spatial indexes via Z-order */
+         HA_TABLE_SCAN_ON_INDEX |     /* Can scan table via index */
+         HA_CAN_REPAIR |              /* Supports REPAIR TABLE (via compaction) */
+         HA_CRASH_SAFE |              /* Crash-safe via WAL */
+         HA_ONLINE_ANALYZE |          /* No cache eviction after ANALYZE */
+         HA_CAN_TABLE_CONDITION_PUSHDOWN | /* WHERE pushdown during scans */
+         HA_CAN_SKIP_LOCKED |         /* MVCC: SELECT FOR UPDATE SKIP LOCKED */
+         HA_HAS_RECORDS |             /* records() returns exact count */
+         HA_CAN_FULLTEXT_EXT;         /* Extended fulltext API */
 }
 ```
 
@@ -254,13 +268,46 @@ ulonglong table_flags() const
 ```cpp
 ulong index_flags(uint inx, uint part, bool all_parts) const
 {
-  return HA_READ_NEXT |      /* Can read next in index order */
-         HA_READ_PREV |      /* Can read previous in index order */
-         HA_READ_ORDER |     /* Returns records in index order */
-         HA_READ_RANGE |     /* Can read ranges */
-         HA_KEYREAD_ONLY;    /* Supports covering index scans (keyread optimization) */
+  ulong flags = HA_READ_NEXT |      /* Can read next in index order */
+                HA_READ_PREV |      /* Can read previous in index order */
+                HA_READ_ORDER |     /* Returns records in index order */
+                HA_READ_RANGE |     /* Can read ranges */
+                HA_DO_INDEX_COND_PUSHDOWN; /* Index Condition Pushdown */
+
+  /* Primary key is clustered -- data stored with key */
+  if (table_share && inx == table_share->primary_key)
+  {
+    flags |= HA_CLUSTERED_INDEX;
+  }
+  else
+  {
+    /* Secondary indexes support keyread and rowid filter */
+    flags |= HA_KEYREAD_ONLY | HA_DO_RANGE_FILTER_PUSHDOWN;
+  }
+  return flags;
 }
+
+/* Primary key is always the clustering key in TidesDB */
+bool pk_is_clustering_key(uint index) const { return true; }
 ```
+
+### Advanced Handler Features
+
+TidesDB implements several advanced handler capabilities:
+
+| Feature | Method | Description |
+|---------|--------|-------------|
+| Table Condition Pushdown | `cond_push()` / `cond_pop()` | Pushes WHERE clauses to storage engine for filtering during scans |
+| Index Condition Pushdown | `idx_cond_push()` | Evaluates conditions during index scans before fetching rows |
+| Consistent Snapshot | `start_consistent_snapshot` | Supports `START TRANSACTION WITH CONSISTENT SNAPSHOT` |
+| Cache Preload | `preload_keys()` | `LOAD INDEX INTO CACHE` warms up block cache |
+| SKIP LOCKED | `HA_CAN_SKIP_LOCKED` | MVCC never blocks · `SELECT FOR UPDATE SKIP LOCKED` works naturally |
+| Clustered Index | `HA_CLUSTERED_INDEX` | Primary key data stored with key (no secondary lookup) |
+| Crash Safety | `HA_CRASH_SAFE` | WAL ensures durability across crashes |
+| Query Cache | `table_cache_type()` | Returns `HA_CACHE_TBL_TRANSACT` for proper query cache integration |
+| Exact Row Count | `records()` | Returns exact row count from TidesDB statistics |
+| Truncate | `truncate()` | Fast table truncation via column family drop/recreate |
+| Custom Errors | `get_error_message()` | Human-readable error messages for TidesDB errors |
 
 ---
 
