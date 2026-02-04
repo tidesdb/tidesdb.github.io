@@ -665,11 +665,35 @@ Fulltext indexes use an inverted index pattern:
 - Value · (empty or relevance score)
 
 Search process:
-1. Tokenize query into words
+1. Tokenize query into words (up to `tidesdb_ft_max_query_words`, default 32)
 2. For each word, seek to prefix in FT column family
 3. Collect matching primary keys
-4. Intersect (AND) or union (OR) results
+4. Intersect (AND for boolean mode) or union (OR for natural language) results
 5. Fetch rows by primary key
+
+### Result Set Operations
+
+Multi-word searches combine results using hash-based set operations for O(n) complexity:
+
+```cpp
+/* Hash-based union for O(n) instead of O(n²) */
+HASH pk_hash;
+my_hash_init(&pk_hash, &my_charset_bin, count1 + count2, ...);
+
+/* Add first set to hash and output */
+for (uint i = 0; i < count1; i++) {
+    /* Entry format: [4-byte len][pk data] */
+    my_hash_insert(&pk_hash, entry);
+    output[out_count++] = pk;
+}
+
+/* Add second set only if not in hash */
+for (uint i = 0; i < count2; i++) {
+    if (!my_hash_search(&pk_hash, pks2[i], lens2[i])) {
+        output[out_count++] = pk;
+    }
+}
+```
 
 ---
 
@@ -764,6 +788,7 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 |----------|---------|-------------|
 | `tidesdb_ft_min_word_len` | 4 | Minimum word length for fulltext indexing |
 | `tidesdb_ft_max_word_len` | 84 | Maximum word length for fulltext indexing |
+| `tidesdb_ft_max_query_words` | 32 | Maximum words in a fulltext search query (1-256) |
 
 ### B+tree Format Option
 
@@ -1208,6 +1233,7 @@ SHOW VARIABLES LIKE 'tidesdb%';
 | tidesdb_flush_threads            | 2              |
 | tidesdb_ft_max_word_len          | 84             |
 | tidesdb_ft_min_word_len          | 4              |
+| tidesdb_ft_max_query_words       | 32             |
 | tidesdb_klog_value_threshold     | 512            |
 | tidesdb_level_size_ratio         | 10             |
 | tidesdb_log_level                | info           |
@@ -1350,9 +1376,68 @@ ulonglong pk_val = my_atomic_add64_explicit(
 | Resource | Lock Type | Purpose |
 |----------|-----------|---------|
 | Hidden PK counter | Atomic | Lock-free increment |
-| Auto-increment | Mutex | Gap reservation |
-| Table share | Mutex | Metadata access |
-| Change buffer | Mutex | Batch secondary index updates |
+| Auto-increment | Atomic + Batch Persist | Lock-free with periodic persistence |
+| Table share hash | RW Lock | Fast read path, write lock only for new shares |
+| Change buffer counter | Atomic | Lock-free increment |
+
+#### Auto-Increment Scalability
+
+Auto-increment uses lock-free atomic operations with batch persistence every 1000 values
+to avoid per-insert disk writes:
+
+```cpp
+/* Lock-free atomic reservation */
+ulonglong reserve_amount = nb_desired_values * increment;
+ulonglong old_val = my_atomic_add64_explicit(
+    (volatile int64 *)&share->auto_increment_value,
+    reserve_amount, MY_MEMORY_ORDER_RELAXED);
+
+*first_value = old_val;
+*nb_reserved_values = nb_desired_values;
+
+/* Batch persist every 1000 values to reduce I/O */
+ulonglong new_val = old_val + reserve_amount;
+if ((new_val / 1000) > (old_val / 1000))
+{
+    persist_auto_increment_value(new_val);
+}
+```
+
+#### Table Share Access (RW Lock)
+
+The global table share hash uses a read-write lock for better concurrency:
+
+```cpp
+/* Fast path: read lock for existing shares */
+pthread_rwlock_rdlock(&tidesdb_rwlock);
+share = my_hash_search(&tidesdb_open_tables, table_name, len);
+if (share) {
+    share->ref_count++;
+    pthread_rwlock_unlock(&tidesdb_rwlock);
+    return share;
+}
+pthread_rwlock_unlock(&tidesdb_rwlock);
+
+/* Slow path: write lock only when creating new share */
+pthread_rwlock_wrlock(&tidesdb_rwlock);
+/* Double-check pattern... */
+```
+
+#### Buffer Pooling
+
+Handler instances maintain pooled buffers to avoid per-row allocations:
+
+```cpp
+/* In ha_tidesdb class */
+uchar *idx_pk_buffer;           /* Pooled buffer for PK in insert_index_entry */
+size_t idx_pk_buffer_capacity;
+
+/* Realloc only when needed */
+if (pk_len > idx_pk_buffer_capacity) {
+    idx_pk_buffer = my_realloc(idx_pk_buffer, pk_len * 2);
+    idx_pk_buffer_capacity = pk_len * 2;
+}
+```
 
 TidesDB's internal components are lockless:
 - Skip lists (memtables) · Lock-free CAS for updates
