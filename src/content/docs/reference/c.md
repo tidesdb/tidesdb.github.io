@@ -102,6 +102,64 @@ if (result != TDB_SUCCESS)
 }
 ```
 
+## Initialization
+
+TidesDB supports optional custom memory allocators for integration with custom memory managers (e.g., a Redis module allocator).
+
+### tidesdb_init
+
+Initializes TidesDB with optional custom memory allocation functions. Must be called exactly once before any other TidesDB function. Pass `NULL` for any function to use the default system allocator.
+
+```c
+int tidesdb_init(tidesdb_malloc_fn malloc_fn, tidesdb_calloc_fn calloc_fn,
+                 tidesdb_realloc_fn realloc_fn, tidesdb_free_fn free_fn);
+```
+
+**Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `malloc_fn` | `tidesdb_malloc_fn` | Custom malloc function (or `NULL` for system malloc) |
+| `calloc_fn` | `tidesdb_calloc_fn` | Custom calloc function (or `NULL` for system calloc) |
+| `realloc_fn` | `tidesdb_realloc_fn` | Custom realloc function (or `NULL` for system realloc) |
+| `free_fn` | `tidesdb_free_fn` | Custom free function (or `NULL` for system free) |
+
+**Returns**
+- `0` on success
+- `-1` if already initialized
+
+**Example (system allocator)**
+```c
+tidesdb_init(NULL, NULL, NULL, NULL);
+```
+
+**Example (custom allocator)**
+```c
+tidesdb_init(RedisModule_Alloc, RedisModule_Calloc,
+             RedisModule_Realloc, RedisModule_Free);
+```
+
+:::note[Auto-initialization]
+If `tidesdb_init()` is not called, TidesDB will auto-initialize with the system allocator on the first call to `tidesdb_open()`.
+:::
+
+### tidesdb_finalize
+
+Finalizes TidesDB and resets the allocator. Should be called after all TidesDB operations are complete. After calling this, `tidesdb_init()` can be called again.
+
+```c
+void tidesdb_finalize(void);
+```
+
+**Example**
+```c
+tidesdb_init(NULL, NULL, NULL, NULL);
+
+/* ... use TidesDB ... */
+
+tidesdb_close(db);
+tidesdb_finalize();
+```
+
 ## Storage Engine Operations
 
 ### Opening TidesDB
@@ -125,6 +183,22 @@ if (tidesdb_open(&config, &db) != 0)
 }
 
 if (tidesdb_close(db) != 0)
+{
+    return -1;
+}
+```
+
+**Using default configuration**
+
+Use `tidesdb_default_config()` to get a configuration with sensible defaults, then override specific fields as needed:
+
+```c
+tidesdb_config_t config = tidesdb_default_config();
+config.db_path = "./mydb";
+config.log_level = TDB_LOG_WARN;  /* Override: only warnings and errors */
+
+tidesdb_t *db = NULL;
+if (tidesdb_open(&config, &db) != 0)
 {
     return -1;
 }
@@ -326,6 +400,46 @@ if (tidesdb_rename_column_family(db, "old_name", "new_name") != 0)
 - `TDB_ERR_NOT_FOUND` · Column family with `old_name` doesn't exist
 - `TDB_ERR_EXISTS` · Column family with `new_name` already exists
 - `TDB_ERR_IO` · Failed to rename directory on disk
+
+### Cloning a Column Family
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning.
+
+```c
+if (tidesdb_clone_column_family(db, "source_cf", "cloned_cf") != 0)
+{
+    return -1;
+}
+
+/* Both column families now exist independently */
+tidesdb_column_family_t *original = tidesdb_get_column_family(db, "source_cf");
+tidesdb_column_family_t *clone = tidesdb_get_column_family(db, "cloned_cf");
+```
+
+**Behavior**
+- Flushes the source column family's memtable to ensure all data is on disk
+- Waits for any in-progress flush or compaction to complete
+- Copies all SSTable files (`.klog` and `.vlog`) to the new directory
+- Copies manifest and configuration files
+- Creates a new column family structure and loads the copied SSTables
+- The clone is completely independent - modifications to one do not affect the other
+
+**Use cases**
+- **Testing** · Create a copy of production data for testing without affecting the original
+- **Branching** · Create a snapshot of data before making experimental changes
+- **Migration** · Clone data before schema or configuration changes
+- **Backup verification** · Clone and verify data integrity without modifying the source
+
+**Return values**
+- `TDB_SUCCESS` · Clone completed successfully
+- `TDB_ERR_NOT_FOUND` · Source column family doesn't exist
+- `TDB_ERR_EXISTS` · Destination column family already exists
+- `TDB_ERR_INVALID_ARGS` · Invalid arguments (NULL pointers or same source/destination name)
+- `TDB_ERR_IO` · Failed to copy files or create directory
+
+:::note[Clone vs Backup]
+`tidesdb_clone_column_family` creates a new column family within the same database instance. For creating an external backup of the entire database, use `tidesdb_backup` instead.
+:::
 
 ### Getting a Column Family
 
@@ -629,6 +743,13 @@ If `persist_to_disk = 1`, changes are saved to `config.ini` in the column family
 ```c
 /* Save configuration to custom INI file */
 tidesdb_cf_config_save_to_ini("custom_config.ini", "my_cf", &new_config);
+
+/* Load configuration from INI file */
+tidesdb_column_family_config_t loaded_config;
+if (tidesdb_cf_config_load_from_ini("custom_config.ini", "my_cf", &loaded_config) == 0)
+{
+    printf("Configuration loaded successfully\n");
+}
 ```
 
 :::tip[Important Notes]
@@ -938,6 +1059,10 @@ tidesdb_txn_free(txn);
 
 Iterators provide efficient forward and backward traversal over key-value pairs.
 
+:::caution[Memory Ownership]
+The key and value pointers returned by `tidesdb_iter_key()` and `tidesdb_iter_value()` are **internal pointers owned by the iterator**. Do **NOT** free them. They remain valid until the next `tidesdb_iter_next()`, `tidesdb_iter_prev()`, seek operation, or `tidesdb_iter_free()` call. If you need to retain the data beyond the current iteration step, copy it to your own buffer.
+:::
+
 ### Forward Iteration
 
 ```c
@@ -967,6 +1092,7 @@ while (tidesdb_iter_valid(iter))
     if (tidesdb_iter_key(iter, &key, &key_size) == 0 &&
         tidesdb_iter_value(iter, &value, &value_size) == 0)
     {
+        /* key and value are internal pointers - do NOT free them */
         printf("Key: %.*s, Value: %.*s\n", 
                (int)key_size, key, (int)value_size, value);
     }
@@ -1170,6 +1296,31 @@ cf_config.comparator_name[TDB_MAX_COMPARATOR_NAME - 1] = '\0';
 tidesdb_create_column_family(db, "events", &cf_config);
 ```
 
+### Retrieving a Registered Comparator
+
+Use `tidesdb_get_comparator` to retrieve a previously registered comparator by name:
+
+```c
+tidesdb_comparator_fn fn = NULL;
+void *ctx = NULL;
+
+if (tidesdb_get_comparator(db, "timestamp_desc", &fn, &ctx) == 0)
+{
+    /* Comparator found - fn and ctx are now populated */
+    printf("Comparator 'timestamp_desc' is registered\n");
+}
+else
+{
+    /* Comparator not found */
+    printf("Comparator not registered\n");
+}
+```
+
+**Use cases**
+- **Validation** · Check if a comparator is registered before creating a column family
+- **Debugging** · Verify comparator registration during development
+- **Dynamic configuration** · Query available comparators at runtime
+
 **Comparator function signature**
 ```c
 int (*comparator_fn)(const uint8_t *key1, size_t key1_size,
@@ -1222,7 +1373,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
         - Configurable sync interval via `sync_interval_us` (microseconds)
         - Structural operations (flush, compaction, WAL rotation) always enforce durability
         - At most `sync_interval_us` worth of data at risk on crash
-        - **Mid-durability correctness**: When memtables rotate, the WAL receives an escalated fsync before entering the flush queue. Sorted run creation and merge operations always propagate full sync to block managers regardless of sync mode.
+        - Mid-durability correctness - When memtables rotate, the WAL receives an escalated fsync before entering the flush queue. Sorted run creation and merge operations always propagate full sync to block managers regardless of sync mode.
 
 - **TDB_SYNC_FULL** · Fsync on every write operation (slowest, most durable)
     - Best for · Critical data requiring maximum durability
@@ -1291,6 +1442,34 @@ if (tidesdb_is_compacting(cf))
 - `1` · Operation is in progress
 - `0` · No operation in progress (or invalid column family)
 
+### Manual Flush
+
+Manually flush a column family's memtable to disk. This creates a new SSTable (sorted run) in level 1.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+/* Trigger flush manually */
+if (tidesdb_flush_memtable(cf) != 0)
+{
+    fprintf(stderr, "Failed to trigger flush\n");
+    return -1;
+}
+```
+
+**When to use manual flush**
+- **Before backup** · Ensure all in-memory data is persisted before taking a backup
+- **Memory pressure** · Force data to disk when memory usage is high
+- **Testing** · Verify SSTable creation and compaction behavior
+- **Graceful shutdown** · Flush pending data before closing the database
+
+**Behavior**
+- Enqueues flush work in the global flush thread pool
+- Returns immediately (non-blocking) - flush runs asynchronously in background threads
+- If flush is already running for the column family, the call succeeds but doesn't queue duplicate work
+- Thread-safe - can be called concurrently from multiple threads
+
 ### Manual Compaction
 
 ```c
@@ -1335,12 +1514,12 @@ See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction
 
 TidesDB uses separate thread pools for flush and compaction operations. Understanding the parallelism model is important for optimal configuration.
 
-**Parallelism semantics:**
+**Parallelism semantics**
 - **Cross-CF parallelism** · Multiple flush/compaction workers CAN process different column families in parallel
 - **Within-CF serialization** · A single column family can only have one flush and one compaction running at any time (enforced by atomic `is_flushing` and `is_compacting` flags)
 - **No intra-CF memtable parallelism** · Even if a CF has multiple immutable memtables queued, they are flushed sequentially
 
-**Thread pool sizing guidance:**
+**Thread pool sizing guidance**
 - **Single column family** · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
 - **Multiple column families** · Set thread counts up to the number of column families for maximum parallelism. With N column families and M workers (where M ≤ N), throughput scales linearly.
 
@@ -1364,3 +1543,31 @@ tidesdb_open(&config, &db);
 :::
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and work distribution.
+
+## Utility Functions
+
+### tidesdb_free
+
+Use `tidesdb_free` to free memory allocated by TidesDB. This is particularly useful for FFI/language bindings where the caller needs to free memory returned by TidesDB functions (e.g., values from `tidesdb_txn_get`).
+
+```c
+uint8_t *value = NULL;
+size_t value_size = 0;
+
+if (tidesdb_txn_get(txn, cf, key, key_size, &value, &value_size) == 0)
+{
+    /* Use value */
+    printf("Value: %.*s\n", (int)value_size, value);
+    
+    /* Free using tidesdb_free (or standard free) */
+    tidesdb_free(value);
+}
+```
+
+:::note[When to use tidesdb_free]
+- **FFI bindings** · Language bindings (Java, Rust, Go, Python) should use `tidesdb_free` to ensure memory is freed by the same allocator that allocated it
+- **Cross-platform** · Ensures correct deallocation on all platforms
+- **Consistency** · Provides a uniform API for memory management
+
+For native C/C++ applications, `free()` works identically since TidesDB uses the standard allocator.
+:::

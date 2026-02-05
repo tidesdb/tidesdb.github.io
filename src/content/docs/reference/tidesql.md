@@ -124,10 +124,10 @@ maria_declare_plugin(tidesdb)
   PLUGIN_LICENSE_GPL,
   tidesdb_init_func,       /* Plugin Init */
   tidesdb_done_func,       /* Plugin Deinit */
-  0x0110,                  /* version: 1.1.0 */
+  0x0120,                  /* version: 1.2.0 */
   NULL,                    /* status variables */
   tidesdb_system_variables,/* system variables */
-  "1.1.0",                 /* version string */
+  "1.2.0",                 /* version string */
   MariaDB_PLUGIN_MATURITY_STABLE  /* maturity */
 }
 maria_declare_plugin_end;
@@ -386,7 +386,6 @@ typedef struct st_tidesdb_share {
   uint referencing_fk_col_count[TIDESDB_MAX_FK];     /* Number of FK columns per reference */
   size_t referencing_fk_offsets[TIDESDB_MAX_FK][16]; /* Byte offset of each FK col in child row */
   size_t referencing_fk_lengths[TIDESDB_MAX_FK][16]; /* Byte length of each FK column */
-  uint num_referencing;
 
   /* Change buffer for secondary index updates */
   struct {
@@ -394,6 +393,7 @@ typedef struct st_tidesdb_share {
     uint pending_count;
     pthread_mutex_t mutex;
   } change_buffer;
+  uint num_referencing;
 
   /* Tablespace state -- for DISCARD/IMPORT TABLESPACE */
   bool tablespace_discarded;
@@ -499,13 +499,16 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 |  1. Handle auto_increment if needed                           |
 |  2. build_primary_key(buf) -> key                             |
 |  3. pack_row(buf) -> value                                    |
-|  4. Get transaction (bulk_txn / current_txn / THD txn)        |
-|  5. check_foreign_key_constraints_insert()                    |
-|  6. Calculate TTL if applicable                               |
-|  7. tidesdb_txn_put(txn, cf, key, value, ttl)                 |
-|  8. Insert secondary index entries                            |
-|  9. Insert fulltext index words                               |
-| 10. Commit if own_txn                                         |
+|  4. Encrypt value if encryption enabled                       |
+|  5. Get transaction (bulk_txn / current_txn / THD txn)        |
+|  6. check_foreign_key_constraints_insert()                    |
+|  7. Calculate TTL if applicable                               |
+|  8. Check for duplicate primary key (unless skip_dup_check)   |
+|  9. tidesdb_txn_put(txn, cf, key, value, ttl)                 |
+| 10. Insert secondary index entries                            |
+| 11. Insert fulltext index words                               |
+| 12. Insert spatial index entries (Z-order encoded)            |
+| 13. Commit if own_txn                                         |
 +--------------------------------------------------------------+
 ```
 
@@ -516,8 +519,9 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 |  rnd_init(scan=true)                                          |
 +--------------------------------------------------------------+
 |  1. Get/create transaction (current_txn)                      |
-|  2. tidesdb_iter_new(txn, cf) -> scan_iter                    |
-|  3. tidesdb_iter_seek_to_first(scan_iter)                     |
+|  2. For read-only scans, use READ_UNCOMMITTED isolation       |
+|  3. tidesdb_iter_new(txn, cf) -> scan_iter                    |
+|  4. tidesdb_iter_seek_to_first(scan_iter)                     |
 +--------------------------------------------------------------+
 
 +--------------------------------------------------------------+
@@ -527,8 +531,10 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 |  2. Skip metadata keys (starting with \0)                     |
 |  3. tidesdb_iter_value(scan_iter) -> value                    |
 |  4. Save key to current_key (for position())                  |
-|  5. unpack_row(buf, value)                                    |
-|  6. tidesdb_iter_next(scan_iter)                              |
+|  5. Decrypt if encryption enabled                             |
+|  6. unpack_row(buf, value)                                    |
+|  7. Evaluate pushed_cond (Table Condition Pushdown)           |
+|  8. tidesdb_iter_next(scan_iter)                              |
 +--------------------------------------------------------------+
 
 +--------------------------------------------------------------+
@@ -620,6 +626,30 @@ DS-MRR benefits for TidesDB (LSM-tree):
 - Batching secondary index → PK lookups reduces transaction overhead
 - Key-ordered access is more efficient for LSM merge iterators
 
+### Read-Only Scan Optimization
+
+For simple SELECT queries in auto-commit mode, TidesDB uses `READ_UNCOMMITTED`
+isolation level to avoid MVCC visibility checks, improving scan performance:
+
+```cpp
+/* In rnd_init() */
+bool is_read_only = thd &&
+    !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN) &&
+    (lock.type == TL_READ || lock.type == TL_READ_NO_INSERT);
+
+tidesdb_isolation_level_t iso_level =
+    is_read_only ? TDB_ISOLATION_READ_UNCOMMITTED
+                 : (tidesdb_isolation_level_t)tidesdb_default_isolation;
+
+ret = tidesdb_txn_begin_with_isolation(tidesdb_instance, iso_level, &current_txn);
+scan_txn_owned = true;
+is_read_only_scan = is_read_only;
+```
+
+This optimization applies when:
+- Query is in auto-commit mode (not inside BEGIN...COMMIT)
+- Lock type is read-only (TL_READ or TL_READ_NO_INSERT)
+
 ### Handler Cloning
 
 TidesDB supports handler cloning for parallel operations:
@@ -708,7 +738,7 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 | `tidesdb_data_dir` | `{datadir}/tidesdb` | Database directory |
 | `tidesdb_flush_threads` | 2 | Number of background flush threads |
 | `tidesdb_compaction_threads` | 2 | Number of background compaction threads |
-| `tidesdb_block_cache_size` | 64MB | Clock cache size for hot SSTable blocks |
+| `tidesdb_block_cache_size` | 256MB | Clock cache size for hot SSTable blocks |
 | `tidesdb_max_open_sstables` | 256 | Maximum cached SSTable structures (each uses 2 FDs) |
 | `tidesdb_log_level` | info | Log level (debug/info/warn/error/fatal/none) |
 | `tidesdb_log_to_file` | FALSE | Log to file instead of stderr |
@@ -775,6 +805,16 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `tidesdb_default_ttl` | 0 | Default TTL in seconds (0 = no expiration) |
+
+### Change Buffer
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `tidesdb_enable_change_buffer` | TRUE | Enable change buffer for secondary index updates |
+| `tidesdb_change_buffer_max_size` | 1024 | Maximum pending entries before flush |
+
+The change buffer batches secondary index updates to reduce random I/O. When enabled,
+index modifications are buffered and applied in batches rather than individually.
 
 ### Disk Space
 
@@ -956,8 +996,8 @@ Supported partition types:
 
 ## 12. TTL (Time-To-Live)
 
-Rows can expire automatically using a `_ttl` column. The value specifies
-the number of seconds until expiration.
+Rows can expire automatically using a `_ttl` or `TTL` column (case-insensitive).
+The value specifies the number of seconds until expiration.
 
 ```sql
 CREATE TABLE sessions (
@@ -1057,10 +1097,187 @@ Supported referential actions:
 - `ON DELETE RESTRICT` — block delete if children exist
 - `ON DELETE CASCADE` — delete children when parent is deleted
 - `ON DELETE SET NULL` — set FK column to NULL when parent is deleted
+- `ON UPDATE CASCADE` — update child FK values when parent key is updated
+- `ON UPDATE SET NULL` — set FK column to NULL when parent key is updated
 
 ---
 
-## 15. Online DDL
+## 15. Spatial Indexing
+
+TidesDB supports spatial indexes using Z-order (Morton) curve encoding. This maps
+2D coordinates to a 1D key space while preserving locality, enabling efficient
+range queries on geometry data.
+
+### Z-Order Encoding
+
+```cpp
+/**
+  Encode 2D coordinates into Z-order curve value.
+  Interleaves bits of x and y coordinates for locality-preserving 1D key.
+  
+  @param x  Normalized X coordinate (0.0 to 1.0)
+  @param y  Normalized Y coordinate (0.0 to 1.0)
+  @return   64-bit Z-order encoded value
+*/
+uint64_t ha_tidesdb::encode_zorder(double x, double y)
+{
+    /* Normalize to 32-bit integer range */
+    uint32_t ix = (uint32_t)(x * (double)TIDESDB_ZORDER_MAX_VALUE);
+    uint32_t iy = (uint32_t)(y * (double)TIDESDB_ZORDER_MAX_VALUE);
+
+    /* Interleave bits using the "magic bits" method */
+    uint64_t z = 0;
+    for (int i = 0; i < TIDESDB_ZORDER_BITS; i++)
+    {
+        z |= ((uint64_t)((ix >> i) & 1) << (2 * i));
+        z |= ((uint64_t)((iy >> i) & 1) << (2 * i + 1));
+    }
+    return z;
+}
+```
+
+### Spatial Index Storage
+
+Spatial indexes are stored in separate column families with Z-order encoded keys:
+- Key: `[z-order value][primary key]`
+- Value: `primary key`
+
+### Example Usage
+
+```sql
+CREATE TABLE locations (
+  id INT PRIMARY KEY,
+  name VARCHAR(100),
+  coords GEOMETRY NOT NULL,
+  SPATIAL INDEX idx_coords (coords)
+) ENGINE=TIDESDB;
+
+INSERT INTO locations VALUES 
+  (1, 'Office', ST_GeomFromText('POINT(40.7128 -74.0060)')),
+  (2, 'Home', ST_GeomFromText('POINT(34.0522 -118.2437)'));
+
+SELECT * FROM locations WHERE MBRContains(
+  ST_GeomFromText('POLYGON((30 -120, 30 -70, 45 -70, 45 -120, 30 -120))'),
+  coords
+);
+```
+
+### Bounding Box Extraction
+
+For geometry types, TidesDB extracts the bounding box from WKB format:
+
+```cpp
+/* WKB format: [1-byte order][4-byte type][coordinates...] */
+const uchar *wkb = field->ptr;
+uint32_t wkb_type = uint4korr(wkb + 1);
+
+switch (wkb_type)
+{
+    case 1:  /* Point */
+        min_x = max_x = float8get(wkb + 5);
+        min_y = max_y = float8get(wkb + 13);
+        break;
+    case 2:  /* LineString */
+    case 3:  /* Polygon */
+        /* Iterate through points to find bounding box */
+        ...
+}
+```
+
+---
+
+## 16. Tablespace Import/Export
+
+TidesDB supports transportable tablespaces for backup and migration scenarios,
+similar to InnoDB's approach.
+
+### DISCARD TABLESPACE
+
+Prepares a table for data file replacement:
+
+```sql
+ALTER TABLE mytable DISCARD TABLESPACE;
+```
+
+This operation:
+1. Flushes the memtable to ensure all data is on disk
+2. Drops the column family (closes handles, releases files)
+3. Marks the table as discarded
+4. User can now copy/replace the CF directory files
+
+### IMPORT TABLESPACE
+
+Imports data files after DISCARD:
+
+```sql
+ALTER TABLE mytable IMPORT TABLESPACE;
+```
+
+This operation:
+1. Verifies the table was previously discarded
+2. Recreates the column family (picks up new files)
+3. Clears the discarded flag
+
+### Example Workflow
+
+```bash
+# On source server
+mysql -e "FLUSH TABLES mytable FOR EXPORT"
+cp -r /var/lib/mysql/tidesdb/mytable_cf /backup/
+mysql -e "UNLOCK TABLES"
+
+# On target server
+mysql -e "ALTER TABLE mytable DISCARD TABLESPACE"
+cp -r /backup/mytable_cf /var/lib/mysql/tidesdb/
+mysql -e "ALTER TABLE mytable IMPORT TABLESPACE"
+```
+
+---
+
+## 17. Native Backup
+
+TidesDB provides native backup functionality using the `tidesdb_backup` API.
+This creates a consistent snapshot without blocking normal operations.
+
+### Triggering Backup
+
+```sql
+CHECK TABLE mytable FOR UPGRADE;  -- Triggers backup via handler
+```
+
+Or programmatically via the `backup()` handler method:
+
+```cpp
+int ha_tidesdb::backup(THD *thd, HA_CHECK_OPT *check_opt)
+{
+    /* Generate backup directory with timestamp */
+    char backup_dir[256];
+    snprintf(backup_dir, sizeof(backup_dir), 
+             "/tmp/tidesdb_backup_%s", timestamp);
+
+    /* Use native TidesDB backup API */
+    int ret = tidesdb_backup(tidesdb_instance, backup_dir);
+    if (ret != TDB_SUCCESS)
+    {
+        sql_print_error("TidesDB: Backup failed: %d", ret);
+        return HA_ADMIN_FAILED;
+    }
+
+    sql_print_information("TidesDB: Backup completed to '%s'", backup_dir);
+    return HA_ADMIN_OK;
+}
+```
+
+### Backup Characteristics
+
+- Non-blocking · Normal reads/writes continue during backup
+- Consistent · Point-in-time snapshot of all column families
+- Complete · Includes all SSTables, WAL, and metadata
+- Restorable · Backup can be opened as a new TidesDB instance
+
+---
+
+## 18. Online DDL
 
 TidesDB supports online ALTER TABLE for index operations:
 
@@ -1082,7 +1299,7 @@ ALTER TABLE users DROP INDEX idx_email;
 
 ---
 
-## 16. Handler Methods
+## 19. Handler Methods
 
 ### Table Lifecycle
 
@@ -1125,13 +1342,24 @@ int ha_tidesdb::delete_table(const char *name)
 
 The `rename_table` method uses TidesDB's native `tidesdb_rename_column_family`
 which atomically renames the column family and waits for any in-progress
-flush or compaction to complete:
+flush or compaction to complete. The implementation includes retry logic for
+file system timing issues:
 
 ```c
 int ha_tidesdb::rename_table(const char *from, const char *to)
 {
   /* Rename main column family */
   ret = tidesdb_rename_column_family(tidesdb_instance, old_cf_name, new_cf_name);
+
+  /* Retry with delay for file system timing issues */
+  if (ret != TDB_SUCCESS && ret != TDB_ERR_NOT_FOUND)
+  {
+    for (int retry = 0; retry < TIDESDB_RENAME_RETRY_COUNT && ret != TDB_SUCCESS; retry++)
+    {
+      my_sleep(TIDESDB_RENAME_RETRY_SLEEP_US);
+      ret = tidesdb_rename_column_family(tidesdb_instance, old_cf_name, new_cf_name);
+    }
+  }
 
   /* Rename secondary index CFs */
   for (uint i = 0; i < TIDESDB_MAX_INDEXES; i++)
@@ -1204,7 +1432,7 @@ if (bulk_insert_count >= BULK_COMMIT_THRESHOLD)  // 10,000
 
 ---
 
-## 17. Configuration Reference
+## 20. Configuration Reference
 
 View all TidesDB variables:
 
@@ -1217,7 +1445,7 @@ SHOW VARIABLES LIKE 'tidesdb%';
 | Variable_name                    | Value          |
 +----------------------------------+----------------+
 | tidesdb_active_txn_buffer_size   | 65536          |
-| tidesdb_block_cache_size         | 67108864       |
+| tidesdb_block_cache_size         | 268435456      |
 | tidesdb_block_index_prefix_len   | 16             |
 | tidesdb_bloom_fpr                | 0.010000       |
 | tidesdb_change_buffer_max_size   | 1024           |
@@ -1252,7 +1480,7 @@ SHOW VARIABLES LIKE 'tidesdb%';
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `tidesdb_block_cache_size` | 64MB | Clock cache for hot SSTable blocks |
+| `tidesdb_block_cache_size` | 256MB | Clock cache for hot SSTable blocks |
 | `tidesdb_write_buffer_size` | 64MB | Memtable size before flush |
 | `tidesdb_compression_algo` | lz4 | Compression - none/snappy/lz4/zstd |
 | `tidesdb_sync_mode` | full | Durability - none/interval/full |
@@ -1263,7 +1491,7 @@ SHOW VARIABLES LIKE 'tidesdb%';
 
 ---
 
-## 18. Engine Status
+## 21. Engine Status
 
 View TidesDB runtime statistics and configuration:
 
@@ -1298,7 +1526,7 @@ THREAD POOLS
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 MEMORY
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-| Block Cache Size         | 64.00             MB |
+| Block Cache Size         | 256.00            MB |
 | Write Buffer Size        | 64.00             MB |
 
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -1354,7 +1582,7 @@ TTL
 
 ---
 
-## 19. Scalability & Lock-Free Operations
+## 22. Scalability & Lock-Free Operations
 
 TidesDB is designed for high concurrency with minimal lock contention. The plugin
 uses atomic operations where possible to match TidesDB's lockless internal architecture.
@@ -1409,17 +1637,17 @@ The global table share hash uses a read-write lock for better concurrency:
 
 ```cpp
 /* Fast path: read lock for existing shares */
-pthread_rwlock_rdlock(&tidesdb_rwlock);
+mysql_rwlock_rdlock(&tidesdb_rwlock);
 share = my_hash_search(&tidesdb_open_tables, table_name, len);
 if (share) {
-    share->ref_count++;
-    pthread_rwlock_unlock(&tidesdb_rwlock);
+    my_atomic_add32_explicit(&share->use_count, 1, MY_MEMORY_ORDER_RELAXED);
+    mysql_rwlock_unlock(&tidesdb_rwlock);
     return share;
 }
-pthread_rwlock_unlock(&tidesdb_rwlock);
+mysql_rwlock_unlock(&tidesdb_rwlock);
 
 /* Slow path: write lock only when creating new share */
-pthread_rwlock_wrlock(&tidesdb_rwlock);
+mysql_rwlock_wrlock(&tidesdb_rwlock);
 /* Double-check pattern... */
 ```
 
@@ -1446,7 +1674,7 @@ TidesDB's internal components are lockless:
 
 ---
 
-## 20. Transaction Conflict Handling
+## 23. Transaction Conflict Handling
 
 TidesDB uses optimistic concurrency control (OCC) with MVCC. When concurrent
 transactions modify the same rows, conflicts are detected at commit time.

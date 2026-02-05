@@ -157,6 +157,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Large Amount of Column Families with RocksDB and TidesDB',
+							link: 'articles/rocksdb-tidesdb-large-amount-column-families'
+						},
+						{
 							label: 'Benchmark Analysis on TidesDB v8.1.1, RocksDB v10.10.1, and LMDB v0.9.24',
 							link: 'articles/benchmark-analysis-tidesdb-v8-1-1-rocksdb-v10-10-1-lmdb-v0-9-24'
 						},
