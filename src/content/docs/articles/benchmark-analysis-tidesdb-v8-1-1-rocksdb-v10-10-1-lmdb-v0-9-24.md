@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![TidesDB v8.0.0 with optional LSM-B+Tree KLog Indexes](/pexels-karola-g-4711782.jpg)
+![Benchmark Analysis on TidesDB v8.1.1, RocksDB v10.10.1, and LMDB v0.9.24](/pexels-karola-g-4711782.jpg)
 
 </div>
 
@@ -29,8 +29,8 @@ I came across a <a href="http://smalldatum.blogspot.com/2015/08/different-kinds-
 - 48GB DDR4
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
-- TidesDB v8.1.1
-- <a href="https://rocksdb.org/">RocksDB</a> v10.10.1
+- TidesDB v8.1.1 (Compressed Block KLog format with LZ4 compression)
+- <a href="https://rocksdb.org/">RocksDB</a> v10.10.1 (Compressed with LZ4 compression)
 - <a href="https://www.symas.com/mdb">LMDB</a> v0.9.24 (Lightning Memory-Mapped Database)
 - GCC (glibc)
 
@@ -59,7 +59,7 @@ I came across a <a href="http://smalldatum.blogspot.com/2015/08/different-kinds-
 ![Mixed Workload](/tidesdb-8-1-1-rocksdb-10-10-1-lmdb-0-9-24-bench/mixed_workload.png)
 
 ## Disk Usage
-![Disk Usage](/tidesdb-8-1-1-rocksdb-10-10-1-lmdb-0-9-24-bench/disk_usage.png)
+![Disk Usage](/tidesdb-8-1-1-rocksdb-10-10-1-lmdb-0-9-24-bench/disk_usage2.png)
 
 ## CPU Usage
 ![CPU Usage](/tidesdb-8-1-1-rocksdb-10-10-1-lmdb-0-9-24-bench/cpu_usage.png)
@@ -83,3 +83,5 @@ That's it for this article, it's a short one, if you want to do a deeper dive on
 CSV Data:
 
 - <a href="/tidesdb-8-1-1-rocksdb-10-10-1-lmdb-0-9-24-bench/tidesdb_rocksdb_lmdb_benchmark_results_20260204_165956.csv" download>tidesdb_rocksdb_lmdb_benchmark_results_20260204_165956.csv</a>
+
+Thank you @TheSeyan for the feedback and suggestions!
