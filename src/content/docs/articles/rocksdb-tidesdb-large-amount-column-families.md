@@ -48,7 +48,7 @@ I look forward to seeing what you build with TidesDB!
 
 Code for comparison:
 
-<a href="https://github.com/tidesdb/multi-cf-rocksdb-comparison/tree/update-code">multi-cf-rocksdb-comparison</a>
+<a href="https://github.com/tidesdb/multi-cf-rocksdb-comparison/tree/update-comparison">multi-cf-rocksdb-comparison</a>
 
 Raw data:
 
