@@ -1,6 +1,6 @@
 ---
 title: "Large Amount of Column Families with RocksDB and TidesDB"
-description: "Large Amount of Column Families with RocksDB and TidesDB"
+description: "Comparisons of large amount of column families with RocksDB and TidesDB"
 head:
   - tag: meta
     attrs:
@@ -29,6 +29,15 @@ See: <a href="https://github.com/facebook/rocksdb/issues/5117">RocksDB issue #51
 The plot was created by modifying the Java program at
 <a href="https://github.com/grove/bugs-and-regressions/tree/master">https://github.com/grove/bugs-and-regressions/tree/master</a>
 to compare RocksDB against TidesDB.
+
+**Environment**
+- Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
+- 48GB DDR4
+- Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
+- Ubuntu 23.04 x86_64 6.2.0-39-generic
+- TidesDB v8.1.2 
+- <a href="https://rocksdb.org/">RocksDB</a> v10.10.1 
+- GCC (glibc)
 
 ![Large Amount of Column Families with RocksDB and TidesDB](/large-n-cfs-rocksdb-tidesdb/result.png)
 ![Large Amount of Column Families with RocksDB and TidesDB Scaling](/large-n-cfs-rocksdb-tidesdb/scaling-result.png)
