@@ -30,8 +30,8 @@ I came across a <a href="http://smalldatum.blogspot.com/2015/08/different-kinds-
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
 - TidesDB v8.1.1
-- RocksDB v10.10.1
-- LMDB v0.9.24
+- <a href="https://rocksdb.org/">RocksDB</a> v10.10.1
+- <a href="https://www.symas.com/mdb">LMDB</a> v0.9.24 (Lightning Memory-Mapped Database)
 - GCC (glibc)
 
 ## Write Throughput Comparison
