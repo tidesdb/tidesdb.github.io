@@ -104,11 +104,11 @@ if (result != TDB_SUCCESS)
 
 ## Initialization
 
-TidesDB supports optional custom memory allocators for integration with custom memory managers (e.g., a Redis module allocator).
+TidesDB supports **optional** custom memory allocators for integration with custom memory managers (e.g., a Redis module allocator, jemalloc, etc).  You don't need to do this, this is completely optional.
 
 ### tidesdb_init
 
-Initializes TidesDB with optional custom memory allocation functions. Must be called exactly once before any other TidesDB function. Pass `NULL` for any function to use the default system allocator.
+Initializes TidesDB with *optional* custom memory allocation functions. When in use, this must be called exactly once before any other TidesDB function. 
 
 ```c
 int tidesdb_init(tidesdb_malloc_fn malloc_fn, tidesdb_calloc_fn calloc_fn,
