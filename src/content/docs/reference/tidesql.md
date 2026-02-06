@@ -308,6 +308,9 @@ TidesDB implements several advanced handler capabilities:
 | Exact Row Count | `records()` | Returns exact row count from TidesDB statistics |
 | Truncate | `truncate()` | Fast table truncation via column family drop/recreate |
 | Custom Errors | `get_error_message()` | Human-readable error messages for TidesDB errors |
+| Rowid Filter Pushdown | `rowid_filter_push()` | Accepts rowid filters for semi-join optimization |
+| Persistent Statistics | `persist_table_stats()` / `load_table_stats()` | ANALYZE TABLE persists stats to metadata; loaded on table open |
+| Compatible Data Check | `check_if_incompatible_data()` | Returns COMPATIBLE_DATA_YES for metadata-only ALTERs to avoid unnecessary rebuilds |
 
 ---
 
@@ -1100,6 +1103,40 @@ Supported referential actions:
 - `ON UPDATE CASCADE` — update child FK values when parent key is updated
 - `ON UPDATE SET NULL` — set FK column to NULL when parent key is updated
 
+### FK Handler Methods
+
+TidesDB implements the full set of FK handler methods:
+
+| Method | Description |
+|--------|-------------|
+| `get_foreign_key_create_info()` | Returns FK DDL for `SHOW CREATE TABLE` |
+| `get_foreign_key_list()` | Returns list of FKs where this table is the child |
+| `get_parent_foreign_key_list()` | Returns list of FKs where this table is the parent (referenced) |
+| `referenced_by_foreign_key()` | Returns true if other tables reference this table |
+| `can_switch_engines()` | Checks if engine switch is allowed given FK constraints |
+
+The `get_parent_foreign_key_list()` method is used by MariaDB during ALTER TABLE
+to properly handle self-referencing foreign keys and validate FK constraints
+that would be affected by schema changes.
+
+### Self-Referencing FK Example
+
+```sql
+CREATE TABLE employees (
+  id INT PRIMARY KEY,
+  name VARCHAR(50),
+  manager_id INT,
+  FOREIGN KEY (manager_id) REFERENCES employees(id) ON DELETE SET NULL
+) ENGINE=TIDESDB;
+
+INSERT INTO employees VALUES (1, 'CEO', NULL);
+INSERT INTO employees VALUES (2, 'VP', 1);
+INSERT INTO employees VALUES (3, 'Manager', 2);
+
+-- ALTER TABLE works correctly with self-referencing FKs
+ALTER TABLE employees ADD COLUMN department VARCHAR(50);
+```
+
 ---
 
 ## 15. Spatial Indexing
@@ -1279,15 +1316,42 @@ int ha_tidesdb::backup(THD *thd, HA_CHECK_OPT *check_opt)
 
 ## 18. Online DDL
 
-TidesDB supports online ALTER TABLE for index operations:
+TidesDB supports online ALTER TABLE with three tiers of support:
+
+### Instant Operations (Metadata Only)
+
+| Operation | Algorithm | Lock |
+|-----------|-----------|------|
+| RENAME COLUMN | INSTANT | NONE |
+| RENAME INDEX | INSTANT | NONE |
+| RENAME TABLE | INSTANT | NONE |
+| CHANGE DEFAULT | INSTANT | NONE |
+| ADD/DROP VIRTUAL COLUMN | INSTANT | NONE |
+| ADD/DROP CHECK CONSTRAINT | INSTANT | NONE |
+| CHANGE INDEX VISIBILITY | INSTANT | NONE |
+| CHANGE TABLE OPTIONS | INSTANT | NONE |
+| ENABLE/DISABLE KEYS | INSTANT | NONE |
+
+### In-Place Operations (Index Rebuild)
 
 | Operation | Algorithm | Lock |
 |-----------|-----------|------|
 | ADD INDEX | INPLACE | NONE |
-| DROP INDEX | INSTANT | NONE |
-| ADD COLUMN | COPY | SHARED |
-| DROP COLUMN | COPY | SHARED |
-| RENAME INDEX | INSTANT | NONE |
+| DROP INDEX | INPLACE | NONE |
+| ADD UNIQUE INDEX | INPLACE | NONE |
+| ADD/DROP PRIMARY KEY | INPLACE | NONE |
+| ADD/DROP FOREIGN KEY | INPLACE | NONE |
+
+### Copy Operations (Table Rebuild)
+
+| Operation | Algorithm | Lock |
+|-----------|-----------|------|
+| ADD COLUMN (stored) | COPY | SHARED |
+| DROP COLUMN (stored) | COPY | SHARED |
+| CHANGE COLUMN TYPE | COPY | SHARED |
+| CHANGE NULLABILITY | COPY | SHARED |
+| CONVERT TO CHARSET | COPY | SHARED |
+| REORDER COLUMNS | COPY | SHARED |
 
 ```sql
 -- Online index creation (no blocking)
@@ -1295,7 +1359,18 @@ ALTER TABLE users ADD INDEX idx_email (email), ALGORITHM=INPLACE, LOCK=NONE;
 
 -- Instant index drop
 ALTER TABLE users DROP INDEX idx_email;
+
+-- Instant rename
+ALTER TABLE users RENAME COLUMN email TO email_address;
+
+-- Column operations require COPY (table rebuild)
+ALTER TABLE users ADD COLUMN age INT;
 ```
+
+> **Note:** Instant ADD COLUMN (like InnoDB's instant DDL) would require row
+> versioning metadata in the storage format. TidesDB's LSM-tree row format
+> does not currently track schema versions, so stored column changes require
+> a table rebuild via the COPY algorithm.
 
 ---
 
