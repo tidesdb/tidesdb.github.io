@@ -157,6 +157,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Plugging into MariaDB',
+							link: 'articles/plugging-into-mariadb'
+						},
+						{
 							label: 'Large Amount of Column Families with RocksDB and TidesDB',
 							link: 'articles/rocksdb-tidesdb-large-amount-column-families'
 						},
