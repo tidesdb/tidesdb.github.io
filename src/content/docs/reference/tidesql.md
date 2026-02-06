@@ -97,11 +97,15 @@ Create Table: CREATE TABLE `users` (
 | Isolation Levels | 5 (incl. SSI) | 2 | 4 |
 | XA Transactions | ✓ | ✓ | ✓ |
 | Savepoints | ✓ | ✓ | ✓ |
-| TTL/Expiration | ✓ (per-row) | ✓ (CF-level) | — |
+| TTL/Expiration | ✓ (per-row + per-table) | ✓ (CF-level) | — |
 | Foreign Keys | ✓ | — | ✓ |
 | Partitioning | ✓ | ✓ | ✓ |
 | Encryption | ✓ | ✓ | ✓ |
 | Online DDL | ✓ (indexes) | ✓ | ✓ |
+| Per-Table CF Options | ✓ (20 options) | ✓ | — |
+| Semi-Consistent Reads | ✓ | — | ✓ |
+| Bulk Load Index Disable | ✓ | — | ✓ |
+| Sequential Scan Prefetch | ✓ | — | ✓ |
 | Write Amplification | Low | Low | High |
 | Space Amplification | Low | Medium | High |
 | Read Amplification | Medium | Medium | Low |
@@ -122,12 +126,12 @@ maria_declare_plugin(tidesdb)
   "TidesDB Authors",
   "TidesDB LSMB+ storage engine with ACID transactions",
   PLUGIN_LICENSE_GPL,
-  tidesdb_init_func,       /* Plugin Init */
-  tidesdb_done_func,       /* Plugin Deinit */
-  0x0120,                  /* version: 1.2.0 */
+  tidesdb_init_func,       /* plugin Init */
+  tidesdb_done_func,       /* plugin Deinit */
+  0x0130,                 
   NULL,                    /* status variables */
   tidesdb_system_variables,/* system variables */
-  "1.2.0",                 /* version string */
+  "1.3.0",                 /* version string */
   MariaDB_PLUGIN_MATURITY_STABLE  /* maturity */
 }
 maria_declare_plugin_end;
@@ -165,6 +169,9 @@ tidesdb_hton->update_optimizer_costs = tidesdb_update_optimizer_costs;
 
 /* Consistent snapshot support */
 tidesdb_hton->start_consistent_snapshot = tidesdb_start_consistent_snapshot;
+
+/* Per-table CREATE TABLE options (compression, bloom, buffer size, TTL, etc.) */
+tidesdb_hton->table_options = tidesdb_table_option_list;
 ```
 
 ---
@@ -311,6 +318,12 @@ TidesDB implements several advanced handler capabilities:
 | Rowid Filter Pushdown | `rowid_filter_push()` | Accepts rowid filters for semi-join optimization |
 | Persistent Statistics | `persist_table_stats()` / `load_table_stats()` | ANALYZE TABLE persists stats to metadata; loaded on table open |
 | Compatible Data Check | `check_if_incompatible_data()` | Returns COMPATIBLE_DATA_YES for metadata-only ALTERs to avoid unnecessary rebuilds |
+| Semi-Consistent Reads | `was_semi_consistent_read()` / `try_semi_consistent_read()` | Optimistic reads under READ COMMITTED — reads last committed version instead of blocking |
+| Disable/Enable Indexes | `disable_indexes()` / `enable_indexes()` | Disable secondary index maintenance during bulk load; rebuild on re-enable |
+| Row Estimate Upper Bound | `estimate_rows_upper_bound()` | Returns SSTable metadata total_keys for tighter optimizer estimates |
+| Query Cache Integration | `register_query_cache_table()` | Allows query cache when no active transaction |
+| Sequential Scan Prefetch | `extra(HA_EXTRA_CACHE)` | Warms block cache by reading keys ahead before sequential scans |
+| Per-Table CF Options | `ha_table_option_struct` | 20 CREATE TABLE options for per-table column family configuration |
 
 ---
 
@@ -832,6 +845,56 @@ index modifications are buffered and applied in batches rather than individually
 | `tidesdb_ft_min_word_len` | 4 | Minimum word length for fulltext indexing |
 | `tidesdb_ft_max_word_len` | 84 | Maximum word length for fulltext indexing |
 | `tidesdb_ft_max_query_words` | 32 | Maximum words in a fulltext search query (1-256) |
+
+### Per-Table Column Family Options
+
+All column family configuration parameters can be overridden per table using
+`CREATE TABLE` options. When a value is 0 (or empty string), the global system
+variable default is used.
+
+```sql
+CREATE TABLE hot_data (
+  id INT PRIMARY KEY,
+  data VARCHAR(255)
+) ENGINE=TidesDB
+  COMPRESSION='zstd'
+  WRITE_BUFFER_SIZE=134217728
+  BLOOM_FILTER=1
+  BLOOM_FPR=10
+  USE_BTREE=1
+  LEVEL_SIZE_RATIO=8
+  MIN_LEVELS=3
+  SYNC_MODE='full'
+  TTL=86400;
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `COMPRESSION` | String | (global) | Compression algorithm: `none`, `snappy`, `lz4`, `zstd`, `lz4_fast` |
+| `USE_BTREE` | Bool | 1 | Use B+tree SSTable format (faster point lookups) |
+| `WRITE_BUFFER_SIZE` | Number | 0 (global) | Memtable size in bytes |
+| `SKIP_LIST_MAX_LEVEL` | Number | 0 (global) | Skip list max level for memtable |
+| `SKIP_LIST_PROBABILITY` | Number | 0 (global) | Skip list probability × 10000 (2500 = 0.25) |
+| `BLOOM_FILTER` | Bool | 1 | Enable/disable bloom filter |
+| `BLOOM_FPR` | Number | 0 (global) | Bloom filter FPR in parts per 10000 (100 = 1%, 10 = 0.1%) |
+| `BLOCK_INDEXES` | Bool | 1 | Enable compact block indexes |
+| `INDEX_SAMPLE_RATIO` | Number | 0 (global) | Block index sampling ratio |
+| `BLOCK_INDEX_PREFIX_LEN` | Number | 0 (global) | Block index prefix length in bytes |
+| `LEVEL_SIZE_RATIO` | Number | 0 (global) | LSM level size ratio |
+| `MIN_LEVELS` | Number | 0 (global) | Minimum number of LSM levels |
+| `DIVIDING_LEVEL_OFFSET` | Number | 0 (global) | Compaction dividing level offset |
+| `L1_FILE_COUNT_TRIGGER` | Number | 0 (global) | L1 file count trigger for compaction |
+| `L0_QUEUE_STALL_THRESHOLD` | Number | 0 (global) | L0 queue stall threshold for backpressure |
+| `SYNC_MODE` | String | (global) | Sync mode: `none`, `interval`, `full` |
+| `SYNC_INTERVAL_US` | Number | 0 (global) | Sync interval in microseconds |
+| `KLOG_VALUE_THRESHOLD` | Number | 0 (global) | Values larger than this go to vlog |
+| `MIN_DISK_SPACE` | Number | 0 (global) | Minimum free disk space in bytes |
+| `ISOLATION_LEVEL` | String | (global) | Default isolation: `read_uncommitted`, `read_committed`, `repeatable_read`, `snapshot`, `serializable` |
+| `TTL` | Number | 0 | Default TTL in seconds for rows (0 = no expiry) |
+
+Per-table options are applied when the column family is created. The TTL option
+is also checked at write time — if no per-row TTL field exists, the per-table
+TTL is used before falling back to the global `tidesdb_default_ttl`.
 
 ### B+tree Format Option
 
@@ -1783,5 +1846,3 @@ optimistic concurrency conflicts.
 
 --- 
 You can find the source for the TideSQL project [here](https://github.com/tidesdb/tidesql).
-
-For detailed benchmarks against InnoDB, see [here](/articles/tidesql-v1-1-0-and-innodb-in-mariadb-12-1-benchmark-analysis).
