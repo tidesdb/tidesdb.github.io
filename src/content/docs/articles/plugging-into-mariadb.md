@@ -108,7 +108,7 @@ At 4 threads, InnoDB pulls ahead on read/write mixed (0.47x) partly due to MVCC 
 
 **A Note on LSMB+ (B+Tree KLog Layout)**
 
-TidesDB supports two SSTable (KLog) formats - the default B+tree layout and a simpler block layout. The B+tree format organizes keys within each KLog as a B+tree with prefix compression, key indirection tables, and delta encoding - giving O(log N) point lookups within a single SSTable instead of binary search over block indexes which are also expensive to keep in memory.
+TidesDB supports two SSTable (KLog) formats - the B+tree layout and a simpler block layout. The B+tree format organizes keys within each KLog as a B+tree with prefix compression, key indirection tables, and delta encoding - giving O(log N) point lookups within a single SSTable instead of binary search over block indexes which are also expensive to keep in memory.  In TideSQL the B+Tree KLog format is the default, in TidesDB the library column family defaults to block layout.
 
 I ran the same sysbench suite with `tidesdb_use_btree=OFF` (block layout) and the results were nearly identical at this scale - within a few percent either way. The difference would show up with larger KLogs across many levels, where each SSTable may contain millions of keys and the B+tree's O(log N) in-file lookup avoids scanning through many block index entries. The tradeoff is that the B+tree KLog layout takes more space on disk due to the internal node overhead.
 
