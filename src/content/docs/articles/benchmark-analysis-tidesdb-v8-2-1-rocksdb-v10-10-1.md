@@ -1,6 +1,6 @@
 ---
 title: "Benchmark Analysis on TidesDB v8.2.1 and RocksDB v10.10.1"
-description: "Benchmark Analysis on TidesDB v8.2.1 and RocksDB v10.10.1"
+description: "Deep benchmark analysis on TidesDB v8.2.1 and RocksDB v10.10.1 across multiple workloads"
 head:
   - tag: meta
     attrs:
