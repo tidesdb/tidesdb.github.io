@@ -1,6 +1,6 @@
 ---
 title: "Plugging into MariaDB"
-description: "How is the process of plugging TidesDB into MariaDB?"
+description: "The journey of building TideSQL, a pluggable LSM-tree storage engine for MariaDB powered by TidesDB, with sysbench benchmarks against InnoDB and MyRocks."
 head:
   - tag: meta
     attrs:
@@ -69,14 +69,14 @@ and more...
 
 **Benchmarks**
 
-I ran sysbench against TideSQL and InnoDB on the same MariaDB 12.1.2 instance (10K rows, 60s per test, 10s warmup). Here's what the numbers look like.
+I ran sysbench against TidesDB v1.2.0 and InnoDB on the same MariaDB 12.1.2 instance (10K rows, 60s per test, 10s warmup). Here's what the numbers look like.
 
 Environment:
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
 - 48GB DDR4
 - Western Digital 500GB WD Blue 3D NAND Internal PC SSD (SATA)
 - Ubuntu 23.04 x86_64 6.2.0-39-generic
-- TidesDB v8.2.0 (TidesSQL v1.2.0 Plugin)
+- TidesDB v8.2.0
 - GCC (glibc)
 
 
