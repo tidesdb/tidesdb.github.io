@@ -3,13 +3,13 @@ title: TidesDB Engine for MariaDB/MySQL Reference
 description: TidesDB Engine for MariaDB/MySQL Reference
 ---
 
-If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/tidesdb.md).
+If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/tidesql.md).
 
 <hr/>
 
 ## Overview
 
-TidesDB is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture with optional B+tree format for point lookups. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
+TideSQL is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture with optional B+tree KLog format for point lookups. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
 
 ---
 
@@ -84,7 +84,7 @@ Create Table: CREATE TABLE `users` (
 
 ## Feature Comparison
 
-| Feature | TidesDB | MyRocks | InnoDB |
+| Feature | TideSQL | MyRocks | InnoDB |
 |---------|:-------:|:-------:|:------:|
 | Storage Structure | LSMB+ | LSM-tree | B+tree |
 | ACID Transactions | ✓ | ✓ | ✓ |
@@ -2132,4 +2132,4 @@ the standard mechanism for handling optimistic concurrency conflicts.
 
 
 --- 
-You can find the source for the TidesDB project [here](https://github.com/tidesdb/tidesdb).
+You can find the source for the TidesDB project [here](https://github.com/tidesdb/tidesql).
