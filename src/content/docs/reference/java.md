@@ -363,6 +363,25 @@ Atomically rename a column family:
 db.renameColumnFamily("old_name", "new_name");
 ```
 
+### Cloning Column Families
+
+Create a complete copy of an existing column family with a new name. The clone is completely independent — modifications to one do not affect the other.
+
+```java
+// Clone source column family to a new column family
+db.cloneColumnFamily("source_cf", "cloned_cf");
+
+// Both column families now exist independently
+ColumnFamily original = db.getColumnFamily("source_cf");
+ColumnFamily clone = db.getColumnFamily("cloned_cf");
+```
+
+**Use cases:**
+- **Testing** — Create a copy of production data for testing without affecting the original
+- **Branching** — Create a snapshot of data before making experimental changes
+- **Migration** — Clone data before schema or configuration changes
+- **Backup verification** — Clone and verify data integrity without modifying the source
+
 ### B+tree KLog Format (Optional)
 
 Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
