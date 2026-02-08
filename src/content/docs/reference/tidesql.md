@@ -3,13 +3,13 @@ title: TidesDB Engine for MariaDB/MySQL Reference
 description: TidesDB Engine for MariaDB/MySQL Reference
 ---
 
-If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/tidesql.md).
+If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/tidesdb.md).
 
 <hr/>
 
 ## Overview
 
-TideSQL is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture with optional B+tree format for point lookups. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
+TidesDB is a pluggable storage engine designed primarily for <a href="https://mariadb.org/">MariaDB</a>, built on a Log-Structured Merge-tree (LSM-tree) architecture with optional B+tree format for point lookups. It supports ACID transactions and MVCC, and is optimized for write-heavy workloads, delivering reduced write and space amplification.
 
 ---
 
@@ -84,7 +84,7 @@ Create Table: CREATE TABLE `users` (
 
 ## Feature Comparison
 
-| Feature | TideSQL | MyRocks | InnoDB |
+| Feature | TidesDB | MyRocks | InnoDB |
 |---------|:-------:|:-------:|:------:|
 | Storage Structure | LSMB+ | LSM-tree | B+tree |
 | ACID Transactions | ✓ | ✓ | ✓ |
@@ -126,12 +126,12 @@ maria_declare_plugin(tidesdb)
   "TidesDB Authors",
   "TidesDB LSMB+ storage engine with ACID transactions",
   PLUGIN_LICENSE_GPL,
-  tidesdb_init_func,       /* plugin Init */
-  tidesdb_done_func,       /* plugin Deinit */
-  0x0130,                 
+  tidesdb_init_func,       /* Plugin Init */
+  tidesdb_done_func,       /* Plugin Deinit */
+  0x0140,                  /* version: 1.4.0 */
   NULL,                    /* status variables */
   tidesdb_system_variables,/* system variables */
-  "1.3.0",                 /* version string */
+  "1.4.0",                 /* version string */
   MariaDB_PLUGIN_MATURITY_STABLE  /* maturity */
 }
 maria_declare_plugin_end;
@@ -191,6 +191,7 @@ class ha_tidesdb: public handler
   /* Current transaction for this handler */
   tidesdb_txn_t *current_txn;
   bool scan_txn_owned;            /* True if we created the scan transaction */
+  bool index_txn_owned;           /* True if we created the index scan transaction */
   bool is_read_only_scan;         /* True if current operation is read-only */
 
   /* Iterator for table scans */
@@ -208,12 +209,21 @@ class ha_tidesdb: public handler
   /* Current row position (for rnd_pos) -- pre-allocated buffer */
   uchar *current_key;
   size_t current_key_len;
-  size_t current_key_capacity;    /* Pre-allocated capacity */
+  size_t current_key_capacity;
 
   /* Bulk insert state */
   bool bulk_insert_active;
   tidesdb_txn_t *bulk_txn;
   ha_rows bulk_insert_rows;
+  ha_rows bulk_insert_count;                          /* Rows inserted in current batch */
+  static const ha_rows BULK_COMMIT_THRESHOLD = 10000; /* Commit every N rows */
+
+  /* Disable/enable indexes state for bulk load */
+  bool indexes_disabled;
+
+  /* Sequential scan prefetch state */
+  bool prefetch_active;
+  static const uint PREFETCH_BATCH_SIZE = 64;
 
   /* Performance optimizations */
   bool skip_dup_check;            /* Skip redundant duplicate key check */
@@ -221,16 +231,38 @@ class ha_tidesdb: public handler
   size_t pack_buffer_capacity;
   Item *pushed_idx_cond;          /* Index Condition Pushdown */
   uint pushed_idx_cond_keyno;
+  const COND *pushed_cond;        /* Table Condition Pushdown (full WHERE clause) */
   bool keyread_only;              /* Index-only scan mode */
   bool txn_read_only;             /* Track read-only transactions */
+  time_t cached_now;              /* Cached time to avoid per-row syscalls */
   uchar *idx_key_buffer;          /* Buffer pooling for build_index_key() */
   size_t idx_key_buffer_capacity;
+
+  /* Semi-consistent read state */
+  bool semi_consistent_read_enabled;
+  bool did_semi_consistent_read;
+
+  /* Fulltext search state */
+  uint ft_current_idx;            /* Current FT index being searched */
+  tidesdb_iter_t *ft_iter;        /* Iterator for FT results */
+  char **ft_matched_pks;          /* Array of matched primary keys */
+  size_t *ft_matched_pk_lens;     /* Lengths of matched PKs */
+  uint ft_matched_count;          /* Number of matched PKs */
+  uint ft_current_match;          /* Current position in matches */
 
   /* Secondary index scan state */
   tidesdb_iter_t *index_iter;
   uchar *index_key_buf;
   uint index_key_len;
   uint index_key_buf_capacity;
+
+  /* Buffer for saved old key in update_row */
+  uchar *saved_key_buffer;
+  size_t saved_key_buffer_capacity;
+
+  /* Buffer pooling for insert_index_entry() PK value */
+  uchar *idx_pk_buffer;
+  size_t idx_pk_buffer_capacity;
 
   /* DS-MRR (Disk-Sweep Multi-Range Read) implementation */
   DsMrr_impl m_ds_mrr;
@@ -265,7 +297,6 @@ ulonglong table_flags() const
          HA_ONLINE_ANALYZE |          /* No cache eviction after ANALYZE */
          HA_CAN_TABLE_CONDITION_PUSHDOWN | /* WHERE pushdown during scans */
          HA_CAN_SKIP_LOCKED |         /* MVCC: SELECT FOR UPDATE SKIP LOCKED */
-         HA_HAS_RECORDS |             /* records() returns exact count */
          HA_CAN_FULLTEXT_EXT;         /* Extended fulltext API */
 }
 ```
@@ -304,16 +335,21 @@ TidesDB implements several advanced handler capabilities:
 
 | Feature | Method | Description |
 |---------|--------|-------------|
-| Table Condition Pushdown | `cond_push()` / `cond_pop()` | Pushes WHERE clauses to storage engine for filtering during scans |
+| Table Condition Pushdown | `cond_push()` / `cond_pop()` | Pushes WHERE clauses to storage engine for early filtering; returns condition to SQL layer for re-check (safe for complex expressions) |
 | Index Condition Pushdown | `idx_cond_push()` | Evaluates conditions during index scans before fetching rows |
+| DESC LIMIT 1 Optimization | `index_read_last_map()` | Seeks to last row matching key prefix for `ORDER BY ... DESC LIMIT 1` |
+| Per-Index Cardinality | `info(HA_STATUS_CONST)` | Sets `rec_per_key` for each index key part (exact for unique, heuristic for non-unique) |
+| Online Row Count | `write_row()` / `delete_row()` | Atomically updates `share->row_count` on each DML for live statistics |
+| Key Buffer Pre-allocation | `open()` | Pre-allocates key buffers based on max key length to avoid per-row realloc |
+| FK Fast Path | `check_foreign_key_constraints_*()` | Skips `ha_thd()` call entirely when table has no FK constraints |
 | Consistent Snapshot | `start_consistent_snapshot` | Supports `START TRANSACTION WITH CONSISTENT SNAPSHOT` |
 | Cache Preload | `preload_keys()` | `LOAD INDEX INTO CACHE` warms up block cache |
 | SKIP LOCKED | `HA_CAN_SKIP_LOCKED` | MVCC never blocks · `SELECT FOR UPDATE SKIP LOCKED` works naturally |
 | Clustered Index | `HA_CLUSTERED_INDEX` | Primary key data stored with key (no secondary lookup) |
 | Crash Safety | `HA_CRASH_SAFE` | WAL ensures durability across crashes |
 | Query Cache | `table_cache_type()` | Returns `HA_CACHE_TBL_TRANSACT` for proper query cache integration |
-| Exact Row Count | `records()` | Returns exact row count from TidesDB statistics |
-| Truncate | `truncate()` | Fast table truncation via column family drop/recreate |
+| Exact Row Count | `records()` | Returns exact row count from `tidesdb_get_stats()` minus metadata keys |
+| Truncate | `truncate()` | Instant table truncation via `drop_cf_and_cleanup()` + recreate |
 | Custom Errors | `get_error_message()` | Human-readable error messages for TidesDB errors |
 | Rowid Filter Pushdown | `rowid_filter_push()` | Accepts rowid filters for semi-join optimization |
 | Persistent Statistics | `persist_table_stats()` / `load_table_stats()` | ANALYZE TABLE persists stats to metadata; loaded on table open |
@@ -324,6 +360,46 @@ TidesDB implements several advanced handler capabilities:
 | Query Cache Integration | `register_query_cache_table()` | Allows query cache when no active transaction |
 | Sequential Scan Prefetch | `extra(HA_EXTRA_CACHE)` | Warms block cache by reading keys ahead before sequential scans |
 | Per-Table CF Options | `ha_table_option_struct` | 20 CREATE TABLE options for per-table column family configuration |
+
+### Row Count Statistics (`info()`)
+
+The `info(HA_STATUS_VARIABLE)` method reports `stats.records` to the optimizer
+and to `SELECT COUNT(*)`. TidesDB uses a two-tier approach:
+
+1. **Tracked count** (`share->row_count_valid == true`) — When `write_row()` and
+   `delete_row()` have been called on the table, they atomically maintain
+   `share->row_count`. This value is exact and preferred.
+
+2. **Realtime stats** (`share->row_count_valid == false`) — Falls back to
+   `tidesdb_get_stats()` which returns `total_keys` from the column family's
+   SSTable metadata. Metadata keys (hidden PK counter, auto-increment counter)
+   are subtracted to yield the user row count.
+
+In both paths, zero is reported accurately — there is no artificial floor.
+This ensures `COUNT(*)` returns 0 after `TRUNCATE TABLE`, `TRUNCATE PARTITION`,
+or `DELETE` of all rows.
+
+```cpp
+if (share->row_count_valid)
+{
+    stats.records = share->row_count;  /* Exact tracked count */
+}
+else
+{
+    tidesdb_stats_t *tdb_stats = get_realtime_stats(share);
+    if (tdb_stats)
+    {
+        ha_rows metadata_keys = 0;
+        if (!share->has_primary_key) metadata_keys++;
+        if (table->s->found_next_number_field) metadata_keys++;
+
+        stats.records = tdb_stats->total_keys > metadata_keys
+                            ? tdb_stats->total_keys - metadata_keys
+                            : 0;
+        tidesdb_free_stats(tdb_stats);
+    }
+}
+```
 
 ---
 
@@ -396,20 +472,18 @@ typedef struct st_tidesdb_share {
   uint num_fk;
 
   /* Tables that reference this table (parent FKs) -- for DELETE/UPDATE checks */
-  char referencing_tables[TIDESDB_MAX_FK][256];      /* "db.table" format */
-  int referencing_fk_rules[TIDESDB_MAX_FK];          /* delete_rule for each referencing FK */
-  uint referencing_fk_cols[TIDESDB_MAX_FK][16];      /* FK column indices in child table */
-  uint referencing_fk_col_count[TIDESDB_MAX_FK];     /* Number of FK columns per reference */
-  size_t referencing_fk_offsets[TIDESDB_MAX_FK][16]; /* Byte offset of each FK col in child row */
-  size_t referencing_fk_lengths[TIDESDB_MAX_FK][16]; /* Byte length of each FK column */
+  char referencing_tables[TIDESDB_MAX_FK][TIDESDB_TABLE_NAME_MAX_LEN]; /* "db.table" format */
+  int referencing_fk_rules[TIDESDB_MAX_FK];                /* delete_rule for each referencing FK */
+  uint referencing_fk_cols[TIDESDB_MAX_FK][TIDESDB_FK_MAX_COLS]; /* FK column indices in child */
+  uint referencing_fk_col_count[TIDESDB_MAX_FK];           /* Number of FK columns per reference */
+  size_t referencing_fk_offsets[TIDESDB_MAX_FK][TIDESDB_FK_MAX_COLS]; /* Byte offset per col */
+  size_t referencing_fk_lengths[TIDESDB_MAX_FK][TIDESDB_FK_MAX_COLS]; /* Byte length per col */
 
-  /* Change buffer for secondary index updates */
-  struct {
-    bool enabled;
-    uint pending_count;
-    pthread_mutex_t mutex;
-  } change_buffer;
   uint num_referencing;
+
+  /* Cached stats from tidesdb_get_stats() to avoid repeated calls */
+  tidesdb_stats_t *cached_stats;
+  time_t cached_stats_time;  /* When stats were last fetched */
 
   /* Tablespace state -- for DISCARD/IMPORT TABLESPACE */
   bool tablespace_discarded;
@@ -434,50 +508,53 @@ typedef struct st_tidesdb_share {
 +------------------------------------------------------------------+
 |  1. external_lock(F_RDLCK/F_WRLCK)  ->  Begin TidesDB transaction |
 |  2. Execute operations (read/write)                               |
-|  3. external_lock(F_UNLCK)          ->  Commit/Rollback           |
+|  3. external_lock(F_UNLCK)          ->  Detach handler            |
+|  4. tidesdb_commit / tidesdb_rollback called by tx coordinator    |
 +------------------------------------------------------------------+
 ```
 
-### Two Transaction Modes
+### Unified Transaction Path
 
-Auto-commit Mode (single statement):
+TidesDB uses a single unified transaction path for both auto-commit and
+multi-statement modes. Every statement always gets a THD-level transaction:
+
 ```c
-/* Auto-commit mode -- use handler-level transaction */
-if (!current_txn)
+int ha_tidesdb::external_lock(THD *thd, int lock_type)
 {
-  int isolation = map_isolation_level(
-    (enum_tx_isolation)thd->variables.tx_isolation);
-
-  ret = tidesdb_txn_begin_with_isolation(tidesdb_instance,
-                                          (tidesdb_isolation_level_t)isolation,
-                                          &current_txn);
-}
-```
-
-Multi-statement Transaction (BEGIN...COMMIT):
-```c
-if (in_transaction)
-{
-  /* Multi-statement transaction -- use THD-level transaction for savepoint support */
-  tidesdb_txn_t *thd_txn = get_thd_txn(thd, tidesdb_hton);
-
-  if (!thd_txn)
+  if (lock_type != F_UNLCK)
   {
-    /* Start a new transaction at THD level */
-    int isolation = map_isolation_level(
-      (enum_tx_isolation)thd->variables.tx_isolation);
+    /* Always use THD-level transaction */
+    tidesdb_txn_t *thd_txn = get_thd_txn(thd, tidesdb_hton);
 
-    ret = tidesdb_txn_begin_with_isolation(tidesdb_instance,
-                                            (tidesdb_isolation_level_t)isolation,
-                                            &thd_txn);
-    set_thd_txn(thd, tidesdb_hton, thd_txn);
+    if (!thd_txn)
+    {
+      int isolation = map_isolation_level(
+        (enum_tx_isolation)thd->variables.tx_isolation);
 
-    /* Register with MySQL transaction coordinator */
-    trans_register_ha(thd, TRUE, tidesdb_hton, 0);
+      tidesdb_txn_begin_with_isolation(tidesdb_instance,
+                                        (tidesdb_isolation_level_t)isolation,
+                                        &thd_txn);
+      set_thd_txn(thd, tidesdb_hton, thd_txn);
+    }
+
+    current_txn = thd_txn;
+    txn_read_only = (lock_type == F_RDLCK);
+
+    /* Always register at statement level */
+    trans_register_ha(thd, FALSE, tidesdb_hton, 0);
+
+    /* Register at global level only for multi-statement transactions
+       (BEGIN...COMMIT or autocommit=0). For single auto-commit statements,
+       statement-level registration is sufficient. */
+    if (thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
+      trans_register_ha(thd, TRUE, tidesdb_hton, 0);
   }
-
-  /* Use THD transaction for this handler */
-  current_txn = thd_txn;
+  else
+  {
+    /* F_UNLCK -- detach handler. Actual commit/rollback happens via
+       tidesdb_commit / tidesdb_rollback called by MariaDB's tx coordinator. */
+    current_txn = NULL;
+  }
 }
 ```
 
@@ -502,6 +579,26 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 }
 ```
 
+### MVCC and Iterator Visibility
+
+TidesDB iterators and point lookups see the transaction's own uncommitted writes.
+The library builds a merge heap from four source types:
+
+| Merge Source | Description |
+|-------------|-------------|
+| `MERGE_SOURCE_MEMTABLE` | Active memtable |
+| `MERGE_SOURCE_SSTABLE` | On-disk SSTables (block-based format) |
+| `MERGE_SOURCE_BTREE` | On-disk SSTables (B+tree format) |
+| `MERGE_SOURCE_TXN_OPS` | Transaction's write buffer (uncommitted ops) |
+
+Transaction ops use `seq=UINT64_MAX` so they are always visible to the owning
+transaction. For `REPEATABLE_READ`, a `snapshot_seq` is captured at transaction
+start and only committed data with `seq <= snapshot_seq` is visible from other
+transactions.
+
+Point lookups (`tidesdb_txn_get`) check the write buffer first ("read your own
+writes"), then fall through to memtable → immutable memtables → SSTables.
+
 ---
 
 ## 5. Read/Write Paths
@@ -518,13 +615,16 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 |  4. Encrypt value if encryption enabled                       |
 |  5. Get transaction (bulk_txn / current_txn / THD txn)        |
 |  6. check_foreign_key_constraints_insert()                    |
-|  7. Calculate TTL if applicable                               |
+|  7. Calculate TTL (per-row _ttl field / table option / global) |
 |  8. Check for duplicate primary key (unless skip_dup_check)   |
 |  9. tidesdb_txn_put(txn, cf, key, value, ttl)                 |
-| 10. Insert secondary index entries                            |
-| 11. Insert fulltext index words                               |
-| 12. Insert spatial index entries (Z-order encoded)            |
-| 13. Commit if own_txn                                         |
+| 10. If !indexes_disabled:                                     |
+|     a. Insert secondary index entries                         |
+|     b. Insert fulltext index words                            |
+|     c. Insert spatial index entries (Z-order encoded)         |
+| 11. If own_txn: commit                                        |
+|     If bulk_insert: intermediate commit every 10K rows        |
+| 12. Update stats.records and share->row_count                 |
 +--------------------------------------------------------------+
 ```
 
@@ -534,30 +634,29 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 +--------------------------------------------------------------+
 |  rnd_init(scan=true)                                          |
 +--------------------------------------------------------------+
-|  1. Get/create transaction (current_txn)                      |
-|  2. For read-only scans, use READ_UNCOMMITTED isolation       |
-|  3. tidesdb_iter_new(txn, cf) -> scan_iter                    |
-|  4. tidesdb_iter_seek_to_first(scan_iter)                     |
+|  1. Use current_txn (set by external_lock)                    |
+|  2. tidesdb_iter_new(txn, cf) -> scan_iter                    |
+|  3. tidesdb_iter_seek_to_first(scan_iter)                     |
 +--------------------------------------------------------------+
 
 +--------------------------------------------------------------+
 |  rnd_next(buf)  [called repeatedly]                           |
 +--------------------------------------------------------------+
-|  1. tidesdb_iter_key(scan_iter) -> key                        |
+|  1. tidesdb_iter_key(scan_iter) -> key_ptr                    |
 |  2. Skip metadata keys (starting with \0)                     |
-|  3. tidesdb_iter_value(scan_iter) -> value                    |
-|  4. Save key to current_key (for position())                  |
-|  5. Decrypt if encryption enabled                             |
-|  6. unpack_row(buf, value)                                    |
-|  7. Evaluate pushed_cond (Table Condition Pushdown)           |
-|  8. tidesdb_iter_next(scan_iter)                              |
+|  3. tidesdb_iter_value(scan_iter) -> val_ptr                  |
+|  4. Copy key to current_key, copy value to val_copy           |
+|     (iterator memory is invalidated by iter_next)             |
+|  5. tidesdb_iter_next(scan_iter)  -- advance BEFORE unpack    |
+|  6. Decrypt val_copy if encryption enabled                    |
+|  7. unpack_row(buf, value)                                    |
+|  8. Evaluate pushed_cond (Table Condition Pushdown)           |
 +--------------------------------------------------------------+
 
 +--------------------------------------------------------------+
 |  rnd_end()                                                    |
 +--------------------------------------------------------------+
 |  1. tidesdb_iter_free(scan_iter)                              |
-|  2. Cleanup owned transaction if any                          |
 +--------------------------------------------------------------+
 ```
 
@@ -574,46 +673,30 @@ static int map_isolation_level(enum_tx_isolation mysql_iso)
 |  Secondary Index:                                             |
 |    1. tidesdb_iter_new(txn, index_cf[idx]) -> iter            |
 |    2. tidesdb_iter_seek(iter, search_key)                     |
-|    3. tidesdb_iter_value(iter) -> primary_key                 |
-|    4. tidesdb_txn_get(txn, cf, primary_key) -> value          |
-|    5. unpack_row(buf, value)                                  |
+|    3. Evaluate pushed_idx_cond (ICP) on index columns         |
+|       -- If condition fails, skip to next index entry         |
+|    4. tidesdb_iter_value(iter) -> primary_key                 |
+|    5. tidesdb_txn_get(txn, cf, primary_key) -> value          |
+|    6. unpack_row(buf, value)                                  |
 +--------------------------------------------------------------+
 ```
 
-### Keyread Optimization (Covering Index)
+### Keyread Limitation (Sort-Key Format)
 
-When a query only needs columns that are part of an index, TidesDB can satisfy
-the query directly from the index without fetching the full row. This is called
-a "covering index" or "keyread" optimization.
+TidesDB advertises `HA_KEYREAD_ONLY` on secondary indexes so the optimizer
+can factor covering-index plans into its cost model. However, secondary index
+keys are stored in **sort-key format** (`make_sort_key` weights) rather than
+`key_copy` format. Because `key_restore()` cannot decode sort-key weights back
+to field values, the actual index scan code always falls through to a PK lookup:
 
-```cpp
-/* In index_next(), index_read_map(), index_next_same() */
-if (keyread_only)
-{
-    KEY *key_info = &table->key_info[active_index];
-    uint idx_restore_len = key_info->key_length;
+This means every secondary index scan performs the full path:
+1. Seek/iterate in the index CF (sort-key → PK mapping)
+2. Fetch the row from the main CF via `tidesdb_txn_get(txn, cf, primary_key)`
+3. `unpack_row(buf, value)`
 
-    /* Clear the record buffer first */
-    memset(buf, 0, table->s->reclength);
-
-    /* Restore the index columns using MariaDB's key_restore() */
-    key_restore(buf, idx_key, key_info, idx_restore_len);
-
-    /* Also restore the primary key portion (appended after index columns) */
-    if (table->s->primary_key != MAX_KEY)
-    {
-        KEY *pk_info = &table->key_info[table->s->primary_key];
-        key_restore(buf, idx_key + idx_restore_len, pk_info, pk_len);
-    }
-
-    DBUG_RETURN(0);  /* Skip expensive PK lookup! */
-}
-```
-
-This optimization significantly improves performance for queries like:
-```sql
-SELECT id, name FROM users WHERE name = 'Alice';  -- Uses index on (name)
-```
+The `HA_KEYREAD_ONLY` flag is retained because it still benefits the optimizer's
+cost estimates — it indicates that index-only plans *would* be efficient if the
+key format were compatible, influencing join order and access path selection.
 
 ### Multi-Range Read (DS-MRR)
 
@@ -642,29 +725,35 @@ DS-MRR benefits for TidesDB (LSM-tree):
 - Batching secondary index → PK lookups reduces transaction overhead
 - Key-ordered access is more efficient for LSM merge iterators
 
-### Read-Only Scan Optimization
+### Read-Only Transaction Tracking
 
-For simple SELECT queries in auto-commit mode, TidesDB uses `READ_UNCOMMITTED`
-isolation level to avoid MVCC visibility checks, improving scan performance:
+TidesDB tracks whether a handler's transaction is read-only via the
+`txn_read_only` flag, set in `external_lock()` based on the lock type:
 
 ```cpp
-/* In rnd_init() */
-bool is_read_only = thd &&
-    !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN) &&
-    (lock.type == TL_READ || lock.type == TL_READ_NO_INSERT);
-
-tidesdb_isolation_level_t iso_level =
-    is_read_only ? TDB_ISOLATION_READ_UNCOMMITTED
-                 : (tidesdb_isolation_level_t)tidesdb_default_isolation;
-
-ret = tidesdb_txn_begin_with_isolation(tidesdb_instance, iso_level, &current_txn);
-scan_txn_owned = true;
-is_read_only_scan = is_read_only;
+/* In external_lock() */
+txn_read_only = (lock_type == F_RDLCK);
 ```
 
-This optimization applies when:
-- Query is in auto-commit mode (not inside BEGIN...COMMIT)
-- Lock type is read-only (TL_READ or TL_READ_NO_INSERT)
+Read-only transactions skip unnecessary commit overhead in `tidesdb_commit()`.
+The `rnd_init()` method itself always uses the THD-level transaction set by
+`external_lock()` — it does not create its own transaction:
+
+```cpp
+int ha_tidesdb::rnd_init(bool scan)
+{
+    /* current_txn is always set by external_lock before we get here.
+       If somehow it's not (e.g. internal scan), fall back to THD txn. */
+    if (!current_txn)
+    {
+        THD *thd = ha_thd();
+        current_txn = get_thd_txn(thd, tidesdb_hton);
+    }
+
+    ret = tidesdb_iter_new(current_txn, share->cf, &scan_iter);
+    tidesdb_iter_seek_to_first(scan_iter);
+}
+```
 
 ### Handler Cloning
 
@@ -691,13 +780,21 @@ Handler cloning enables:
 ## 6. Secondary Indexes
 
 Secondary indexes are stored in separate column families:
-- Key · `index_columns + primary_key` (ensures uniqueness)
+- Key · `sort_key(index_columns) + primary_key` (ensures uniqueness and correct ordering)
 - Value · `primary_key` (for fetching actual row)
+
+Index keys use **sort-key format** via `field->make_sort_key_part()`, not `key_copy` format.
+This ensures correct binary comparison ordering for all field types (VARCHAR, DECIMAL, DATE, etc.)
+but means `key_restore()` cannot decode the keys back to field values (see Keyread Limitation above).
+
+Null byte polarity differs from `key_copy`:
+- `key_copy`: `0x00` = NOT NULL, `0x01` = NULL
+- `make_sort_key_part`: `0x00` = NULL (sorts first), `0x01` = NOT NULL
 
 ```c
 /**
   Insert an entry into a secondary index.
-  Stores: index_key -> primary_key (extracted from row buffer)
+  Stores: sort_key(index_columns) + pk -> primary_key
 */
 int ha_tidesdb::insert_index_entry(uint idx, const uchar *buf, tidesdb_txn_t *txn);
 ```
@@ -715,7 +812,23 @@ Search process:
 2. For each word, seek to prefix in FT column family
 3. Collect matching primary keys
 4. Intersect (AND for boolean mode) or union (OR for natural language) results
-5. Fetch rows by primary key
+5. Compute per-document TF-IDF relevance scores
+6. Sort results by relevance descending (most relevant first)
+7. Fetch rows by primary key via `ft_read()`
+
+### TF-IDF Relevance Scoring
+
+Each matched document receives a relevance score computed as:
+
+```
+score(doc) = Σ IDF(word) for each query word present in doc
+IDF(word) = log(1 + N / df)
+```
+
+Where `N` = total documents (from cached stats) and `df` = documents containing the word.
+Results are sorted by score descending so `ORDER BY MATCH(...) AGAINST(...) DESC` returns
+the most relevant documents first without requiring a filesort. Per-document scores are
+returned via `ft_find_relevance()` and `ft_get_relevance()` in the `_ft_vft` interface.
 
 ### Result Set Operations
 
@@ -770,7 +883,7 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 | `tidesdb_dividing_level_offset` | 2 | Compaction dividing level offset |
 | `tidesdb_l1_file_count_trigger` | 4 | L1 file count trigger for compaction |
 | `tidesdb_l0_queue_stall_threshold` | 20 | L0 queue stall threshold for backpressure |
-| `tidesdb_use_btree` | TRUE | Use B+tree format for column families (faster point lookups) |
+| `tidesdb_use_btree` | FALSE | Use B+tree format for column families (faster point lookups) |
 
 ### Compression & Bloom Filters
 
@@ -813,7 +926,7 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `tidesdb_default_isolation` | READ_COMMITTED | Default isolation level |
+| `tidesdb_default_isolation` | REPEATABLE_READ | Default isolation level |
 | `tidesdb_active_txn_buffer_size` | 64KB | Buffer size for SSI conflict detection |
 
 ### TTL & Expiration
@@ -821,16 +934,6 @@ The plugin exposes all TidesDB configuration parameters as MySQL system variable
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `tidesdb_default_ttl` | 0 | Default TTL in seconds (0 = no expiration) |
-
-### Change Buffer
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `tidesdb_enable_change_buffer` | TRUE | Enable change buffer for secondary index updates |
-| `tidesdb_change_buffer_max_size` | 1024 | Maximum pending entries before flush |
-
-The change buffer batches secondary index updates to reduce random I/O. When enabled,
-index modifications are buffered and applied in batches rather than individually.
 
 ### Disk Space
 
@@ -871,7 +974,7 @@ CREATE TABLE hot_data (
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `COMPRESSION` | String | (global) | Compression algorithm: `none`, `snappy`, `lz4`, `zstd`, `lz4_fast` |
-| `USE_BTREE` | Bool | 1 | Use B+tree SSTable format (faster point lookups) |
+| `USE_BTREE` | Bool | 0 | Use B+tree SSTable format (faster point lookups) |
 | `WRITE_BUFFER_SIZE` | Number | 0 (global) | Memtable size in bytes |
 | `SKIP_LIST_MAX_LEVEL` | Number | 0 (global) | Skip list max level for memtable |
 | `SKIP_LIST_PROBABILITY` | Number | 0 (global) | Skip list probability × 10000 (2500 = 0.25) |
@@ -898,7 +1001,7 @@ TTL is used before falling back to the global `tidesdb_default_ttl`.
 
 ### B+tree Format Option
 
-TidesDB supports an optional B+tree format for column families (enabled by default).
+TidesDB supports an optional B+tree format for column families (disabled by default; block-based is the default klog format).
 This provides faster point lookups compared to the standard block-based format:
 
 | Format | Point Lookup | Range Scan | Write |
@@ -908,7 +1011,7 @@ This provides faster point lookups compared to the standard block-based format:
 
 Enable/disable via system variable:
 ```sql
-SET GLOBAL tidesdb_use_btree = ON;  -- Default: ON
+SET GLOBAL tidesdb_use_btree = ON;  -- Default: OFF (block-based)
 ```
 
 ---
@@ -928,30 +1031,44 @@ static void tidesdb_update_optimizer_costs(OPTIMIZER_COSTS *costs)
     /* With bloom filters, point lookups are efficient */
     if (tidesdb_enable_bloom_filter)
     {
-        costs->key_lookup_cost = 0.0008;  /* Slightly higher than B-tree */
-        costs->row_lookup_cost = 0.0010;
+        costs->key_lookup_cost = TIDESDB_KEY_LOOKUP_COST_BTREE;  /* 0.0008 */
+        costs->row_lookup_cost = TIDESDB_ROW_LOOKUP_COST_BTREE;  /* 0.0010 */
     }
     else
     {
-        costs->key_lookup_cost = 0.0020;  /* Higher without bloom filters */
-        costs->row_lookup_cost = 0.0025;
+        costs->key_lookup_cost = TIDESDB_KEY_LOOKUP_COST_BLOCK;  /* 0.0020 */
+        costs->row_lookup_cost = TIDESDB_ROW_LOOKUP_COST_BLOCK;  /* 0.0025 */
     }
-    
+
     /* Merge iterator overhead for sequential access */
-    costs->key_next_find_cost = 0.00012;
-    costs->row_next_find_cost = 0.00015;
-    
-    /* 80% cache hit rate assumed */
-    costs->disk_read_ratio = 0.20;
+    costs->key_next_find_cost = TIDESDB_KEY_NEXT_FIND_COST;  /* 0.00012 */
+    costs->row_next_find_cost = TIDESDB_ROW_NEXT_FIND_COST;  /* 0.00015 */
+
+    /* Key/row copy costs */
+    costs->key_copy_cost = TIDESDB_KEY_COPY_COST;            /* 0.000015 */
+    costs->row_copy_cost = TIDESDB_ROW_COPY_COST;            /* 0.000060 */
+
+    /* Disk read characteristics -- 80% block cache hit rate */
+    costs->disk_read_cost = TIDESDB_DISK_READ_COST;          /* 0.000875 */
+    costs->disk_read_ratio = TIDESDB_DISK_READ_RATIO;        /* 0.20 */
+
+    /* Index block, key comparison, and rowid costs */
+    costs->index_block_copy_cost = TIDESDB_INDEX_BLOCK_COPY_COST; /* 0.000030 */
+    costs->key_cmp_cost = TIDESDB_KEY_CMP_COST;              /* 0.000011 */
+    costs->rowid_cmp_cost = TIDESDB_ROWID_CMP_COST;          /* 0.000006 */
+    costs->rowid_copy_cost = TIDESDB_ROWID_COPY_COST;        /* 0.000012 */
 }
 ```
 
 | Cost Variable | TidesDB Value | Notes |
 |--------------|---------------|-------|
-| `key_lookup_cost` | 0.0008 | With bloom filters |
-| `row_lookup_cost` | 0.0010 | Row fetch after key |
+| `key_lookup_cost` | 0.0008 / 0.0020 | With / without bloom filters |
+| `row_lookup_cost` | 0.0010 / 0.0025 | With / without bloom filters |
 | `key_next_find_cost` | 0.00012 | Merge iterator overhead |
+| `row_next_find_cost` | 0.00015 | Row fetch in merge iterator |
 | `disk_read_ratio` | 0.20 | 80% block cache hit rate |
+| `key_cmp_cost` | 0.000011 | Per-key comparison |
+| `rowid_cmp_cost` | 0.000006 | For MRR / rowid filter |
 
 ### scan_time() · Full Table Scan Cost
 
@@ -961,16 +1078,19 @@ IO_AND_CPU_COST ha_tidesdb::scan_time()
     /* Factors considered:
      * 1. Merge iterator overhead: O(log S) per row where S = number of sources
      * 2. Cache effectiveness: hit_rate reduces I/O cost
-     * 3. Vlog indirection: large values (>512 bytes) require extra seeks
+     * 3. Vlog indirection: large values (>TIDESDB_VLOG_LARGE_VALUE_THRESHOLD) require extra seeks
      * 4. B+tree vs block-based format overhead
      */
-    double merge_overhead = 1.0 + (log2((double)total_sources) * 0.05);
-    double cache_factor = 1.0 - (hit_rate * 0.9);
-    double vlog_overhead = (avg_value_size > 512) ? 1.3 : 1.0;
-    double format_factor = use_btree ? 1.02 : 1.0;
+    double merge_overhead = TIDESDB_MIN_IO_COST +
+        (log2((double)total_sources) * TIDESDB_MERGE_OVERHEAD_FACTOR);
+    double cache_factor = TIDESDB_MIN_IO_COST -
+        (hit_rate * TIDESDB_CACHE_EFFECTIVENESS_FACTOR);
+    double vlog_overhead = (avg_value_size > TIDESDB_VLOG_LARGE_VALUE_THRESHOLD)
+        ? TIDESDB_VLOG_OVERHEAD_LARGE : TIDESDB_MIN_IO_COST;
+    double format_factor = use_btree ? TIDESDB_BTREE_FORMAT_OVERHEAD : TIDESDB_MIN_IO_COST;
 
     cost.io = num_blocks * merge_overhead * cache_factor * vlog_overhead * format_factor;
-    cost.cpu = total_keys * 0.001 * merge_overhead;
+    cost.cpu = total_keys * TIDESDB_CPU_COST_PER_KEY * merge_overhead;
 }
 ```
 
@@ -981,21 +1101,61 @@ IO_AND_CPU_COST ha_tidesdb::read_time(uint index, uint ranges, ha_rows rows)
 {
     /* Factors considered:
      * 1. Read amplification from LSM levels
-     * 2. Bloom filter benefit: 1% FPR eliminates 99% of negative lookups
+     * 2. Bloom filter benefit: FPR eliminates most negative lookups
      * 3. B+tree height for point lookups
      * 4. Secondary index double-lookup overhead (index CF → main CF)
      * 5. Vlog indirection for large values
      */
-    double bloom_benefit = enable_bloom_filter ? 
-                           (0.3 + (fpr * num_levels)) : 1.0;
-    double format_factor = use_btree ? 
-                           (0.2 + (btree_height * 0.15)) : 1.0;
-    double secondary_idx_factor = (index != primary_key) ? 2.0 : 1.0;
+    double bloom_benefit = enable_bloom_filter ?
+        (TIDESDB_BLOOM_BENEFIT_BASE + (fpr * num_levels)) : TIDESDB_MIN_IO_COST;
+    double format_factor = use_btree ?
+        (TIDESDB_BTREE_HEIGHT_COST_BASE + (btree_height * TIDESDB_BTREE_HEIGHT_COST_PER_LEVEL))
+        : TIDESDB_MIN_IO_COST;
+    double secondary_idx_factor =
+        (index != primary_key) ? TIDESDB_SECONDARY_IDX_FACTOR : TIDESDB_MIN_IO_COST;
 
     cost.io = (ranges * seek_cost * cache_factor * secondary_idx_factor) +
               (rows * row_fetch_cost * vlog_factor * secondary_idx_factor);
 }
 ```
+
+### records_in_range() · Range Row Estimate
+
+The optimizer calls `records_in_range()` to estimate how many rows fall within
+a key range. TidesDB uses a multi-strategy approach:
+
+1. **PK equality** — returns 1 (clustered index, unique)
+2. **Unique secondary index equality** — returns 1
+3. **Non-unique equality** — heuristic `1/sqrt(N)` selectivity per key part
+4. **PK range scans** — **data sampling**: creates a temporary iterator, scans
+   up to `TIDESDB_RANGE_SAMPLE_LIMIT` keys in the range, and returns the exact
+   count if the range is fully scanned; otherwise extrapolates
+5. **Fallback** — heuristic estimate capped at a fraction of total rows
+
+```cpp
+/* For PK range scans, sample actual keys */
+if (inx == primary_key && min_key && current_txn && share->cf)
+{
+    tidesdb_iter_t *sample_iter = NULL;
+    tidesdb_iter_new(current_txn, share->cf, &sample_iter);
+    tidesdb_iter_seek(sample_iter, min_key->key, min_key->length);
+
+    ha_rows sample_count = 0;
+    while (tidesdb_iter_valid(sample_iter) &&
+           sample_count < TIDESDB_RANGE_SAMPLE_LIMIT)
+    {
+        /* Stop if we've passed the max key */
+        if (max_key && memcmp(iter_key, max_key->key, ...) > 0)
+            break;
+        sample_count++;
+        tidesdb_iter_next(sample_iter);
+    }
+    tidesdb_iter_free(sample_iter);
+}
+```
+
+This data-sampling approach gives much better estimates than pure heuristics,
+especially for skewed data distributions common in time-series workloads.
 
 ---
 
@@ -1057,6 +1217,20 @@ Supported partition types:
 - LIST / LIST COLUMNS
 - HASH
 - KEY
+
+### Partition Operations
+
+| Operation | How It Works |
+|-----------|-------------|
+| `DROP PARTITION` | Drops the partition's column family and all its index CFs |
+| `TRUNCATE PARTITION` | Calls `truncate()` on the partition handler, which drops and recreates the partition's column family via `drop_cf_and_cleanup()` |
+| `REORGANIZE PARTITION` | Rebuilds affected partitions by copying rows into new column families |
+| `ADD PARTITION` | Creates a new column family for the new partition |
+
+Each partition is an independent TidesDB column family with its own memtable,
+SSTables, and compaction state. Partition pruning allows the optimizer to skip
+irrelevant partitions entirely, reading only the column families that match
+the query's WHERE clause.
 
 ---
 
@@ -1219,7 +1393,7 @@ range queries on geometry data.
   @param y  Normalized Y coordinate (0.0 to 1.0)
   @return   64-bit Z-order encoded value
 */
-uint64_t ha_tidesdb::encode_zorder(double x, double y)
+static uint64_t encode_zorder(double x, double y)
 {
     /* Normalize to 32-bit integer range */
     uint32_t ix = (uint32_t)(x * (double)TIDESDB_ZORDER_MAX_VALUE);
@@ -1402,8 +1576,8 @@ TidesDB supports online ALTER TABLE with three tiers of support:
 | ADD INDEX | INPLACE | NONE |
 | DROP INDEX | INPLACE | NONE |
 | ADD UNIQUE INDEX | INPLACE | NONE |
-| ADD/DROP PRIMARY KEY | INPLACE | NONE |
-| ADD/DROP FOREIGN KEY | INPLACE | NONE |
+| ADD/DROP PRIMARY KEY | INPLACE | SHARED |
+| ADD/DROP FOREIGN KEY | INPLACE | SHARED |
 
 ### Copy Operations (Table Rebuild)
 
@@ -1457,21 +1631,30 @@ with in-progress flush/compaction operations:
 ```c
 int ha_tidesdb::delete_table(const char *name)
 {
-  /* Drop secondary index column families first */
-  for (uint i = 0; i < 16; i++)
+  /* Drop secondary index column families (up to TIDESDB_MAX_INDEXES = 64).
+     We don't have access to table->s->keys here since the table may not be open,
+     so we try the full range. tidesdb_drop_column_family returns
+     TDB_ERR_NOT_FOUND for non-existent CFs which is fine. */
+  for (uint i = 0; i < TIDESDB_MAX_INDEXES; i++)
   {
-    char idx_cf_name[512];
-    snprintf(idx_cf_name, sizeof(idx_cf_name), "%s_idx_%u", cf_name, i);
+    char idx_cf_name[TIDESDB_IDX_CF_NAME_BUF_SIZE];
+    snprintf(idx_cf_name, sizeof(idx_cf_name), TIDESDB_CF_IDX_FMT, cf_name, i);
     tidesdb_drop_column_family(tidesdb_instance, idx_cf_name);
   }
 
-  /* Rename main CF first (waits for flush/compaction), then drop */
-  char tmp_cf_name[512];
-  snprintf(tmp_cf_name, sizeof(tmp_cf_name), "%s__dropping_%lu", cf_name, time(NULL));
-  
+  /* Rename main CF first (waits for flush/compaction), then drop.
+     This works around a race condition in tidesdb_drop_column_family. */
+  char tmp_cf_name[TIDESDB_IDX_CF_NAME_BUF_SIZE];
+  snprintf(tmp_cf_name, sizeof(tmp_cf_name), "%s" TIDESDB_CF_DROPPING_SUFFIX,
+           cf_name, (unsigned long)time(NULL));
+
   int ret = tidesdb_rename_column_family(tidesdb_instance, cf_name, tmp_cf_name);
   if (ret == TDB_SUCCESS)
     ret = tidesdb_drop_column_family(tidesdb_instance, tmp_cf_name);
+  else if (ret == TDB_ERR_NOT_FOUND)
+    ret = TDB_SUCCESS;  /* CF doesn't exist -- that's fine */
+  else
+    ret = tidesdb_drop_column_family(tidesdb_instance, cf_name);  /* Fallback: direct drop */
   ...
 }
 ```
@@ -1486,31 +1669,95 @@ file system timing issues:
 ```c
 int ha_tidesdb::rename_table(const char *from, const char *to)
 {
-  /* Rename main column family */
+  /* Rename main column family (no retry -- fail fast) */
   ret = tidesdb_rename_column_family(tidesdb_instance, old_cf_name, new_cf_name);
+  if (ret != TDB_SUCCESS)
+    DBUG_RETURN(HA_ERR_GENERIC);
 
-  /* Retry with delay for file system timing issues */
-  if (ret != TDB_SUCCESS && ret != TDB_ERR_NOT_FOUND)
-  {
-    for (int retry = 0; retry < TIDESDB_RENAME_RETRY_COUNT && ret != TDB_SUCCESS; retry++)
-    {
-      my_sleep(TIDESDB_RENAME_RETRY_SLEEP_US);
-      ret = tidesdb_rename_column_family(tidesdb_instance, old_cf_name, new_cf_name);
-    }
-  }
-
-  /* Rename secondary index CFs */
+  /* Rename secondary index CFs with retry logic for file system timing issues */
   for (uint i = 0; i < TIDESDB_MAX_INDEXES; i++)
   {
-    snprintf(old_idx_cf, sizeof(old_idx_cf), "%s_idx_%u", old_cf_name, i);
-    snprintf(new_idx_cf, sizeof(new_idx_cf), "%s_idx_%u", new_cf_name, i);
-    tidesdb_rename_column_family(tidesdb_instance, old_idx_cf, new_idx_cf);
+    snprintf(old_idx_cf, sizeof(old_idx_cf), TIDESDB_CF_IDX_FMT, old_cf_name, i);
+    snprintf(new_idx_cf, sizeof(new_idx_cf), TIDESDB_CF_IDX_FMT, new_cf_name, i);
+
+    /* Only rename CFs that actually exist */
+    tidesdb_column_family_t *old_cf = tidesdb_get_column_family(tidesdb_instance, old_idx_cf);
+    if (old_cf)
+    {
+      int rename_ret = tidesdb_rename_column_family(tidesdb_instance, old_idx_cf, new_idx_cf);
+      if (rename_ret != TDB_SUCCESS && rename_ret != TDB_ERR_NOT_FOUND)
+      {
+        /* Retry with delay for file system timing issues */
+        for (int retry = 0; retry < TIDESDB_RENAME_RETRY_COUNT && rename_ret != TDB_SUCCESS;
+             retry++)
+        {
+          my_sleep(TIDESDB_RENAME_RETRY_SLEEP_US);
+          rename_ret = tidesdb_rename_column_family(tidesdb_instance, old_idx_cf, new_idx_cf);
+        }
+      }
+    }
   }
 
   /* Also rename fulltext and spatial index CFs */
   ...
 }
 ```
+
+#### truncate / delete_all_rows Implementation
+
+The `truncate()` method delegates to `delete_all_rows()`, which drops and recreates
+the column family for an instant reset. This is far faster than iterating and deleting
+individual keys, and avoids LSM-tree tombstone accumulation.
+
+A helper function `drop_cf_and_cleanup()` handles the drop and ensures any residual
+on-disk directory is removed before the fresh column family is created:
+
+```c
+static int drop_cf_and_cleanup(const char *cf_name)
+{
+  int ret = tidesdb_drop_column_family(tidesdb_instance, cf_name);
+  if (ret != TDB_SUCCESS && ret != TDB_ERR_NOT_FOUND)
+    return ret;
+
+  /* If the on-disk directory still exists after drop, remove it so
+     tidesdb_create_column_family starts with a clean slate. */
+  char cf_dir[FN_REFLEN];
+  snprintf(cf_dir, sizeof(cf_dir), "%s/tidesdb/%s", mysql_real_data_home, cf_name);
+
+  MY_DIR *dir = my_dir(cf_dir, MYF(0));
+  if (dir)
+  {
+    for (uint i = 0; i < dir->number_of_files; i++)
+      my_delete(filepath, MYF(0));
+    my_dirend(dir);
+    rmdir(cf_dir);
+  }
+  return 0;
+}
+
+int ha_tidesdb::delete_all_rows()
+{
+  /* Drop and recreate main column family */
+  drop_cf_and_cleanup(cf_name);
+  tidesdb_create_column_family(tidesdb_instance, cf_name, &cf_config);
+  share->cf = tidesdb_get_column_family(tidesdb_instance, cf_name);
+
+  /* Drop and recreate secondary index CFs */
+  for (uint i = 0; i < table->s->keys; i++) { ... }
+
+  /* Drop and recreate fulltext index CFs */
+  for (uint i = 0; i < share->num_ft_indexes; i++) { ... }
+
+  stats.records = 0;
+  share->row_count = 0;
+  share->row_count_valid = true;
+}
+```
+
+This approach is used for both `TRUNCATE TABLE` and `ALTER TABLE ... TRUNCATE PARTITION`.
+For partitioned tables, MariaDB's `ha_partition::truncate_partition()` calls `ha_truncate()`
+on each affected partition handler, which calls `truncate()` → `delete_all_rows()` on the
+partition's column family.
 
 ### Row Operations
 
@@ -1550,12 +1797,19 @@ void ha_tidesdb::start_bulk_insert(ha_rows rows, uint flags)
     bulk_insert_rows = rows;
     bulk_insert_count = 0;
     skip_dup_check = true;
-    
+
     /* Use THD transaction if in multi-statement, else create own */
+    THD *thd = ha_thd();
     tidesdb_txn_t *thd_txn = get_thd_txn(thd, tidesdb_hton);
     if (thd_txn)
+    {
         bulk_txn = thd_txn;
-    else
+        bulk_insert_active = true;
+        return;
+    }
+
+    bulk_insert_active = true;
+    if (!bulk_txn)
         tidesdb_txn_begin(tidesdb_instance, &bulk_txn);
 }
 
@@ -1579,39 +1833,46 @@ SHOW VARIABLES LIKE 'tidesdb%';
 ```
 
 ```
-+----------------------------------+----------------+
-| Variable_name                    | Value          |
-+----------------------------------+----------------+
-| tidesdb_active_txn_buffer_size   | 65536          |
-| tidesdb_block_cache_size         | 268435456      |
-| tidesdb_block_index_prefix_len   | 16             |
-| tidesdb_bloom_fpr                | 0.010000       |
-| tidesdb_change_buffer_max_size   | 1024           |
-| tidesdb_compaction_threads       | 2              |
-| tidesdb_compression_algo         | lz4            |
-| tidesdb_default_isolation        | read_committed |
-| tidesdb_default_ttl              | 0              |
-| tidesdb_enable_bloom_filter      | ON             |
-| tidesdb_enable_change_buffer     | ON             |
-| tidesdb_enable_compression       | ON             |
-| tidesdb_enable_encryption        | OFF            |
-| tidesdb_encryption_key_id        | 1              |
-| tidesdb_flush_threads            | 2              |
-| tidesdb_ft_max_word_len          | 84             |
-| tidesdb_ft_min_word_len          | 4              |
-| tidesdb_ft_max_query_words       | 32             |
-| tidesdb_klog_value_threshold     | 512            |
-| tidesdb_level_size_ratio         | 10             |
-| tidesdb_log_level                | info           |
-| tidesdb_max_open_sstables        | 256            |
-| tidesdb_min_disk_space           | 104857600      |
-| tidesdb_min_levels               | 5              |
-| tidesdb_skip_list_max_level      | 12             |
-| tidesdb_skip_list_probability    | 0.250000       |
-| tidesdb_sync_interval_us         | 128000         |
-| tidesdb_sync_mode                | full           |
-| tidesdb_write_buffer_size        | 67108864       |
-+----------------------------------+----------------+
++--------------------------------------+----------------------------+
+| Variable_name                        | Value                      |
++--------------------------------------+----------------------------+
+| tidesdb_active_txn_buffer_size       | 65536                      |
+| tidesdb_block_cache_size             | 268435456                  |
+| tidesdb_block_index_prefix_len       | 16                         |
+| tidesdb_bloom_fpr                    | 0.010000                   |
+| tidesdb_compaction_threads           | 2                          |
+| tidesdb_compression_algo             | lz4                        |
+| tidesdb_data_dir                     | /var/lib/mysql/tidesdb     |
+| tidesdb_default_isolation            | repeatable_read            |
+| tidesdb_default_ttl                  | 0                          |
+| tidesdb_dividing_level_offset        | 2                          |
+| tidesdb_enable_block_indexes         | ON                         |
+| tidesdb_enable_bloom_filter          | ON                         |
+| tidesdb_enable_compression           | ON                         |
+| tidesdb_enable_encryption            | OFF                        |
+| tidesdb_encryption_key_id            | 1                          |
+| tidesdb_flush_threads                | 2                          |
+| tidesdb_ft_max_query_words           | 32                         |
+| tidesdb_ft_max_word_len              | 84                         |
+| tidesdb_ft_min_word_len              | 4                          |
+| tidesdb_index_sample_ratio           | 1                          |
+| tidesdb_klog_value_threshold         | 512                        |
+| tidesdb_l0_queue_stall_threshold     | 20                         |
+| tidesdb_l1_file_count_trigger        | 4                          |
+| tidesdb_level_size_ratio             | 10                         |
+| tidesdb_log_level                    | info                       |
+| tidesdb_log_to_file                  | OFF                        |
+| tidesdb_log_truncation_at            | 25165824                   |
+| tidesdb_max_open_sstables            | 256                        |
+| tidesdb_min_disk_space               | 104857600                  |
+| tidesdb_min_levels                   | 5                          |
+| tidesdb_skip_list_max_level          | 12                         |
+| tidesdb_skip_list_probability        | 0.250000                   |
+| tidesdb_sync_interval_us             | 128000                     |
+| tidesdb_sync_mode                    | full                       |
+| tidesdb_use_btree                    | OFF                        |
+| tidesdb_write_buffer_size            | 67108864                   |
++--------------------------------------+----------------------------+
 ```
 
 ### Key Variables
@@ -1620,12 +1881,12 @@ SHOW VARIABLES LIKE 'tidesdb%';
 |----------|---------|-------------|
 | `tidesdb_block_cache_size` | 256MB | Clock cache for hot SSTable blocks |
 | `tidesdb_write_buffer_size` | 64MB | Memtable size before flush |
-| `tidesdb_compression_algo` | lz4 | Compression - none/snappy/lz4/zstd |
+| `tidesdb_compression_algo` | lz4 | Compression - none/snappy/lz4/zstd/lz4_fast |
 | `tidesdb_sync_mode` | full | Durability - none/interval/full |
-| `tidesdb_default_isolation` | read_committed | Transaction isolation level |
+| `tidesdb_default_isolation` | repeatable_read | Transaction isolation level |
 | `tidesdb_enable_bloom_filter` | ON | Bloom filters for point lookups |
 | `tidesdb_enable_encryption` | OFF | Data-at-rest encryption |
-| `tidesdb_use_btree` | ON | B+tree format for faster point lookups |
+| `tidesdb_use_btree` | OFF | B+tree format for faster point lookups |
 
 ---
 
@@ -1649,6 +1910,9 @@ Status:
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 BLOCK CACHE
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+| Status                   | ENABLED              |
+| State                    | ACTIVE               |
+| Entries                  | 0                    |
 | Size                     | 0.00              MB |
 | Hits                     | 0                    |
 | Misses                   | 0                    |
@@ -1688,7 +1952,7 @@ DURABILITY
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 TRANSACTIONS
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-| Default Isolation        | read_committed       |
+| Default Isolation        | repeatable_read      |
 | XA Support               | YES                  |
 | Savepoints               | YES                  |
 
@@ -1744,28 +2008,48 @@ ulonglong pk_val = my_atomic_add64_explicit(
 | Hidden PK counter | Atomic | Lock-free increment |
 | Auto-increment | Atomic + Batch Persist | Lock-free with periodic persistence |
 | Table share hash | RW Lock | Fast read path, write lock only for new shares |
-| Change buffer counter | Atomic | Lock-free increment |
+| Row count | Atomic | Lock-free increment/decrement for live `share->row_count` |
 
 #### Auto-Increment Scalability
 
-Auto-increment uses lock-free atomic operations with batch persistence every 1000 values
-to avoid per-insert disk writes:
+Auto-increment uses lock-free atomic operations with batch persistence every
+`TIDESDB_AUTO_INC_PERSIST_INTERVAL` (1000) values to avoid per-insert disk writes.
+The value is lazy-loaded on first use with a double-check pattern:
 
 ```cpp
-/* Lock-free atomic reservation */
-ulonglong reserve_amount = nb_desired_values * increment;
-ulonglong old_val = my_atomic_add64_explicit(
-    (volatile int64 *)&share->auto_increment_value,
-    reserve_amount, MY_MEMORY_ORDER_RELAXED);
-
-*first_value = old_val;
-*nb_reserved_values = nb_desired_values;
-
-/* Batch persist every 1000 values to reduce I/O */
-ulonglong new_val = old_val + reserve_amount;
-if ((new_val / 1000) > (old_val / 1000))
+void ha_tidesdb::get_auto_increment(ulonglong offset, ulonglong increment,
+                                    ulonglong nb_desired_values, ulonglong *first_value,
+                                    ulonglong *nb_reserved_values)
 {
-    persist_auto_increment_value(new_val);
+    /* Lazy-load from storage on first access (double-check pattern) */
+    if (!my_atomic_load32_explicit(&share->auto_inc_loaded, MY_MEMORY_ORDER_ACQUIRE))
+    {
+        pthread_mutex_lock(&share->auto_inc_mutex);
+        if (!share->auto_inc_loaded)
+        {
+            load_auto_increment_value();
+            if (share->auto_increment_value == 0) share->auto_increment_value = 1;
+            my_atomic_store32_explicit(&share->auto_inc_loaded, 1, MY_MEMORY_ORDER_RELEASE);
+        }
+        pthread_mutex_unlock(&share->auto_inc_mutex);
+    }
+
+    /* Lock-free atomic reservation */
+    ulonglong reserve_amount = nb_desired_values * increment;
+    ulonglong old_val = my_atomic_add64_explicit(
+        (volatile int64 *)&share->auto_increment_value,
+        reserve_amount, MY_MEMORY_ORDER_RELAXED);
+
+    *first_value = old_val;
+    *nb_reserved_values = nb_desired_values;
+
+    /* Batch persist every TIDESDB_AUTO_INC_PERSIST_INTERVAL values */
+    ulonglong new_val = old_val + reserve_amount;
+    if ((new_val / TIDESDB_AUTO_INC_PERSIST_INTERVAL) >
+        (old_val / TIDESDB_AUTO_INC_PERSIST_INTERVAL))
+    {
+        persist_auto_increment_value(new_val);
+    }
 }
 ```
 
@@ -1821,28 +2105,31 @@ transactions modify the same rows, conflicts are detected at commit time.
 static int tidesdb_commit(THD *thd, bool all)
 {
   tidesdb_txn_t *txn = get_thd_txn(thd, tidesdb_hton);
+  if (!txn)
+    return 0;
 
-  if (txn && all)
+  /* Commit when all=true (explicit COMMIT) or when not inside any form
+     of transaction (autocommit=1 single statement). For autocommit=0 or
+     explicit BEGIN, all=false is a statement-end no-op. */
+  bool do_commit = all || !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN);
+
+  if (do_commit)
   {
     int ret = tidesdb_txn_commit(txn);
     tidesdb_txn_free(txn);
     set_thd_txn(thd, tidesdb_hton, NULL);
 
-    if (ret == TDB_ERR_CONFLICT)
-    {
-      /* Transaction conflict -- tell MySQL to retry */
-      return HA_ERR_LOCK_DEADLOCK;
-    }
-    ...
+    if (ret != TDB_SUCCESS)
+      return map_tidesdb_error(ret);  /* TDB_ERR_CONFLICT -> HA_ERR_LOCK_DEADLOCK */
   }
   return 0;
 }
 ```
 
-When a conflict occurs, TidesDB returns `HA_ERR_LOCK_DEADLOCK` which tells
-MariaDB to retry the transaction. This is the standard mechanism for handling
-optimistic concurrency conflicts.
+When a conflict occurs, `map_tidesdb_error()` translates `TDB_ERR_CONFLICT` to
+`HA_ERR_LOCK_DEADLOCK`, which tells MariaDB to retry the transaction. This is
+the standard mechanism for handling optimistic concurrency conflicts.
 
 
 --- 
-You can find the source for the TideSQL project [here](https://github.com/tidesdb/tidesql).
+You can find the source for the TidesDB project [here](https://github.com/tidesdb/tidesdb).
