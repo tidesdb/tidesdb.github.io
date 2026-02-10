@@ -909,6 +909,65 @@ tidesdb_txn_free(txn);
 /* No changes were applied */
 ```
 
+### Transaction Reset
+
+`tidesdb_txn_reset` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```c
+int tidesdb_txn_reset(tidesdb_txn_t *txn, tidesdb_isolation_level_t isolation);
+```
+
+**Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `txn` | `tidesdb_txn_t*` | Transaction handle (must be committed or aborted) |
+| `isolation` | `tidesdb_isolation_level_t` | New isolation level for the reset transaction |
+
+**Returns**
+- `TDB_SUCCESS` on success
+- `TDB_ERR_INVALID_ARGS` if txn is NULL, still active (not committed/aborted), or isolation level is invalid
+
+**Example**
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+/* First batch of work */
+tidesdb_txn_put(txn, cf, (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
+tidesdb_txn_commit(txn);
+
+/* Reset instead of free + begin */
+tidesdb_txn_reset(txn, TDB_ISOLATION_READ_COMMITTED);
+
+/* Second batch of work using the same transaction */
+tidesdb_txn_put(txn, cf, (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
+tidesdb_txn_commit(txn);
+
+/* Free once when done */
+tidesdb_txn_free(txn);
+```
+
+**Behavior**
+- The transaction must be committed or aborted before reset; resetting an active transaction returns `TDB_ERR_INVALID_ARGS`
+- Internal buffers (ops array, read set arrays, arena pointer array, column family array, savepoints array) are retained to avoid reallocation
+- Per-operation key/value data, arena buffers, hash tables, and savepoint children are freed
+- A fresh `txn_id` and `snapshot_seq` are assigned based on the new isolation level
+- The isolation level can be changed on each reset (e.g., `READ_COMMITTED` → `REPEATABLE_READ`)
+- If switching to an isolation level that requires read tracking (`REPEATABLE_READ` or higher), read set arrays are allocated automatically
+- SERIALIZABLE transactions are correctly unregistered from and re-registered to the active transaction list
+
+**When to use**
+- **Batch processing** · Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** · Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** · Reduce malloc/free overhead in tight write loops
+
+:::tip[Reset vs Free + Begin]
+For a single transaction, `tidesdb_txn_reset` is functionally equivalent to calling `tidesdb_txn_free` followed by `tidesdb_txn_begin_with_isolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+:::
+
 ### Savepoints
 
 Savepoints allow partial rollback within a transaction. You can create named savepoints and rollback to them without aborting the entire transaction.
