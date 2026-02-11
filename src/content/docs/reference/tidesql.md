@@ -13,7 +13,7 @@ TideSQL is a pluggable storage engine for <a href="https://mariadb.org/">MariaDB
 
 The engine supports ACID transactions through multi-version concurrency control (MVCC), letting readers proceed without blocking writers. It handles primary keys, secondary indexes, auto-increment columns, virtual and stored generated columns, TTL-based expiration, data-at-rest encryption, online DDL, partitioning, and online backups. All of these features are accessible through standard SQL, so switching from InnoDB to TidesDB for a particular table requires nothing more than changing the `ENGINE` clause.
 
-The TidesDB data files live in a sibling directory next to the MariaDB data directory, named `tidesdb_data`. The engine manages its own file layout entirely, and MariaDB's schema discovery mechanism does not interfere with it. Each table maps to a "column family" inside TidesDB, which is essentially an independent LSM-tree with its own memtable, options, SSTable files, and flush-compaction schedules.
+The TidesDB data files live in a sibling directory next to the MariaDB data directory, named `tidesdb_data`. The engine manages its own file layout entirely, and MariaDB's schema discovery mechanism does not interfere with it. 
 
 
 ## Getting Started
@@ -39,7 +39,7 @@ CREATE TABLE events (
   ts    DATETIME NOT NULL,
   kind  VARCHAR(50),
   data  TEXT
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 ```
 
 This creates a column family inside TidesDB for the table's data. If you later drop the table, the column family and all of its SSTables are removed as well.
@@ -49,7 +49,7 @@ This creates a column family inside TidesDB for the table's data. If you later d
 
 Every TidesDB table corresponds to one main column family that holds the row data. Each secondary index gets its own separate column family. The naming convention is rather deterministic, a table `test.events` maps to the column family `test__events`, and a secondary index named `idx_ts` on that table maps to `test__events__idx_idx_ts`.
 
-This separation is meaningful. Because each column family has its own LSM-tree, a secondary index has its own memtable, its own set of SSTables, and its own compaction schedule. This avoids the problem that some LSM-based engines face where index maintenance causes write amplification in the main data tree.
+This separation is meaningful. Because each column family has its own LSM-tree, a secondary index has its own memtable, its own set of SSTables files, and its own compaction and flush schedules. 
 
 When a table is renamed with `RENAME TABLE` or `ALTER TABLE ... RENAME`, the engine renames all associated column families, both the main data CF and every secondary index CF.
 
@@ -67,13 +67,13 @@ Inside the column family, every row's key is prefixed with a single namespace by
 CREATE TABLE users (
   id   INT NOT NULL PRIMARY KEY,
   name VARCHAR(100)
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 -- Without PK (hidden auto-generated row ID)
 CREATE TABLE logs (
   ts      DATETIME,
   message TEXT
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 ```
 
 
@@ -89,7 +89,7 @@ CREATE TABLE products (
   category INT,
   name     VARCHAR(100),
   KEY idx_category (category)
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 INSERT INTO products VALUES (1, 10, 'Widget'), (2, 20, 'Gadget'), (3, 10, 'Sprocket');
 
@@ -102,13 +102,13 @@ The optimizer is aware of these indexes. The engine reports cost estimates based
 
 ## Auto-Increment
 
-Auto-increment works the same way it does with InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`, and the default `get_auto_increment()` handler method uses `index_last` on the primary key to discover the current maximum value. There is no separate metadata key for the auto-increment counter; it is derived from the data at runtime.
+Auto-increment works in a similar way to InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`, and the default `get_auto_increment()` handler method uses `index_last` on the primary key to discover the current maximum value. There is no separate metadata key for the auto-increment counter; it is derived from the data at runtime.
 
 ```sql
 CREATE TABLE tickets (
   id   INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   desc VARCHAR(200)
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 INSERT INTO tickets (desc) VALUES ('First ticket');
 INSERT INTO tickets (desc) VALUES ('Second ticket');
@@ -132,7 +132,7 @@ The per-table isolation level is configurable at table creation time and default
 CREATE TABLE ledger (
   id  INT PRIMARY KEY,
   amt DECIMAL(10,2)
-) ENGINE=TidesDB ISOLATION_LEVEL='SERIALIZABLE';
+) ENGINE=TIDESDB ISOLATION_LEVEL='SERIALIZABLE';
 ```
 
 The available isolation levels are `READ_UNCOMMITTED`, `READ_COMMITTED`, `REPEATABLE_READ`, `SNAPSHOT`, and `SERIALIZABLE`.
@@ -150,7 +150,7 @@ The engine supports several compression algorithms for SSTables. The default is 
 CREATE TABLE archive (
   id   INT PRIMARY KEY,
   data TEXT
-) ENGINE=TidesDB COMPRESSION='ZSTD';
+) ENGINE=TIDESDB COMPRESSION='ZSTD';
 ```
 
 Available choices are `NONE`, `SNAPPY`, `LZ4`, `ZSTD`, and `LZ4_FAST`. Different tables can use different compression algorithms. ZSTD tends to give the best compression ratio, while LZ4 and LZ4_FAST favor speed.
@@ -163,7 +163,7 @@ The write buffer is the in-memory skip list that absorbs writes before they are 
 CREATE TABLE high_write (
   id  INT PRIMARY KEY,
   val VARCHAR(200)
-) ENGINE=TidesDB WRITE_BUFFER_SIZE=16777216;  -- 16 MB
+) ENGINE=TIDESDB WRITE_BUFFER_SIZE=16777216;  -- 16 MB
 ```
 
 The default is 128 MB.
@@ -174,10 +174,10 @@ By default, TidesDB creates bloom filters for each SSTable, which allow point lo
 
 ```sql
 -- Disable bloom filters entirely
-CREATE TABLE no_bloom (id INT PRIMARY KEY, v INT) ENGINE=TidesDB BLOOM_FILTER=0;
+CREATE TABLE no_bloom (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB BLOOM_FILTER=0;
 
 -- Very low FPR (10 basis points = 0.01%)
-CREATE TABLE precise (id INT PRIMARY KEY, v INT) ENGINE=TidesDB BLOOM_FPR=10;
+CREATE TABLE precise (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB BLOOM_FPR=10;
 ```
 
 The `BLOOM_FPR` value is specified in parts per 10,000. The default of 100 gives a 1% false positive rate.
@@ -188,14 +188,14 @@ Controls how aggressively the engine flushes writes to durable storage:
 
 ```sql
 -- No fsync (fastest, data at risk on crash)
-CREATE TABLE fast_writes (id INT PRIMARY KEY, v INT) ENGINE=TidesDB SYNC_MODE='NONE';
+CREATE TABLE fast_writes (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB SYNC_MODE='NONE';
 
 -- Periodic fsync every 500ms
 CREATE TABLE balanced (id INT PRIMARY KEY, v INT)
-  ENGINE=TidesDB SYNC_MODE='INTERVAL' SYNC_INTERVAL_US=500000;
+  ENGINE=TIDESDB SYNC_MODE='INTERVAL' SYNC_INTERVAL_US=500000;
 
 -- fsync every write (safest, slowest)
-CREATE TABLE durable (id INT PRIMARY KEY, v INT) ENGINE=TidesDB SYNC_MODE='FULL';
+CREATE TABLE durable (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB SYNC_MODE='FULL';
 ```
 
 The default is `FULL`. For benchmarking or non-critical data, `NONE` can dramatically improve throughput.
@@ -205,7 +205,7 @@ The default is `FULL`. For benchmarking or non-critical data, `NONE` can dramati
 TidesDB can optionally use a B+tree layout for the key log within SSTables instead of the default block-based format. The SSTable still consists of a key log and a value log; only the key log's internal organization changes. This is a per-table choice:
 
 ```sql
-CREATE TABLE btree_table (id INT PRIMARY KEY, v INT) ENGINE=TidesDB USE_BTREE=1;
+CREATE TABLE btree_table (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB USE_BTREE=1;
 ```
 
 When `ANALYZE TABLE` is run on a B+tree-formatted table, the output includes additional statistics about the tree structure (node counts, heights).
@@ -218,7 +218,7 @@ Several options let you tune the shape and behavior of the LSM-tree:
 CREATE TABLE tuned (
   id INT PRIMARY KEY,
   v  VARCHAR(200)
-) ENGINE=TidesDB
+) ENGINE=TIDESDB
   LEVEL_SIZE_RATIO=8
   MIN_LEVELS=3
   SKIP_LIST_MAX_LEVEL=16
@@ -236,7 +236,7 @@ Options can be freely combined:
 CREATE TABLE optimized (
   id  INT PRIMARY KEY,
   val VARCHAR(100)
-) ENGINE=TidesDB
+) ENGINE=TIDESDB
   COMPRESSION='ZSTD'
   WRITE_BUFFER_SIZE=8388608
   BLOOM_FILTER=1
@@ -258,7 +258,7 @@ Every row inserted into the table expires after the specified number of seconds:
 CREATE TABLE sessions (
   id    INT PRIMARY KEY,
   token VARCHAR(100)
-) ENGINE=TidesDB TTL=3600;  -- 1 hour
+) ENGINE=TIDESDB TTL=3600;  -- 1 hour
 
 INSERT INTO sessions VALUES (1, 'abc123');
 -- After 3600 seconds, this row will no longer be returned by queries
@@ -273,7 +273,7 @@ CREATE TABLE cache (
   id      INT PRIMARY KEY,
   val     VARCHAR(100),
   ttl_sec INT `TTL`=1
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 INSERT INTO cache VALUES (1, 'short-lived', 5);       -- expires in 5 seconds
 INSERT INTO cache VALUES (2, 'long-lived', 86400);    -- expires in 1 day
@@ -293,7 +293,7 @@ TidesDB can encrypt row data before writing it to the column family. Encryption 
 CREATE TABLE secrets (
   id  INT NOT NULL PRIMARY KEY,
   val VARCHAR(100)
-) ENGINE=TidesDB `ENCRYPTED`=YES;
+) ENGINE=TIDESDB `ENCRYPTED`=YES;
 ```
 
 Each row is encrypted individually. The format is a 16-byte random IV followed by the ciphertext. On read, the engine decrypts transparently. You can specify which encryption key ID to use:
@@ -302,7 +302,7 @@ Each row is encrypted individually. The format is a 16-byte random IV followed b
 CREATE TABLE classified (
   id   INT NOT NULL PRIMARY KEY,
   data TEXT
-) ENGINE=TidesDB `ENCRYPTED`=YES `ENCRYPTION_KEY_ID`=2;
+) ENGINE=TIDESDB `ENCRYPTED`=YES `ENCRYPTION_KEY_ID`=2;
 ```
 
 Encryption works with all other features, including secondary indexes, BLOB columns, and TTL. The secondary index keys themselves are not encrypted (they need to remain comparable for seeking), but the row data pointed to by those keys is encrypted in the data column family.
@@ -321,7 +321,7 @@ CREATE TABLE orders (
   category VARCHAR(10) AS (
     CASE WHEN price >= 100 THEN 'premium' ELSE 'standard' END
   ) VIRTUAL
-) ENGINE=TidesDB;
+) ENGINE=TIDESDB;
 
 INSERT INTO orders (id, price, qty) VALUES (1, 49.99, 3);
 SELECT * FROM orders;
@@ -411,7 +411,7 @@ CREATE TABLE metrics (
   ts      DATE NOT NULL,
   value   DOUBLE,
   PRIMARY KEY (id, ts)
-) ENGINE=TidesDB
+) ENGINE=TIDESDB
 PARTITION BY RANGE COLUMNS(ts) (
   PARTITION p_2024   VALUES LESS THAN ('2025-01-01'),
   PARTITION p_2025   VALUES LESS THAN ('2026-01-01'),
@@ -443,7 +443,7 @@ The engine exposes several global system variables that control TidesDB's runtim
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup |
 | `tidesdb_debug_trace` | OFF | Enables per-operation trace logging to the error log |
 
-The block cache is a read cache that holds decompressed SSTable blocks in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of available CPU cores and the I/O bandwidth of the storage device.
+The block clock cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of available CPU cores and the I/O bandwidth of the storage device.
 
 
 ## How It Stores Data Internally
