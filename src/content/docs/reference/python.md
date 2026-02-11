@@ -126,6 +126,38 @@ db.rename_column_family("my_cf", "new_cf")
 db.drop_column_family("new_cf")
 ```
 
+### Cloning a Column Family
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning and is completely independent.
+
+```python
+# Clone an existing column family
+db.clone_column_family("source_cf", "cloned_cf")
+
+# Both column families now exist independently
+source = db.get_column_family("source_cf")
+clone = db.get_column_family("cloned_cf")
+
+# Modifications to one do not affect the other
+with db.begin_txn() as txn:
+    txn.put(source, b"key", b"new_value")
+    txn.commit()
+
+with db.begin_txn() as txn:
+    # clone still has the original value
+    value = txn.get(clone, b"key")
+```
+
+**Use cases:**
+- **Testing** -- Create a copy of production data for testing without affecting the original
+- **Branching** -- Create a snapshot of data before making experimental changes
+- **Migration** -- Clone data before schema or configuration changes
+- **Backup verification** -- Clone and verify data integrity without modifying the source
+
+:::note[Clone vs Backup]
+`clone_column_family` creates a new column family within the same database instance. For creating an external backup of the entire database, use `backup()` instead.
+:::
+
 ### Transactions
 
 ```python
@@ -152,6 +184,56 @@ with db.begin_txn() as txn:
     txn.put(cf, b"key", b"value")
     txn.commit()
 ```
+
+### Transaction Reset
+
+`reset()` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```python
+txn = db.begin_txn()
+
+# First batch of work
+txn.put(cf, b"key1", b"value1")
+txn.commit()
+
+# Reset instead of close + begin_txn
+txn.reset(tidesdb.IsolationLevel.READ_COMMITTED)
+
+# Second batch of work using the same transaction
+txn.put(cf, b"key2", b"value2")
+txn.commit()
+
+# Free once when done
+txn.close()
+```
+
+**Batch processing example:**
+```python
+txn = db.begin_txn()
+
+for batch in batches:
+    for key, value in batch:
+        txn.put(cf, key, value)
+    txn.commit()
+    txn.reset(tidesdb.IsolationLevel.READ_COMMITTED)
+
+txn.close()
+```
+
+**Behavior:**
+- The transaction must be committed or rolled back before reset; resetting an active transaction raises `TidesDBError`
+- Internal buffers are retained to avoid reallocation
+- A fresh transaction ID and snapshot sequence are assigned
+- The isolation level can be changed on each reset
+
+**When to use:**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+
+:::tip[Reset vs Close + Begin]
+`txn.reset()` is functionally equivalent to `txn.close()` followed by `db.begin_txn()`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead.
+:::
 
 ### TTL (Time-To-Live)
 

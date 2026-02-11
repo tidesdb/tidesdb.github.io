@@ -311,6 +311,31 @@ db.renameColumnFamily("old_name", "new_name");
 - Updates all internal paths (SSTables, manifest, config)
 - Thread-safe with proper locking
 
+### Cloning a Column Family
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning.
+
+```cpp
+db.cloneColumnFamily("source_cf", "cloned_cf");
+
+// Both column families now exist independently
+auto original = db.getColumnFamily("source_cf");
+auto clone = db.getColumnFamily("cloned_cf");
+```
+
+**Behavior**
+- Flushes the source column family's memtable to ensure all data is on disk
+- Waits for any in-progress flush or compaction to complete
+- Copies all SSTable files (`.klog` and `.vlog`) to the new directory
+- Copies manifest and configuration files
+- The clone is completely independent -- modifications to one do not affect the other
+
+**Use cases**
+- **Testing** -- Create a copy of production data for testing without affecting the original
+- **Branching** -- Create a snapshot of data before making experimental changes
+- **Migration** -- Clone data before schema or configuration changes
+- **Backup verification** -- Clone and verify data integrity without modifying the source
+
 ### Compaction
 
 #### Manual Compaction
@@ -651,6 +676,52 @@ txn.commit();
 - `savepoint(name)` -- Create a savepoint
 - `rollbackToSavepoint(name)` -- Rollback to savepoint
 - `releaseSavepoint(name)` -- Release savepoint without rolling back
+
+## Transaction Reset
+
+`Transaction::reset` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+auto txn = db.beginTransaction();
+
+// First batch of work
+txn.put(cf, "key1", "value1", -1);
+txn.commit();
+
+// Reset instead of destroying and creating a new transaction
+txn.reset(tidesdb::IsolationLevel::ReadCommitted);
+
+// Second batch of work using the same transaction
+txn.put(cf, "key2", "value2", -1);
+txn.commit();
+```
+
+**Behavior**
+- The transaction must be committed or aborted before reset; resetting an active transaction throws an exception
+- Internal buffers are retained to avoid reallocation
+- A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
+- The isolation level can be changed on each reset (e.g., `ReadCommitted` to `RepeatableRead`)
+
+**When to use**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce malloc/free overhead in tight write loops
+
+**Reset after rollback**
+
+```cpp
+auto txn = db.beginTransaction();
+
+txn.put(cf, "key", "value", -1);
+txn.rollback();
+
+// Reset after rollback and reuse
+txn.reset(tidesdb::IsolationLevel::ReadCommitted);
+txn.put(cf, "new_key", "new_value", -1);
+txn.commit();
+```
 
 ## Multi-Column-Family Transactions
 

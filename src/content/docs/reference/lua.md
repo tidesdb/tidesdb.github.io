@@ -142,6 +142,30 @@ db:rename_column_family("old_name", "new_name")
 local cf = db:get_column_family("new_name")
 ```
 
+### Cloning Column Families
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning.
+
+```lua
+db:clone_column_family("source_cf", "cloned_cf")
+
+-- Both column families now exist independently
+local original = db:get_column_family("source_cf")
+local clone = db:get_column_family("cloned_cf")
+```
+
+**Behavior**
+- Flushes the source column family's memtable to ensure all data is on disk
+- Waits for any in-progress flush or compaction to complete
+- Copies all SSTable files to the new directory
+- The clone is completely independent -- modifications to one do not affect the other
+
+**Use cases**
+- **Testing** -- Create a copy of production data for testing without affecting the original
+- **Branching** -- Create a snapshot of data before making experimental changes
+- **Migration** -- Clone data before schema or configuration changes
+- **Backup verification** -- Clone and verify data integrity without modifying the source
+
 ### CRUD Operations
 
 All operations in TidesDB are performed through transactions for ACID guarantees.
@@ -651,6 +675,41 @@ db:drop_column_family("users")
 db:close()
 ```
 
+### Transaction Reset
+
+Reset a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local txn = db:begin_txn()
+
+-- First batch of work
+txn:put(cf, "key1", "value1", -1)
+txn:commit()
+
+-- Reset instead of free + begin
+txn:reset(tidesdb.IsolationLevel.READ_COMMITTED)
+
+-- Second batch of work using the same transaction
+txn:put(cf, "key2", "value2", -1)
+txn:commit()
+
+-- Free once when done
+txn:free()
+```
+
+**Behavior**
+- The transaction must be committed or aborted before reset; resetting an active transaction raises an error
+- Internal buffers are retained to avoid reallocation
+- A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
+- The isolation level can be changed on each reset
+
+**When to use**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+
 ## Isolation Levels
 
 TidesDB supports five MVCC isolation levels:
@@ -779,6 +838,7 @@ lua test_tidesdb.lua
 | `db:create_column_family(name, config)` | Create a column family |
 | `db:drop_column_family(name)` | Drop a column family |
 | `db:rename_column_family(old_name, new_name)` | Rename a column family |
+| `db:clone_column_family(source_name, dest_name)` | Clone a column family |
 | `db:get_column_family(name)` | Get a column family handle |
 | `db:list_column_families()` | List all column family names |
 | `db:begin_txn()` | Begin a transaction |
@@ -808,6 +868,7 @@ lua test_tidesdb.lua
 | `txn:delete(cf, key)` | Delete a key |
 | `txn:commit()` | Commit the transaction |
 | `txn:rollback()` | Rollback the transaction |
+| `txn:reset(isolation)` | Reset transaction for reuse with new isolation level |
 | `txn:savepoint(name)` | Create a savepoint |
 | `txn:rollback_to_savepoint(name)` | Rollback to savepoint |
 | `txn:release_savepoint(name)` | Release a savepoint |

@@ -104,6 +104,46 @@ db.CreateColumnFamily("my_cf", new ColumnFamilyConfig
 db.DropColumnFamily("my_cf");
 ```
 
+### Cloning a Column Family
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning.
+
+```csharp
+using TidesDB;
+
+db.CreateColumnFamily("source_cf");
+
+// ... write data to source_cf ...
+
+// Clone the column family
+db.CloneColumnFamily("source_cf", "cloned_cf");
+
+// Both column families now exist independently
+var original = db.GetColumnFamily("source_cf");
+var clone = db.GetColumnFamily("cloned_cf");
+```
+
+**Use cases**
+- **Testing** -- Create a copy of production data for testing without affecting the original
+- **Branching** -- Create a snapshot of data before making experimental changes
+- **Migration** -- Clone data before schema or configuration changes
+
+### Renaming a Column Family
+
+Atomically rename a column family and its underlying directory.
+
+```csharp
+using TidesDB;
+
+db.CreateColumnFamily("old_name");
+
+// Rename atomically
+db.RenameColumnFamily("old_name", "new_name");
+
+// Access using the new name
+var cf = db.GetColumnFamily("new_name");
+```
+
 ### CRUD Operations
 
 All operations in TidesDB are performed through transactions for ACID guarantees.
@@ -615,6 +655,70 @@ txn.RollbackToSavepoint("sp1");
 
 // Commit -- only key1 is written
 txn.Commit();
+```
+
+## Transaction Reset
+
+Reset a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+using var txn = db.BeginTransaction();
+
+// First batch of work
+txn.Put(cf, Encoding.UTF8.GetBytes("key1"), Encoding.UTF8.GetBytes("value1"), -1);
+txn.Commit();
+
+// Reset instead of Dispose + BeginTransaction
+txn.Reset(IsolationLevel.ReadCommitted);
+
+// Second batch of work using the same transaction
+txn.Put(cf, Encoding.UTF8.GetBytes("key2"), Encoding.UTF8.GetBytes("value2"), -1);
+txn.Commit();
+
+// Dispose once when done
+```
+
+**When to use**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+
+## Backup
+
+Create an on-disk snapshot of an open database without blocking normal reads/writes.
+
+```csharp
+using TidesDB;
+
+using var db = TidesDb.Open(config);
+
+// Create backup
+db.Backup("./mydb_backup");
+```
+
+**Behavior**
+- Requires the directory to be non-existent or empty
+- Does not copy the LOCK file, so the backup can be opened normally
+- Database stays open and usable during backup
+
+## Checking Flush/Compaction Status
+
+Check if a column family currently has flush or compaction operations in progress.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+if (cf.IsFlushing())
+{
+    Console.WriteLine("Flush in progress");
+}
+
+if (cf.IsCompacting())
+{
+    Console.WriteLine("Compaction in progress");
+}
 ```
 
 ## Cache Statistics

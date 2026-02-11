@@ -158,6 +158,40 @@ if err != nil {
 }
 ```
 
+### Cloning a Column Family
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning.
+
+```go
+err := db.CloneColumnFamily("source_cf", "cloned_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Both column families now exist independently
+sourceCF, _ := db.GetColumnFamily("source_cf")
+clonedCF, _ := db.GetColumnFamily("cloned_cf")
+```
+
+**Behavior**
+- Flushes the source column family's memtable to ensure all data is on disk
+- Waits for any in-progress flush or compaction to complete
+- Copies all SSTable files to the new directory
+- The clone is completely independent -- modifications to one do not affect the other
+
+**Use cases**
+- **Testing** -- Create a copy of production data for testing without affecting the original
+- **Branching** -- Create a snapshot of data before making experimental changes
+- **Migration** -- Clone data before schema or configuration changes
+- **Backup verification** -- Clone and verify data integrity without modifying the source
+
+**Return values**
+- `nil` -- Clone completed successfully
+- Error with `ErrNotFound` -- Source column family doesn't exist
+- Error with `ErrExists` -- Destination column family already exists
+- Error with `ErrInvalidArgs` -- Invalid arguments (nil pointers or same source/destination name)
+- Error with `ErrIO` -- Failed to copy files or create directory
+
 ### CRUD Operations
 
 All operations in TidesDB are performed through transactions for ACID guarantees.
@@ -919,6 +953,61 @@ err = txn.Commit()
 - `RollbackToSavepoint(name string)` -- Rollback to savepoint
 - `ReleaseSavepoint(name string)` -- Release savepoint without rolling back
 
+## Transaction Reset
+
+`Reset` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```go
+txn, err := db.BeginTxn()
+if err != nil {
+    log.Fatal(err)
+}
+
+// First batch of work
+err = txn.Put(cf, []byte("key1"), []byte("value1"), -1)
+if err != nil {
+    log.Fatal(err)
+}
+err = txn.Commit()
+if err != nil {
+    log.Fatal(err)
+}
+
+// Reset instead of Free + BeginTxn
+err = txn.Reset(tidesdb.IsolationReadCommitted)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Second batch of work using the same transaction
+err = txn.Put(cf, []byte("key2"), []byte("value2"), -1)
+if err != nil {
+    log.Fatal(err)
+}
+err = txn.Commit()
+if err != nil {
+    log.Fatal(err)
+}
+
+// Free once when done
+txn.Free()
+```
+
+**Behavior**
+- The transaction must be committed or aborted before reset; resetting an active transaction returns an error
+- Internal buffers are retained to avoid reallocation
+- A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
+- The isolation level can be changed on each reset (e.g., `IsolationReadCommitted` → `IsolationRepeatableRead`)
+
+**When to use**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce malloc/free overhead in tight write loops
+
+**Reset vs Free + BeginTxn**
+
+For a single transaction, `Reset` is functionally equivalent to calling `Free` followed by `BeginTxnWithIsolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+
 ## B+tree KLog Format
 
 Column families can optionally use a B+tree structure for the key log instead of the default block-based format.
@@ -988,4 +1077,10 @@ go test -race -v
 
 # Run B+tree test
 go test -v -run TestBtreeColumnFamily
+
+# Run clone column family test
+go test -v -run TestCloneColumnFamily
+
+# Run transaction reset test
+go test -v -run TestTransactionReset
 ```
