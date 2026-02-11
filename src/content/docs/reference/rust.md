@@ -174,7 +174,7 @@ fn main() -> tidesdb::Result<()> {
 
     let cf = db.get_column_family("my_cf")?;
 
-    let txn = db.begin_transaction()?;
+    let mut txn = db.begin_transaction()?;
 
     // Put a key-value pair (TTL -1 means no expiration)
     txn.put(&cf, b"key", b"value", -1)?;
@@ -197,7 +197,7 @@ fn main() -> tidesdb::Result<()> {
 
     let cf = db.get_column_family("my_cf")?;
 
-    let txn = db.begin_transaction()?;
+    let mut txn = db.begin_transaction()?;
 
     // Set expiration time (Unix timestamp)
     let ttl = SystemTime::now()
@@ -267,7 +267,7 @@ fn main() -> tidesdb::Result<()> {
 
     let cf = db.get_column_family("my_cf")?;
 
-    let txn = db.begin_transaction()?;
+    let mut txn = db.begin_transaction()?;
     txn.delete(&cf, b"key")?;
     txn.commit()?;
 
@@ -286,7 +286,7 @@ fn main() -> tidesdb::Result<()> {
 
     let cf = db.get_column_family("my_cf")?;
 
-    let txn = db.begin_transaction()?;
+    let mut txn = db.begin_transaction()?;
 
     // Multiple operations in one transaction
     txn.put(&cf, b"key1", b"value1", -1)?;
@@ -311,7 +311,7 @@ fn main() -> tidesdb::Result<()> {
 
     let cf = db.get_column_family("my_cf")?;
 
-    let txn = db.begin_transaction()?;
+    let mut txn = db.begin_transaction()?;
     txn.put(&cf, b"key", b"value", -1)?;
 
     // Decide to rollback instead of commit
@@ -321,6 +321,53 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+### Transaction Reset
+
+`Transaction::reset` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig, IsolationLevel};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let cf = db.get_column_family("my_cf")?;
+
+    let mut txn = db.begin_transaction()?;
+
+    // First batch of work
+    txn.put(&cf, b"key1", b"value1", -1)?;
+    txn.commit()?;
+
+    // Reset instead of drop + begin
+    txn.reset(IsolationLevel::ReadCommitted)?;
+
+    // Second batch of work using the same transaction
+    txn.put(&cf, b"key2", b"value2", -1)?;
+    txn.commit()?;
+
+    // Transaction is freed once when `txn` goes out of scope
+
+    Ok(())
+}
+```
+
+**Behavior**
+- The transaction must be committed or aborted before reset; resetting an active transaction returns an error
+- Internal buffers are retained to avoid reallocation
+- A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
+- The isolation level can be changed on each reset (e.g., `ReadCommitted` → `RepeatableRead`)
+
+**When to use**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+
+:::tip[Reset vs Drop + Begin]
+For a single transaction, `reset` is functionally equivalent to dropping the transaction and calling `begin_transaction_with_isolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+:::
 
 ### Iterating Over Data
 
@@ -556,6 +603,55 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+### Cloning Column Families
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("source_cf", ColumnFamilyConfig::default())?;
+
+    // Insert some data into source
+    let cf = db.get_column_family("source_cf")?;
+    let mut txn = db.begin_transaction()?;
+    txn.put(&cf, b"key1", b"value1", -1)?;
+    txn.put(&cf, b"key2", b"value2", -1)?;
+    txn.commit()?;
+
+    // Clone the column family
+    db.clone_column_family("source_cf", "cloned_cf")?;
+
+    // Both column families now exist independently
+    let cloned_cf = db.get_column_family("cloned_cf")?;
+    let txn = db.begin_transaction()?;
+    let value = txn.get(&cloned_cf, b"key1")?;
+    println!("Cloned value: {:?}", String::from_utf8_lossy(&value));
+
+    Ok(())
+}
+```
+
+**Behavior**
+- Flushes the source column family's memtable to ensure all data is on disk
+- Waits for any in-progress flush or compaction to complete
+- Copies all SSTable files to the new directory
+- The clone is completely independent -- modifications to one do not affect the other
+
+**Use cases**
+- **Testing** -- Create a copy of production data for testing without affecting the original
+- **Branching** -- Create a snapshot of data before making experimental changes
+- **Migration** -- Clone data before schema or configuration changes
+
+**Return values**
+- `Ok(())` -- Clone completed successfully
+- `ErrorCode::NotFound` -- Source column family doesn't exist
+- `ErrorCode::Exists` -- Destination column family already exists
+- `ErrorCode::InvalidArgs` -- Invalid arguments (same source/destination name)
+- `ErrorCode::Io` -- Failed to copy files or create directory
 
 ### Compaction
 
@@ -915,7 +1011,7 @@ fn main() -> tidesdb::Result<()> {
     let cf = db.get_column_family("users")?;
 
     {
-        let txn = db.begin_transaction()?;
+        let mut txn = db.begin_transaction()?;
 
         txn.put(&cf, b"user:1", b"Alice", -1)?;
         txn.put(&cf, b"user:2", b"Bob", -1)?;
@@ -1001,7 +1097,7 @@ fn main() -> tidesdb::Result<()> {
 
     let cf = db.get_column_family("my_cf")?;
 
-    let txn = db.begin_transaction()?;
+    let mut txn = db.begin_transaction()?;
 
     txn.put(&cf, b"key1", b"value1", -1)?;
 
@@ -1043,7 +1139,7 @@ fn main() -> tidesdb::Result<()> {
 
         thread::spawn(move || {
             let cf = db.get_column_family(&cf_name).unwrap();
-            let txn = db.begin_transaction().unwrap();
+            let mut txn = db.begin_transaction().unwrap();
 
             let key = format!("key:{}", i);
             let value = format!("value:{}", i);

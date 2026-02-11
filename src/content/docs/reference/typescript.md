@@ -122,6 +122,9 @@ db.dropColumnFamily('my_cf');
 
 // Rename a column family atomically
 db.renameColumnFamily('old_name', 'new_name');
+
+// Clone a column family (creates an independent copy with all data)
+db.cloneColumnFamily('source_cf', 'cloned_cf');
 ```
 
 ### CRUD Operations
@@ -399,6 +402,36 @@ db.backup('./mydb_backup');
 - Does not copy the `LOCK` file, so the backup can be opened normally
 - Database stays open and usable during backup
 - The backup represents the database state after all pending flushes complete
+
+### Cloning a Column Family
+
+Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning and is completely independent.
+
+```typescript
+// Clone a column family
+db.cloneColumnFamily('source_cf', 'cloned_cf');
+
+// Both column families now exist independently
+const original = db.getColumnFamily('source_cf');
+const clone = db.getColumnFamily('cloned_cf');
+```
+
+**Behavior**
+- Flushes the source column family's memtable to ensure all data is on disk
+- Waits for any in-progress flush or compaction to complete
+- Copies all SSTable files to the new directory
+- The clone is completely independent -- modifications to one do not affect the other
+
+**Use cases**
+- **Testing** -- Create a copy of production data for testing without affecting the original
+- **Branching** -- Create a snapshot of data before making experimental changes
+- **Migration** -- Clone data before schema or configuration changes
+- **Backup verification** -- Clone and verify data integrity without modifying the source
+
+**Return values**
+- Throws `TidesDBError` with `ErrorCode.ErrNotFound` if source column family doesn't exist
+- Throws `TidesDBError` with `ErrorCode.ErrExists` if destination column family already exists
+- Throws `TidesDBError` with `ErrorCode.ErrInvalidArgs` for invalid arguments
 
 ### Compaction
 
@@ -739,6 +772,45 @@ txn.rollbackToSavepoint('sp1');
 txn.commit();
 txn.free();
 ```
+
+## Transaction Reset
+
+`txn.reset()` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const txn = db.beginTransaction();
+
+// First batch of work
+txn.put(cf, Buffer.from('key1'), Buffer.from('value1'), -1);
+txn.commit();
+
+// Reset instead of free + beginTransaction
+txn.reset(IsolationLevel.ReadCommitted);
+
+// Second batch of work using the same transaction
+txn.put(cf, Buffer.from('key2'), Buffer.from('value2'), -1);
+txn.commit();
+
+// Free once when done
+txn.free();
+```
+
+**Behavior**
+- The transaction must be committed or aborted before reset; resetting an active transaction throws an error
+- Internal buffers are retained to avoid reallocation
+- A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
+- The isolation level can be changed on each reset (e.g., `ReadCommitted` → `Serializable`)
+
+**When to use**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+
+**Reset vs Free + Begin**
+
+For a single transaction, `txn.reset()` is functionally equivalent to calling `txn.free()` followed by `db.beginTransactionWithIsolation()`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
 
 ## Cache Statistics
 

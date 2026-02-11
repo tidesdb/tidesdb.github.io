@@ -471,6 +471,44 @@ try (Transaction txn = db.beginTransaction()) {
 - `rollbackToSavepoint(name)` - Rollback to savepoint
 - `releaseSavepoint(name)` - Release savepoint without rolling back
 
+### Transaction Reset
+
+`reset` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+// Begin transaction and do first batch of work
+Transaction txn = db.beginTransaction();
+txn.put(cf, "key1".getBytes(), "value1".getBytes());
+txn.commit();
+
+// Reset instead of free + begin
+txn.reset(IsolationLevel.READ_COMMITTED);
+
+// Second batch of work using the same transaction
+txn.put(cf, "key2".getBytes(), "value2".getBytes());
+txn.commit();
+
+// Free once when done
+txn.free();
+```
+
+**Behavior:**
+- The transaction must be committed or aborted before reset; resetting an active transaction throws `TidesDBException`
+- Internal buffers are retained to avoid reallocation
+- A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
+- The isolation level can be changed on each reset (e.g., `READ_COMMITTED` to `REPEATABLE_READ`)
+
+**When to use:**
+- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
+- **Connection pooling** -- Reset a transaction for a new request without reallocation
+- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+
+**Reset vs Free + Begin:**
+
+For a single transaction, `reset` is functionally equivalent to calling `free` followed by `beginTransaction`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+
 ## Configuration Options
 
 ### Database Configuration

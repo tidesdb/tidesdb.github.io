@@ -111,6 +111,30 @@ Rename a column family.
 cf-rename <old_name> <new_name>
 ```
 
+### cf-clone
+Clone a column family. Creates a complete copy of an existing column family with a new name, including all data.
+```
+cf-clone <source_name> <destination_name>
+```
+
+**Behavior:**
+- Flushes the source column family's memtable to ensure all data is on disk
+- Waits for any in-progress flush or compaction to complete
+- Copies all SSTable files (`.klog` and `.vlog`) to the new directory
+- Copies manifest and configuration files
+- The clone is completely independent — modifications to one do not affect the other
+
+**Use cases:**
+- Testing with a copy of production data
+- Creating a snapshot before experimental changes
+- Data migration before configuration changes
+
+**Example**
+```
+admintool(./mydb)> cf-clone users users_backup
+Cloned column family 'users' to 'users_backup'
+```
+
 ### cf-stats
 Show column family statistics and configuration.
 ```
