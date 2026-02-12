@@ -51,7 +51,7 @@ First up is sequential inserts. These tests heavily favor an engine that can tur
 
 ![Batch INSERT](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/fig2.png)
 
-In the batch insert test, InnoDB is slightly faster, but the margin is small—about 7%. Given the broader results, this looks less like a structural advantage and more like a workload-specific effect of how batching interacts with InnoDB's write path. The result doesn't contradict TidesDB's strength on sequential and low-concurrency inserts; it just shows that once inserts are grouped and amortized, InnoDB's overhead matters less. This is a case where the difference exists, but it's not decisive.
+In the batch insert test, InnoDB is slightly faster, but the margin is small - about 7%. Given the broader results, this looks less like a structural advantage and more like a workload-specific effect of how batching interacts with InnoDB's write path. The result doesn't contradict TidesDB's strength on sequential and low-concurrency inserts; it just shows that once inserts are grouped and amortized, InnoDB's overhead matters less. This is a case where the difference exists, but it's not decisive.
 
 ## Random READ
 

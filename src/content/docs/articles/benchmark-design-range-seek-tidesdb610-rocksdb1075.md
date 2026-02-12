@@ -239,7 +239,7 @@ Unlike point seeks, range queries require:
 
 The 2.41x advantage on small ranges comes from TidesDB's fast seek positioning. Once positioned, iteration speed is comparable between engines.
 
-For large ranges (1000 keys), both engines spend most time iterating, not seeking. The 1.11x difference is within measurement variance—essentially a tie.
+For large ranges (1000 keys), both engines spend most time iterating, not seeking. The 1.11x difference is within measurement variance,essentially a tie.
 
 ### The Honest Assessment
 

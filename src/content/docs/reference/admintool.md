@@ -91,7 +91,7 @@ Create a new column family.
 ```
 cf-create <name> [--btree]
 ```
-- `--btree` — Use B+tree format for klog (faster point lookups)
+- `--btree` · Use B+tree format for klog (faster point lookups)
 
 **Example**
 ```
@@ -122,7 +122,7 @@ cf-clone <source_name> <destination_name>
 - Waits for any in-progress flush or compaction to complete
 - Copies all SSTable files (`.klog` and `.vlog`) to the new directory
 - Copies manifest and configuration files
-- The clone is completely independent — modifications to one do not affect the other
+- The clone is completely independent; modifications to one do not affect the other
 
 **Use cases:**
 - Testing with a copy of production data

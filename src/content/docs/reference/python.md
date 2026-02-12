@@ -149,10 +149,10 @@ with db.begin_txn() as txn:
 ```
 
 **Use cases:**
-- **Testing** -- Create a copy of production data for testing without affecting the original
-- **Branching** -- Create a snapshot of data before making experimental changes
-- **Migration** -- Clone data before schema or configuration changes
-- **Backup verification** -- Clone and verify data integrity without modifying the source
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
+- Backup verification · Clone and verify data integrity without modifying the source
 
 :::note[Clone vs Backup]
 `clone_column_family` creates a new column family within the same database instance. For creating an external backup of the entire database, use `backup()` instead.
@@ -227,9 +227,9 @@ txn.close()
 - The isolation level can be changed on each reset
 
 **When to use:**
-- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** -- Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce allocation overhead in tight write loops
 
 :::tip[Reset vs Close + Begin]
 `txn.reset()` is functionally equivalent to `txn.close()` followed by `db.begin_txn()`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead.
@@ -254,11 +254,11 @@ with db.begin_txn() as txn:
 txn = db.begin_txn_with_isolation(tidesdb.IsolationLevel.SERIALIZABLE)
 
 # Available levels
-# - READ_UNCOMMITTED -- Sees all data including uncommitted changes
-# - READ_COMMITTED -- Sees only committed data (default)
-# - REPEATABLE_READ -- Consistent snapshot, phantom reads possible
-# - SNAPSHOT -- Write-write conflict detection
-# - SERIALIZABLE -- Full read-write conflict detection (SSI)
+# - READ_UNCOMMITTED        - Sees all data including uncommitted changes
+# - READ_COMMITTED          - Sees only committed data (default)
+# - REPEATABLE_READ         - Consistent snapshot, phantom reads possible
+# - SNAPSHOT                - Write-write conflict detection
+# - SERIALIZABLE            - Full read-write conflict detection (SSI)
 ```
 
 ### Savepoints
@@ -342,6 +342,40 @@ with tidesdb.TidesDB.open("./mydb_backup") as backup_db:
     pass
 ```
 
+### Checkpoint
+
+Create a lightweight, near-instant snapshot of the database using hard links instead of copying SSTable data.
+
+```python
+# Create a checkpoint (near-instant, uses hard links)
+db.checkpoint("./mydb_checkpoint")
+
+# The checkpoint directory must be non-existent or empty
+# Checkpoint can be opened as a normal database
+with tidesdb.TidesDB.open("./mydb_checkpoint") as checkpoint_db:
+    # ... read from checkpoint
+    pass
+```
+
+**Checkpoint vs Backup:**
+
+| | `backup()` | `checkpoint()` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+
+**Behavior:**
+- Requires `checkpoint_dir` to be a non-existent directory or an empty directory
+- For each column family: flushes the active memtable, halts compactions, hard links all SSTable files, copies small metadata files, then resumes compactions
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+- Database stays open and usable during checkpoint
+
+:::note
+Hard-linked files share storage with the live database. Deleting the original database does not affect the checkpoint (hard link semantics). The checkpoint can be opened as a normal TidesDB database.
+:::
+
 ### Updating Runtime Configuration
 
 ```python
@@ -357,13 +391,13 @@ new_config.sync_mode = tidesdb.SyncMode.SYNC_FULL
 cf.update_runtime_config(new_config, persist_to_disk=True)
 
 # Updatable settings (safe to change at runtime):
-# -- write_buffer_size: Memtable flush threshold
-# -- skip_list_max_level: Skip list level for new memtables
-# -- skip_list_probability: Skip list probability for new memtables
-# -- bloom_fpr: False positive rate for new SSTables
-# -- index_sample_ratio: Index sampling ratio for new SSTables
-# -- sync_mode: Durability mode
-# -- sync_interval_us: Sync interval in microseconds
+# -- write_buffer_size     - Memtable flush threshold
+# -- skip_list_max_level   - Skip list level for new memtables
+# -- skip_list_probability - Skip list probability for new memtables
+# -- bloom_fpr             - False positive rate for new SSTables
+# -- index_sample_ratio    - Index sampling ratio for new SSTables
+# -- sync_mode             - Durability mode
+# -- sync_interval_us      - Sync interval in microseconds
 
 # Save config to custom INI file
 tidesdb.save_config_to_ini("custom_config.ini", "my_cf", new_config)
@@ -381,10 +415,10 @@ db.create_column_family("btree_cf", config)
 ```
 
 **Characteristics:**
-- Point lookups: O(log N) tree traversal with binary search at each node
-- Range scans: Doubly-linked leaf nodes enable efficient bidirectional iteration
-- Immutable: Tree is bulk-loaded from sorted memtable data during flush
-- Compression: Nodes compress independently using the same algorithms
+- Point lookups · O(log N) tree traversal with binary search at each node
+- Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable · Tree is bulk-loaded from sorted memtable data during flush
+- Compression · Nodes compress independently using the same algorithms
 
 **When to use B+tree klog format:**
 - Read-heavy workloads with frequent point lookups

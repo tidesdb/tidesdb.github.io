@@ -157,7 +157,7 @@ While RocksDB achieves higher GET throughput, TidesDB delivers better latency at
 
 ### Seek Performance
 
-Seek operations position an iterator at a specific key—critical for range queries and prefix scans.
+Seek operations position an iterator at a specific key -- critical for range queries and prefix scans.
 
 | Pattern | TidesDB ops/sec | RocksDB ops/sec | Ratio |
 |---------|-----------------|-----------------|-------|
@@ -308,7 +308,7 @@ new Chart(document.getElementById('zipfianChart'), {
 
 ## Large Value Performance (4KB values)
 
-Larger values stress different parts of the system—more I/O bandwidth, different compression ratios, and different memory pressure.
+Larger values stress different parts of the system - more I/O bandwidth, different compression ratios, and different memory pressure.
 
 | Metric | TidesDB v7.4.0 | RocksDB v10.9.1 | Ratio |
 |--------|----------------|-----------------|-------|

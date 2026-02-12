@@ -72,7 +72,6 @@ var config = new Config
 using var db = TidesDb.Open(config);
 Console.WriteLine("Database opened successfully");
 
-// Database is automatically closed when disposed
 ```
 
 ### Creating and Dropping Column Families
@@ -82,10 +81,8 @@ Column families are isolated key-value stores with independent configuration.
 ```csharp
 using TidesDB;
 
-// Create with default configuration
 db.CreateColumnFamily("my_cf");
 
-// Create with custom configuration
 db.CreateColumnFamily("my_cf", new ColumnFamilyConfig
 {
     WriteBufferSize = 128 * 1024 * 1024,
@@ -113,20 +110,17 @@ using TidesDB;
 
 db.CreateColumnFamily("source_cf");
 
-// ... write data to source_cf ...
-
 // Clone the column family
 db.CloneColumnFamily("source_cf", "cloned_cf");
 
-// Both column families now exist independently
 var original = db.GetColumnFamily("source_cf");
 var clone = db.GetColumnFamily("cloned_cf");
 ```
 
 **Use cases**
-- **Testing** -- Create a copy of production data for testing without affecting the original
-- **Branching** -- Create a snapshot of data before making experimental changes
-- **Migration** -- Clone data before schema or configuration changes
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
 
 ### Renaming a Column Family
 
@@ -137,10 +131,8 @@ using TidesDB;
 
 db.CreateColumnFamily("old_name");
 
-// Rename atomically
 db.RenameColumnFamily("old_name", "new_name");
 
-// Access using the new name
 var cf = db.GetColumnFamily("new_name");
 ```
 
@@ -155,7 +147,6 @@ var cf = db.GetColumnFamily("my_cf")!;
 
 using var txn = db.BeginTransaction();
 
-// Put a key-value pair (TTL -1 means no expiration)
 txn.Put(cf, Encoding.UTF8.GetBytes("key"), Encoding.UTF8.GetBytes("value"), -1);
 
 txn.Commit();
@@ -168,8 +159,7 @@ var cf = db.GetColumnFamily("my_cf")!;
 
 using var txn = db.BeginTransaction();
 
-// Set expiration time (Unix timestamp in seconds)
-var ttl = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 10; // Expire in 10 seconds
+var ttl = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 10;
 
 txn.Put(cf, Encoding.UTF8.GetBytes("temp_key"), Encoding.UTF8.GetBytes("temp_value"), ttl);
 
@@ -178,16 +168,12 @@ txn.Commit();
 
 **TTL Examples**
 ```csharp
-// No expiration
 long ttl = -1;
 
-// Expire in 5 minutes
 long ttl = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 5 * 60;
 
-// Expire in 1 hour
 long ttl = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 60 * 60;
 
-// Expire at specific time
 long ttl = new DateTimeOffset(2026, 12, 31, 23, 59, 59, TimeSpan.Zero).ToUnixTimeSeconds();
 ```
 
@@ -226,12 +212,10 @@ using var txn = db.BeginTransaction();
 
 try
 {
-    // Multiple operations in one transaction, across column families as well
     txn.Put(cf, Encoding.UTF8.GetBytes("key1"), Encoding.UTF8.GetBytes("value1"), -1);
     txn.Put(cf, Encoding.UTF8.GetBytes("key2"), Encoding.UTF8.GetBytes("value2"), -1);
     txn.Delete(cf, Encoding.UTF8.GetBytes("old_key"));
 
-    // Commit atomically -- all or nothing
     txn.Commit();
 }
 catch
@@ -337,7 +321,6 @@ while (iter.Valid())
 {
     var key = Encoding.UTF8.GetString(iter.Key());
     
-    // Stop when keys no longer match prefix
     if (!key.StartsWith(prefix)) break;
     
     Console.WriteLine($"Found: {key}");
@@ -363,13 +346,11 @@ Console.WriteLine($"Avg Value Size: {stats.AvgValueSize:F1} bytes");
 Console.WriteLine($"Read Amplification: {stats.ReadAmp:F2}");
 Console.WriteLine($"Cache Hit Rate: {stats.HitRate * 100:F1}%");
 
-// Per-level statistics
 for (int i = 0; i < stats.NumLevels; i++)
 {
     Console.WriteLine($"Level {i + 1}: {stats.LevelNumSstables[i]} SSTables, {stats.LevelSizes[i]} bytes, {stats.LevelKeyCounts[i]} keys");
 }
 
-// B+tree stats (only populated if UseBtree=true)
 if (stats.UseBtree)
 {
     Console.WriteLine($"B+tree Total Nodes: {stats.BtreeTotalNodes}");
@@ -397,7 +378,6 @@ foreach (var name in cfList)
 ```csharp
 var cf = db.GetColumnFamily("my_cf")!;
 
-// Manually trigger compaction (queues compaction from L1+)
 cf.Compact();
 ```
 
@@ -406,7 +386,6 @@ cf.Compact();
 ```csharp
 var cf = db.GetColumnFamily("my_cf")!;
 
-// Manually trigger memtable flush (queues memtable for sorted run to disk (L1))
 cf.FlushMemtable();
 ```
 
@@ -417,20 +396,17 @@ Control the durability vs performance tradeoff.
 ```csharp
 using TidesDB;
 
-// SyncNone -- Fastest, least durable (OS handles flushing)
 db.CreateColumnFamily("fast_cf", new ColumnFamilyConfig
 {
     SyncMode = SyncMode.None,
 });
 
-// SyncInterval -- Balanced (periodic background syncing)
 db.CreateColumnFamily("balanced_cf", new ColumnFamilyConfig
 {
     SyncMode = SyncMode.Interval,
     SyncIntervalUs = 128000, // Sync every 128ms
 });
 
-// SyncFull -- Most durable (fsync on every write)
 db.CreateColumnFamily("durable_cf", new ColumnFamilyConfig
 {
     SyncMode = SyncMode.Full,
@@ -477,7 +453,6 @@ Column families can optionally use a B+tree structure for the key log instead of
 ```csharp
 using TidesDB;
 
-// Enable B+tree klog format for faster point lookups
 db.CreateColumnFamily("btree_cf", new ColumnFamilyConfig
 {
     UseBtree = true,
@@ -522,19 +497,19 @@ catch (TidesDBException ex)
 ```
 
 **Error Codes**
-- `TDB_SUCCESS` (0) -- Operation successful
-- `TDB_ERR_MEMORY` (-1) -- Memory allocation failed
-- `TDB_ERR_INVALID_ARGS` (-2) -- Invalid arguments
-- `TDB_ERR_NOT_FOUND` (-3) -- Key not found
-- `TDB_ERR_IO` (-4) -- I/O error
-- `TDB_ERR_CORRUPTION` (-5) -- Data corruption
-- `TDB_ERR_EXISTS` (-6) -- Resource already exists
-- `TDB_ERR_CONFLICT` (-7) -- Transaction conflict
-- `TDB_ERR_TOO_LARGE` (-8) -- Key or value too large
-- `TDB_ERR_MEMORY_LIMIT` (-9) -- Memory limit exceeded
-- `TDB_ERR_INVALID_DB` (-10) -- Invalid database handle
-- `TDB_ERR_UNKNOWN` (-11) -- Unknown error
-- `TDB_ERR_LOCKED` (-12) -- Database is locked
+- `TDB_SUCCESS` (0) · Operation successful
+- `TDB_ERR_MEMORY` (-1) · Memory allocation failed
+- `TDB_ERR_INVALID_ARGS` (-2) · Invalid arguments
+- `TDB_ERR_NOT_FOUND` (-3) · Key not found
+- `TDB_ERR_IO` (-4) · I/O error
+- `TDB_ERR_CORRUPTION` (-5) · Data corruption
+- `TDB_ERR_EXISTS` (-6) · Resource already exists
+- `TDB_ERR_CONFLICT` (-7) · Transaction conflict
+- `TDB_ERR_TOO_LARGE` (-8) · Key or value too large
+- `TDB_ERR_MEMORY_LIMIT` (-9) · Memory limit exceeded
+- `TDB_ERR_INVALID_DB` (-10) · Invalid database handle
+- `TDB_ERR_UNKNOWN` (-11) · Unknown error
+- `TDB_ERR_LOCKED` (-12) · Database is locked
 
 ## Complete Example
 
@@ -624,17 +599,15 @@ using TidesDB;
 
 using var txn = db.BeginTransaction(IsolationLevel.ReadCommitted);
 
-// ... perform operations
-
 txn.Commit();
 ```
 
 **Available Isolation Levels**
-- `IsolationLevel.ReadUncommitted` -- Sees all data including uncommitted changes
-- `IsolationLevel.ReadCommitted` -- Sees only committed data (default)
-- `IsolationLevel.RepeatableRead` -- Consistent snapshot, phantom reads possible
-- `IsolationLevel.Snapshot` -- Write-write conflict detection
-- `IsolationLevel.Serializable` -- Full read-write conflict detection (SSI)
+- `IsolationLevel.ReadUncommitted` · Sees all data including uncommitted changes
+- `IsolationLevel.ReadCommitted` · Sees only committed data (default)
+- `IsolationLevel.RepeatableRead` · Consistent snapshot, phantom reads possible
+- `IsolationLevel.Snapshot` · Write-write conflict detection
+- `IsolationLevel.Serializable` · Full read-write conflict detection (SSI)
 
 ## Savepoints
 
@@ -650,10 +623,8 @@ txn.Put(cf, Encoding.UTF8.GetBytes("key1"), Encoding.UTF8.GetBytes("value1"), -1
 txn.Savepoint("sp1");
 txn.Put(cf, Encoding.UTF8.GetBytes("key2"), Encoding.UTF8.GetBytes("value2"), -1);
 
-// Rollback to savepoint -- key2 is discarded, key1 remains
 txn.RollbackToSavepoint("sp1");
 
-// Commit -- only key1 is written
 txn.Commit();
 ```
 
@@ -666,24 +637,20 @@ var cf = db.GetColumnFamily("my_cf")!;
 
 using var txn = db.BeginTransaction();
 
-// First batch of work
 txn.Put(cf, Encoding.UTF8.GetBytes("key1"), Encoding.UTF8.GetBytes("value1"), -1);
 txn.Commit();
 
-// Reset instead of Dispose + BeginTransaction
 txn.Reset(IsolationLevel.ReadCommitted);
 
-// Second batch of work using the same transaction
 txn.Put(cf, Encoding.UTF8.GetBytes("key2"), Encoding.UTF8.GetBytes("value2"), -1);
 txn.Commit();
 
-// Dispose once when done
 ```
 
 **When to use**
-- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** -- Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce allocation overhead in tight write loops
 
 ## Backup
 
@@ -694,7 +661,6 @@ using TidesDB;
 
 using var db = TidesDb.Open(config);
 
-// Create backup
 db.Backup("./mydb_backup");
 ```
 
@@ -702,6 +668,38 @@ db.Backup("./mydb_backup");
 - Requires the directory to be non-existent or empty
 - Does not copy the LOCK file, so the backup can be opened normally
 - Database stays open and usable during backup
+
+## Checkpoint
+
+Create a lightweight, near-instant snapshot of an open database using hard links instead of copying SSTable data.
+
+```csharp
+using TidesDB;
+
+using var db = TidesDb.Open(config);
+
+db.Checkpoint("./mydb_checkpoint");
+```
+
+**Behavior**
+- Requires the directory to be non-existent or empty
+- Uses hard links for SSTable files (near-instant, O(1) per file)
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+- Flushes memtables and halts compactions to ensure a consistent snapshot
+- Database stays open and usable during checkpoint
+
+**Checkpoint vs Backup**
+
+| | `Backup` | `Checkpoint` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+
+**Notes**
+- The checkpoint can be opened as a normal TidesDB database with `TidesDb.Open`
+- Hard-linked files share storage with the live database; deleting the original does not affect the checkpoint
 
 ## Checking Flush/Compaction Status
 

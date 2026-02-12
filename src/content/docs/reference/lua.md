@@ -84,10 +84,7 @@ Column families are isolated key-value stores with independent configuration.
 local cf_config = tidesdb.default_column_family_config()
 db:create_column_family("my_cf", cf_config)
 
--- Create with custom configuration based on defaults
 local cf_config = tidesdb.default_column_family_config()
-
--- You can modify the configuration as needed
 cf_config.write_buffer_size = 128 * 1024 * 1024
 cf_config.level_size_ratio = 10
 cf_config.min_levels = 5
@@ -138,7 +135,6 @@ Atomically rename a column family and its underlying directory. The operation wa
 ```lua
 db:rename_column_family("old_name", "new_name")
 
--- Data is preserved after rename
 local cf = db:get_column_family("new_name")
 ```
 
@@ -149,7 +145,6 @@ Create a complete copy of an existing column family with a new name. The clone c
 ```lua
 db:clone_column_family("source_cf", "cloned_cf")
 
--- Both column families now exist independently
 local original = db:get_column_family("source_cf")
 local clone = db:get_column_family("cloned_cf")
 ```
@@ -177,7 +172,6 @@ local cf = db:get_column_family("my_cf")
 
 local txn = db:begin_txn()
 
--- Put a key-value pair (TTL -1 means no expiration)
 txn:put(cf, "key", "value", -1)
 
 txn:commit()
@@ -191,8 +185,7 @@ local cf = db:get_column_family("my_cf")
 
 local txn = db:begin_txn()
 
--- Set expiration time (Unix timestamp)
-local ttl = os.time() + 10  -- Expire in 10 seconds
+local ttl = os.time() + 10
 
 txn:put(cf, "temp_key", "temp_value", ttl)
 
@@ -202,16 +195,12 @@ txn:free()
 
 **TTL Examples**
 ```lua
--- No expiration
 local ttl = -1
 
--- Expire in 5 minutes
 local ttl = os.time() + 5 * 60
 
--- Expire in 1 hour
 local ttl = os.time() + 60 * 60
 
--- Expire at specific time
 local ttl = os.time({year=2026, month=12, day=31, hour=23, min=59, sec=59})
 ```
 
@@ -249,7 +238,6 @@ local cf = db:get_column_family("my_cf")
 
 local txn = db:begin_txn()
 
--- Multiple operations in one transaction, across column families as well
 local ok, err = pcall(function()
     txn:put(cf, "key1", "value1", -1)
     txn:put(cf, "key2", "value2", -1)
@@ -261,7 +249,6 @@ if not ok then
     error(err)
 end
 
--- Commit atomically -- all or nothing
 txn:commit()
 txn:free()
 ```
@@ -336,13 +323,11 @@ print(string.format("Average Value Size: %.2f bytes", stats.avg_value_size))
 print(string.format("Read Amplification: %.2f", stats.read_amp))
 print(string.format("Hit Rate: %.2f%%", stats.hit_rate * 100))
 
--- Per-level statistics
 for i, size in ipairs(stats.level_sizes) do
     print(string.format("Level %d: %d bytes, %d SSTables, %d keys",
         i, size, stats.level_num_sstables[i], stats.level_key_counts[i]))
 end
 
--- B+tree stats (only populated if use_btree=true)
 if stats.use_btree then
     print(string.format("B+tree Total Nodes: %d", stats.btree_total_nodes))
     print(string.format("B+tree Max Height: %d", stats.btree_max_height))
@@ -359,22 +344,22 @@ end
 ```
 
 **Statistics Fields**
-- `num_levels` -- Number of LSM levels
-- `memtable_size` -- Current memtable size in bytes
-- `level_sizes` -- Array of sizes per level
-- `level_num_sstables` -- Array of SSTable counts per level
-- `level_key_counts` -- Array of key counts per level
-- `total_keys` -- Total keys across memtable and all SSTables
-- `total_data_size` -- Total data size (klog + vlog) across all SSTables
-- `avg_key_size` -- Average key size in bytes
-- `avg_value_size` -- Average value size in bytes
-- `read_amp` -- Read amplification (point lookup cost multiplier)
-- `hit_rate` -- Cache hit rate (0.0 if cache disabled)
-- `use_btree` -- Whether column family uses B+tree klog format
-- `btree_total_nodes` -- Total B+tree nodes across all SSTables (only if use_btree=true)
-- `btree_max_height` -- Maximum tree height across all SSTables (only if use_btree=true)
-- `btree_avg_height` -- Average tree height across all SSTables (only if use_btree=true)
-- `config` -- Column family configuration
+- `num_levels` · Number of LSM levels
+- `memtable_size` · Current memtable size in bytes
+- `level_sizes` · Array of sizes per level
+- `level_num_sstables` · Array of SSTable counts per level
+- `level_key_counts` · Array of key counts per level
+- `total_keys` · Total keys across memtable and all SSTables
+- `total_data_size` · Total data size (klog + vlog) across all SSTables
+- `avg_key_size` · Average key size in bytes
+- `avg_value_size` · Average value size in bytes
+- `read_amp` · Read amplification (point lookup cost multiplier)
+- `hit_rate` · Cache hit rate (0.0 if cache disabled)
+- `use_btree` · Whether column family uses B+tree klog format
+- `btree_total_nodes` · Total B+tree nodes across all SSTables (only if use_btree=true)
+- `btree_max_height` · Maximum tree height across all SSTables (only if use_btree=true)
+- `btree_avg_height` · Average tree height across all SSTables (only if use_btree=true)
+- `config` · Column family configuration
 
 ### Getting Block Cache Statistics
 
@@ -414,7 +399,6 @@ end
 ```lua
 local cf = db:get_column_family("my_cf")
 
--- Manually trigger compaction (queues compaction from L1+)
 local ok, err = pcall(function()
     cf:compact()
 end)
@@ -428,7 +412,6 @@ end
 ```lua
 local cf = db:get_column_family("my_cf")
 
--- Manually trigger memtable flush (queues memtable for sorted run to disk (L1))
 local ok, err = pcall(function()
     cf:flush_memtable()
 end)
@@ -444,28 +427,24 @@ Check if a column family currently has flush or compaction operations in progres
 ```lua
 local cf = db:get_column_family("my_cf")
 
--- Check if flushing is in progress
 if cf:is_flushing() then
     print("Flush in progress")
 end
 
--- Check if compaction is in progress
 if cf:is_compacting() then
     print("Compaction in progress")
 end
 
--- Wait for background operations to complete
 while cf:is_flushing() or cf:is_compacting() do
-    -- Wait before checking again
     os.execute("sleep 0.1")
 end
 print("Background operations completed")
 ```
 
 **Use cases**
-- **Graceful shutdown** -- Wait for background operations to complete before closing
-- **Maintenance windows** -- Check if operations are running before triggering manual compaction
-- **Monitoring** -- Track background operation status for observability
+- Graceful shutdown · Wait for background operations to complete before closing
+- Maintenance windows · Check if operations are running before triggering manual compaction
+- Monitoring · Track background operation status for observability
 
 ### Sync Modes
 
@@ -474,14 +453,11 @@ Control the durability vs performance tradeoff.
 ```lua
 local cf_config = tidesdb.default_column_family_config()
 
--- SYNC_NONE -- Fastest, least durable (OS handles flushing on sorted runs and compaction to sync after completion)
 cf_config.sync_mode = tidesdb.SyncMode.SYNC_NONE
 
--- SYNC_INTERVAL -- Balanced (periodic background syncing)
 cf_config.sync_mode = tidesdb.SyncMode.SYNC_INTERVAL
 cf_config.sync_interval_us = 128000  -- Sync every 128ms
 
--- SYNC_FULL -- Most durable (fsync on every write)
 cf_config.sync_mode = tidesdb.SyncMode.SYNC_FULL
 
 db:create_column_family("my_cf", cf_config)
@@ -517,10 +493,8 @@ db:create_column_family("my_cf", cf_config)
 Create an on-disk snapshot of an open database without blocking normal reads/writes.
 
 ```lua
--- Create backup to a new directory
 db:backup("./mydb_backup")
 
--- The backup can be opened as a normal database
 local backup_db = tidesdb.TidesDB.open("./mydb_backup")
 ```
 
@@ -529,6 +503,36 @@ local backup_db = tidesdb.TidesDB.open("./mydb_backup")
 - Does not copy the `LOCK` file, so the backup can be opened normally
 - Database stays open and usable during backup
 - The backup represents the database state after the final flush/compaction drain
+
+### Database Checkpoint
+
+Create a lightweight, near-instant snapshot of an open database using hard links instead of copying SSTable data.
+
+```lua
+db:checkpoint("./mydb_checkpoint")
+
+local checkpoint_db = tidesdb.TidesDB.open("./mydb_checkpoint")
+```
+
+**Behavior**
+- Requires the checkpoint directory to be non-existent or empty
+- For each column family:
+  - Flushes the active memtable so all data is in SSTables
+  - Halts compactions to ensure a consistent view of live SSTable files
+  - Hard links all SSTable files (`.klog` and `.vlog`) into the checkpoint directory
+  - Copies small metadata files (manifest, config) into the checkpoint directory
+  - Resumes compactions
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+- Database stays open and usable during checkpoint
+
+**Checkpoint vs Backup**
+
+| | `db:backup(dir)` | `db:checkpoint(dir)` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
 
 ### Updating Runtime Configuration
 
@@ -541,18 +545,17 @@ local new_config = tidesdb.default_column_family_config()
 new_config.write_buffer_size = 256 * 1024 * 1024  -- 256MB
 new_config.bloom_fpr = 0.001  -- 0.1% false positive rate
 
--- Update config (persist_to_disk = true to save to config.ini)
 cf:update_runtime_config(new_config, true)
 ```
 
 **Updatable settings** (safe to change at runtime):
-- `write_buffer_size` -- Memtable flush threshold
-- `skip_list_max_level` -- Skip list level for new memtables
-- `skip_list_probability` -- Skip list probability for new memtables
-- `bloom_fpr` -- False positive rate for new SSTables
-- `index_sample_ratio` -- Index sampling ratio for new SSTables
-- `sync_mode` -- Durability mode
-- `sync_interval_us` -- Sync interval in microseconds
+- `write_buffer_size` · Memtable flush threshold
+- `skip_list_max_level` · Skip list level for new memtables
+- `skip_list_probability` · Skip list probability for new memtables
+- `bloom_fpr` · False positive rate for new SSTables
+- `index_sample_ratio` · Index sampling ratio for new SSTables
+- `sync_mode` · Durability mode
+- `sync_interval_us` · Sync interval in microseconds
 
 **Non-updatable settings** (would corrupt existing data):
 - `compression_algorithm`, `enable_block_indexes`, `enable_bloom_filter`, `comparator_name`, `level_size_ratio`, `klog_value_threshold`, `min_levels`, `dividing_level_offset`, `block_index_prefix_len`, `l1_file_count_trigger`, `l0_queue_stall_threshold`, `use_btree`
@@ -562,10 +565,8 @@ cf:update_runtime_config(new_config, true)
 Load and save column family configurations from/to INI files.
 
 ```lua
--- Load configuration from INI file
 local config = tidesdb.load_config_from_ini("config.ini", "my_cf")
 
--- Save configuration to INI file
 tidesdb.save_config_to_ini("config.ini", "my_cf", config)
 ```
 
@@ -581,12 +582,7 @@ local ok, err = pcall(function()
 end)
 
 if not ok then
-    -- Errors include context and error codes
     print("Error: " .. tostring(err))
-    
-    -- Example error message:
-    -- "TidesDBError: failed to put key-value pair: memory allocation failed (code: -1)"
-    
     txn:rollback()
     return
 end
@@ -596,19 +592,19 @@ txn:free()
 ```
 
 **Error Codes**
-- `TDB_SUCCESS` (0) -- Operation successful
-- `TDB_ERR_MEMORY` (-1) -- Memory allocation failed
-- `TDB_ERR_INVALID_ARGS` (-2) -- Invalid arguments
-- `TDB_ERR_NOT_FOUND` (-3) -- Key not found
-- `TDB_ERR_IO` (-4) -- I/O error
-- `TDB_ERR_CORRUPTION` (-5) -- Data corruption
-- `TDB_ERR_EXISTS` (-6) -- Resource already exists
-- `TDB_ERR_CONFLICT` (-7) -- Transaction conflict
-- `TDB_ERR_TOO_LARGE` (-8) -- Key or value too large
-- `TDB_ERR_MEMORY_LIMIT` (-9) -- Memory limit exceeded
-- `TDB_ERR_INVALID_DB` (-10) -- Invalid database handle
-- `TDB_ERR_UNKNOWN` (-11) -- Unknown error
-- `TDB_ERR_LOCKED` (-12) -- Database is locked
+- `TDB_SUCCESS` (0) · Operation successful
+- `TDB_ERR_MEMORY` (-1) · Memory allocation failed
+- `TDB_ERR_INVALID_ARGS` (-2) · Invalid arguments
+- `TDB_ERR_NOT_FOUND` (-3) · Key not found
+- `TDB_ERR_IO` (-4) · I/O error
+- `TDB_ERR_CORRUPTION` (-5) · Data corruption
+- `TDB_ERR_EXISTS` (-6) · Resource already exists
+- `TDB_ERR_CONFLICT` (-7) · Transaction conflict
+- `TDB_ERR_TOO_LARGE` (-8) · Key or value too large
+- `TDB_ERR_MEMORY_LIMIT` (-9) · Memory limit exceeded
+- `TDB_ERR_INVALID_DB` (-10) · Invalid database handle
+- `TDB_ERR_UNKNOWN` (-11) · Unknown error
+- `TDB_ERR_LOCKED` (-12) · Database is locked
 
 ## Complete Example
 
@@ -684,18 +680,14 @@ local cf = db:get_column_family("my_cf")
 
 local txn = db:begin_txn()
 
--- First batch of work
 txn:put(cf, "key1", "value1", -1)
 txn:commit()
 
--- Reset instead of free + begin
 txn:reset(tidesdb.IsolationLevel.READ_COMMITTED)
 
--- Second batch of work using the same transaction
 txn:put(cf, "key2", "value2", -1)
 txn:commit()
 
--- Free once when done
 txn:free()
 ```
 
@@ -706,9 +698,9 @@ txn:free()
 - The isolation level can be changed on each reset
 
 **When to use**
-- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** -- Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce allocation overhead in tight write loops
 
 ## Isolation Levels
 
@@ -721,11 +713,11 @@ txn:free()
 ```
 
 **Available Isolation Levels**
-- `READ_UNCOMMITTED` -- Sees all data including uncommitted changes
-- `READ_COMMITTED` -- Sees only committed data (default)
-- `REPEATABLE_READ` -- Consistent snapshot, phantom reads possible
-- `SNAPSHOT` -- Write-write conflict detection
-- `SERIALIZABLE` -- Full read-write conflict detection (SSI)
+- `READ_UNCOMMITTED` · Sees all data including uncommitted changes
+- `READ_COMMITTED` · Sees only committed data (default)
+- `REPEATABLE_READ` · Consistent snapshot, phantom reads possible
+- `SNAPSHOT` · Write-write conflict detection
+- `SERIALIZABLE` · Full read-write conflict detection (SSI)
 
 ## Savepoints
 
@@ -739,18 +731,16 @@ txn:put(cf, "key1", "value1", -1)
 txn:savepoint("sp1")
 txn:put(cf, "key2", "value2", -1)
 
--- Rollback to savepoint -- key2 is discarded, key1 remains
 txn:rollback_to_savepoint("sp1")
 
--- Commit -- only key1 is written
 txn:commit()
 txn:free()
 ```
 
 **Savepoint API**
-- `txn:savepoint(name)` -- Create a savepoint
-- `txn:rollback_to_savepoint(name)` -- Rollback to savepoint
-- `txn:release_savepoint(name)` -- Release savepoint without rolling back
+- `txn:savepoint(name)` · Create a savepoint
+- `txn:rollback_to_savepoint(name)` · Rollback to savepoint
+- `txn:release_savepoint(name)` · Release savepoint without rolling back
 
 ## Custom Comparators
 
@@ -760,12 +750,12 @@ TidesDB uses comparators to determine the sort order of keys. Once a comparator 
 
 TidesDB provides six built-in comparators that are automatically registered:
 
-- **`"memcmp"`** (default) -- Binary byte-by-byte comparison
-- **`"lexicographic"`** -- Null-terminated string comparison (uses `strcmp`)
-- **`"uint64"`** -- Unsigned 64-bit integer comparison (8-byte keys)
-- **`"int64"`** -- Signed 64-bit integer comparison (8-byte keys)
-- **`"reverse"`** -- Reverse binary comparison (descending order)
-- **`"case_insensitive"`** -- Case-insensitive ASCII comparison
+- **`"memcmp"`** (default) · Binary byte-by-byte comparison
+- **`"lexicographic"`** · Null-terminated string comparison (uses `strcmp`)
+- **`"uint64"`** · Unsigned 64-bit integer comparison (8-byte keys)
+- **`"int64"`** · Signed 64-bit integer comparison (8-byte keys)
+- **`"reverse"`** · Reverse binary comparison (descending order)
+- **`"case_insensitive"`** · Case-insensitive ASCII comparison
 
 ```lua
 local cf_config = tidesdb.default_column_family_config()
@@ -781,10 +771,7 @@ You can register custom comparators using FFI callbacks:
 ```lua
 local ffi = require("ffi")
 
--- Define comparison function
 local my_compare = ffi.cast("tidesdb_comparator_fn", function(key1, key1_size, key2, key2_size, ctx)
-    -- Custom comparison logic
-    -- Return: < 0 if key1 < key2, 0 if equal, > 0 if key1 > key2
     local s1 = ffi.string(key1, key1_size)
     local s2 = ffi.string(key2, key2_size)
     if s1 < s2 then return -1
@@ -792,10 +779,8 @@ local my_compare = ffi.cast("tidesdb_comparator_fn", function(key1, key1_size, k
     else return 0 end
 end)
 
--- Register before creating column families
 db:register_comparator("my_comparator", my_compare, nil, nil)
 
--- Use in column family
 local cf_config = tidesdb.default_column_family_config()
 cf_config.comparator_name = "my_comparator"
 db:create_column_family("custom_cf", cf_config)
@@ -845,6 +830,7 @@ lua test_tidesdb.lua
 | `db:begin_txn_with_isolation(level)` | Begin transaction with isolation level |
 | `db:get_cache_stats()` | Get block cache statistics |
 | `db:backup(dir)` | Create database backup |
+| `db:checkpoint(dir)` | Create lightweight database checkpoint using hard links |
 | `db:register_comparator(name, fn, ctx_str, ctx)` | Register custom comparator |
 | `db:get_comparator(name)` | Get registered comparator |
 

@@ -62,7 +62,7 @@ Sequential write operations represent an idealized scenario where keys are inser
 
 TidesDB's performance advantage in sequential writes is extraordinary, achieving more than triple RocksDB's throughput at 6.18M ops/sec versus 1.88M ops/sec.
 
-Write amplification strongly favors TidesDB at 1.08x versus 1.44x—a 25% reduction indicating significantly less internal data movement during compaction and flushing operations. This low write amplification is crucial for SSD longevity and overall I/O efficiency.
+Write amplification strongly favors TidesDB at 1.08x versus 1.44x -- a 25% reduction indicating significantly less internal data movement during compaction and flushing operations. This low write amplification is crucial for SSD longevity and overall I/O efficiency.
 
 The iteration throughput shows TidesDB at 8.22M ops/sec versus RocksDB's 5.30M ops/sec (1.55x faster), confirming that TidesDB's internal organization facilitates exceptionally fast sequential access patterns.
 
@@ -83,7 +83,7 @@ Random writes stress the storage engine's ability to handle dispersed key insert
 
 ### Analysis
 
-Under random access patterns, TidesDB maintains a strong 52% throughput advantage at 2.59M ops/sec versus 1.70M ops/sec. The median latency advantage is particularly impressive—2,831 μs versus 4,696 μs represents a 1.7x improvement, indicating TidesDB handles random writes with significantly less overhead.
+Under random access patterns, TidesDB maintains a strong 52% throughput advantage at 2.59M ops/sec versus 1.70M ops/sec. The median latency advantage is particularly impressive -- 2,831 μs versus 4,696 μs represents a 1.7x improvement, indicating TidesDB handles random writes with significantly less overhead.
 
 Write amplification remains favorable at 1.12x versus 1.33x (16% lower), demonstrating efficient internal organization even under randomized access patterns. The 1.3x smaller database size (89.75 MB vs 113.17 MB) continues to showcase TidesDB's superior space efficiency.
 
@@ -105,7 +105,7 @@ Read performance is critical for many database workloads, particularly those inv
 
 ### Analysis
 
-TidesDB demonstrates superior read performance, achieving 2.55M ops/sec versus RocksDB's 1.45M ops/sec—a 76% advantage. This represents a complete reversal from earlier benchmarks where RocksDB held a 5.68x read advantage.
+TidesDB demonstrates superior read performance, achieving 2.55M ops/sec versus RocksDB's 1.45M ops/sec -- a 76% advantage. This represents a complete reversal from earlier benchmarks where RocksDB held a 5.68x read advantage.
 
 The latency characteristics are particularly impressive · TidesDB achieves 3 μs median latency versus RocksDB's 5 μs (1.7x lower), and at the P99 percentile, TidesDB's 5 μs versus RocksDB's 13 μs represents a 2.6x advantage. These microsecond-level latencies indicate highly efficient index structures and cache utilization.
 
@@ -132,7 +132,7 @@ Real-world applications typically exhibit mixed access patterns. This test split
 
 Under mixed workloads, TidesDB demonstrates balanced performance advantages across both operations. The 16% write advantage (2.16M vs 1.87M ops/sec) and 4% read advantage (1.45M vs 1.39M ops/sec).
 
-The read latency parity at 5 μs median is particularly noteworthy—TidesDB matches RocksDB's read latency while maintaining superior write performance. 
+The read latency parity at 5 μs median is particularly noteworthy -- TidesDB matches RocksDB's read latency while maintaining superior write performance. 
 
 The 1.8x difference in database size (43.86 MB vs 78.19 MB for identical data) demonstrates TidesDB's exceptional space efficiency, which translates to significant storage cost savings at scale. The 13% lower write amplification (1.09x vs 1.25x) further confirms TidesDB's efficiency advantages.
 
@@ -167,7 +167,7 @@ The space efficiency is extraordinary · 5.5x-6.1x smaller database sizes (10 MB
 
 TidesDB's read performance advantage in this scenario (2.73M ops/sec vs 1.52M ops/sec, with 2 μs vs 3 μs median latency) demonstrates excellent cache utilization for hot data. The consistent 2 μs read latency represents exceptional performance for frequently accessed keys.
 
-**Key Insight** · While TidesDB shows balanced performance in uniform random workloads, it truly excels when access patterns exhibit locality—a characteristic of most production workloads.
+**Key Insight** · While TidesDB shows balanced performance in uniform random workloads, it truly excels when access patterns exhibit locality -- a characteristic of most production workloads.
 
 ## 6. Delete Performance
 
@@ -187,7 +187,7 @@ Deletion efficiency impacts applications with high turnover rates, such as cachi
 
 TidesDB demonstrates a modest but consistent 10% advantage in delete throughput (3.81M vs 3.47M ops/sec), with 1.2x lower median latency. Both engines show impressive delete performance exceeding 3 million operations per second.
 
-The write amplification factors are notable · both engines show values well below 1.0 (0.18x and 0.28x), indicating that deletion operations write significantly less data to disk than the original data size—expected behavior as deletions primarily involve tombstone markers rather than physical data removal. TidesDB's 36% lower write amplification (0.18x vs 0.28x) suggests more efficient tombstone handling.
+The write amplification factors are notable · both engines show values well below 1.0 (0.18x and 0.28x), indicating that deletion operations write significantly less data to disk than the original data size - expected behavior as deletions primarily involve tombstone markers rather than physical data removal. TidesDB's 36% lower write amplification (0.18x vs 0.28x) suggests more efficient tombstone handling.
 
 The critical difference lies in space reclamation · TidesDB achieves a final database size of 0.00 MB after deleting all 5 million records, while RocksDB retains 63.77 MB. This demonstrates TidesDB performs immediate or aggressive garbage collection, while RocksDB requires explicit compaction to fully reclaim space. For applications with high delete rates or strict storage requirements, this difference could be operationally significant.
 
@@ -218,7 +218,7 @@ Iteration performance strongly favors TidesDB at 961K ops/sec versus RocksDB's 4
 
 ## 8. Small Value Performance
 
-The converse scenario tests tiny 64-byte values with 16-byte keys—common in key-value caches and metadata stores.
+The converse scenario tests tiny 64-byte values with 16-byte keys,common in key-value caches and metadata stores.
 
 ### Results Summary
 
@@ -421,11 +421,11 @@ This comprehensive benchmark suite reveals that TidesDB v6.0.0 represents a sign
 
 **The Bottom Line**
 
-The benchmarks demonstrate that TidesDB has evolved beyond a write-optimized maestro into a truly balanced, high-performance storage engine. It achieves exceptional write throughput while simultaneously delivering competitive-to-superior read performance—a combination that positions it as a compelling choice for modern applications.
+The benchmarks demonstrate that TidesDB has evolved beyond a write-optimized maestro into a truly balanced, high-performance storage engine. It achieves exceptional write throughput while simultaneously delivering competitive-to-superior read performance, a combination that positions it as a compelling choice for modern applications.
 
 TidesDB's most remarkable achievement is delivering 1.76x faster random reads than RocksDB while maintaining 3.28x faster sequential writes and using 1.9x less storage space. 
 
-The space efficiency alone—with databases 1.2x-6.1x smaller than RocksDB for identical data—represents substantial cost savings in cloud storage scenarios. At scale, this could translate to millions of dollars in reduced storage costs while simultaneously improving performance.
+The space efficiency alone - with databases 1.2x-6.1x smaller than RocksDB for identical data - represents substantial cost savings in cloud storage scenarios. At scale, this could translate to millions of dollars in reduced storage costs while simultaneously improving performance.
 
 Very excite ;)
 
