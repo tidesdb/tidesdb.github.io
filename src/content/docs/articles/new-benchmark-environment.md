@@ -153,6 +153,7 @@ wipefs -af /dev/nvme1n1
 
 I basically in rescue mode setup the server with this one command after setting up scripts:
 ```bash
+chmod +x /tmp/post-install.sh
 installimage -a -c /tmp/setup.conf -x /tmp/post-install.sh
 ```
 
