@@ -54,13 +54,14 @@ IMAGE /root/images/Ubuntu-2204-jammy-amd64-base.tar.gz
 **post-install.sh**
 ```bash
 #!/usr/bin/env bash
-set -euo pipefail
+# Note: Not using set -e because some commands fail in chroot but are non-fatal
+set -uo pipefail
 
 echo "== Post-install: packages =="
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y --no-install-recommends \
-  xfsprogs nvme-cli fio locales
+  xfsprogs nvme-cli fio locales parted
 
 echo "== Post-install: locale fix (prevents LC_* warnings) =="
 sed -i 's/^# *\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen || true
@@ -68,34 +69,33 @@ locale-gen
 update-locale LANG=en_US.UTF-8
 
 echo "== Post-install: fstab mount options for XFS (LSM-optimized) =="
-ROOT_SRC="$(findmnt -no SOURCE / || true)"
-ROOT_UUID="$(blkid -s UUID -o value "${ROOT_SRC}" 2>/dev/null || true)"
+# In chroot, findmnt doesn't work reliably. Parse fstab directly.
+XFS_OPTS="defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k"
+# noatime         -- skip access time updates (reduces write amplification)
+# nodiratime      -- skip dir access time
+# discard         -- enable TRIM for SSD (matches RocksDB benchmark setup)
+# inode64         -- allow inodes anywhere on disk
+# logbufs=8       -- more log buffers for write-heavy workloads
+# logbsize=256k   -- larger log buffer size
 
-if [[ -n "${ROOT_UUID}" ]]; then
-  # noatime         -- skip access time updates (reduces write amplification)
-  # nodiratime      -- skip dir access time
-  # discard         -- enable TRIM for SSD (matches RocksDB benchmark setup)
-  # inode64         -- allow inodes anywhere on disk
-  # logbufs=8       -- more log buffers for write-heavy workloads
-  # logbsize=256k   -- larger log buffer size
-  XFS_OPTS="defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k"
-
-  awk -v uuid="${ROOT_UUID}" -v opts="${XFS_OPTS}" '
-    $2=="/" {print "UUID="uuid" / xfs "opts" 0 1"; next}
-    {print}
-  ' /etc/fstab > /etc/fstab.new && mv /etc/fstab.new /etc/fstab
+# Update XFS root mount options in fstab
+if grep -q 'xfs' /etc/fstab; then
+  sed -i 's|^\(UUID=[^ ]*\s\+/\s\+xfs\s\+\)[^ ]*|\1'"${XFS_OPTS}"'|' /etc/fstab
+  echo "Updated /etc/fstab with XFS options: ${XFS_OPTS}"
+  cat /etc/fstab
 fi
 
-echo "== Post-install: enable continuous TRIM =="
-systemctl enable --now fstrim.timer || true
+echo "== Post-install: enable TRIM timer (will activate on boot) =="
+systemctl enable fstrim.timer 2>/dev/null || true
 
-echo "== Post-install: I/O scheduler (none for NVMe) =="
-for dev in /sys/block/nvme*/queue/scheduler; do
-  echo "none" > "$dev" 2>/dev/null || true
-done
+echo "== Post-install: I/O scheduler udev rule (applies on boot) =="
+cat > /etc/udev/rules.d/60-nvme-scheduler.rules << 'EOF'
+# Set I/O scheduler to none for NVMe devices
+ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ATTR{queue/scheduler}="none"
+EOF
 
 echo "== Post-install: sysctl tuning for LSM workloads =="
-cat >> /etc/sysctl.d/99-lsm-bench.conf << 'EOF'
+cat > /etc/sysctl.d/99-lsm-bench.conf << 'EOF'
 # Reduce swappiness for in-memory workloads
 vm.swappiness = 1
 # Increase dirty ratio for write batching
@@ -104,28 +104,70 @@ vm.dirty_background_ratio = 10
 # Reduce vfs_cache_pressure
 vm.vfs_cache_pressure = 50
 EOF
-sysctl --system
 
-echo "== Post-install: setup dedicated data drive (nvme1n1) =="
+echo "== Post-install: first-boot systemd service to setup data drive =="
+# Create a systemd service (more reliable than rc.local on Ubuntu 22.04)
+cat > /etc/systemd/system/setup-data-drive.service << 'SVCEOF'
+[Unit]
+Description=One-time setup of data drive
+After=local-fs.target
+ConditionPathExists=!/data/.setup-complete
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/setup-data-drive.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+cat > /usr/local/bin/setup-data-drive.sh << 'SCRIPTEOF'
+#!/bin/bash
+set -x
 DATA_DEV="/dev/nvme1n1"
-if [[ -b "${DATA_DEV}" ]]; then
-  # We wipe and create single partition
-  wipefs -af "${DATA_DEV}"
-  parted -s "${DATA_DEV}" mklabel gpt
-  parted -s "${DATA_DEV}" mkpart primary 0% 100%
-  
-  # We format as XFS with LSM-optimized settings
-  mkfs.xfs -f -K "${DATA_DEV}p1"
-  
-  # We get UUID and add to fstab
-  DATA_UUID="$(blkid -s UUID -o value "${DATA_DEV}p1")"
-  mkdir -p /data
-  DATA_OPTS="defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k"
-  echo "UUID=${DATA_UUID} /data xfs ${DATA_OPTS} 0 2" >> /etc/fstab
-  mount /data
-  
-  echo "Data drive mounted at /data"
+DATA_OPTS="defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k"
+
+if [[ ! -b "${DATA_DEV}" ]]; then
+  echo "Data device ${DATA_DEV} not found, skipping"
+  exit 0
 fi
+
+if mountpoint -q /data; then
+  echo "/data already mounted, skipping"
+  exit 0
+fi
+
+echo "Setting up ${DATA_DEV} as /data..."
+wipefs -af "${DATA_DEV}"
+parted -s "${DATA_DEV}" mklabel gpt
+parted -s "${DATA_DEV}" mkpart primary 0% 100%
+partprobe "${DATA_DEV}"
+sleep 3  # Wait for kernel to create partition device
+
+# Handle both nvme0n1p1 and nvme0n1-part1 naming conventions
+if [[ -b "${DATA_DEV}p1" ]]; then
+  PART="${DATA_DEV}p1"
+elif [[ -b "${DATA_DEV}-part1" ]]; then
+  PART="${DATA_DEV}-part1"
+else
+  echo "ERROR: Partition device not found"
+  ls -la /dev/nvme*
+  exit 1
+fi
+
+mkfs.xfs -f -K "${PART}"
+DATA_UUID="$(blkid -s UUID -o value "${PART}")"
+mkdir -p /data
+echo "UUID=${DATA_UUID} /data xfs ${DATA_OPTS} 0 2" >> /etc/fstab
+mount /data
+touch /data/.setup-complete
+echo "Data drive setup complete: /data on ${PART} (UUID=${DATA_UUID})"
+SCRIPTEOF
+chmod +x /usr/local/bin/setup-data-drive.sh
+
+# Enable the service
+systemctl enable setup-data-drive.service 2>/dev/null || true
 
 echo "== Post-install: initramfs refresh =="
 apt-get install -y --no-install-recommends initramfs-tools
@@ -157,6 +199,7 @@ chmod +x /tmp/post-install.sh
 installimage -a -c /tmp/setup.conf -x /tmp/post-install.sh
 ```
 
+![installimage](/installimage.png)
 ![all setup](/setup-hetz.png)
 
 After that I rebooted the server and it was ready to go.
