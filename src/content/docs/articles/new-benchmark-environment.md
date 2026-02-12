@@ -166,7 +166,6 @@ echo "Data drive setup complete: /data on ${PART} (UUID=${DATA_UUID})"
 SCRIPTEOF
 chmod +x /usr/local/bin/setup-data-drive.sh
 
-# Enable the service
 systemctl enable setup-data-drive.service 2>/dev/null || true
 
 echo "== Post-install: initramfs refresh =="
@@ -199,10 +198,15 @@ chmod +x /tmp/post-install.sh
 installimage -a -c /tmp/setup.conf -x /tmp/post-install.sh
 ```
 
-![installimage](/installimage.png)
 ![all setup](/setup-hetz.png)
 
 After that I rebooted the server and it was ready to go.
+
+On first boot:
+- XFS root will have optimized mount options
+- I/O scheduler will be set to none via udev
+- sysctl tuning will be applied
+- First boot: systemd service will format nvme1n1 and mount /data
 
 With that, I think this was a great investment, and I will be expanding more in the future.  For now this server will be used in upcoming analysis.
 
@@ -211,3 +215,10 @@ Look out!!
 *Thanks for reading!*
 
 --
+
+Logs from my setup:
+
+| File | Checksum |
+|------|----------|
+| [postinstall_debug.txt](/hetz-setup-logs/postinstall_debug.txt) | `21649b46654bdcd80964b3577fbc5280faccd0b05f48f2deb6acf1c1119004a3` |
+| [debug.txt](/hetz-setup-logs/debug.txt) | `8ab8fb219f0b9b5d5ae3aed4084c6c9ecbcd52d7303bdd97d9ca92c370719747` |
