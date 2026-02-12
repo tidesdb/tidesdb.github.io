@@ -34,29 +34,22 @@ The prices are great, for just over $100 CAD per month you can get above from th
 
 I ended up creating custom installimage and post-install scripts for the server as I wanted it to be setup a certain way for effective benchmarking, to really push storage engines.
 
-**setup.cnf**
+I placed the files below in `/tmp` on the server.
+
+**setup.conf**
 
 Ubuntu 22.04 (Jammy), RAID1 over two NVMe, XFS root.
 
 ```bash
 DRIVE1 /dev/nvme0n1
-DRIVE2 /dev/nvme1n1
 
-SWRAID 1
-SWRAIDLEVEL 1
+SWRAID 0
 
 BOOTLOADER grub
 HOSTNAME xfs
-
-# ---- Partitions ----
-# swap on RAID1
 PART swap  swap   4G
-# /boot on RAID1 (ext4)
 PART /boot ext4   1G
-# root on RAID1 (XFS) - "all remaining space"
 PART /     xfs    all
-
-# ---- OS image ----
 IMAGE /root/images/Ubuntu-2204-jammy-amd64-base.tar.gz
 ```
 
@@ -69,25 +62,25 @@ echo "== Post-install: packages =="
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y --no-install-recommends \
-  xfsprogs nvme-cli mdadm locales
+  xfsprogs nvme-cli fio locales
 
 echo "== Post-install: locale fix (prevents LC_* warnings) =="
 sed -i 's/^# *\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen || true
 locale-gen
 update-locale LANG=en_US.UTF-8
 
-echo "== Post-install: ensure mdadm config present =="
-mkdir -p /etc/mdadm
-mdadm --detail --scan > /etc/mdadm/mdadm.conf || true
-
-echo "== Post-install: fstab mount options for XFS root =="
+echo "== Post-install: fstab mount options for XFS (LSM-optimized) =="
 ROOT_SRC="$(findmnt -no SOURCE / || true)"
 ROOT_UUID="$(blkid -s UUID -o value "${ROOT_SRC}" 2>/dev/null || true)"
 
 if [[ -n "${ROOT_UUID}" ]]; then
-  # We prefer scheduled TRIM via fstrim.timer (recommended for SSD/NVMe).
-  # Essentially like discard option in which Meta team uses.
-  XFS_OPTS="defaults,noatime,nodiratime,inode64"
+  # noatime         -- skip access time updates (reduces write amplification)
+  # nodiratime      -- skip dir access time
+  # discard         -- enable TRIM for SSD (matches RocksDB benchmark setup)
+  # inode64         -- allow inodes anywhere on disk
+  # logbufs=8       -- more log buffers for write-heavy workloads
+  # logbsize=256k   -- larger log buffer size
+  XFS_OPTS="defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k"
 
   awk -v uuid="${ROOT_UUID}" -v opts="${XFS_OPTS}" '
     $2=="/" {print "UUID="uuid" / xfs "opts" 0 1"; next}
@@ -95,23 +88,60 @@ if [[ -n "${ROOT_UUID}" ]]; then
   ' /etc/fstab > /etc/fstab.new && mv /etc/fstab.new /etc/fstab
 fi
 
-echo "== Post-install: enable periodic TRIM =="
+echo "== Post-install: enable continuous TRIM =="
 systemctl enable --now fstrim.timer || true
 
-echo "== Post-install: initramfs refresh (picks up mdadm etc.) =="
+echo "== Post-install: I/O scheduler (none for NVMe) =="
+for dev in /sys/block/nvme*/queue/scheduler; do
+  echo "none" > "$dev" 2>/dev/null || true
+done
+
+echo "== Post-install: sysctl tuning for LSM workloads =="
+cat >> /etc/sysctl.d/99-lsm-bench.conf << 'EOF'
+# Reduce swappiness for in-memory workloads
+vm.swappiness = 1
+# Increase dirty ratio for write batching
+vm.dirty_ratio = 40
+vm.dirty_background_ratio = 10
+# Reduce vfs_cache_pressure
+vm.vfs_cache_pressure = 50
+EOF
+sysctl --system
+
+echo "== Post-install: setup dedicated data drive (nvme1n1) =="
+DATA_DEV="/dev/nvme1n1"
+if [[ -b "${DATA_DEV}" ]]; then
+  # We wipe and create single partition
+  wipefs -af "${DATA_DEV}"
+  parted -s "${DATA_DEV}" mklabel gpt
+  parted -s "${DATA_DEV}" mkpart primary 0% 100%
+  
+  # We format as XFS with LSM-optimized settings
+  mkfs.xfs -f -K "${DATA_DEV}p1"
+  
+  # We get UUID and add to fstab
+  DATA_UUID="$(blkid -s UUID -o value "${DATA_DEV}p1")"
+  mkdir -p /data
+  DATA_OPTS="defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k"
+  echo "UUID=${DATA_UUID} /data xfs ${DATA_OPTS} 0 2" >> /etc/fstab
+  mount /data
+  
+  echo "Data drive mounted at /data"
+fi
+
+echo "== Post-install: initramfs refresh =="
 apt-get install -y --no-install-recommends initramfs-tools
 update-initramfs -u -k all
 
 echo "== Post-install done =="
 ```
 
-I basically on rescue mode setup the server with this one command:
+I basically in rescue mode setup the server with this one command after setting up scripts:
 ```bash
 installimage -a -c /tmp/setup.conf -x /tmp/post-install.sh
 ```
 
 ![all setup](/setup-hetz.png)
-![final specs](/sspec2.png)
 
 After that I rebooted the server and it was ready to go.
 
