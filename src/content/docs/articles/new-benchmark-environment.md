@@ -25,12 +25,12 @@ head:
 Well, I've been wanting to get a good dedicated server for a while now.  I finally got around to it.  I chose go to go with <a href="https://www.hetzner.com">Hetzner</a>.  
 
 This is what I ended up getting purely for benchmarking and analysis:
-![new benchmark environment](/public/hetz-server-spec.png)
+![new benchmark environment](/hetz-server-spec.png)
 
 The prices are great, for just over $100 CAD per month you can get above from the <a href="https://www.hetzner.com/sb/">server auctions</a>.
 
 
-![specs](/public/sspec1.png)
+![specs](/sspec1.png)
 
 I ended up creating custom installimage and post-install scripts for the server as I wanted it to be setup a certain way for effective benchmarking, to really push storage engines.
 
@@ -110,8 +110,8 @@ I basically on rescue mode setup the server with this one command:
 installimage -a -c /tmp/setup.conf -x /tmp/post-install.sh
 ```
 
-![all setup](/public/setup-hetz.png)
-![final specs](/public/sspec2.png)
+![all setup](/setup-hetz.png)
+![final specs](/sspec2.png)
 
 After that I rebooted the server and it was ready to go.
 
