@@ -1,0 +1,252 @@
+root@rescue ~ # cat postinstall_debug.txt
+== Post-install: packages ==
+Get:1 http://mirror.hetzner.com/ubuntu/packages jammy InRelease [270 kB]
+Get:2 http://mirror.hetzner.com/ubuntu/packages jammy-updates InRelease [128 kB]
+Get:3 http://mirror.hetzner.com/ubuntu/packages jammy-backports InRelease [127 kB]
+Get:4 http://mirror.hetzner.com/ubuntu/packages jammy-security InRelease [129 kB]
+Get:5 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Get:6 http://archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
+Get:7 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 Packages [1395 kB]
+Get:8 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+Get:9 http://mirror.hetzner.com/ubuntu/packages jammy/main Translation-en [510 kB]
+Get:10 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 c-n-f Metadata [30.3 kB]
+Get:11 http://mirror.hetzner.com/ubuntu/packages jammy/restricted amd64 Packages [129 kB]
+Get:12 http://mirror.hetzner.com/ubuntu/packages jammy/restricted Translation-en [18.6 kB]
+Get:13 http://mirror.hetzner.com/ubuntu/packages jammy/restricted amd64 c-n-f Metadata [488 B]
+Get:14 http://mirror.hetzner.com/ubuntu/packages jammy/universe amd64 Packages [14.1 MB]
+Get:15 http://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+Get:16 http://mirror.hetzner.com/ubuntu/packages jammy/universe Translation-en [5652 kB]
+Get:17 http://mirror.hetzner.com/ubuntu/packages jammy/universe amd64 c-n-f Metadata [286 kB]
+Get:18 http://mirror.hetzner.com/ubuntu/packages jammy/multiverse amd64 Packages [217 kB]
+Get:19 http://mirror.hetzner.com/ubuntu/packages jammy/multiverse Translation-en [112 kB]
+Get:20 http://mirror.hetzner.com/ubuntu/packages jammy/multiverse amd64 c-n-f Metadata [8372 B]
+Get:21 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 Packages [3220 kB]
+Get:22 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main Translation-en [492 kB]
+Get:23 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 c-n-f Metadata [19.1 kB]
+Get:24 http://mirror.hetzner.com/ubuntu/packages jammy-updates/restricted amd64 Packages [5253 kB]
+Get:25 http://mirror.hetzner.com/ubuntu/packages jammy-updates/restricted Translation-en [988 kB]
+Get:26 http://mirror.hetzner.com/ubuntu/packages jammy-updates/restricted amd64 c-n-f Metadata [676 B]
+Get:27 http://mirror.hetzner.com/ubuntu/packages jammy-updates/universe amd64 Packages [1253 kB]
+Get:28 http://mirror.hetzner.com/ubuntu/packages jammy-updates/universe Translation-en [313 kB]
+Get:29 http://mirror.hetzner.com/ubuntu/packages jammy-updates/universe amd64 c-n-f Metadata [30.2 kB]
+Get:30 http://mirror.hetzner.com/ubuntu/packages jammy-updates/multiverse amd64 Packages [59.0 kB]
+Get:31 http://mirror.hetzner.com/ubuntu/packages jammy-updates/multiverse Translation-en [13.5 kB]
+Get:32 http://mirror.hetzner.com/ubuntu/packages jammy-updates/multiverse amd64 c-n-f Metadata [612 B]
+Get:33 http://mirror.hetzner.com/ubuntu/packages jammy-backports/main amd64 Packages [69.4 kB]
+Get:34 http://mirror.hetzner.com/ubuntu/packages jammy-backports/main Translation-en [11.5 kB]
+Get:35 http://mirror.hetzner.com/ubuntu/packages jammy-backports/main amd64 c-n-f Metadata [412 B]
+Get:36 http://mirror.hetzner.com/ubuntu/packages jammy-backports/restricted amd64 c-n-f Metadata [116 B]
+Get:37 http://mirror.hetzner.com/ubuntu/packages jammy-backports/universe amd64 Packages [31.7 kB]
+Get:38 http://mirror.hetzner.com/ubuntu/packages jammy-backports/universe Translation-en [16.9 kB]
+Get:39 http://mirror.hetzner.com/ubuntu/packages jammy-backports/universe amd64 c-n-f Metadata [672 B]
+Get:40 http://mirror.hetzner.com/ubuntu/packages jammy-backports/multiverse amd64 c-n-f Metadata [116 B]
+Get:41 http://mirror.hetzner.com/ubuntu/packages jammy-security/main amd64 Packages [2939 kB]
+Get:42 http://mirror.hetzner.com/ubuntu/packages jammy-security/main Translation-en [422 kB]
+Get:43 http://mirror.hetzner.com/ubuntu/packages jammy-security/main amd64 c-n-f Metadata [14.1 kB]
+Get:44 http://mirror.hetzner.com/ubuntu/packages jammy-security/restricted amd64 Packages [5032 kB]
+Get:45 http://mirror.hetzner.com/ubuntu/packages jammy-security/restricted Translation-en [949 kB]
+Get:46 http://mirror.hetzner.com/ubuntu/packages jammy-security/restricted amd64 c-n-f Metadata [680 B]
+Get:47 http://mirror.hetzner.com/ubuntu/packages jammy-security/universe amd64 Packages [1015 kB]
+Get:48 http://mirror.hetzner.com/ubuntu/packages jammy-security/universe Translation-en [223 kB]
+Get:49 http://mirror.hetzner.com/ubuntu/packages jammy-security/universe amd64 c-n-f Metadata [22.5 kB]
+Get:50 http://mirror.hetzner.com/ubuntu/packages jammy-security/multiverse amd64 Packages [51.9 kB]
+Get:51 http://mirror.hetzner.com/ubuntu/packages jammy-security/multiverse Translation-en [10.6 kB]
+Get:52 http://mirror.hetzner.com/ubuntu/packages jammy-security/multiverse amd64 c-n-f Metadata [388 B]
+Get:53 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [2959 kB]
+Get:54 http://security.ubuntu.com/ubuntu jammy-security/main Translation-en [425 kB]
+Get:55 http://security.ubuntu.com/ubuntu jammy-security/main amd64 c-n-f Metadata [14.1 kB]
+Get:56 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [5089 kB]
+Get:57 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1395 kB]
+Get:58 http://security.ubuntu.com/ubuntu jammy-security/restricted Translation-en [963 kB]
+Get:59 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 c-n-f Metadata [680 B]
+Get:60 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1016 kB]
+Get:61 http://security.ubuntu.com/ubuntu jammy-security/universe Translation-en [224 kB]
+Get:62 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 c-n-f Metadata [22.6 kB]
+Get:63 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [51.9 kB]
+Get:64 http://security.ubuntu.com/ubuntu jammy-security/multiverse Translation-en [10.6 kB]
+Get:65 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 c-n-f Metadata [388 B]
+Get:66 http://archive.ubuntu.com/ubuntu jammy/main Translation-en [510 kB]
+Get:67 http://archive.ubuntu.com/ubuntu jammy/main amd64 c-n-f Metadata [30.3 kB]
+Get:68 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [129 kB]
+Get:69 http://archive.ubuntu.com/ubuntu jammy/restricted Translation-en [18.6 kB]
+Get:70 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 c-n-f Metadata [488 B]
+Get:71 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [14.1 MB]
+Get:72 http://archive.ubuntu.com/ubuntu jammy/universe Translation-en [5652 kB]
+Get:73 http://archive.ubuntu.com/ubuntu jammy/universe amd64 c-n-f Metadata [286 kB]
+Get:74 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [217 kB]
+Get:75 http://archive.ubuntu.com/ubuntu jammy/multiverse Translation-en [112 kB]
+Get:76 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 c-n-f Metadata [8372 B]
+Get:77 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [3220 kB]
+Get:78 http://archive.ubuntu.com/ubuntu jammy-updates/main Translation-en [492 kB]
+Get:79 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 c-n-f Metadata [19.1 kB]
+Get:80 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [5253 kB]
+Get:81 http://archive.ubuntu.com/ubuntu jammy-updates/restricted Translation-en [988 kB]
+Get:82 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 c-n-f Metadata [676 B]
+Get:83 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1254 kB]
+Get:84 http://archive.ubuntu.com/ubuntu jammy-updates/universe Translation-en [313 kB]
+Get:85 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 c-n-f Metadata [30.2 kB]
+Get:86 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [59.0 kB]
+Get:87 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse Translation-en [13.5 kB]
+Get:88 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 c-n-f Metadata [612 B]
+Get:89 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [69.4 kB]
+Get:90 http://archive.ubuntu.com/ubuntu jammy-backports/main Translation-en [11.5 kB]
+Get:91 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 c-n-f Metadata [412 B]
+Get:92 http://archive.ubuntu.com/ubuntu jammy-backports/restricted amd64 c-n-f Metadata [116 B]
+Get:93 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [31.7 kB]
+Get:94 http://archive.ubuntu.com/ubuntu jammy-backports/universe Translation-en [16.9 kB]
+Get:95 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 c-n-f Metadata [672 B]
+Get:96 http://archive.ubuntu.com/ubuntu jammy-backports/multiverse amd64 c-n-f Metadata [116 B]
+Fetched 91.2 MB in 8s (11.8 MB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+parted is already the newest version (3.4-2build1).
+xfsprogs is already the newest version (5.13.0-1ubuntu2.1).
+The following additional packages will be installed:
+libboost-iostreams1.74.0 libboost-thread1.74.0 libdaxctl1 libgfapi0
+libgfrpc0 libgfxdr0 libglusterfs0 libibverbs1 libndctl6 libnl-route-3-200
+libpmem1 libpmemblk1 libpmemobj1 librados2 librbd1 librdmacm1
+Suggested packages:
+gnuplot gfio python-scipy
+Recommended packages:
+ibverbs-providers
+The following NEW packages will be installed:
+fio libboost-iostreams1.74.0 libboost-thread1.74.0 libdaxctl1 libgfapi0
+libgfrpc0 libgfxdr0 libglusterfs0 libibverbs1 libndctl6 libnl-route-3-200
+libpmem1 libpmemblk1 libpmemobj1 librados2 librbd1 librdmacm1 nvme-cli
+The following packages will be upgraded:
+locales
+1 upgraded, 18 newly installed, 0 to remove and 18 not upgraded.
+Need to get 17.5 MB of archives.
+After this operation, 46.2 MB of additional disk space will be used.
+Get:1 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 locales all 2.35-0ubuntu3.13 [4248 kB]
+Get:2 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 libgfxdr0 amd64 10.1-1ubuntu0.2 [22.3 kB]
+Get:3 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 libglusterfs0 amd64 10.1-1ubuntu0.2 [287 kB]
+Get:4 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 libgfrpc0 amd64 10.1-1ubuntu0.2 [47.1 kB]
+Get:5 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 libgfapi0 amd64 10.1-1ubuntu0.2 [77.3 kB]
+Get:6 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libnl-route-3-200 amd64 3.5.0-0.1 [180 kB]
+Get:7 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libibverbs1 amd64 39.0-1 [69.3 kB]
+Get:8 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libdaxctl1 amd64 72.1-1 [19.8 kB]
+Get:9 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libndctl6 amd64 72.1-1 [57.7 kB]
+Get:10 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libpmem1 amd64 1.11.1-3build1 [81.4 kB]
+Get:11 http://mirror.hetzner.com/ubuntu/packages jammy/universe amd64 libpmemblk1 amd64 1.11.1-3build1 [65.6 kB]
+Get:12 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libboost-iostreams1.74.0 amd64 1.74.0-14ubuntu3 [245 kB]
+Get:13 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libboost-thread1.74.0 amd64 1.74.0-14ubuntu3 [262 kB]
+Get:14 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 librdmacm1 amd64 39.0-1 [71.2 kB]
+Get:15 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 librados2 amd64 17.2.9-0ubuntu0.22.04.1 [3607 kB]
+Get:16 http://mirror.hetzner.com/ubuntu/packages jammy/main amd64 libpmemobj1 amd64 1.11.1-3build1 [124 kB]
+Get:17 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 librbd1 amd64 17.2.9-0ubuntu0.22.04.1 [3557 kB]
+Get:18 http://mirror.hetzner.com/ubuntu/packages jammy/universe amd64 fio amd64 3.28-1 [4047 kB]
+Get:19 http://mirror.hetzner.com/ubuntu/packages jammy-updates/main amd64 nvme-cli amd64 1.16-3ubuntu0.3 [474 kB]
+Preconfiguring packages ...
+Fetched 17.5 MB in 0s (104 MB/s)
+(Reading database ... 43783 files and directories currently installed.)
+Preparing to unpack .../00-locales_2.35-0ubuntu3.13_all.deb ...
+Unpacking locales (2.35-0ubuntu3.13) over (2.35-0ubuntu3.12) ...
+Selecting previously unselected package libgfxdr0:amd64.
+Preparing to unpack .../01-libgfxdr0_10.1-1ubuntu0.2_amd64.deb ...
+Unpacking libgfxdr0:amd64 (10.1-1ubuntu0.2) ...
+Selecting previously unselected package libglusterfs0:amd64.
+Preparing to unpack .../02-libglusterfs0_10.1-1ubuntu0.2_amd64.deb ...
+Unpacking libglusterfs0:amd64 (10.1-1ubuntu0.2) ...
+Selecting previously unselected package libgfrpc0:amd64.
+Preparing to unpack .../03-libgfrpc0_10.1-1ubuntu0.2_amd64.deb ...
+Unpacking libgfrpc0:amd64 (10.1-1ubuntu0.2) ...
+Selecting previously unselected package libgfapi0:amd64.
+Preparing to unpack .../04-libgfapi0_10.1-1ubuntu0.2_amd64.deb ...
+Unpacking libgfapi0:amd64 (10.1-1ubuntu0.2) ...
+Selecting previously unselected package libnl-route-3-200:amd64.
+Preparing to unpack .../05-libnl-route-3-200_3.5.0-0.1_amd64.deb ...
+Unpacking libnl-route-3-200:amd64 (3.5.0-0.1) ...
+Selecting previously unselected package libibverbs1:amd64.
+Preparing to unpack .../06-libibverbs1_39.0-1_amd64.deb ...
+Unpacking libibverbs1:amd64 (39.0-1) ...
+Selecting previously unselected package libdaxctl1:amd64.
+Preparing to unpack .../07-libdaxctl1_72.1-1_amd64.deb ...
+Unpacking libdaxctl1:amd64 (72.1-1) ...
+Selecting previously unselected package libndctl6:amd64.
+Preparing to unpack .../08-libndctl6_72.1-1_amd64.deb ...
+Unpacking libndctl6:amd64 (72.1-1) ...
+Selecting previously unselected package libpmem1:amd64.
+Preparing to unpack .../09-libpmem1_1.11.1-3build1_amd64.deb ...
+Unpacking libpmem1:amd64 (1.11.1-3build1) ...
+Selecting previously unselected package libpmemblk1:amd64.
+Preparing to unpack .../10-libpmemblk1_1.11.1-3build1_amd64.deb ...
+Unpacking libpmemblk1:amd64 (1.11.1-3build1) ...
+Selecting previously unselected package libboost-iostreams1.74.0:amd64.
+Preparing to unpack .../11-libboost-iostreams1.74.0_1.74.0-14ubuntu3_amd64.deb ...
+Unpacking libboost-iostreams1.74.0:amd64 (1.74.0-14ubuntu3) ...
+Selecting previously unselected package libboost-thread1.74.0:amd64.
+Preparing to unpack .../12-libboost-thread1.74.0_1.74.0-14ubuntu3_amd64.deb ...
+Unpacking libboost-thread1.74.0:amd64 (1.74.0-14ubuntu3) ...
+Selecting previously unselected package librdmacm1:amd64.
+Preparing to unpack .../13-librdmacm1_39.0-1_amd64.deb ...
+Unpacking librdmacm1:amd64 (39.0-1) ...
+Selecting previously unselected package librados2.
+Preparing to unpack .../14-librados2_17.2.9-0ubuntu0.22.04.1_amd64.deb ...
+Unpacking librados2 (17.2.9-0ubuntu0.22.04.1) ...
+Selecting previously unselected package libpmemobj1:amd64.
+Preparing to unpack .../15-libpmemobj1_1.11.1-3build1_amd64.deb ...
+Unpacking libpmemobj1:amd64 (1.11.1-3build1) ...
+Selecting previously unselected package librbd1.
+Preparing to unpack .../16-librbd1_17.2.9-0ubuntu0.22.04.1_amd64.deb ...
+Unpacking librbd1 (17.2.9-0ubuntu0.22.04.1) ...
+Selecting previously unselected package fio.
+Preparing to unpack .../17-fio_3.28-1_amd64.deb ...
+Unpacking fio (3.28-1) ...
+Selecting previously unselected package nvme-cli.
+Preparing to unpack .../18-nvme-cli_1.16-3ubuntu0.3_amd64.deb ...
+Unpacking nvme-cli (1.16-3ubuntu0.3) ...
+Setting up nvme-cli (1.16-3ubuntu0.3) ...
+Created symlink /etc/systemd/system/default.target.wants/nvmefc-boot-connections.service → /lib/systemd/system/nvmefc-boot-connections.service.
+Created symlink /etc/systemd/system/default.target.wants/nvmf-autoconnect.service → /lib/systemd/system/nvmf-autoconnect.service.
+Setting up libboost-iostreams1.74.0:amd64 (1.74.0-14ubuntu3) ...
+Setting up locales (2.35-0ubuntu3.13) ...
+Generating locales (this might take a while)...
+en_US.UTF-8... done
+Generation complete.
+Setting up libnl-route-3-200:amd64 (3.5.0-0.1) ...
+Setting up libglusterfs0:amd64 (10.1-1ubuntu0.2) ...
+Setting up libdaxctl1:amd64 (72.1-1) ...
+Setting up libndctl6:amd64 (72.1-1) ...
+Setting up libpmem1:amd64 (1.11.1-3build1) ...
+Setting up libgfxdr0:amd64 (10.1-1ubuntu0.2) ...
+Setting up libboost-thread1.74.0:amd64 (1.74.0-14ubuntu3) ...
+Setting up libibverbs1:amd64 (39.0-1) ...
+Setting up libpmemobj1:amd64 (1.11.1-3build1) ...
+Setting up libpmemblk1:amd64 (1.11.1-3build1) ...
+Setting up libgfrpc0:amd64 (10.1-1ubuntu0.2) ...
+Setting up librdmacm1:amd64 (39.0-1) ...
+Setting up librados2 (17.2.9-0ubuntu0.22.04.1) ...
+Setting up librbd1 (17.2.9-0ubuntu0.22.04.1) ...
+Setting up libgfapi0:amd64 (10.1-1ubuntu0.2) ...
+Setting up fio (3.28-1) ...
+Processing triggers for man-db (2.10.2-1) ...
+Processing triggers for libc-bin (2.35-0ubuntu3.12) ...
+== Post-install: locale fix (prevents LC_* warnings) ==
+Generating locales (this might take a while)...
+en_US.UTF-8... done
+Generation complete.
+== Post-install: fstab mount options for XFS (LSM-optimized) ==
+Updated /etc/fstab with XFS options: defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k
+proc /proc proc defaults 0 0
+# /dev/nvme0n1p1
+UUID=d0247438-c4b3-4f18-970d-087b304e64d2 none swap sw 0 0
+# /dev/nvme0n1p2
+UUID=d1bf6266-9bde-46a4-81fc-85e186624927 /boot ext4 defaults 0 0
+# /dev/nvme0n1p3
+UUID=a5c5f1e7-00fe-41aa-a05c-70d1c30b620d / xfs defaults,noatime,nodiratime,discard,inode64,logbufs=8,logbsize=256k 0 0
+== Post-install: enable TRIM timer (will activate on boot) ==
+== Post-install: I/O scheduler udev rule (applies on boot) ==
+== Post-install: sysctl tuning for LSM workloads ==
+== Post-install: first-boot systemd service to setup data drive ==
+== Post-install: initramfs refresh ==
+Reading package lists...
+Building dependency tree...
+Reading state information...
+initramfs-tools is already the newest version (0.140ubuntu13.5).
+initramfs-tools set to manually installed.
+0 upgraded, 0 newly installed, 0 to remove and 18 not upgraded.
+update-initramfs: Generating /boot/initrd.img-5.15.0-164-generic
+== Post-install done ==

@@ -1,0 +1,320 @@
+root@rescue ~ # cat debug.txt
+
+[16:26:20] # use config file /tmp/setup.conf for autosetup
+[16:26:20] # use post-install file /tmp/post-install.sh
+[16:26:20] # OPT_CONFIGFILE:   /tmp/setup.conf
+[16:26:21] # starting installimage
+[16:26:21] -------------------------------------
+[16:26:21] :   Hardware data:
+[16:26:21] :   CPU1: AMD Ryzen Threadripper 2950X 16-Core Processor (Cores 32)
+[16:26:21] :   Memory:  128724 MB (ECC)
+[16:26:21] :   Disk /dev/nvme0n1: 512 GB (=> 476 GiB) doesn't contain a valid partition table
+[16:26:21] :   Disk /dev/nvme1n1: 512 GB (=> 476 GiB) doesn't contain a valid partition table
+[16:26:21] :   Total capacity 953 GiB with 2 Disks
+[16:26:21] -------------------------------------
+[16:26:21] # make clean config
+[16:26:21] # SYSTYPE: MS-7B09
+[16:26:21] # SYSMFC:  Micro-Star International Co., Ltd.
+[16:26:21] running swapoff -a
+[16:26:21] running dmsetup remove_all
+[16:26:21] # stopping rescue system systemd-resolved
+[16:26:22] # updating /etc/resolv.conf
+[16:26:22] :   renamed '/etc/resolv.conf' -> '/etc/resolv.conf.bak'
+[16:26:22] :   --- /etc/resolv.conf.bak	2026-02-12 16:24:46.060982702 +0100
+[16:26:22] :   +++ /etc/resolv.conf	2026-02-12 16:26:22.133561164 +0100
+[16:26:22] :   @@ -1,23 +1,4 @@
+[16:26:22] :   -# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+[16:26:22] :   -# Do not edit.
+[16:26:22] :   -#
+[16:26:22] :   -# This file might be symlinked as /etc/resolv.conf. If you're looking at
+[16:26:22] :   -# /etc/resolv.conf and seeing this text, you have followed the symlink.
+[16:26:22] :   -#
+[16:26:22] :   -# This is a dynamic resolv.conf file for connecting local clients to the
+[16:26:22] :   -# internal DNS stub resolver of systemd-resolved. This file lists all
+[16:26:22] :   -# configured search domains.
+[16:26:22] :   -#
+[16:26:22] :   -# Run "resolvectl status" to see details about the uplink DNS servers
+[16:26:22] :   -# currently in use.
+[16:26:22] :   -#
+[16:26:22] :   -# Third party programs should typically not access this file directly, but only
+[16:26:22] :   -# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+[16:26:22] :   -# different way, replace this symlink by a static file or a different symlink.
+[16:26:22] :   -#
+[16:26:22] :   -# See man:systemd-resolved.service(8) for details about the supported modes of
+[16:26:22] :   -# operation for /etc/resolv.conf.
+[16:26:22] :   -
+[16:26:22] :   -nameserver 127.0.0.53
+[16:26:22] :   -options edns0 trust-ad
+[16:26:22] :   -search .
+[16:26:22] :   +nameserver 185.12.64.2
+[16:26:22] :   +nameserver 2a01:4ff:ff00::add:1
+[16:26:22] :   +nameserver 185.12.64.1
+[16:26:22] :   +nameserver 2a01:4ff:ff00::add:2
+[16:26:22] # updating /run/systemd/resolve/stub-resolv.conf
+[16:26:22] :   --- /run/systemd/resolve/stub-resolv.conf.bak	2026-02-12 16:26:22.149561174 +0100
+[16:26:22] :   +++ /run/systemd/resolve/stub-resolv.conf	2026-02-12 16:26:22.153561177 +0100
+[16:26:22] :   @@ -1,23 +1,4 @@
+[16:26:22] :   -# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+[16:26:22] :   -# Do not edit.
+[16:26:22] :   -#
+[16:26:22] :   -# This file might be symlinked as /etc/resolv.conf. If you're looking at
+[16:26:22] :   -# /etc/resolv.conf and seeing this text, you have followed the symlink.
+[16:26:22] :   -#
+[16:26:22] :   -# This is a dynamic resolv.conf file for connecting local clients to the
+[16:26:22] :   -# internal DNS stub resolver of systemd-resolved. This file lists all
+[16:26:22] :   -# configured search domains.
+[16:26:22] :   -#
+[16:26:22] :   -# Run "resolvectl status" to see details about the uplink DNS servers
+[16:26:22] :   -# currently in use.
+[16:26:22] :   -#
+[16:26:22] :   -# Third party programs should typically not access this file directly, but only
+[16:26:22] :   -# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+[16:26:22] :   -# different way, replace this symlink by a static file or a different symlink.
+[16:26:22] :   -#
+[16:26:22] :   -# See man:systemd-resolved.service(8) for details about the supported modes of
+[16:26:22] :   -# operation for /etc/resolv.conf.
+[16:26:22] :   -
+[16:26:22] :   -nameserver 127.0.0.53
+[16:26:22] :   -options edns0 trust-ad
+[16:26:22] :   -search .
+[16:26:22] :   +nameserver 185.12.64.2
+[16:26:22] :   +nameserver 2a01:4ff:ff00::add:1
+[16:26:22] :   +nameserver 185.12.64.1
+[16:26:22] :   +nameserver 2a01:4ff:ff00::add:2
+[16:26:22] # executing autosetup ...
+[16:26:22] # SYSTYPE: MS-7B09
+[16:26:22] # SYSMFC:  Micro-Star International Co., Ltd.
+[16:26:22] # checking if the script is disabled
+[16:26:22] # validating config ...
+[16:26:22] :   swap : 4096
+[16:26:22] :   /boot : 1024
+[16:26:22] :   / : all
+[16:26:22] Image info:
+[16:26:22] :   DISTRIB ID:               debian
+[16:26:22] :   DISTRIB RELEASE/CODENAME: 0
+[16:26:22] Image info:
+[16:26:22] :   DISTRIB ID:               ubuntu
+[16:26:22] :   DISTRIB RELEASE/CODENAME: 2204
+[16:26:22] :   Size of the first hdd is: 512110190592
+[16:26:22] :   setting TAR to GNUtar
+[16:26:23] :   check_dos_partitions
+[16:26:43] # executing installfile ...
+[16:26:43] # SYSTYPE: MS-7B09
+[16:26:43] # SYSMFC:  Micro-Star International Co., Ltd.
+[16:26:43] :   swap : 4096
+[16:26:43] :   /boot : 1024
+[16:26:43] :   / : all
+[16:26:43] Image info:
+[16:26:43] :   DISTRIB ID:               ubuntu
+[16:26:43] :   DISTRIB RELEASE/CODENAME: 2204
+[16:26:43] :   check_dos_partitions
+[16:26:43] Image info:
+[16:26:43] :   DISTRIB ID:               ubuntu
+[16:26:43] :   DISTRIB RELEASE/CODENAME: 2204
+[16:26:43] # load ubuntu specific functions...
+[16:26:43] # Deleting partitions
+[16:26:43] running swapoff -a
+[16:26:44] running dmsetup remove_all
+[16:26:44] # Deleting partitions on /dev/nvme0n1
+[16:26:45] :   Creating new GPT entries in memory.
+[16:26:45] :   GPT data structures destroyed! You may now partition the disk using fdisk or
+[16:26:45] :   other utilities.
+[16:26:45] # Test partition size
+[16:26:45] :   check_dos_partitions
+[16:26:45] # Creating partitions and /etc/fstab
+[16:26:45] # Creating partitions on /dev/nvme0n1
+[16:26:45] :   deactivate all dm-devices with dmraid and dmsetup
+[16:26:45] :   no block devices found
+[16:26:45] :   
+[16:26:45] :   /dev/nvme0n1:
+[16:26:45] :   re-reading partition table
+[16:26:45] :   create partition: parted -s /dev/nvme0n1 mkpart primary linux-swap 2048s 8390655s
+[16:26:46] :   
+[16:26:46] :   ***************************************************************
+[16:26:46] :   Found invalid GPT and valid MBR; converting MBR to GPT format
+[16:26:46] :   in memory.
+[16:26:46] :   ***************************************************************
+[16:26:46] :   
+[16:26:46] :   8390656
+[16:26:46] :   create partition: parted -s /dev/nvme0n1 mkpart primary ext3 8390656s 10487807s
+[16:26:46] :   
+[16:26:46] :   ***************************************************************
+[16:26:46] :   Found invalid GPT and valid MBR; converting MBR to GPT format
+[16:26:46] :   in memory.
+[16:26:46] :   ***************************************************************
+[16:26:46] :   
+[16:26:46] :   10487808
+[16:26:46] :   create partition: parted -s /dev/nvme0n1 mkpart primary ext3 10487808s 1000213167s
+[16:26:46] :   reread partition table after 5 seconds
+[16:26:51] :   deactivate all dm-devices with dmraid and dmsetup
+[16:26:51] :   no block devices found
+[16:26:56] # formatting  /dev/nvme0n1p1  with  swap
+[16:26:56] :   Setting up swapspace version 1, size = 4 GiB (4294963200 bytes)
+[16:26:56] :   no label, UUID=d0247438-c4b3-4f18-970d-087b304e64d2
+[16:27:00] # formatting  /dev/nvme0n1p2  with  ext4
+[16:27:00] :   /dev/nvme0n1p2: 2 bytes were erased at offset 0x00000438 (ext4): 53 ef
+[16:27:04] # formatting  /dev/nvme0n1p3  with  xfs
+[16:27:04] :   /dev/nvme0n1p3: 4 bytes were erased at offset 0x00000000 (xfs): 58 46 53 42
+[16:27:04] # Mounting partitions
+[16:27:05] # Sync time via ntp
+[16:27:05] :   Using standard Hetzner Online GmbH pubkey: /root/.oldroot/nfs/install/gpg/public-key.asc
+[16:27:05] :   Using standard Hetzner Online GmbH pubkey: /root/.oldroot/nfs/install/gpg/public-key-2018.asc
+[16:27:05] :   Using standard Hetzner Online GmbH pubkey: /root/.oldroot/nfs/install/gpg/public-key-2023.asc
+[16:27:05] :   gpg: key 9E03E2BEB8F0F463: public key "Hetzner Online AG, RZ-Softwareentwicklung (Signing Key 2013) <info@hetzner.de>" imported
+[16:27:05] :   gpg: Total number processed: 1
+[16:27:05] :   gpg:               imported: 1
+[16:27:05] :   gpg: key 7030DBE4387333B3: public key "Hetzner Online GmbH image signing key <info@hetzner.com>" imported
+[16:27:05] :   gpg: Total number processed: 1
+[16:27:05] :   gpg:               imported: 1
+[16:27:05] :   gpg: key 5D6C6CC99D52C310: public key "info@hetzner.com" imported
+[16:27:05] :   gpg: key B97D95710D4B657E: public key "Hetzner Online GmbH (image signing key) <info@hetzner.com>" imported
+[16:27:05] :   gpg: Total number processed: 2
+[16:27:05] :   gpg:               imported: 2
+[16:27:05] # Validating image before starting extraction
+[16:27:14] :   gpg: Signature made Sun 25 Jan 2026 05:17:18 PM CET
+[16:27:14] :   gpg:                using RSA key 8203B5A82E952B9187A0115FB97D95710D4B657E
+[16:27:14] :   gpg: Good signature from "Hetzner Online GmbH (image signing key) <info@hetzner.com>" [unknown]
+[16:27:14] :   gpg: WARNING: This key is not certified with a trusted signature!
+[16:27:14] :   gpg:          There is no indication that the signature belongs to the owner.
+[16:27:14] :   Primary key fingerprint: 8203 B5A8 2E95 2B91 87A0  115F B97D 9571 0D4B 657E
+[16:27:14] # Extracting image (local)
+[16:27:28] # verify that systemd-nspawn works
+[16:27:30] # Setting up network config
+[16:27:30] # setup network config
+[16:27:30] # setting up /etc/netplan/01-netcfg.yaml
+[16:27:31] :   configuring ipv4 addr 144.76.43.19/32 for enp8s0
+[16:27:31] :   configuring ipv4 gateway 144.76.43.1 for enp8s0
+[16:27:31] :   configuring ipv6 addr 2a01:4f8:191:43c1::2/64 for enp8s0
+[16:27:31] netplan config: using default routes instead of gateway4 and gateway6
+[16:27:32] :   configuring ipv6 gateway fe80::1 for enp8s0
+[16:27:32] mtab is already a symlink
+[16:27:32] # Setting hostname
+[16:27:32] # chroot: hostname xfs
+[16:27:32] # set new hostname 'xfs' in /installimage.IHK0T/hdd/etc/hostname
+[16:27:32] # Generating new SSH keys
+[16:27:32] skipping rsa1 key gen
+[16:27:32] skipping dsa key gen
+[16:27:32] # chroot: ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N '' >/dev/null
+[16:27:33] # chroot: ssh-keygen -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N '' >/dev/null
+[16:27:33] # chroot: ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N '' >/dev/null
+[16:27:33] # chroot: ssh-keygen -l -f /etc/ssh/ssh_host_rsa_key.pub -E md5 > /tmp/rsa 2> /dev/null
+[16:27:33] # chroot: ssh-keygen -l -f /etc/ssh/ssh_host_rsa_key.pub -E sha256 > /tmp/rsa.sha256 2> /dev/null
+[16:27:33] # chroot: ssh-keygen -l -f /etc/ssh/ssh_host_ecdsa_key.pub -E md5 > /tmp/ecdsa 2> /dev/null
+[16:27:33] # chroot: ssh-keygen -l -f /etc/ssh/ssh_host_ecdsa_key.pub -E sha256 > /tmp/ecdsa.sha256 2> /dev/null
+[16:27:33] # chroot: ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub -E md5 > /tmp/ed25519 2> /dev/null
+[16:27:33] # chroot: ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub -E sha256 > /tmp/ed25519.sha256 2> /dev/null
+[16:27:33] # Generating ramdisk
+[16:27:33] # Kernel Version found: 5.15.0-164-generic
+[16:27:33] # blacklisting unwanted and buggy kernel modules
+[16:27:33] :   --- /dev/null	2026-02-12 16:26:52.290422445 +0100
+[16:27:33] :   +++ /installimage.IHK0T/hdd/etc/modprobe.d/blacklist-hetzner.conf	2026-02-12 16:27:33.879038454 +0100
+[16:27:33] :   @@ -0,0 +1,8 @@
+[16:27:33] :   +### Hetzner Online GmbH - installimage
+[16:27:33] :   +### unwanted kernel modules
+[16:27:33] :   +blacklist pcspkr
+[16:27:33] :   +blacklist snd_pcsp
+[16:27:33] :   +### buggy kernel modules
+[16:27:33] :   +blacklist mei
+[16:27:33] :   +blacklist mei-me
+[16:27:33] :   +blacklist sm750fb
+[16:27:33] # configuring kernel modules
+[16:27:33] :   --- /dev/null	2026-02-12 16:26:52.290422445 +0100
+[16:27:33] :   +++ /installimage.IHK0T/hdd/etc/modprobe.d/hetzner.conf	2026-02-12 16:27:33.895038611 +0100
+[16:27:33] :   @@ -0,0 +1,2 @@
+[16:27:33] :   +### Hetzner Online GmbH - installimage
+[16:27:33] :   +options drm edid_firmware=edid/1280x1024.bin
+[16:27:33] # chroot: update-initramfs -u -k 5.15.0-164-generic
+[16:27:33] :   update-initramfs: Generating /boot/initrd.img-5.15.0-164-generic
+[16:28:02] # Generating ntp config
+[16:28:02] # using systemd-timesyncd
+[16:28:02] # Setting up miscellaneous files
+[16:28:03] # set SSH PermitRootLogin
+[16:28:04] :   --- /installimage.IHK0T/hdd/etc/ssh/sshd_config	2025-04-11 14:05:47.000000000 +0200
+[16:28:04] :   +++ /installimage.IHK0T/sshd_config	2026-02-12 16:28:03.999280460 +0100
+[16:28:04] :   @@ -30,7 +30,7 @@
+[16:28:04] :   # Authentication:
+[16:28:04] :   
+[16:28:04] :   #LoginGraceTime 2m
+[16:28:04] :   -#PermitRootLogin prohibit-password
+[16:28:04] :   +PermitRootLogin yes
+[16:28:04] :   #StrictModes yes
+[16:28:04] :   #MaxAuthTries 6
+[16:28:04] :   #MaxSessions 10
+[16:28:04] # Installing bootloader grub
+[16:28:04] # Generating config for grub
+[16:28:04] # chroot: grub-mkconfig -o /boot/grub/grub.cfg 2>&1
+[16:28:04] :   Sourcing file `/etc/default/grub'
+[16:28:04] :   Sourcing file `/etc/default/grub.d/hetzner.cfg'
+[16:28:04] :   Sourcing file `/etc/default/grub.d/init-select.cfg'
+[16:28:04] :   Generating grub configuration file ...
+[16:28:05] :   Found linux image: /boot/vmlinuz-5.15.0-164-generic
+[16:28:05] :   Found initrd image: /boot/initrd.img-5.15.0-164-generic
+[16:28:05] :   Warning: os-prober will not be executed to detect other bootable partitions.
+[16:28:05] :   Systems on them will not be added to the GRUB boot configuration.
+[16:28:05] :   Check GRUB_DISABLE_OS_PROBER documentation entry.
+[16:28:05] :   done
+[16:28:05] # chroot: grub-install --no-floppy --recheck /dev/nvme0n1 2>&1
+[16:28:05] :   Installing for i386-pc platform.
+[16:28:07] :   Installation finished. No error reported.
+[16:28:07] # debconf RESET grub-common grub-efi/install_devices
+[16:28:07] :   0
+[16:28:08] # dpkg-reconfigure grub-common
+[16:28:08] :   Running in chroot, ignoring command 'daemon-reload'
+[16:28:08] :   Running in chroot, ignoring command 'is-active'
+[16:28:08] :   Running in chroot, ignoring command 'restart'
+[16:28:08] :   update-rc.d: warning: start and stop actions are no longer supported; falling back to defaults
+[16:28:08] :   Running in chroot, ignoring command 'daemon-reload'
+[16:28:08] :   Running in chroot, ignoring request.
+[16:28:08] :   Running in chroot, ignoring command 'restart'
+[16:28:08] # debconf RESET grub-efi-amd64 grub-efi/install_devices
+[16:28:08] :   0
+[16:28:09] # dpkg-reconfigure grub-efi-amd64
+[16:28:09] :   Trying to migrate /boot/efi into esp config
+[16:28:09] :   Failed: grub-install --target=x86_64-efi  --no-nvram
+[16:28:09] :   WARNING: Bootloader is not properly installed, system may not be bootable
+[16:28:10] :   Sourcing file `/etc/default/grub'
+[16:28:10] :   Sourcing file `/etc/default/grub.d/hetzner.cfg'
+[16:28:10] :   Sourcing file `/etc/default/grub.d/init-select.cfg'
+[16:28:10] :   Generating grub configuration file ...
+[16:28:10] :   Found linux image: /boot/vmlinuz-5.15.0-164-generic
+[16:28:10] :   Found initrd image: /boot/initrd.img-5.15.0-164-generic
+[16:28:11] :   Warning: os-prober will not be executed to detect other bootable partitions.
+[16:28:11] :   Systems on them will not be added to the GRUB boot configuration.
+[16:28:11] :   Check GRUB_DISABLE_OS_PROBER documentation entry.
+[16:28:11] :   done
+[16:28:11] # debconf RESET grub-efi-arm64 grub-efi/install_devices
+[16:28:11] :   0
+[16:28:11] # debconf RESET grub-pc grub-efi/install_devices
+[16:28:11] :   0
+[16:28:12] :   
+[16:28:12] :   ***************************************************************
+[16:28:12] :   Found invalid GPT and valid MBR; converting MBR to GPT format
+[16:28:12] :   in memory.
+[16:28:12] :   ***************************************************************
+[16:28:12] :   
+[16:28:12] :   Disk /dev/disk/by-id/nvme-eui.002538b631b61aa1: 1000215216 sectors, 476.9 GiB
+[16:28:12] :   Sector size (logical/physical): 512/512 bytes
+[16:28:12] :   Disk identifier (GUID): C40289B9-5F66-40B6-BD3B-AF702BFCAB03
+[16:28:12] :   Partition table holds up to 128 entries
+[16:28:12] :   Main partition table begins at sector 2 and ends at sector 33
+[16:28:12] :   First usable sector is 34, last usable sector is 1000215182
+[16:28:12] :   Partitions will be aligned on 2048-sector boundaries
+[16:28:12] :   Total free space is 4029 sectors (2.0 MiB)
+[16:28:12] :   
+[16:28:12] :   Number  Start (sector)    End (sector)  Size       Code  Name
+[16:28:12] :   1            2048         8390655   4.0 GiB     8200  Linux swap
+[16:28:12] :   2         8390656        10487807   1024.0 MiB  8300  Linux filesystem
+[16:28:12] :   3        10487808      1000213167   471.9 GiB   8300  Linux filesystem
+[16:28:12] # debconf set grub-pc grub-pc/install_devices multiselect /dev/disk/by-id/nvme-eui.002538b631b61aa1
+[16:28:12] # chroot: debconf-set-selections
+[16:28:12] # change all device names to uuid (e.g. for ide/pata transition)
+[16:28:12] # Writing bootloader grub into MBR
+[16:28:12] # Running some ubuntu specific functions
+[16:28:12] # Randomizing systemd timer for mdadm checkarray: day 12 @ 4:56
+[16:28:12] # not disabling resume, /etc/initramfs-tools/conf.d/resume not empty
+[16:28:12] # Clearing log files
+[16:28:12] # Found post-installation script /post-install; executing it...
+[16:29:14] WARNING: install.conf.default not found or not readable
+[16:29:14] # Installation report generated
+[16:29:14] Installation report UUID: 92a44569-d583-417a-aa84-e824bce89d74
+[16:29:14] cleaning up
