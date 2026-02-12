@@ -38,8 +38,6 @@ I placed the files below in `/tmp` on the server.
 
 **setup.conf**
 
-Ubuntu 22.04 (Jammy), RAID1 over two NVMe, XFS root.
-
 ```bash
 DRIVE1 /dev/nvme0n1
 
@@ -134,6 +132,23 @@ apt-get install -y --no-install-recommends initramfs-tools
 update-initramfs -u -k all
 
 echo "== Post-install done =="
+```
+
+
+**Stop and wipe existing RAID (run in rescue mode)** this is required by Hetzner.
+
+```bash
+mdadm --stop /dev/md0 2>/dev/null || true
+mdadm --stop /dev/md1 2>/dev/null || true
+mdadm --stop /dev/md2 2>/dev/null || true
+mdadm --zero-superblock /dev/nvme0n1p1 2>/dev/null || true
+mdadm --zero-superblock /dev/nvme0n1p2 2>/dev/null || true
+mdadm --zero-superblock /dev/nvme0n1p3 2>/dev/null || true
+mdadm --zero-superblock /dev/nvme1n1p1 2>/dev/null || true
+mdadm --zero-superblock /dev/nvme1n1p2 2>/dev/null || true
+mdadm --zero-superblock /dev/nvme1n1p3 2>/dev/null || true
+wipefs -af /dev/nvme0n1
+wipefs -af /dev/nvme1n1
 ```
 
 I basically in rescue mode setup the server with this one command after setting up scripts:
