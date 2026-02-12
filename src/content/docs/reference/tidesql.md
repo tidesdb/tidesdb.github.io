@@ -60,7 +60,7 @@ If you define a `PRIMARY KEY` on a table, TidesDB uses it as the physical orderi
 
 If you create a table without an explicit primary key, the engine generates a hidden 8-byte row ID for each row, encoded in big-endian. These hidden IDs are monotonically increasing, assigned from an atomic counter that is recovered on restart by seeking to the last key in the column family.
 
-Inside the column family, every row's key is prefixed with a single namespace byte (`0x01` for data rows, `0x00` for metadata). The value is simply the raw record bytes from MariaDB's record buffer, or, for tables with BLOB columns or encryption enabled, a serialized form that includes the BLOB data inline.
+Inside the column family, every row's key is prefixed with a single namespace byte (`0x01` for data rows, `0x00` for metadata). The value is stored in a packed binary format. A null bitmap is written first, followed by each non-null field serialized using MariaDB's `Field::pack()` method. Fixed-size fields like `INT` and `BIGINT` are stored at their native pack length. `CHAR` fields have trailing spaces stripped. `VARCHAR` fields store only the actual data length rather than padding to the declared maximum. `BLOB` and `TEXT` fields are inlined with a length prefix followed by the data bytes. This packed format is more compact than the raw record buffer and reduces I/O and storage costs, especially for tables with variable-length columns.
 
 ```sql
 -- With explicit PK (comparable key ordering)
@@ -122,7 +122,7 @@ SELECT * FROM tickets ORDER BY id;
 
 ## Transactions and Concurrency
 
-TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction that provides MVCC-based isolation at the level configured for the table. The engine follows the InnoDB pattern of lazy transaction creation, a transaction object is allocated on the first data access and reused across the statement. At statement end, dirty transactions are committed and then reset for reuse, which avoids the overhead of allocating a fresh transaction object for the next statement. Read-only transactions are simply freed.
+TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction that provides MVCC-based isolation at the level configured for the table. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. At statement end, dirty transactions are committed and then freed. Read-only transactions are rolled back and reset for reuse, which avoids the overhead of allocating a fresh transaction object for the next read statement.
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
 
@@ -349,7 +349,7 @@ ALTER TABLE events SYNC_MODE='NONE', ALGORITHM=INSTANT;
 
 ### Inplace Operations
 
-Adding or dropping secondary indexes is done inplace. When a new index is added, the engine creates a new column family for it, then performs a full table scan to populate all index entries. This happens under an exclusive metadata lock, so the table is briefly unavailable during the build.
+Adding or dropping secondary indexes is done inplace. When a new index is added, the engine creates a new column family for it, then performs a full table scan to populate all index entries. This runs with no server-level lock blocking (`HA_ALTER_INPLACE_NO_LOCK`), so concurrent reads and writes can proceed during the index build.
 
 ```sql
 ALTER TABLE events ADD INDEX idx_ts (ts), ALGORITHM=INPLACE;
@@ -443,7 +443,7 @@ The engine exposes several global system variables that control TidesDB's runtim
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup |
 | `tidesdb_debug_trace` | OFF | Enables per-operation trace logging to the error log |
 
-The block clock cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of available CPU cores and the I/O bandwidth of the storage device.
+The block cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of available CPU cores and the I/O bandwidth of the storage device.
 
 
 ## How It Stores Data Internally
@@ -456,7 +456,9 @@ Row keys inside the column family use a namespace prefix byte. Data rows use `0x
 
 Primary key bytes are encoded in a memcmp-comparable format. For a signed 32-bit integer, the encoding flips the sign bit and stores the result in big-endian byte order. This means that the integer -1 sorts before 0, and 0 sorts before 1, all under a simple byte comparison. The same principle extends to all numeric types and string collations.
 
-Secondary index entries are stored in their own column family. The key format is the concatenation of the comparable index-column bytes and the comparable primary key bytes. The value is a single zero byte (effectively empty); all the information lives in the key. To resolve a secondary index lookup, the engine seeks into the index CF, reads the key, splits off the trailing PK bytes, and performs a point-get into the data CF.
+Row values are stored in a packed binary format. The null bitmap from MariaDB's record header is written first, then each non-null field is serialized using `Field::pack()`. On read, `Field::unpack()` restores the fields into MariaDB's record buffer. This format is more compact than storing the raw `reclength` bytes, particularly for tables with `VARCHAR` or `CHAR` columns.
+
+Secondary index entries are stored in their own column family. The key format is the concatenation of the comparable index-column bytes and the comparable primary key bytes. The value is a single zero byte (effectively empty); all the information lives in the key. To resolve a secondary index lookup, the engine seeks into the index CF, reads the key, splits off the trailing PK bytes, and performs a point-get into the data CF. When the server indicates that only indexed columns are needed (a covering index scan), the engine can decode integer primary key and index column values directly from the index key bytes, skipping the data CF point-get entirely.
 
 For tables without an explicit primary key, the engine generates a hidden 8-byte big-endian row ID, assigned from an atomic counter. This counter is recovered on table open by seeking to the last key in the column family.
 
@@ -468,6 +470,17 @@ The engine maintains cached statistics that are refreshed at most every two seco
 The cost model accounts for the fact that LSM-tree reads may need to consult multiple levels. A higher read amplification (more levels with overlapping key ranges) increases the cost of point lookups, which nudges the optimizer toward sequential scans when the amplification is high. Conversely, when the data is well-compacted and the read amplification is low, index lookups are cheap.
 
 For `records_in_range()`, the engine returns a rough estimate (one quarter of the cached total row count) rather than performing an expensive exact count. This is a pragmatic tradeoff, the optimizer needs a reasonable estimate to choose between index scan and table scan, but an exact count would require iterating through the range, which defeats the purpose.
+
+
+## OPTIMIZE TABLE
+
+Running `OPTIMIZE TABLE` triggers compaction on all column families associated with the table, both the main data CF and every secondary index CF. Compaction merges SSTables, removes tombstones from deleted rows, and reduces read amplification. TidesDB enqueues the work to its background compaction threads and the statement returns immediately. After compaction, the cached statistics are invalidated so the optimizer sees the post-compaction state sooner.
+
+```sql
+OPTIMIZE TABLE products;
+```
+
+This is useful after bulk deletes or updates that leave behind a large number of tombstones, or when `ANALYZE TABLE` reports high read amplification.
 
 
 ## Rename and Drop

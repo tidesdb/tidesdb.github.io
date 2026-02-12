@@ -157,6 +157,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Benchmark Analysis on TidesQL v3 & InnoDB within MariaDB v12.1.2',
+							link: 'articles/tidesql-3-innodb-mariadb-12-1-2'
+						},
+						{
 							label: 'Benchmark Analysis on TidesDB v8.2.4 & RocksDB v10.10.1',
 							link: 'articles/benchmark-analysis-tidesdb-v8-2-4-rocksdb-v10-10-1'
 						},
