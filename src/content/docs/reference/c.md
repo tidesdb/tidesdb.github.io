@@ -340,10 +340,10 @@ if (tidesdb_checkpoint(db, "./mydb_checkpoint") != 0)
 
 | | `tidesdb_backup` | `tidesdb_checkpoint` |
 |--|---|---|
-| **Speed** | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
-| **Disk usage** | Full independent copy | No extra disk until compaction removes old SSTables |
-| **Portability** | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
-| **Use case** | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
 
 **Notes**
 - The checkpoint represents the database state at the point all memtables are flushed and compactions are halted.
@@ -469,10 +469,10 @@ tidesdb_column_family_t *clone = tidesdb_get_column_family(db, "cloned_cf");
 - The clone is completely independent - modifications to one do not affect the other
 
 **Use cases**
-- **Testing** · Create a copy of production data for testing without affecting the original
-- **Branching** · Create a snapshot of data before making experimental changes
-- **Migration** · Clone data before schema or configuration changes
-- **Backup verification** · Clone and verify data integrity without modifying the source
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
+- Backup verification · Clone and verify data integrity without modifying the source
 
 **Return values**
 - `TDB_SUCCESS` · Clone completed successfully
@@ -858,17 +858,13 @@ tidesdb_txn_free(txn);
 
 :::tip[TTL Examples]
 ```c
-/* No expiration */
 time_t ttl = -1;
 
-/* Expire in 5 minutes */
 time_t ttl = time(NULL) + (5 * 60);
 
-/* Expire in 1 hour */
 time_t ttl = time(NULL) + (60 * 60);
 
-/* Expire at specific time (e.g., midnight) */
-time_t ttl = 1730592000;  /* Specific Unix timestamp */
+time_t ttl = 1730592000;
 ```
 :::
 
@@ -920,7 +916,6 @@ if (!cf) return -1;
 tidesdb_txn_t *txn = NULL;
 tidesdb_txn_begin(db, &txn);
 
-/* Multiple operations in one transaction */
 tidesdb_txn_put(txn, cf, (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
 tidesdb_txn_put(txn, cf, (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
 tidesdb_txn_delete(txn, cf, (uint8_t *)"old_key", 7);
@@ -928,7 +923,6 @@ tidesdb_txn_delete(txn, cf, (uint8_t *)"old_key", 7);
 /* Commit atomically -- all or nothing */
 if (tidesdb_txn_commit(txn) != 0)
 {
-    /* On error, transaction is automatically rolled back */
     tidesdb_txn_free(txn);
     return -1;
 }
@@ -947,10 +941,8 @@ tidesdb_txn_begin(db, &txn);
 
 tidesdb_txn_put(txn, cf, (uint8_t *)"key", 3, (uint8_t *)"value", 5, -1);
 
-/* Decide to rollback instead of commit */
 tidesdb_txn_rollback(txn);
 tidesdb_txn_free(txn);
-/* No changes were applied */
 ```
 
 ### Transaction Reset
@@ -979,18 +971,14 @@ if (!cf) return -1;
 tidesdb_txn_t *txn = NULL;
 tidesdb_txn_begin(db, &txn);
 
-/* First batch of work */
 tidesdb_txn_put(txn, cf, (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
 tidesdb_txn_commit(txn);
 
-/* Reset instead of free + begin */
 tidesdb_txn_reset(txn, TDB_ISOLATION_READ_COMMITTED);
 
-/* Second batch of work using the same transaction */
 tidesdb_txn_put(txn, cf, (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
 tidesdb_txn_commit(txn);
 
-/* Free once when done */
 tidesdb_txn_free(txn);
 ```
 
@@ -1004,9 +992,9 @@ tidesdb_txn_free(txn);
 - SERIALIZABLE transactions are correctly unregistered from and re-registered to the active transaction list
 
 **When to use**
-- **Batch processing** · Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** · Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** · Reduce malloc/free overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce malloc/free overhead in tight write loops
 
 :::tip[Reset vs Free + Begin]
 For a single transaction, `tidesdb_txn_reset` is functionally equivalent to calling `tidesdb_txn_free` followed by `tidesdb_txn_begin_with_isolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
@@ -1023,10 +1011,8 @@ if (!cf) return -1;
 tidesdb_txn_t *txn = NULL;
 tidesdb_txn_begin(db, &txn);
 
-/* First operation */
 tidesdb_txn_put(txn, cf, (uint8_t *)"key1", 4, (uint8_t *)"value1", 6, -1);
 
-/* Create savepoint */
 if (tidesdb_txn_savepoint(txn, "sp1") != 0)
 {
     tidesdb_txn_rollback(txn);
@@ -1034,10 +1020,8 @@ if (tidesdb_txn_savepoint(txn, "sp1") != 0)
     return -1;
 }
 
-/* Second operation */
 tidesdb_txn_put(txn, cf, (uint8_t *)"key2", 4, (uint8_t *)"value2", 6, -1);
 
-/* Rollback to savepoint - key2 is discarded, key1 remains */
 if (tidesdb_txn_rollback_to_savepoint(txn, "sp1") != 0)
 {
     tidesdb_txn_rollback(txn);
@@ -1045,10 +1029,8 @@ if (tidesdb_txn_rollback_to_savepoint(txn, "sp1") != 0)
     return -1;
 }
 
-/* Add different operation after rollback */
 tidesdb_txn_put(txn, cf, (uint8_t *)"key3", 4, (uint8_t *)"value3", 6, -1);
 
-/* Commit transaction - only key1 and key3 are written */
 if (tidesdb_txn_commit(txn) != 0)
 {
     tidesdb_txn_free(txn);
@@ -1087,15 +1069,12 @@ if (tidesdb_txn_begin(db, &txn) != 0)
     return -1;
 }
 
-/* Write to users CF */
 tidesdb_txn_put(txn, users_cf, (uint8_t *)"user:1000", 9, 
                 (uint8_t *)"John Doe", 8, -1);
 
-/* Write to orders CF */
 tidesdb_txn_put(txn, orders_cf, (uint8_t *)"order:5000", 10,
                 (uint8_t *)"user:1000|product:A", 19, -1);
 
-/* Atomic commit across both CFs */
 if (tidesdb_txn_commit(txn) != 0)
 {
     tidesdb_txn_free(txn);
@@ -1122,28 +1101,17 @@ if (!cf) return -1;
 
 tidesdb_txn_t *txn = NULL;
 
-/* READ UNCOMMITTED - sees all data including uncommitted changes */
 tidesdb_txn_begin_with_isolation(db, TDB_ISOLATION_READ_UNCOMMITTED, &txn);
-
-/* READ COMMITTED - sees only committed data (default) */
 tidesdb_txn_begin_with_isolation(db, TDB_ISOLATION_READ_COMMITTED, &txn);
-
-/* REPEATABLE READ - consistent snapshot, phantom reads possible */
 tidesdb_txn_begin_with_isolation(db, TDB_ISOLATION_REPEATABLE_READ, &txn);
-
-/* SNAPSHOT ISOLATION - write-write conflict detection */
 tidesdb_txn_begin_with_isolation(db, TDB_ISOLATION_SNAPSHOT, &txn);
-
-/* SERIALIZABLE - full read-write conflict detection (SSI) */
 tidesdb_txn_begin_with_isolation(db, TDB_ISOLATION_SERIALIZABLE, &txn);
 
-/* Use transaction with operations */
 tidesdb_txn_put(txn, cf, (uint8_t *)"key", 3, (uint8_t *)"value", 5, -1);
 
 int result = tidesdb_txn_commit(txn);
 if (result == TDB_ERR_CONFLICT)
 {
-    /* Conflict detected - retry transaction */
     tidesdb_txn_free(txn);
     return -1;
 }
@@ -1152,11 +1120,11 @@ tidesdb_txn_free(txn);
 ```
 
 **Isolation level characteristics**
-- **READ UNCOMMITTED** · Maximum concurrency, minimal consistency
-- **READ COMMITTED** · Balanced for OLTP workloads (default)
-- **REPEATABLE READ** · Strong point read consistency
-- **SNAPSHOT** · Prevents lost updates with write-write conflict detection
-- **SERIALIZABLE** · Strongest guarantees with full SSI, higher abort rates
+- READ UNCOMMITTED · Maximum concurrency, minimal consistency
+- READ COMMITTED · Balanced for OLTP workloads (default)
+- REPEATABLE READ · Strong point read consistency
+- SNAPSHOT · Prevents lost updates with write-write conflict detection
+- SERIALIZABLE · Strongest guarantees with full SSI, higher abort rates
 
 ## Iterators
 
@@ -1182,7 +1150,6 @@ if (tidesdb_iter_new(txn, cf, &iter) != 0)
     return -1;
 }
 
-/* Seek to first entry */
 tidesdb_iter_seek_to_first(iter);
 
 while (tidesdb_iter_valid(iter))
@@ -1195,7 +1162,6 @@ while (tidesdb_iter_valid(iter))
     if (tidesdb_iter_key(iter, &key, &key_size) == 0 &&
         tidesdb_iter_value(iter, &value, &value_size) == 0)
     {
-        /* key and value are internal pointers - do NOT free them */
         printf("Key: %.*s, Value: %.*s\n", 
                (int)key_size, key, (int)value_size, value);
     }
@@ -1223,7 +1189,6 @@ tidesdb_iter_seek_to_last(iter);
 
 while (tidesdb_iter_valid(iter))
 {
-    /* Process entries in reverse order */
     tidesdb_iter_prev(iter);
 }
 
@@ -1420,9 +1385,9 @@ else
 ```
 
 **Use cases**
-- **Validation** · Check if a comparator is registered before creating a column family
-- **Debugging** · Verify comparator registration during development
-- **Dynamic configuration** · Query available comparators at runtime
+- Validation · Check if a comparator is registered before creating a column family
+- Debugging · Verify comparator registration during development
+- Dynamic configuration · Query available comparators at runtime
 
 **Comparator function signature**
 ```c
@@ -1536,10 +1501,10 @@ if (tidesdb_is_compacting(cf))
 ```
 
 **Use cases**
-- **Graceful shutdown** · Wait for background operations to complete before closing
-- **Maintenance windows** · Check if operations are running before triggering manual compaction
-- **Monitoring** · Track background operation status for observability
-- **Testing** · Verify flush/compaction behavior in unit tests
+- Graceful shutdown · Wait for background operations to complete before closing
+- Maintenance windows · Check if operations are running before triggering manual compaction
+- Monitoring · Track background operation status for observability
+- Testing · Verify flush/compaction behavior in unit tests
 
 **Return values**
 - `1` · Operation is in progress
@@ -1562,10 +1527,10 @@ if (tidesdb_flush_memtable(cf) != 0)
 ```
 
 **When to use manual flush**
-- **Before backup** · Ensure all in-memory data is persisted before taking a backup
-- **Memory pressure** · Force data to disk when memory usage is high
-- **Testing** · Verify SSTable creation and compaction behavior
-- **Graceful shutdown** · Flush pending data before closing the database
+- Before backup · Ensure all in-memory data is persisted before taking a backup
+- Memory pressure · Force data to disk when memory usage is high
+- Testing · Verify SSTable creation and compaction behavior
+- Graceful shutdown · Flush pending data before closing the database
 
 **Behavior**
 - Enqueues flush work in the global flush thread pool
@@ -1589,12 +1554,12 @@ if (tidesdb_compact(cf) != 0)
 
 **When to use manual compaction**
 
-- **After bulk deletes** · Reclaim disk space by removing tombstones and obsolete versions
-- **After bulk updates** · Consolidate multiple versions of keys into single entries
-- **Before read-heavy workloads** · Optimize read performance by reducing the number of levels to search
-- **During maintenance windows** · Proactively compact during low-traffic periods to avoid compaction during peak load
-- **After TTL expiration** · Remove expired entries to reclaim storage
-- **Space optimization** · Force compaction to reduce space amplification when storage is constrained
+- After bulk deletes · Reclaim disk space by removing tombstones and obsolete versions
+- After bulk updates · Consolidate multiple versions of keys into single entries
+- Before read-heavy workloads · Optimize read performance by reducing the number of levels to search
+- During maintenance windows · Proactively compact during low-traffic periods to avoid compaction during peak load
+- After TTL expiration · Remove expired entries to reclaim storage
+- Space optimization · Force compaction to reduce space amplification when storage is constrained
 
 **Behavior**
 
@@ -1618,13 +1583,13 @@ See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction
 TidesDB uses separate thread pools for flush and compaction operations. Understanding the parallelism model is important for optimal configuration.
 
 **Parallelism semantics**
-- **Cross-CF parallelism** · Multiple flush/compaction workers CAN process different column families in parallel
-- **Within-CF serialization** · A single column family can only have one flush and one compaction running at any time (enforced by atomic `is_flushing` and `is_compacting` flags)
-- **No intra-CF memtable parallelism** · Even if a CF has multiple immutable memtables queued, they are flushed sequentially
+- Cross-CF parallelism · Multiple flush/compaction workers CAN process different column families in parallel
+- Within-CF serialization · A single column family can only have one flush and one compaction running at any time (enforced by atomic `is_flushing` and `is_compacting` flags)
+- No intra-CF memtable parallelism · Even if a CF has multiple immutable memtables queued, they are flushed sequentially
 
 **Thread pool sizing guidance**
-- **Single column family** · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
-- **Multiple column families** · Set thread counts up to the number of column families for maximum parallelism. With N column families and M workers (where M ≤ N), throughput scales linearly.
+- Single column family · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
+- Multiple column families · Set thread counts up to the number of column families for maximum parallelism. With N column families and M workers (where M ≤ N), throughput scales linearly.
 
 **Configuration**
 ```c
@@ -1668,9 +1633,9 @@ if (tidesdb_txn_get(txn, cf, key, key_size, &value, &value_size) == 0)
 ```
 
 :::note[When to use tidesdb_free]
-- **FFI bindings** · Language bindings (Java, Rust, Go, Python) should use `tidesdb_free` to ensure memory is freed by the same allocator that allocated it
-- **Cross-platform** · Ensures correct deallocation on all platforms
-- **Consistency** · Provides a uniform API for memory management
+- FFI bindings · Language bindings (Java, Rust, Go, Python) should use `tidesdb_free` to ensure memory is freed by the same allocator that allocated it
+- Cross-platform · Ensures correct deallocation on all platforms
+- Consistency · Provides a uniform API for memory management
 
 For native C/C++ applications, `free()` works identically since TidesDB uses the standard allocator.
 :::

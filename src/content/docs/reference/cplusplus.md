@@ -52,8 +52,7 @@ int main() {
     try {
         tidesdb::TidesDB db(config);
         std::cout << "Database opened successfully" << std::endl;
-        // Database automatically closes when db goes out of scope
-    } catch (const tidesdb::Exception& e) {
+        } catch (const tidesdb::Exception& e) {
         std::cerr << "Failed to open database: " << e.what() << std::endl;
         return 1;
     }
@@ -70,7 +69,6 @@ Column families are isolated key-value stores with independent configuration.
 auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 db.createColumnFamily("my_cf", cfConfig);
 
-// Create with custom configuration
 auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 cfConfig.writeBufferSize = 128 * 1024 * 1024;
 cfConfig.levelSizeRatio = 10;
@@ -99,7 +97,7 @@ All operations in TidesDB are performed through transactions for ACID guarantees
 auto cf = db.getColumnFamily("my_cf");
 
 auto txn = db.beginTransaction();
-txn.put(cf, "key", "value", -1);  // TTL -1 means no expiration
+txn.put(cf, "key", "value", -1);
 txn.commit();
 ```
 
@@ -112,8 +110,7 @@ auto cf = db.getColumnFamily("my_cf");
 
 auto txn = db.beginTransaction();
 
-// Set expiration time (Unix timestamp)
-auto ttl = std::time(nullptr) + 10;  // Expires in 10 seconds
+auto ttl = std::time(nullptr) + 10;
 
 txn.put(cf, "temp_key", "temp_value", ttl);
 txn.commit();
@@ -121,17 +118,13 @@ txn.commit();
 
 **TTL Examples**
 ```cpp
-// No expiration
 auto ttl = static_cast<std::time_t>(-1);
 
-// Expire in 5 minutes
 auto ttl = std::time(nullptr) + (5 * 60);
 
-// Expire in 1 hour
 auto ttl = std::time(nullptr) + (60 * 60);
 
-// Expire at specific time
-auto ttl = static_cast<std::time_t>(1735689599);  // Specific Unix timestamp
+auto ttl = static_cast<std::time_t>(1735689599);
 ```
 
 #### Reading Data
@@ -162,12 +155,10 @@ auto cf = db.getColumnFamily("my_cf");
 
 auto txn = db.beginTransaction();
 
-// Multiple operations in one transaction
 txn.put(cf, "key1", "value1", -1);
 txn.put(cf, "key2", "value2", -1);
 txn.del(cf, "old_key");
 
-// Commit atomically -- all or nothing
 txn.commit();
 ```
 
@@ -211,7 +202,6 @@ iter.seekToLast();
 while (iter.valid()) {
     auto key = iter.key();
     auto value = iter.value();
-    // Process entries in reverse order
     iter.prev();
 }
 ```
@@ -221,10 +211,8 @@ while (iter.valid()) {
 ```cpp
 auto iter = txn.newIterator(cf);
 
-// Seek to first key >= "user:1000"
 iter.seek("user:1000");
 
-// Seek to last key <= "user:2000"
 iter.seekForPrev("user:2000");
 ```
 
@@ -269,22 +257,22 @@ if (stats.config.has_value()) {
 ```
 
 **Statistics Fields**
-- `numLevels` -- Number of LSM levels
-- `memtableSize` -- Current memtable size in bytes
-- `levelSizes` -- Total bytes per level
-- `levelNumSSTables` -- Number of SSTables per level
-- `totalKeys` -- Total number of keys across memtable and all SSTables
-- `totalDataSize` -- Total data size (klog + vlog) across all SSTables
-- `avgKeySize` -- Average key size in bytes
-- `avgValueSize` -- Average value size in bytes
-- `levelKeyCounts` -- Number of keys per level
-- `readAmp` -- Read amplification (point lookup cost multiplier)
-- `hitRate` -- Cache hit rate (0.0 if cache disabled)
-- `useBtree` -- Whether column family uses B+tree klog format
-- `btreeTotalNodes` -- Total B+tree nodes across all SSTables (only if `useBtree=true`)
-- `btreeMaxHeight` -- Maximum tree height across all SSTables (only if `useBtree=true`)
-- `btreeAvgHeight` -- Average tree height across all SSTables (only if `useBtree=true`)
-- `config` -- Column family configuration (optional)
+- `numLevels` · Number of LSM levels
+- `memtableSize` · Current memtable size in bytes
+- `levelSizes` · Total bytes per level
+- `levelNumSSTables` · Number of SSTables per level
+- `totalKeys` · Total number of keys across memtable and all SSTables
+- `totalDataSize` · Total data size (klog + vlog) across all SSTables
+- `avgKeySize` · Average key size in bytes
+- `avgValueSize` · Average value size in bytes
+- `levelKeyCounts` · Number of keys per level
+- `readAmp` · Read amplification (point lookup cost multiplier)
+- `hitRate` · Cache hit rate (0.0 if cache disabled)
+- `useBtree` · Whether column family uses B+tree klog format
+- `btreeTotalNodes` · Total B+tree nodes across all SSTables (only if `useBtree=true`)
+- `btreeMaxHeight` · Maximum tree height across all SSTables (only if `useBtree=true`)
+- `btreeAvgHeight` · Average tree height across all SSTables (only if `useBtree=true`)
+- `config` · Column family configuration (optional)
 
 ### Listing Column Families
 
@@ -331,10 +319,10 @@ auto clone = db.getColumnFamily("cloned_cf");
 - The clone is completely independent -- modifications to one do not affect the other
 
 **Use cases**
-- **Testing** -- Create a copy of production data for testing without affecting the original
-- **Branching** -- Create a snapshot of data before making experimental changes
-- **Migration** -- Clone data before schema or configuration changes
-- **Backup verification** -- Clone and verify data integrity without modifying the source
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
+- Backup verification · Clone and verify data integrity without modifying the source
 
 ### Compaction
 
@@ -343,7 +331,6 @@ auto clone = db.getColumnFamily("cloned_cf");
 ```cpp
 auto cf = db.getColumnFamily("my_cf");
 
-// Manually trigger compaction (queues)
 cf.compact();
 ```
 
@@ -352,7 +339,6 @@ cf.compact();
 ```cpp
 auto cf = db.getColumnFamily("my_cf");
 
-// Manually trigger memtable flush (Queues sorted run for L1)
 cf.flushMemtable(); 
 ```
 
@@ -373,9 +359,9 @@ if (cf.isCompacting()) {
 ```
 
 **Use cases**
-- Graceful shutdown -- Wait for background operations to complete before closing
-- Maintenance windows -- Check if operations are running before triggering manual compaction
-- Monitoring -- Track background operation status for observability
+- Graceful shutdown · Wait for background operations to complete before closing
+- Maintenance windows · Check if operations are running before triggering manual compaction
+- Monitoring · Track background operation status for observability
 
 ### Updating Runtime Configuration
 
@@ -394,13 +380,13 @@ cf.updateRuntimeConfig(newConfig, persistToDisk);
 ```
 
 **Updatable settings** (safe to change at runtime):
-- `writeBufferSize` -- Memtable flush threshold
-- `skipListMaxLevel` -- Skip list level for new memtables
-- `skipListProbability` -- Skip list probability for new memtables
-- `bloomFPR` -- False positive rate for new SSTables
-- `indexSampleRatio` -- Index sampling ratio for new SSTables
-- `syncMode` -- Durability mode
-- `syncIntervalUs` -- Sync interval in microseconds
+- `writeBufferSize` · Memtable flush threshold
+- `skipListMaxLevel` · Skip list level for new memtables
+- `skipListProbability` · Skip list probability for new memtables
+- `bloomFPR` · False positive rate for new SSTables
+- `indexSampleRatio` · Index sampling ratio for new SSTables
+- `syncMode` · Durability mode
+- `syncIntervalUs` · Sync interval in microseconds
 
 **Non-updatable settings** (would corrupt existing data):
 - `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
@@ -420,6 +406,38 @@ db.backup("./mydb_backup");
   - Copies immutable files first (SSTables listed in the manifest plus metadata/config files)
   - Forces memtable flushes, waits for flush/compaction queues to drain, then copies remaining files
 - Database stays open and usable during backup
+
+### Checkpoint
+
+Create a lightweight, near-instant snapshot of an open database using hard links instead of copying SSTable data.
+
+```cpp
+db.checkpoint("./mydb_checkpoint");
+```
+
+**Behavior**
+- Requires `dir` to be a non-existent directory or an empty directory
+- For each column family:
+  - Flushes the active memtable so all data is in SSTables
+  - Halts compactions to ensure a consistent view of live SSTable files
+  - Hard links all SSTable files (`.klog` and `.vlog`) into the checkpoint directory
+  - Copies small metadata files (manifest, config) into the checkpoint directory
+  - Resumes compactions
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+- Database stays open and usable during checkpoint
+
+**Checkpoint vs Backup**
+
+| | `backup` | `checkpoint` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+
+**Notes**
+- The checkpoint can be opened as a normal TidesDB database with `TidesDB(config)`
+- Hard-linked files share storage with the live database. Deleting the original database does not affect the checkpoint (hard link semantics)
 
 ### Block Cache Statistics
 
@@ -442,13 +460,13 @@ if (cacheStats.enabled) {
 ```
 
 **Cache statistics fields**
-- `enabled` -- Whether block cache is active
-- `totalEntries` -- Number of cached blocks
-- `totalBytes` -- Total memory used by cached blocks
-- `hits` -- Number of cache hits
-- `misses` -- Number of cache misses
-- `hitRate` -- Hit rate as a decimal (0.0 to 1.0)
-- `numPartitions` -- Number of cache partitions
+- `enabled` · Whether block cache is active
+- `totalEntries` · Number of cached blocks
+- `totalBytes` · Total memory used by cached blocks
+- `hits` · Number of cache hits
+- `misses` · Number of cache misses
+- `hitRate` · Hit rate as a decimal (0.0 to 1.0)
+- `numPartitions` · Number of cache partitions
 
 ### Sync Modes
 
@@ -457,14 +475,11 @@ Control the durability vs performance tradeoff.
 ```cpp
 auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 
-// SyncNone -- Fastest, least durable
 cfConfig.syncMode = tidesdb::SyncMode::None;
 
-// SyncInterval -- Balanced (periodic background syncing)
 cfConfig.syncMode = tidesdb::SyncMode::Interval;
 cfConfig.syncIntervalUs = 128000;  // Sync every 128ms
 
-// SyncFull -- Most durable (fsync on every write)
 cfConfig.syncMode = tidesdb::SyncMode::Full;
 
 db.createColumnFamily("my_cf", cfConfig);
@@ -500,12 +515,12 @@ db.createColumnFamily("btree_cf", cfConfig);
 ```
 
 **Characteristics**
-- Point lookups -- O(log N) tree traversal with binary search at each node
-- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
-- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
-- Compression -- Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
-- Large values -- Values exceeding `klogValueThreshold` are stored in vlog, same as block-based format
-- Bloom filter -- Works identically - checked before tree traversal
+- Point lookups · O(log N) tree traversal with binary search at each node
+- Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable · Tree is bulk-loaded from sorted memtable data during flush
+- Compression · Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
+- Large values · Values exceeding `klogValueThreshold` are stored in vlog, same as block-based format
+- Bloom filter · Works identically - checked before tree traversal
 
 **When to use B+tree klog format**
 - Read-heavy workloads with frequent point lookups
@@ -517,7 +532,7 @@ db.createColumnFamily("btree_cf", cfConfig);
 - Larger metadata overhead per node compared to block-based format
 - Block-based format may be faster for sequential scans of entire SSTables
 
-**Important**: `useBtree` **cannot be changed** after column family creation. Different column families can use different formats.
+Important · `useBtree` **cannot be changed** after column family creation. Different column families can use different formats.
 
 ## Error Handling
 
@@ -537,19 +552,19 @@ try {
 ```
 
 **Error Codes**
-- `ErrorCode::Success` (0) -- Operation successful
-- `ErrorCode::Memory` (-1) -- Memory allocation failed
-- `ErrorCode::InvalidArgs` (-2) -- Invalid arguments
-- `ErrorCode::NotFound` (-3) -- Key not found
-- `ErrorCode::IO` (-4) -- I/O error
-- `ErrorCode::Corruption` (-5) -- Data corruption
-- `ErrorCode::Exists` (-6) -- Resource already exists
-- `ErrorCode::Conflict` (-7) -- Transaction conflict
-- `ErrorCode::TooLarge` (-8) -- Key or value too large
-- `ErrorCode::MemoryLimit` (-9) -- Memory limit exceeded
-- `ErrorCode::InvalidDB` (-10) -- Invalid database handle
-- `ErrorCode::Unknown` (-11) -- Unknown error
-- `ErrorCode::Locked` (-12) -- Database is locked
+- `ErrorCode::Success` (0) · Operation successful
+- `ErrorCode::Memory` (-1) · Memory allocation failed
+- `ErrorCode::InvalidArgs` (-2) · Invalid arguments
+- `ErrorCode::NotFound` (-3) · Key not found
+- `ErrorCode::IO` (-4) · I/O error
+- `ErrorCode::Corruption` (-5) · Data corruption
+- `ErrorCode::Exists` (-6) · Resource already exists
+- `ErrorCode::Conflict` (-7) · Transaction conflict
+- `ErrorCode::TooLarge` (-8) · Key or value too large
+- `ErrorCode::MemoryLimit` (-9) · Memory limit exceeded
+- `ErrorCode::InvalidDB` (-10) · Invalid database handle
+- `ErrorCode::Unknown` (-11) · Unknown error
+- `ErrorCode::Locked` (-12) · Database is locked
 
 ## Complete Example
 
@@ -639,16 +654,15 @@ TidesDB supports five MVCC isolation levels:
 
 ```cpp
 auto txn = db.beginTransaction(tidesdb::IsolationLevel::ReadCommitted);
-// Perform operations
 txn.commit();
 ```
 
 **Available Isolation Levels**
-- `IsolationLevel::ReadUncommitted` -- Sees all data including uncommitted changes
-- `IsolationLevel::ReadCommitted` -- Sees only committed data (default)
-- `IsolationLevel::RepeatableRead` -- Consistent snapshot, phantom reads possible
-- `IsolationLevel::Snapshot` -- Write-write conflict detection
-- `IsolationLevel::Serializable` -- Full read-write conflict detection (SSI)
+- `IsolationLevel::ReadUncommitted` · Sees all data including uncommitted changes
+- `IsolationLevel::ReadCommitted` · Sees only committed data (default)
+- `IsolationLevel::RepeatableRead` · Consistent snapshot, phantom reads possible
+- `IsolationLevel::Snapshot` · Write-write conflict detection
+- `IsolationLevel::Serializable` · Full read-write conflict detection (SSI)
 
 ## Savepoints
 
@@ -662,20 +676,17 @@ txn.put(cf, "key1", "value1", -1);
 txn.savepoint("sp1");
 txn.put(cf, "key2", "value2", -1);
 
-// Rollback to savepoint -- key2 is discarded, key1 remains
 txn.rollbackToSavepoint("sp1");
 
-// Release a savepoint without rolling back
 txn.releaseSavepoint("sp1");
 
-// Commit -- only key1 is written
 txn.commit();
 ```
 
 **Savepoint API**
-- `savepoint(name)` -- Create a savepoint
-- `rollbackToSavepoint(name)` -- Rollback to savepoint
-- `releaseSavepoint(name)` -- Release savepoint without rolling back
+- `savepoint(name)` · Create a savepoint
+- `rollbackToSavepoint(name)` · Rollback to savepoint
+- `releaseSavepoint(name)` · Release savepoint without rolling back
 
 ## Transaction Reset
 
@@ -686,14 +697,11 @@ auto cf = db.getColumnFamily("my_cf");
 
 auto txn = db.beginTransaction();
 
-// First batch of work
 txn.put(cf, "key1", "value1", -1);
 txn.commit();
 
-// Reset instead of destroying and creating a new transaction
 txn.reset(tidesdb::IsolationLevel::ReadCommitted);
 
-// Second batch of work using the same transaction
 txn.put(cf, "key2", "value2", -1);
 txn.commit();
 ```
@@ -705,9 +713,9 @@ txn.commit();
 - The isolation level can be changed on each reset (e.g., `ReadCommitted` to `RepeatableRead`)
 
 **When to use**
-- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** -- Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** -- Reduce malloc/free overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce malloc/free overhead in tight write loops
 
 **Reset after rollback**
 
@@ -717,7 +725,6 @@ auto txn = db.beginTransaction();
 txn.put(cf, "key", "value", -1);
 txn.rollback();
 
-// Reset after rollback and reuse
 txn.reset(tidesdb::IsolationLevel::ReadCommitted);
 txn.put(cf, "new_key", "new_value", -1);
 txn.commit();
@@ -733,13 +740,10 @@ auto ordersCf = db.getColumnFamily("orders");
 
 auto txn = db.beginTransaction();
 
-// Write to users CF
 txn.put(usersCf, "user:1000", "John Doe", -1);
 
-// Write to orders CF
 txn.put(ordersCf, "order:5000", "user:1000|product:A", -1);
 
-// Atomic commit across both CFs
 txn.commit();
 ```
 
@@ -753,12 +757,10 @@ txn.commit();
 Get default configurations for database and column families.
 
 ```cpp
-// Get default database configuration
 auto defaultDbConfig = tidesdb::TidesDB::defaultConfig();
 defaultDbConfig.dbPath = "./mydb";
 tidesdb::TidesDB db(defaultDbConfig);
 
-// Get default column family configuration
 auto defaultCfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 db.createColumnFamily("my_cf", defaultCfConfig);
 ```
@@ -768,11 +770,9 @@ db.createColumnFamily("my_cf", defaultCfConfig);
 Load and save column family configuration from/to INI files.
 
 ```cpp
-// Load configuration from INI file
 auto config = tidesdb::ColumnFamilyConfig::loadFromIni("config.ini", "my_cf");
 db.createColumnFamily("my_cf", config);
 
-// Save configuration to INI file
 auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 cfConfig.writeBufferSize = 128 * 1024 * 1024;
 tidesdb::ColumnFamilyConfig::saveToIni("config.ini", "my_cf", cfConfig);
@@ -783,7 +783,6 @@ tidesdb::ColumnFamilyConfig::saveToIni("config.ini", "my_cf", cfConfig);
 Register custom comparators for controlling key sort order.
 
 ```cpp
-// Define a custom comparator function
 int myReverseCompare(const uint8_t* key1, size_t key1_size,
                      const uint8_t* key2, size_t key2_size, void* ctx) {
     (void)ctx;
@@ -794,33 +793,28 @@ int myReverseCompare(const uint8_t* key1, size_t key1_size,
     return -result;  // Reverse order
 }
 
-// Register the comparator
 db.registerComparator("reverse", myReverseCompare);
 
-// Use in column family
 auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 cfConfig.comparatorName = "reverse";
 db.createColumnFamily("reverse_cf", cfConfig);
 ```
 
 **Built-in comparators**
-- `"memcmp"` (default) -- Binary byte-by-byte comparison
-- `"lexicographic"` -- Null-terminated string comparison
-- `"uint64"` -- Unsigned 64-bit integer comparison
-- `"int64"` -- Signed 64-bit integer comparison
-- `"reverse"` -- Reverse binary comparison
-- `"case_insensitive"` -- Case-insensitive ASCII comparison
+- `"memcmp"` (default) · Binary byte-by-byte comparison
+- `"lexicographic"` · Null-terminated string comparison
+- `"uint64"` · Unsigned 64-bit integer comparison
+- `"int64"` · Signed 64-bit integer comparison
+- `"reverse"` · Reverse binary comparison
+- `"case_insensitive"` · Case-insensitive ASCII comparison
 
 **Important**: Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
 
 ## Testing
 
 ```bash
-# Build with tests
 cmake -S . -B build -DTIDESDB_CPP_BUILD_TESTS=ON
 cmake --build build
 
-# Run tests
 cd build
 ctest --output-on-failure
-```

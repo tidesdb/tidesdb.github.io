@@ -83,7 +83,6 @@ const db = TidesDB.open({
 
 console.log('Database opened successfully');
 
-// When done
 db.close();
 ```
 
@@ -100,10 +99,8 @@ import {
   defaultColumnFamilyConfig 
 } from 'tidesdb';
 
-// Create with default configuration
 db.createColumnFamily('my_cf');
 
-// Create with custom configuration
 db.createColumnFamily('my_cf', {
   writeBufferSize: 128 * 1024 * 1024,
   levelSizeRatio: 10,
@@ -120,10 +117,8 @@ db.createColumnFamily('my_cf', {
 
 db.dropColumnFamily('my_cf');
 
-// Rename a column family atomically
 db.renameColumnFamily('old_name', 'new_name');
 
-// Clone a column family (creates an independent copy with all data)
 db.cloneColumnFamily('source_cf', 'cloned_cf');
 ```
 
@@ -138,7 +133,6 @@ const cf = db.getColumnFamily('my_cf');
 
 const txn = db.beginTransaction();
 
-// Put a key-value pair (TTL -1 means no expiration)
 txn.put(cf, Buffer.from('key'), Buffer.from('value'), -1);
 
 txn.commit();
@@ -152,8 +146,7 @@ const cf = db.getColumnFamily('my_cf');
 
 const txn = db.beginTransaction();
 
-// Set expiration time (Unix timestamp in seconds)
-const ttl = Math.floor(Date.now() / 1000) + 10; // Expire in 10 seconds
+const ttl = Math.floor(Date.now() / 1000) + 10;
 
 txn.put(cf, Buffer.from('temp_key'), Buffer.from('temp_value'), ttl);
 
@@ -163,16 +156,12 @@ txn.free();
 
 **TTL Examples**
 ```typescript
-// No expiration
 const ttl = -1;
 
-// Expire in 5 minutes
 const ttl = Math.floor(Date.now() / 1000) + 5 * 60;
 
-// Expire in 1 hour
 const ttl = Math.floor(Date.now() / 1000) + 60 * 60;
 
-// Expire at specific time
 const ttl = Math.floor(new Date('2026-12-31T23:59:59Z').getTime() / 1000);
 ```
 
@@ -210,12 +199,10 @@ const cf = db.getColumnFamily('my_cf');
 const txn = db.beginTransaction();
 
 try {
-  // Multiple operations in one transaction, across column families as well
   txn.put(cf, Buffer.from('key1'), Buffer.from('value1'), -1);
   txn.put(cf, Buffer.from('key2'), Buffer.from('value2'), -1);
   txn.delete(cf, Buffer.from('old_key'));
 
-  // Commit atomically -- all or nothing
   txn.commit();
 } catch (err) {
   txn.rollback();
@@ -283,7 +270,6 @@ const cf = db.getColumnFamily('my_cf');
 const txn = db.beginTransaction();
 const iter = txn.newIterator(cf);
 
-// Seek to first key >= target
 iter.seek(Buffer.from('user:1000'));
 
 if (iter.isValid()) {
@@ -302,7 +288,6 @@ const cf = db.getColumnFamily('my_cf');
 const txn = db.beginTransaction();
 const iter = txn.newIterator(cf);
 
-// Seek to last key <= target
 iter.seekForPrev(Buffer.from('user:2000'));
 
 while (iter.isValid()) {
@@ -328,7 +313,6 @@ iter.seek(Buffer.from(prefix));
 while (iter.isValid()) {
   const key = iter.key().toString();
   
-  // Stop when keys no longer match prefix
   if (!key.startsWith(prefix)) break;
   
   console.log(`Found: ${key}`);
@@ -357,12 +341,10 @@ console.log(`Average Value Size: ${stats.avgValueSize} bytes`);
 console.log(`Read Amplification: ${stats.readAmp}`);
 console.log(`Cache Hit Rate: ${stats.hitRate}`);
 
-// Per-level statistics
 for (let i = 0; i < stats.numLevels; i++) {
   console.log(`Level ${i + 1}: ${stats.levelNumSSTables[i]} SSTables, ${stats.levelSizes[i]} bytes, ${stats.levelKeyCounts[i]} keys`);
 }
 
-// B+tree statistics (only populated if useBtree=true)
 if (stats.useBtree) {
   console.log(`B+tree Total Nodes: ${stats.btreeTotalNodes}`);
   console.log(`B+tree Max Height: ${stats.btreeMaxHeight}`);
@@ -393,7 +375,6 @@ for (const name of cfList) {
 Create an on-disk backup of the database without blocking reads/writes.
 
 ```typescript
-// Backup to a directory (must be non-existent or empty)
 db.backup('./mydb_backup');
 ```
 
@@ -403,15 +384,49 @@ db.backup('./mydb_backup');
 - Database stays open and usable during backup
 - The backup represents the database state after all pending flushes complete
 
+### Checkpoint
+
+Create a lightweight, near-instant snapshot of the database using hard links instead of copying SSTable data.
+
+```typescript
+db.checkpoint('./mydb_checkpoint');
+```
+
+**Behavior**
+- Requires the checkpoint directory to be non-existent or empty
+- For each column family:
+  - Flushes the active memtable so all data is in SSTables
+  - Halts compactions to ensure a consistent view of live SSTable files
+  - Hard links all SSTable files (`.klog` and `.vlog`) into the checkpoint directory
+  - Copies small metadata files (manifest, config) into the checkpoint directory
+  - Resumes compactions
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+- Database stays open and usable during checkpoint
+
+**Checkpoint vs Backup**
+
+| | `backup()` | `checkpoint()` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+
+**Notes**
+- The checkpoint can be opened as a normal TidesDB database with `TidesDB.open()`
+- Hard-linked files share storage with the live database. Deleting the original database does not affect the checkpoint
+
+**Return values**
+- Throws `TidesDBError` with `ErrorCode.ErrExists` if checkpoint directory is not empty
+- Throws `TidesDBError` with `ErrorCode.ErrInvalidArgs` for invalid arguments
+
 ### Cloning a Column Family
 
 Create a complete copy of an existing column family with a new name. The clone contains all the data from the source at the time of cloning and is completely independent.
 
 ```typescript
-// Clone a column family
 db.cloneColumnFamily('source_cf', 'cloned_cf');
 
-// Both column families now exist independently
 const original = db.getColumnFamily('source_cf');
 const clone = db.getColumnFamily('cloned_cf');
 ```
@@ -423,10 +438,10 @@ const clone = db.getColumnFamily('cloned_cf');
 - The clone is completely independent -- modifications to one do not affect the other
 
 **Use cases**
-- **Testing** -- Create a copy of production data for testing without affecting the original
-- **Branching** -- Create a snapshot of data before making experimental changes
-- **Migration** -- Clone data before schema or configuration changes
-- **Backup verification** -- Clone and verify data integrity without modifying the source
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
+- Backup verification · Clone and verify data integrity without modifying the source
 
 **Return values**
 - Throws `TidesDBError` with `ErrorCode.ErrNotFound` if source column family doesn't exist
@@ -440,7 +455,6 @@ const clone = db.getColumnFamily('cloned_cf');
 ```typescript
 const cf = db.getColumnFamily('my_cf');
 
-// Manually trigger compaction (queues compaction from L1+)
 cf.compact();
 ```
 
@@ -449,7 +463,6 @@ cf.compact();
 ```typescript
 const cf = db.getColumnFamily('my_cf');
 
-// Manually trigger memtable flush (queues memtable for sorted run to disk (L1))
 cf.flushMemtable();
 ```
 
@@ -460,21 +473,19 @@ Check if a column family has background operations in progress.
 ```typescript
 const cf = db.getColumnFamily('my_cf');
 
-// Check if flushing is in progress
 if (cf.isFlushing()) {
   console.log('Flush in progress');
 }
 
-// Check if compaction is in progress
 if (cf.isCompacting()) {
   console.log('Compaction in progress');
 }
 ```
 
 **Use cases**
-- Graceful shutdown -- Wait for background operations to complete before closing
-- Maintenance windows -- Check if operations are running before triggering manual compaction
-- Monitoring -- Track background operation status for observability
+- Graceful shutdown · Wait for background operations to complete before closing
+- Maintenance windows · Check if operations are running before triggering manual compaction
+- Monitoring · Track background operation status for observability
 
 ### Updating Runtime Configuration
 
@@ -496,13 +507,13 @@ cf.updateRuntimeConfig({
 ```
 
 **Updatable settings** (safe to change at runtime):
-- `writeBufferSize` -- Memtable flush threshold
-- `skipListMaxLevel` -- Skip list level for new memtables
-- `skipListProbability` -- Skip list probability for new memtables
-- `bloomFpr` -- False positive rate for new SSTables
-- `indexSampleRatio` -- Index sampling ratio for new SSTables
-- `syncMode` -- Durability mode
-- `syncIntervalUs` -- Sync interval in microseconds
+- `writeBufferSize` · Memtable flush threshold
+- `skipListMaxLevel` · Skip list level for new memtables
+- `skipListProbability` · Skip list probability for new memtables
+- `bloomFpr` · False positive rate for new SSTables
+- `indexSampleRatio` · Index sampling ratio for new SSTables
+- `syncMode` · Durability mode
+- `syncIntervalUs` · Sync interval in microseconds
 
 **Non-updatable settings** (would corrupt existing data):
 - `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
@@ -580,10 +591,10 @@ if (stats.useBtree) {
 ```
 
 **Characteristics**
-- Point lookups -- O(log N) tree traversal with binary search at each node
-- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
-- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
-- Compression -- Nodes compress independently using the same algorithms (LZ4, Zstd, etc.)
+- Point lookups · O(log N) tree traversal with binary search at each node
+- Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable · Tree is bulk-loaded from sorted memtable data during flush
+- Compression · Nodes compress independently using the same algorithms (LZ4, Zstd, etc.)
 
 **When to use B+tree klog format**
 - Read-heavy workloads with frequent point lookups
@@ -623,19 +634,19 @@ try {
 ```
 
 **Error Codes**
-- `ErrorCode.Success` (0) -- Operation successful
-- `ErrorCode.ErrMemory` (-1) -- Memory allocation failed
-- `ErrorCode.ErrInvalidArgs` (-2) -- Invalid arguments
-- `ErrorCode.ErrNotFound` (-3) -- Key not found
-- `ErrorCode.ErrIO` (-4) -- I/O error
-- `ErrorCode.ErrCorruption` (-5) -- Data corruption
-- `ErrorCode.ErrExists` (-6) -- Resource already exists
-- `ErrorCode.ErrConflict` (-7) -- Transaction conflict
-- `ErrorCode.ErrTooLarge` (-8) -- Key or value too large
-- `ErrorCode.ErrMemoryLimit` (-9) -- Memory limit exceeded
-- `ErrorCode.ErrInvalidDB` (-10) -- Invalid database handle
-- `ErrorCode.ErrUnknown` (-11) -- Unknown error
-- `ErrorCode.ErrLocked` (-12) -- Database is locked
+- `ErrorCode.Success` (0) · Operation successful
+- `ErrorCode.ErrMemory` (-1) · Memory allocation failed
+- `ErrorCode.ErrInvalidArgs` (-2) · Invalid arguments
+- `ErrorCode.ErrNotFound` (-3) · Key not found
+- `ErrorCode.ErrIO` (-4) · I/O error
+- `ErrorCode.ErrCorruption` (-5) · Data corruption
+- `ErrorCode.ErrExists` (-6) · Resource already exists
+- `ErrorCode.ErrConflict` (-7) · Transaction conflict
+- `ErrorCode.ErrTooLarge` (-8) · Key or value too large
+- `ErrorCode.ErrMemoryLimit` (-9) · Memory limit exceeded
+- `ErrorCode.ErrInvalidDB` (-10) · Invalid database handle
+- `ErrorCode.ErrUnknown` (-11) · Unknown error
+- `ErrorCode.ErrLocked` (-12) · Database is locked
 
 ## Complete Example
 
@@ -719,6 +730,10 @@ function main() {
     db.backup('./example_db_backup');
     console.log('\nBackup created successfully');
 
+    // Create a lightweight checkpoint (hard links, near-instant)
+    db.checkpoint('./example_db_checkpoint');
+    console.log('Checkpoint created successfully');
+
     // Cleanup
     db.dropColumnFamily('users');
   } finally {
@@ -745,11 +760,11 @@ txn.free();
 ```
 
 **Available Isolation Levels**
-- `IsolationLevel.ReadUncommitted` -- Sees all data including uncommitted changes
-- `IsolationLevel.ReadCommitted` -- Sees only committed data (default)
-- `IsolationLevel.RepeatableRead` -- Consistent snapshot, phantom reads possible
-- `IsolationLevel.Snapshot` -- Write-write conflict detection
-- `IsolationLevel.Serializable` -- Full read-write conflict detection (SSI)
+- `IsolationLevel.ReadUncommitted` · Sees all data including uncommitted changes
+- `IsolationLevel.ReadCommitted` · Sees only committed data (default)
+- `IsolationLevel.RepeatableRead` · Consistent snapshot, phantom reads possible
+- `IsolationLevel.Snapshot` · Write-write conflict detection
+- `IsolationLevel.Serializable` · Full read-write conflict detection (SSI)
 
 ## Savepoints
 
@@ -804,13 +819,13 @@ txn.free();
 - The isolation level can be changed on each reset (e.g., `ReadCommitted` → `Serializable`)
 
 **When to use**
-- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** -- Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce allocation overhead in tight write loops
 
 **Reset vs Free + Begin**
 
-For a single transaction, `txn.reset()` is functionally equivalent to calling `txn.free()` followed by `db.beginTransactionWithIsolation()`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+For a single transaction, `txn.reset()` is functionally equivalent to calling `txn.free()` followed by `db.beginTransactionWithIsolation()`. The difference is performance - reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
 
 ## Cache Statistics
 

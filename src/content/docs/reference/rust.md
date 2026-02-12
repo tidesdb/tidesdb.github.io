@@ -117,7 +117,6 @@ fn main() -> tidesdb::Result<()> {
 
     println!("Database opened successfully");
 
-    // Database is automatically closed when `db` goes out of scope
     Ok(())
 }
 ```
@@ -132,11 +131,9 @@ use tidesdb::{TidesDB, Config, ColumnFamilyConfig, CompressionAlgorithm, SyncMod
 fn main() -> tidesdb::Result<()> {
     let db = TidesDB::open(Config::new("./mydb"))?;
 
-    // Create with default configuration
     let cf_config = ColumnFamilyConfig::default();
     db.create_column_family("my_cf", cf_config)?;
 
-    // Create with custom configuration
     let cf_config = ColumnFamilyConfig::new()
         .write_buffer_size(128 * 1024 * 1024)
         .level_size_ratio(10)
@@ -152,7 +149,6 @@ fn main() -> tidesdb::Result<()> {
 
     db.create_column_family("custom_cf", cf_config)?;
 
-    // Drop a column family
     db.drop_column_family("my_cf")?;
 
     Ok(())
@@ -176,7 +172,6 @@ fn main() -> tidesdb::Result<()> {
 
     let mut txn = db.begin_transaction()?;
 
-    // Put a key-value pair (TTL -1 means no expiration)
     txn.put(&cf, b"key", b"value", -1)?;
 
     txn.commit()?;
@@ -199,7 +194,6 @@ fn main() -> tidesdb::Result<()> {
 
     let mut txn = db.begin_transaction()?;
 
-    // Set expiration time (Unix timestamp)
     let ttl = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -217,23 +211,19 @@ fn main() -> tidesdb::Result<()> {
 ```rust
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
 
-// No expiration
 let ttl: i64 = -1;
 
-// Expire in 5 minutes
 let ttl = SystemTime::now()
     .duration_since(UNIX_EPOCH)
     .unwrap()
     .as_secs() as i64 + 5 * 60;
 
-// Expire in 1 hour
 let ttl = SystemTime::now()
     .duration_since(UNIX_EPOCH)
     .unwrap()
     .as_secs() as i64 + 60 * 60;
 
-// Expire at specific Unix timestamp
-let ttl: i64 = 1798761599; // Dec 31, 2026 23:59:59 UTC
+let ttl: i64 = 1798761599;
 ```
 
 #### Reading Data
@@ -288,12 +278,10 @@ fn main() -> tidesdb::Result<()> {
 
     let mut txn = db.begin_transaction()?;
 
-    // Multiple operations in one transaction
     txn.put(&cf, b"key1", b"value1", -1)?;
     txn.put(&cf, b"key2", b"value2", -1)?;
     txn.delete(&cf, b"old_key")?;
 
-    // Commit atomically -- all or nothing
     txn.commit()?;
 
     Ok(())
@@ -314,9 +302,7 @@ fn main() -> tidesdb::Result<()> {
     let mut txn = db.begin_transaction()?;
     txn.put(&cf, b"key", b"value", -1)?;
 
-    // Decide to rollback instead of commit
     txn.rollback()?;
-    // No changes were applied
 
     Ok(())
 }
@@ -337,18 +323,13 @@ fn main() -> tidesdb::Result<()> {
 
     let mut txn = db.begin_transaction()?;
 
-    // First batch of work
     txn.put(&cf, b"key1", b"value1", -1)?;
     txn.commit()?;
 
-    // Reset instead of drop + begin
     txn.reset(IsolationLevel::ReadCommitted)?;
 
-    // Second batch of work using the same transaction
     txn.put(&cf, b"key2", b"value2", -1)?;
     txn.commit()?;
-
-    // Transaction is freed once when `txn` goes out of scope
 
     Ok(())
 }
@@ -361,9 +342,9 @@ fn main() -> tidesdb::Result<()> {
 - The isolation level can be changed on each reset (e.g., `ReadCommitted` → `RepeatableRead`)
 
 **When to use**
-- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** -- Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** -- Reduce allocation overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce allocation overhead in tight write loops
 
 :::tip[Reset vs Drop + Begin]
 For a single transaction, `reset` is functionally equivalent to dropping the transaction and calling `begin_transaction_with_isolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
@@ -449,14 +430,11 @@ fn main() -> tidesdb::Result<()> {
     let txn = db.begin_transaction()?;
     let mut iter = txn.new_iterator(&cf)?;
 
-    // Seek to first key >= "user:"
     iter.seek(b"user:")?;
 
-    // Iterate all keys with "user:" prefix
     while iter.is_valid() {
         let key = iter.key()?;
 
-        // Stop when keys no longer match prefix
         if !key.starts_with(b"user:") {
             break;
         }
@@ -642,16 +620,16 @@ fn main() -> tidesdb::Result<()> {
 - The clone is completely independent -- modifications to one do not affect the other
 
 **Use cases**
-- **Testing** -- Create a copy of production data for testing without affecting the original
-- **Branching** -- Create a snapshot of data before making experimental changes
-- **Migration** -- Clone data before schema or configuration changes
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
 
 **Return values**
-- `Ok(())` -- Clone completed successfully
-- `ErrorCode::NotFound` -- Source column family doesn't exist
-- `ErrorCode::Exists` -- Destination column family already exists
-- `ErrorCode::InvalidArgs` -- Invalid arguments (same source/destination name)
-- `ErrorCode::Io` -- Failed to copy files or create directory
+- `Ok(())` · Clone completed successfully
+- `ErrorCode::NotFound` · Source column family doesn't exist
+- `ErrorCode::Exists` · Destination column family already exists
+- `ErrorCode::InvalidArgs` · Invalid arguments (same source/destination name)
+- `ErrorCode::Io` · Failed to copy files or create directory
 
 ### Compaction
 
@@ -729,6 +707,48 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+### Database Checkpoint
+
+`checkpoint` creates a lightweight, near-instant snapshot of an open database using hard links instead of copying SSTable data.
+
+```rust
+use tidesdb::{TidesDB, Config};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+
+    // Create a checkpoint to the specified directory
+    db.checkpoint("./mydb_checkpoint")?;
+
+    Ok(())
+}
+```
+
+**Behavior**
+- Requires `checkpoint_dir` to be a non-existent or empty directory
+- For each column family:
+  - Flushes the active memtable so all data is in SSTables
+  - Halts compactions to ensure a consistent view of live SSTable files
+  - Hard links all SSTable files (`.klog` and `.vlog`) into the checkpoint directory
+  - Copies small metadata files (manifest, config) into the checkpoint directory
+  - Resumes compactions
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+- Database stays open and usable during checkpoint
+
+**Checkpoint vs Backup**
+
+| | `backup` | `checkpoint` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+
+**Notes**
+- The checkpoint represents the database state at the point all memtables are flushed and compactions are halted
+- Hard-linked files share storage with the live database. Deleting the original database does not affect the checkpoint (hard link semantics)
+- The checkpoint can be opened as a normal TidesDB database with `TidesDB::open`
 
 ### Runtime Configuration Updates
 
@@ -870,10 +890,10 @@ fn main() -> tidesdb::Result<()> {
 ```
 
 **B+tree Characteristics**
-- Point lookups -- O(log N) tree traversal with binary search at each node
-- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
-- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
-- Compression -- Nodes compress independently using the same algorithms
+- Point lookups · O(log N) tree traversal with binary search at each node
+- Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable · Tree is bulk-loaded from sorted memtable data during flush
+- Compression · Nodes compress independently using the same algorithms
 
 **When to use B+tree klog format**
 - Read-heavy workloads with frequent point lookups
@@ -964,19 +984,19 @@ fn main() {
 ```
 
 **Error Codes**
-- `ErrorCode::Success` (0) -- Operation successful
-- `ErrorCode::Memory` (-1) -- Memory allocation failed
-- `ErrorCode::InvalidArgs` (-2) -- Invalid arguments
-- `ErrorCode::NotFound` (-3) -- Key not found
-- `ErrorCode::Io` (-4) -- I/O error
-- `ErrorCode::Corruption` (-5) -- Data corruption
-- `ErrorCode::Exists` (-6) -- Resource already exists
-- `ErrorCode::Conflict` (-7) -- Transaction conflict
-- `ErrorCode::TooLarge` (-8) -- Key or value too large
-- `ErrorCode::MemoryLimit` (-9) -- Memory limit exceeded
-- `ErrorCode::InvalidDb` (-10) -- Invalid database handle
-- `ErrorCode::Unknown` (-11) -- Unknown error
-- `ErrorCode::Locked` (-12) -- Database is locked
+- `ErrorCode::Success` (0) · Operation successful
+- `ErrorCode::Memory` (-1) · Memory allocation failed
+- `ErrorCode::InvalidArgs` (-2) · Invalid arguments
+- `ErrorCode::NotFound` (-3) · Key not found
+- `ErrorCode::Io` (-4) · I/O error
+- `ErrorCode::Corruption` (-5) · Data corruption
+- `ErrorCode::Exists` (-6) · Resource already exists
+- `ErrorCode::Conflict` (-7) · Transaction conflict
+- `ErrorCode::TooLarge` (-8) · Key or value too large
+- `ErrorCode::MemoryLimit` (-9) · Memory limit exceeded
+- `ErrorCode::InvalidDb` (-10) · Invalid database handle
+- `ErrorCode::Unknown` (-11) · Unknown error
+- `ErrorCode::Locked` (-12) · Database is locked
 
 ## Complete Example
 
@@ -1078,11 +1098,11 @@ fn main() -> tidesdb::Result<()> {
 ```
 
 **Available Isolation Levels**
-- `IsolationLevel::ReadUncommitted` -- Sees all data including uncommitted changes
-- `IsolationLevel::ReadCommitted` -- Sees only committed data (default)
-- `IsolationLevel::RepeatableRead` -- Consistent snapshot, phantom reads possible
-- `IsolationLevel::Snapshot` -- Write-write conflict detection
-- `IsolationLevel::Serializable` -- Full read-write conflict detection (SSI)
+- `IsolationLevel::ReadUncommitted` · Sees all data including uncommitted changes
+- `IsolationLevel::ReadCommitted` · Sees only committed data (default)
+- `IsolationLevel::RepeatableRead` · Consistent snapshot, phantom reads possible
+- `IsolationLevel::Snapshot` · Write-write conflict detection
+- `IsolationLevel::Serializable` · Full read-write conflict detection (SSI)
 
 ## Savepoints
 

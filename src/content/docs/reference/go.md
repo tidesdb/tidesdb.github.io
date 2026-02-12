@@ -103,6 +103,42 @@ if err != nil {
 - Database stays open and usable during backup
 - The backup represents the database state after the final flush/compaction drain
 
+### Checkpoint
+
+Create a lightweight, near-instant snapshot of an open database using hard links instead of copying SSTable data.
+
+```go
+err := db.Checkpoint("./mydb_checkpoint")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Behavior**
+- Requires the checkpoint directory to be non-existent or empty
+- For each column family:
+  - Flushes the active memtable so all data is in SSTables
+  - Halts compactions to ensure a consistent view of live SSTable files
+  - Hard links all SSTable files (`.klog` and `.vlog`) into the checkpoint directory
+  - Copies small metadata files (manifest, config) into the checkpoint directory
+  - Resumes compactions
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+- Database stays open and usable during checkpoint
+- The checkpoint can be opened as a normal TidesDB database with `Open`
+
+**Checkpoint vs Backup**
+
+| | `Backup` | `Checkpoint` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+
+**Notes**
+- The checkpoint represents the database state at the point all memtables are flushed and compactions are halted
+- Hard-linked files share storage with the live database. Deleting the original database does not affect the checkpoint (hard link semantics)
+
 ### Creating and Dropping Column Families
 
 Column families are isolated key-value stores with independent configuration.
@@ -177,20 +213,20 @@ clonedCF, _ := db.GetColumnFamily("cloned_cf")
 - Flushes the source column family's memtable to ensure all data is on disk
 - Waits for any in-progress flush or compaction to complete
 - Copies all SSTable files to the new directory
-- The clone is completely independent -- modifications to one do not affect the other
+- The clone is completely independent; modifications to one do not affect the other
 
 **Use cases**
-- **Testing** -- Create a copy of production data for testing without affecting the original
-- **Branching** -- Create a snapshot of data before making experimental changes
-- **Migration** -- Clone data before schema or configuration changes
-- **Backup verification** -- Clone and verify data integrity without modifying the source
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
+- Backup verification · Clone and verify data integrity without modifying the source
 
 **Return values**
-- `nil` -- Clone completed successfully
-- Error with `ErrNotFound` -- Source column family doesn't exist
-- Error with `ErrExists` -- Destination column family already exists
-- Error with `ErrInvalidArgs` -- Invalid arguments (nil pointers or same source/destination name)
-- Error with `ErrIO` -- Failed to copy files or create directory
+- `nil` · Clone completed successfully
+- Error with `ErrNotFound` · Source column family doesn't exist
+- Error with `ErrExists` · Destination column family already exists
+- Error with `ErrInvalidArgs` · Invalid arguments (nil pointers or same source/destination name)
+- Error with `ErrIO` · Failed to copy files or create directory
 
 ### CRUD Operations
 
@@ -254,7 +290,6 @@ if err != nil {
 
 **TTL Examples**
 ```go
-// No expiration
 ttl := int64(-1)
 
 // Expire in 5 minutes
@@ -263,7 +298,6 @@ ttl := time.Now().Add(5 * time.Minute).Unix()
 // Expire in 1 hour
 ttl := time.Now().Add(1 * time.Hour).Unix()
 
-// Expire at specific time
 ttl := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC).Unix()
 ```
 
@@ -690,13 +724,13 @@ if err != nil {
 ```
 
 **Updatable settings** (safe to change at runtime):
-- `WriteBufferSize` -- Memtable flush threshold
-- `SkipListMaxLevel` -- Skip list level for new memtables
-- `SkipListProbability` -- Skip list probability for new memtables
-- `BloomFPR` -- False positive rate for new SSTables
-- `IndexSampleRatio` -- Index sampling ratio for new SSTables
-- `SyncMode` -- Durability mode
-- `SyncIntervalUs` -- Sync interval in microseconds
+- `WriteBufferSize` · Memtable flush threshold
+- `SkipListMaxLevel` · Skip list level for new memtables
+- `SkipListProbability` · Skip list probability for new memtables
+- `BloomFPR` · False positive rate for new SSTables
+- `IndexSampleRatio` · Index sampling ratio for new SSTables
+- `SyncMode` · Durability mode
+- `SyncIntervalUs` · Sync interval in microseconds
 
 ### Sync Modes
 
@@ -773,19 +807,19 @@ if err != nil {
 ```
 
 **Error Codes**
-- `ErrSuccess` (0) -- Operation successful
-- `ErrMemory` (-1) -- Memory allocation failed
-- `ErrInvalidArgs` (-2) -- Invalid arguments
-- `ErrNotFound` (-3) -- Key not found
-- `ErrIO` (-4) -- I/O error
-- `ErrCorruption` (-5) -- Data corruption
-- `ErrExists` (-6) -- Resource already exists
-- `ErrConflict` (-7) -- Transaction conflict
-- `ErrTooLarge` (-8) -- Key or value too large
-- `ErrMemoryLimit` (-9) -- Memory limit exceeded
-- `ErrInvalidDB` (-10) -- Invalid database handle
-- `ErrUnknown` (-11) -- Unknown error
-- `ErrLocked` (-12) -- Database is locked
+- `ErrSuccess` (0) · Operation successful
+- `ErrMemory` (-1) · Memory allocation failed
+- `ErrInvalidArgs` (-2) · Invalid arguments
+- `ErrNotFound` (-3) · Key not found
+- `ErrIO` (-4) · I/O error
+- `ErrCorruption` (-5) · Data corruption
+- `ErrExists` (-6) · Resource already exists
+- `ErrConflict` (-7) · Transaction conflict
+- `ErrTooLarge` (-8) · Key or value too large
+- `ErrMemoryLimit` (-9) · Memory limit exceeded
+- `ErrInvalidDB` (-10) · Invalid database handle
+- `ErrUnknown` (-11) · Unknown error
+- `ErrLocked` (-12) · Database is locked
 
 ## Complete Example
 
@@ -916,11 +950,11 @@ defer txn.Free()
 ```
 
 **Available Isolation Levels**
-- `IsolationReadUncommitted` -- Sees all data including uncommitted changes
-- `IsolationReadCommitted` -- Sees only committed data (default)
-- `IsolationRepeatableRead` -- Consistent snapshot, phantom reads possible
-- `IsolationSnapshot` -- Write-write conflict detection
-- `IsolationSerializable` -- Full read-write conflict detection (SSI)
+- `IsolationReadUncommitted` · Sees all data including uncommitted changes
+- `IsolationReadCommitted` · Sees only committed data (default)
+- `IsolationRepeatableRead` · Consistent snapshot, phantom reads possible
+- `IsolationSnapshot` · Write-write conflict detection
+- `IsolationSerializable` · Full read-write conflict detection (SSI)
 
 ## Savepoints
 
@@ -949,9 +983,9 @@ err = txn.Commit()
 ```
 
 **Savepoint API**
-- `Savepoint(name string)` -- Create a savepoint
-- `RollbackToSavepoint(name string)` -- Rollback to savepoint
-- `ReleaseSavepoint(name string)` -- Release savepoint without rolling back
+- `Savepoint(name string)` · Create a savepoint
+- `RollbackToSavepoint(name string)` · Rollback to savepoint
+- `ReleaseSavepoint(name string)` · Release savepoint without rolling back
 
 ## Transaction Reset
 
@@ -1000,9 +1034,9 @@ txn.Free()
 - The isolation level can be changed on each reset (e.g., `IsolationReadCommitted` → `IsolationRepeatableRead`)
 
 **When to use**
-- **Batch processing** -- Reuse a single transaction across many commit cycles in a loop
-- **Connection pooling** -- Reset a transaction for a new request without reallocation
-- **High-throughput ingestion** -- Reduce malloc/free overhead in tight write loops
+- Batch processing · Reuse a single transaction across many commit cycles in a loop
+- Connection pooling · Reset a transaction for a new request without reallocation
+- High-throughput ingestion · Reduce malloc/free overhead in tight write loops
 
 **Reset vs Free + BeginTxn**
 
@@ -1023,9 +1057,9 @@ if err != nil {
 ```
 
 **Characteristics**
-- Point lookups -- O(log N) tree traversal with binary search at each node
-- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
-- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
+- Point lookups · O(log N) tree traversal with binary search at each node
+- Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable · Tree is bulk-loaded from sorted memtable data during flush
 
 **When to use B+tree klog format**
 - Read-heavy workloads with frequent point lookups
@@ -1046,12 +1080,12 @@ config := tidesdb.Config{
 ```
 
 **Available Log Levels**
-- `LogDebug` -- Detailed diagnostic information
-- `LogInfo` -- General informational messages (default)
-- `LogWarn` -- Warning messages for potential issues
-- `LogError` -- Error messages for failures
-- `LogFatal` -- Critical errors that may cause shutdown
-- `LogNone` -- Disable all logging
+- `LogDebug` · Detailed diagnostic information
+- `LogInfo` · General informational messages (default)
+- `LogWarn` · Warning messages for potential issues
+- `LogError` · Error messages for failures
+- `LogFatal` · Critical errors that may cause shutdown
+- `LogNone` · Disable all logging
 
 **Log to file**
 ```go
@@ -1083,4 +1117,7 @@ go test -v -run TestCloneColumnFamily
 
 # Run transaction reset test
 go test -v -run TestTransactionReset
+
+# Run checkpoint test
+go test -v -run TestCheckpoint
 ```
