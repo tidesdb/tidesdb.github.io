@@ -57,31 +57,38 @@ TidesDB looks to pull ahead of InnoDB on pure point lookups.  The caching layers
 
 **oltp_read_only**
 ![oltp_read_only](/analysis-tidesql-3-innodb-mariadb-12-1-2/oltp_read_only_tps_qps.png)
+
 TidesDB again leads InnoDB in read-only transactional workloads for this smaller dataset.
 
 **oltp_write_only**
 ![oltp_write_only](/analysis-tidesql-3-innodb-mariadb-12-1-2/oltp_write_only_tps_qps.png)
+
 TidesDB shows a clear advantage in write-only workloads.  LSM-tree engines are designed to optimize sequential writes and reduce random I/O amplification.  InnoDB's BTree structure incurs more random page modifications.
 
 **oltp_read_write**
 ![oltp_read_write](/analysis-tidesql-3-innodb-mariadb-12-1-2/oltp_read_write_tps_qps.png)
+
 In mixed workloads, TidesDB seems to maintain a consistent performance edge.  I'm gonna assume because of the latency reduction across multiple workloads.
 
 **oltp_insert**
 ![oltp_insert](/analysis-tidesql-3-innodb-mariadb-12-1-2/oltp_insert_tps_qps.png)
+
 This is expected as TidesDB is LSM-tree based.
 
 **oltp_update_index**
 ![oltp_update_index](/analysis-tidesql-3-innodb-mariadb-12-1-2/oltp_update_index_tps_qps.png)
+
 Indexed updates heavily favor TidesDB. Updates in LSM engines are effectively write operations (new versions appended), whereas InnoDB must modify indexed BTree pages in place. 
 
 **oltp_update_non_index**
+
 ![oltp_update_non_index](/analysis-tidesql-3-innodb-mariadb-12-1-2/oltp_update_non_index_tps_qps.png)
 
 TidesDB pulls ahead of InnoDB here as well.
 
 **oltp_delete**
 ![oltp_delete](/analysis-tidesql-3-innodb-mariadb-12-1-2/oltp_delete_tps_qps.png)
+
 Deletes look to strongly favor TidesDB in MariaDB.  This is because in an LSM tree, deletes are tombstones appended to the log and skip list, while InnoDB must modify index pages and potentially cause page merges. 
 
 **space usage for point lookups**
