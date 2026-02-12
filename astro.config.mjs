@@ -157,6 +157,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'New Benchmark Environment',
+							link: 'articles/new-benchmark-environment'
+						},
+						{
 							label: 'Benchmark Analysis on TideSQL v3 & InnoDB within MariaDB v12.1.2',
 							link: 'articles/tidesql-3-innodb-mariadb-12-1-2'
 						},
