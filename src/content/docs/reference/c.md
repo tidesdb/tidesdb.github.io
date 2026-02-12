@@ -306,6 +306,50 @@ if (tidesdb_backup(db, "./mydb_backup") != 0)
 - The backup represents the database state after the final flush/compaction drain.
 - If you need a quiesced backup window, you can pause writes at the application level before calling this API.
 
+### Checkpoint
+
+`tidesdb_checkpoint` creates a lightweight, near-instant snapshot of an open database using hard links instead of copying SSTable data.
+
+```c
+int tidesdb_checkpoint(tidesdb_t *db, const char *checkpoint_dir);
+```
+
+**Usage**
+```c
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
+
+if (tidesdb_checkpoint(db, "./mydb_checkpoint") != 0)
+{
+    fprintf(stderr, "Checkpoint failed\n");
+}
+```
+
+**Behavior**
+- Requires `checkpoint_dir` to be a non-existent directory or an empty directory; returns `TDB_ERR_EXISTS` if not empty.
+- For each column family:
+  - Flushes the active memtable so all data is in SSTables.
+  - Halts compactions to ensure a consistent view of live SSTable files.
+  - Hard links all SSTable files (`.klog` and `.vlog`) into the checkpoint directory, preserving the level subdirectory structure.
+  - Copies small metadata files (manifest, config) into the checkpoint directory.
+  - Resumes compactions.
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem).
+- Database stays open and usable during checkpoint; no exclusive lock is taken on the source directory.
+
+**Checkpoint vs Backup**
+
+| | `tidesdb_backup` | `tidesdb_checkpoint` |
+|--|---|---|
+| **Speed** | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| **Disk usage** | Full independent copy | No extra disk until compaction removes old SSTables |
+| **Portability** | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
+| **Use case** | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
+
+**Notes**
+- The checkpoint represents the database state at the point all memtables are flushed and compactions are halted.
+- Hard-linked files share storage with the live database. Deleting the original database does not affect the checkpoint (hard link semantics).
+- The checkpoint can be opened as a normal TidesDB database with `tidesdb_open`.
+
 ## Column Family Operations
 
 ### Creating a Column Family
