@@ -56,7 +56,7 @@ cmake --build build
 sudo cmake --install build
 
 # Configure environment to use custom location
-export LD_LIBRARY_PATH="/opt/tidesdb/lib:$LD_LIBRARY_PATH"  # Linux
+export LD_LIBRARY_PATH="/opt/tidesdb/lib:$LD_LIBRARY_PATH"      # Linux
 # or
 export DYLD_LIBRARY_PATH="/opt/tidesdb/lib:$DYLD_LIBRARY_PATH"  # macOS
 
@@ -77,7 +77,7 @@ const db = TidesDB.open({
   logLevel: LogLevel.Info,
   blockCacheSize: 64 * 1024 * 1024,
   maxOpenSSTables: 256,
-  logToFile: false,           // Write logs to file instead of stderr
+  logToFile: false,                   // Write logs to file instead of stderr
   logTruncationAt: 24 * 1024 * 1024,  // Log file truncation size (24MB), 0 = no truncation
 });
 
@@ -496,14 +496,14 @@ const cf = db.getColumnFamily('my_cf');
 
 // Update configuration (changes apply to new operations)
 cf.updateRuntimeConfig({
-  writeBufferSize: 256 * 1024 * 1024,  // 256MB
+  writeBufferSize: 256 * 1024 * 1024,   
   skipListMaxLevel: 16,
   skipListProbability: 0.25,
-  bloomFpr: 0.001,  // 0.1% false positive rate
-  indexSampleRatio: 8,  // sample 1 in 8 keys
+  bloomFpr: 0.001,                      // 0.1% false positive rate
+  indexSampleRatio: 8,                  // sample 1 in 8 keys
   syncMode: SyncMode.Interval,
-  syncIntervalUs: 100000,  // 100ms
-}, true);  // persist to disk (config.ini)
+  syncIntervalUs: 100000,               // 100ms
+}, true);                               // persist to disk (config.ini)
 ```
 
 **Updatable settings** (safe to change at runtime):
