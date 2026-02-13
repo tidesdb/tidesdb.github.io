@@ -571,7 +571,6 @@ db.createColumnFamily('zstd_cf', {
 Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
 
 ```typescript
-// Create column family with B+tree klog format
 db.createColumnFamily('btree_cf', {
   useBtree: true,
   enableBloomFilter: true,

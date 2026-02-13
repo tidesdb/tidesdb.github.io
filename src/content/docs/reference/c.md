@@ -375,7 +375,7 @@ tidesdb_column_family_config_t cf_config = {
     .dividing_level_offset = 2,                 /* Compaction dividing level offset (default: 2) */
     .skip_list_max_level = 12,                  /* Skip list max level */
     .skip_list_probability = 0.25f,             /* Skip list probability */
-    .compression_algorithm = TDB_COMPRESS_LZ4,   /* TDB_COMPRESS_LZ4, TDB_COMPRESS_LZ4_FAST, TDB_COMPRESS_ZSTD, TDB_COMPRESS_SNAPPY, or TDB_COMPRESS_NONE */
+    .compression_algorithm = TDB_COMPRESS_LZ4,  /* TDB_COMPRESS_LZ4, TDB_COMPRESS_LZ4_FAST, TDB_COMPRESS_ZSTD, TDB_COMPRESS_SNAPPY, or TDB_COMPRESS_NONE */
     .enable_bloom_filter = 1,                   /* Enable bloom filters */
     .bloom_fpr = 0.01,                          /* 1% false positive rate */
     .enable_block_indexes = 1,                  /* Enable compact block indexes */
@@ -384,7 +384,7 @@ tidesdb_column_family_config_t cf_config = {
     .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
     .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
     .comparator_name = {0},                     /* Empty = use default "memcmp" */
-    .klog_value_threshold = 512,               /* Values > 512 bytes go to vlog (default: 512) */
+    .klog_value_threshold = 512,                /* Values > 512 bytes go to vlog (default: 512) */
     .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
     .l1_file_count_trigger = 4,                 /* L1 file count trigger for compaction (default: 4) */
@@ -703,7 +703,7 @@ tidesdb_create_column_family(db, "btree_cf", &cf_config);
 - Immutable · Tree is bulk-loaded from sorted memtable data during flush and never modified afterward
 - Compression · Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
 - Large values · Values exceeding `klog_value_threshold` are stored in vlog, same as block-based format
-- Bloom filter · Works identically - checked before tree traversal to skip lookups for absent keys
+- Bloom filter · Works identically -- checked before tree traversal to skip lookups for absent keys
 
 **When to use B+tree format**
 - Read-heavy workloads with frequent point lookups
@@ -740,13 +740,13 @@ tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
 if (!cf) return -1;
 
 tidesdb_column_family_config_t new_config = tidesdb_default_column_family_config();
-new_config.write_buffer_size = 256 * 1024 * 1024;  /* 256MB */
+new_config.write_buffer_size = 256 * 1024 * 1024;  
 new_config.skip_list_max_level = 16;
 new_config.skip_list_probability = 0.25f;
-new_config.bloom_fpr = 0.001;  /* 0.1% false positive rate */
+new_config.bloom_fpr = 0.001;       /* 0.1% false positive rate */
 new_config.index_sample_ratio = 8;  /* sample 1 in 8 keys */
 
-int persist_to_disk = 1;  /* save to config.ini */
+int persist_to_disk = 1;            /* save to config.ini */
 if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 {
     printf("Configuration updated successfully\n");
@@ -1415,14 +1415,14 @@ Control durability vs performance tradeoff with three sync modes.
 ```c
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 
-/* TDB_SYNC_NONE - Fastest, least durable (OS handles flushing) */
+/* TDB_SYNC_NONE     -- Fastest, least durable (OS handles flushing) */
 cf_config.sync_mode = TDB_SYNC_NONE;
 
-/* TDB_SYNC_INTERVAL - Balanced performance with periodic background syncing */
+/* TDB_SYNC_INTERVAL -- Balanced performance with periodic background syncing */
 cf_config.sync_mode = TDB_SYNC_INTERVAL;
 cf_config.sync_interval_us = 128000;  /* Sync every 128ms (default) */
 
-/* TDB_SYNC_FULL - Most durable (fsync on every write) */
+/* TDB_SYNC_FULL     -- Most durable (fsync on every write) */
 cf_config.sync_mode = TDB_SYNC_FULL;
 
 tidesdb_create_column_family(db, "my_cf", &cf_config);
@@ -1534,9 +1534,9 @@ if (tidesdb_flush_memtable(cf) != 0)
 
 **Behavior**
 - Enqueues flush work in the global flush thread pool
-- Returns immediately (non-blocking) - flush runs asynchronously in background threads
+- Returns immediately (non-blocking) -- flush runs asynchronously in background threads
 - If flush is already running for the column family, the call succeeds but doesn't queue duplicate work
-- Thread-safe - can be called concurrently from multiple threads
+- Thread-safe -- can be called concurrently from multiple threads
 
 ### Manual Compaction
 
@@ -1564,16 +1564,16 @@ if (tidesdb_compact(cf) != 0)
 **Behavior**
 
 - Enqueues compaction work in the global compaction thread pool
-- Returns immediately (non-blocking) - compaction runs asynchronously in background threads
+- Returns immediately (non-blocking) -- compaction runs asynchronously in background threads
 - If compaction is already running for the column family, the call succeeds but doesn't queue duplicate work
 - Compaction merges SSTables across levels, removes tombstones, expired TTL entries, and obsolete versions
-- Thread-safe - can be called concurrently from multiple threads
+- Thread-safe -- can be called concurrently from multiple threads
 
 **Performance considerations**
 
 - Manual compaction uses the same thread pool as automatic background compaction
 - Configure thread pool size via `config.num_compaction_threads` (default: 2)
-- Compaction is I/O intensive - avoid triggering during peak write workloads
+- Compaction is I/O intensive -- avoid triggering during peak write workloads
 - Multiple column families can compact in parallel up to the thread pool limit
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on compaction algorithms, merge strategies, and parallel compaction.
@@ -1588,7 +1588,7 @@ TidesDB uses separate thread pools for flush and compaction operations. Understa
 - No intra-CF memtable parallelism · Even if a CF has multiple immutable memtables queued, they are flushed sequentially
 
 **Thread pool sizing guidance**
-- Single column family · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
+- Single column family · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time -- extra threads will simply wait idle.
 - Multiple column families · Set thread counts up to the number of column families for maximum parallelism. With N column families and M workers (where M ≤ N), throughput scales linearly.
 
 **Configuration**

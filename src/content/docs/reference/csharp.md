@@ -749,23 +749,23 @@ The package exports all necessary types for full C# support:
 using TidesDB;
 
 // Main classes
-// - TidesDb
-// - ColumnFamily
-// - Transaction
-// - Iterator
-// - TidesDBException
+// -- TidesDb
+// -- ColumnFamily
+// -- Transaction
+// -- Iterator
+// -- TidesDBException
 
 // Configuration classes
-// - Config
-// - ColumnFamilyConfig
-// - Stats
-// - CacheStats
+// -- Config
+// -- ColumnFamilyConfig
+// -- Stats
+// -- CacheStats
 
 // Enums
-// - CompressionAlgorithm
-// - SyncMode
-// - LogLevel
-// - IsolationLevel
+// -- CompressionAlgorithm
+// -- SyncMode
+// -- LogLevel
+// -- IsolationLevel
 ```
 
 ## Configuration Reference
