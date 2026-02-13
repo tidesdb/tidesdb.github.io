@@ -713,9 +713,9 @@ if err != nil {
 }
 
 newConfig := tidesdb.DefaultColumnFamilyConfig()
-newConfig.WriteBufferSize = 256 * 1024 * 1024  // 256MB
+newConfig.WriteBufferSize = 256 * 1024 * 1024  
 newConfig.SkipListMaxLevel = 16
-newConfig.BloomFPR = 0.001  // 0.1% false positive rate
+newConfig.BloomFPR = 0.001                      // 0.1% false positive rate
 
 err = cf.UpdateRuntimeConfig(newConfig, true)
 if err != nil {
@@ -1066,7 +1066,7 @@ if err != nil {
 - Workloads where read latency is more important than write throughput
 - Large SSTables where block scanning becomes expensive
 
-**Important**: `UseBtree` cannot be changed after column family creation.
+**Important** · `UseBtree` cannot be changed after column family creation.
 
 ## Log Levels
 

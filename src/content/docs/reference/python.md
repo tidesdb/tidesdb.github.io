@@ -70,7 +70,7 @@ config = tidesdb.Config(
     num_flush_threads=2,
     num_compaction_threads=2,
     log_level=tidesdb.LogLevel.LOG_INFO,
-    block_cache_size=64 * 1024 * 1024,  # 64MB
+    block_cache_size=64 * 1024 * 1024,   # 64MB
     max_open_sstables=256,
     log_to_file=False,                   # Write logs to file instead of stderr
     log_truncation_at=24 * 1024 * 1024,  # Log file truncation size (24MB)
@@ -254,11 +254,11 @@ with db.begin_txn() as txn:
 txn = db.begin_txn_with_isolation(tidesdb.IsolationLevel.SERIALIZABLE)
 
 # Available levels
-# - READ_UNCOMMITTED        - Sees all data including uncommitted changes
-# - READ_COMMITTED          - Sees only committed data (default)
-# - REPEATABLE_READ         - Consistent snapshot, phantom reads possible
-# - SNAPSHOT                - Write-write conflict detection
-# - SERIALIZABLE            - Full read-write conflict detection (SSI)
+# -- READ_UNCOMMITTED        -- Sees all data including uncommitted changes
+# -- READ_COMMITTED          -- Sees only committed data (default)
+# -- REPEATABLE_READ         -- Consistent snapshot, phantom reads possible
+# -- SNAPSHOT                -- Write-write conflict detection
+# -- SERIALIZABLE            -- Full read-write conflict detection (SSI)
 ```
 
 ### Savepoints
@@ -391,13 +391,13 @@ new_config.sync_mode = tidesdb.SyncMode.SYNC_FULL
 cf.update_runtime_config(new_config, persist_to_disk=True)
 
 # Updatable settings (safe to change at runtime):
-# -- write_buffer_size     - Memtable flush threshold
-# -- skip_list_max_level   - Skip list level for new memtables
-# -- skip_list_probability - Skip list probability for new memtables
-# -- bloom_fpr             - False positive rate for new SSTables
-# -- index_sample_ratio    - Index sampling ratio for new SSTables
-# -- sync_mode             - Durability mode
-# -- sync_interval_us      - Sync interval in microseconds
+# -- write_buffer_size     -- Memtable flush threshold
+# -- skip_list_max_level   -- Skip list level for new memtables
+# -- skip_list_probability -- Skip list probability for new memtables
+# -- bloom_fpr             -- False positive rate for new SSTables
+# -- index_sample_ratio    -- Index sampling ratio for new SSTables
+# -- sync_mode             -- Durability mode
+# -- sync_interval_us      -- Sync interval in microseconds
 
 # Save config to custom INI file
 tidesdb.save_config_to_ini("custom_config.ini", "my_cf", new_config)

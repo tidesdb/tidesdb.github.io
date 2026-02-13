@@ -114,10 +114,10 @@ db:create_column_family("btree_cf", cf_config)
 ```
 
 **Characteristics**
-- Point lookups -- O(log N) tree traversal with binary search at each node
-- Range scans -- Doubly-linked leaf nodes enable efficient bidirectional iteration
-- Immutable -- Tree is bulk-loaded from sorted memtable data during flush
-- Compression -- Nodes compress independently using the same algorithms
+- Point lookups · O(log N) tree traversal with binary search at each node
+- Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
+- Immutable · Tree is bulk-loaded from sorted memtable data during flush
+- Compression · Nodes compress independently using the same algorithms
 
 **When to use B+tree klog format**
 - Read-heavy workloads with frequent point lookups
@@ -156,10 +156,10 @@ local clone = db:get_column_family("cloned_cf")
 - The clone is completely independent -- modifications to one do not affect the other
 
 **Use cases**
-- **Testing** -- Create a copy of production data for testing without affecting the original
-- **Branching** -- Create a snapshot of data before making experimental changes
-- **Migration** -- Clone data before schema or configuration changes
-- **Backup verification** -- Clone and verify data integrity without modifying the source
+- Testing · Create a copy of production data for testing without affecting the original
+- Branching · Create a snapshot of data before making experimental changes
+- Migration · Clone data before schema or configuration changes
+- Backup verification · Clone and verify data integrity without modifying the source
 
 ### CRUD Operations
 
@@ -471,10 +471,10 @@ TidesDB supports multiple compression algorithms:
 local cf_config = tidesdb.default_column_family_config()
 
 cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.NO_COMPRESSION
-cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.SNAPPY_COMPRESSION  -- Not available on SunOS/Illumos
-cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.LZ4_COMPRESSION     -- Default, balanced
+cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.SNAPPY_COMPRESSION   -- Not available on SunOS/Illumos
+cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.LZ4_COMPRESSION      -- Default, balanced
 cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.LZ4_FAST_COMPRESSION -- Faster, slightly lower ratio
-cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.ZSTD_COMPRESSION    -- Best ratio, moderate speed
+cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.ZSTD_COMPRESSION     -- Best ratio, moderate speed
 
 db:create_column_family("my_cf", cf_config)
 ```
