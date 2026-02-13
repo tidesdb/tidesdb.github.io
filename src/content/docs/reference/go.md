@@ -1066,7 +1066,9 @@ if err != nil {
 - Workloads where read latency is more important than write throughput
 - Large SSTables where block scanning becomes expensive
 
-**Important** · `UseBtree` cannot be changed after column family creation.
+:::caution[Important]
+`UseBtree` cannot be changed after column family creation.
+:::
 
 ## Log Levels
 

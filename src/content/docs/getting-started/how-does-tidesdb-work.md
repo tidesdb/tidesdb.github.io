@@ -104,7 +104,7 @@ Large values exceeding the configured threshold (default 512 bytes) are written 
 
 - **Child offset deltas** · Internal nodes store child offsets as cumulative signed deltas - each offset is encoded as the difference from the previous child's offset, starting from a base offset (the first child). Since child nodes are typically written sequentially, deltas are small positive values that compress efficiently.
 
-**Leaf node format:**
+**Leaf node format**
 ```
 [type:1][num_entries:varint][prev_offset:8][next_offset:8]
 [key_offsets_table: num_entries × 2 bytes]
@@ -115,7 +115,7 @@ Large values exceeding the configured threshold (default 512 bytes) are written 
 [values: inline values only]
 ```
 
-**Internal node format:**
+**Internal node format**
 ```
 [type:1][num_keys:varint][base_offset:8]
 [child_offset_deltas: signed_varint × (num_keys + 1)]
@@ -674,17 +674,17 @@ Four worker pools handle asynchronous operations:
 
 The database maintains two global work queues: one for flush operations, one for compaction operations. Each work item identifies the target column family. When a memtable exceeds its size threshold, the system enqueues a flush work item containing the column family pointer and immutable memtable. When a level exceeds capacity, it enqueues a compaction work item with the column family and level range.
 
-Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously - worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags (`is_flushing`, `is_compacting`) with compare-and-swap to prevent concurrent operations on the same structure: **only one flush can run per column family at a time**, and **only one compaction per column family at a time**.
+Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously - worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags (`is_flushing`, `is_compacting`) with compare-and-swap to prevent concurrent operations on the same structure - **only one flush can run per column family at a time**, and **only one compaction per column family at a time**.
 
-**Parallelism semantics:**
-- **Cross-CF parallelism** · Multiple flush/compaction workers CAN process different column families in parallel
-- **Within-CF serialization** · A single column family can only have one flush and one compaction running at any time
-- **No intra-CF memtable parallelism** · Even if a CF has multiple immutable memtables queued, they are flushed sequentially (one at a time)
+**Parallelism semantics**
+- Cross-CF parallelism · Multiple flush/compaction workers CAN process different column families in parallel
+- Within-CF serialization · A single column family can only have one flush and one compaction running at any time
+- No intra-CF memtable parallelism · Even if a CF has multiple immutable memtables queued, they are flushed sequentially (one at a time)
 
-**Thread pool sizing guidance:**
-- **Single column family** · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
-- **Multiple column families** · Set thread counts up to the number of column families. With N column families and M flush workers (where M ≤ N), flush latency is roughly N/M × flush_time. The global queue provides natural load balancing.
-- **Mixed workloads** · If some CFs are write-heavy and others read-heavy, the thread pool automatically prioritizes work from active CFs.
+**Thread pool sizing guidance**
+- Single column family · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time - extra threads will simply wait idle.
+- Multiple column families · Set thread counts up to the number of column families. With N column families and M flush workers (where M ≤ N), flush latency is roughly N/M × flush_time. The global queue provides natural load balancing.
+- Mixed workloads · If some CFs are write-heavy and others read-heavy, the thread pool automatically prioritizes work from active CFs.
 
 Workers coordinate through thread-safe queues and atomic flags. The main thread enqueues work and returns immediately. Workers process work asynchronously, allowing high write throughput.
 
@@ -709,17 +709,17 @@ More status codes can be seen in the [C reference](/reference/c) section.
 
 The system distinguishes transient errors (disk space, memory) from permanent errors (corruption, invalid arguments). Critical operations use fsync for durability. All disk reads validate checksums at the block manager level.  At a higher level the system utilizes magic numbers to detect corruption at the SSTable level.
 
-**Error scenarios:**
+**Error scenarios**
 
-- **Disk full during flush** · Flush fails, memtable remains in immutable queue. Writes continue to active memtable. When active memtable fills, writes stall (no more memtable swaps possible). System logs error but does not fail writes until memory exhausted.
+- Disk full during flush · Flush fails, memtable remains in immutable queue. Writes continue to active memtable. When active memtable fills, writes stall (no more memtable swaps possible). System logs error but does not fail writes until memory exhausted.
 
-- **Corruption during read** · Returns `TDB_ERR_CORRUPTION` to caller. Does not mark SSTable as bad - subsequent reads may succeed if corruption is localized to one block.
+- Corruption during read · Returns `TDB_ERR_CORRUPTION` to caller. Does not mark SSTable as bad - subsequent reads may succeed if corruption is localized to one block.
 
-- **Corruption during compaction** · `tidesdb_merge_heap_pop()` detects corruption when advancing a source, returns the corrupted SSTable. Compaction marks it for deletion and continues with remaining sources.
+- Corruption during compaction · `tidesdb_merge_heap_pop()` detects corruption when advancing a source, returns the corrupted SSTable. Compaction marks it for deletion and continues with remaining sources.
 
-- **Memory allocation failure during compaction** · Compaction aborts, returns `TDB_ERR_MEMORY`. Old SSTables remain intact. Compaction retries on next trigger.
+- Memory allocation failure during compaction · Compaction aborts, returns `TDB_ERR_MEMORY`. Old SSTables remain intact. Compaction retries on next trigger.
 
-- **Comparator changes between restarts** · Keys will be in wrong order within SSTables. Binary search will miss existing keys (returns NOT_FOUND for keys that exist). Iterators will return keys out of order. Compaction will produce incorrectly sorted output. The system does not detect comparator changes - this is a configuration error that corrupts the logical structure without corrupting the physical data.
+- Comparator changes between restarts · Keys will be in wrong order within SSTables. Binary search will miss existing keys (returns NOT_FOUND for keys that exist). Iterators will return keys out of order. Compaction will produce incorrectly sorted output. The system does not detect comparator changes - this is a configuration error that corrupts the logical structure without corrupting the physical data.
 
 - **Bloom filter false positives** · Cause 2 unnecessary disk reads (block index + block) but no errors.
 

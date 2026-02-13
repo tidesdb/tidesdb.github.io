@@ -676,10 +676,9 @@ cf_config.compression_algorithm = TDB_COMPRESS_NONE;
 tidesdb_create_column_family(db, "my_cf", &cf_config);
 ```
 
-**Important Notes**
-
-- Compression algorithm **cannot be changed** after column family creation without corrupting existing SSTables
-- Compression is applied at the block level (both klog and vlog blocks)
+:::caution[Important]
+Compression algorithm **cannot be changed** after column family creation without corrupting existing SSTables. Compression is applied at the block level (both klog and vlog blocks).
+:::
 - Decompression happens automatically during reads
 - Block cache stores **decompressed** blocks to avoid repeated decompression overhead
 - Different column families can use different compression algorithms
@@ -715,10 +714,9 @@ tidesdb_create_column_family(db, "btree_cf", &cf_config);
 - Larger metadata overhead per node compared to block-based format
 - Block-based format may be faster for sequential scans of entire SSTables
 
-**Important notes**
-- `use_btree` **cannot be changed** after column family creation
-- Different column families can use different formats (some B+tree, some block-based)
-- Both formats support the same compression algorithms and bloom filters
+:::caution[Important]
+`use_btree` **cannot be changed** after column family creation. Different column families can use different formats (some B+tree, some block-based). Both formats support the same compression algorithms and bloom filters.
+:::
 
 **Choosing a Compression Algorithm**
 
@@ -1401,10 +1399,9 @@ int (*comparator_fn)(const uint8_t *key1, size_t key1_size,
 - `0` if key1 == key2
 - `> 0` if key1 > key2
 
-**Important notes**
-- Comparators must be **registered before** creating column families that use them
-- Once set, a comparator **cannot be changed** for a column family
-- The same comparator is used across memtables, SSTables, block indexes, and iterators
+:::caution[Important]
+Comparators must be **registered before** creating column families that use them. Once set, a comparator **cannot be changed** for a column family. The same comparator is used across memtables, SSTables, block indexes, and iterators.
+:::
 - Custom comparators can use the `ctx` parameter for runtime configuration
 
 

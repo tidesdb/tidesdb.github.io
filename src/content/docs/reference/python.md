@@ -148,7 +148,7 @@ with db.begin_txn() as txn:
     value = txn.get(clone, b"key")
 ```
 
-**Use cases:**
+**Use cases**
 - Testing · Create a copy of production data for testing without affecting the original
 - Branching · Create a snapshot of data before making experimental changes
 - Migration · Clone data before schema or configuration changes
@@ -207,7 +207,7 @@ txn.commit()
 txn.close()
 ```
 
-**Batch processing example:**
+**Batch processing example**
 ```python
 txn = db.begin_txn()
 
@@ -220,13 +220,13 @@ for batch in batches:
 txn.close()
 ```
 
-**Behavior:**
+**Behavior**
 - The transaction must be committed or rolled back before reset; resetting an active transaction raises `TidesDBError`
 - Internal buffers are retained to avoid reallocation
 - A fresh transaction ID and snapshot sequence are assigned
 - The isolation level can be changed on each reset
 
-**When to use:**
+**When to use**
 - Batch processing · Reuse a single transaction across many commit cycles in a loop
 - Connection pooling · Reset a transaction for a new request without reallocation
 - High-throughput ingestion · Reduce allocation overhead in tight write loops
@@ -357,7 +357,7 @@ with tidesdb.TidesDB.open("./mydb_checkpoint") as checkpoint_db:
     pass
 ```
 
-**Checkpoint vs Backup:**
+**Checkpoint vs Backup**
 
 | | `backup()` | `checkpoint()` |
 |--|---|---|
@@ -366,7 +366,7 @@ with tidesdb.TidesDB.open("./mydb_checkpoint") as checkpoint_db:
 | Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
 | Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
 
-**Behavior:**
+**Behavior**
 - Requires `checkpoint_dir` to be a non-existent directory or an empty directory
 - For each column family: flushes the active memtable, halts compactions, hard links all SSTable files, copies small metadata files, then resumes compactions
 - Falls back to file copy if hard linking fails (e.g., cross-filesystem)
@@ -414,18 +414,18 @@ config.use_btree = True  # Enable B+tree klog format
 db.create_column_family("btree_cf", config)
 ```
 
-**Characteristics:**
+**Characteristics**
 - Point lookups · O(log N) tree traversal with binary search at each node
 - Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
 - Immutable · Tree is bulk-loaded from sorted memtable data during flush
 - Compression · Nodes compress independently using the same algorithms
 
-**When to use B+tree klog format:**
+**When to use B+tree klog format**
 - Read-heavy workloads with frequent point lookups
 - Workloads where read latency is more important than write throughput
 - Large SSTables where block scanning becomes expensive
 
-**Tradeoffs:**
+**Tradeoffs**
 - Slightly higher write amplification during flush
 - Larger metadata overhead per node
 - Block-based format may be faster for sequential scans

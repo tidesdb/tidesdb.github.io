@@ -600,9 +600,9 @@ if (stats.useBtree) {
 - Workloads where read latency is more important than write throughput
 - Large SSTables where block scanning becomes expensive
 
-**Important notes**
-- `useBtree` **cannot be changed** after column family creation
-- Different column families can use different formats
+:::caution[Important]
+`useBtree` **cannot be changed** after column family creation. Different column families can use different formats.
+:::
 
 ## Error Handling
 

@@ -30,7 +30,7 @@ sudo cmake --install build
 
 ### Adding to Your Project
 
-**Maven:**
+**Maven**
 ```xml
 <dependency>
     <groupId>com.tidesdb</groupId>
@@ -124,7 +124,7 @@ try (Transaction txn = db.beginTransaction()) {
 }
 ```
 
-**TTL Examples:**
+**TTL Examples**
 ```java
 long ttl = -1;
 
@@ -345,7 +345,7 @@ Create a lightweight, near-instant snapshot of an open database using hard links
 db.checkpoint("./mydb_checkpoint");
 ```
 
-**Checkpoint vs Backup:**
+**Checkpoint vs Backup**
 
 | | `backup()` | `checkpoint()` |
 |--|---|---|
@@ -354,7 +354,7 @@ db.checkpoint("./mydb_checkpoint");
 | Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
 | Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
 
-**Behavior:**
+**Behavior**
 - Requires the directory to be non-existent or empty
 - For each column family: flushes the active memtable, halts compactions, hard links all SSTable files, copies small metadata files, then resumes compactions
 - Falls back to file copy if hard linking fails (e.g., cross-filesystem)
@@ -415,17 +415,19 @@ if (stats.isUseBtree()) {
 }
 ```
 
-**When to use B+tree klog format:**
+**When to use B+tree klog format**
 - Read-heavy workloads with frequent point lookups
 - Workloads where read latency is more important than write throughput
 - Large SSTables where block scanning becomes expensive
 
-**Tradeoffs:**
+**Tradeoffs**
 - Slightly higher write amplification during flush
 - Larger metadata overhead per node
 - Block-based format may be faster for sequential scans
 
-**Important:** `useBtree` cannot be changed after column family creation.
+:::caution[Important]
+`useBtree` cannot be changed after column family creation.
+:::
 
 ### Transaction Isolation Levels
 
@@ -435,7 +437,7 @@ try (Transaction txn = db.beginTransaction(IsolationLevel.SERIALIZABLE)) {
 }
 ```
 
-**Available Isolation Levels:**
+**Available Isolation Levels**
 - `READ_UNCOMMITTED` · Sees all data including uncommitted changes
 - `READ_COMMITTED` · Sees only committed data (default)
 - `REPEATABLE_READ` · Consistent snapshot, phantom reads possible
@@ -459,7 +461,7 @@ try (Transaction txn = db.beginTransaction()) {
 }
 ```
 
-**Savepoint API:**
+**Savepoint API**
 - `savepoint(name)` · Create a savepoint
 - `rollbackToSavepoint(name)` · Rollback to savepoint
 - `releaseSavepoint(name)` · Release savepoint without rolling back
@@ -483,18 +485,18 @@ txn.commit();
 txn.free();
 ```
 
-**Behavior:**
+**Behavior**
 - The transaction must be committed or aborted before reset; resetting an active transaction throws `TidesDBException`
 - Internal buffers are retained to avoid reallocation
 - A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
 - The isolation level can be changed on each reset (e.g., `READ_COMMITTED` to `REPEATABLE_READ`)
 
-**When to use:**
+**When to use**
 - Batch processing · Reuse a single transaction across many commit cycles in a loop
 - Connection pooling · Reset a transaction for a new request without reallocation
 - High-throughput ingestion · Reduce allocation overhead in tight write loops
 
-**Reset vs Free + Begin:**
+**Reset vs Free + Begin**
 
 For a single transaction, `reset` is functionally equivalent to calling `free` followed by `beginTransaction`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
 

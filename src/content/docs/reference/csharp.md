@@ -471,7 +471,9 @@ db.CreateColumnFamily("btree_cf", new ColumnFamilyConfig
 - Larger metadata overhead per node
 - Block-based format may be faster for sequential scans
 
-**Important:** `UseBtree` cannot be changed after column family creation.
+:::caution[Important]
+`UseBtree` cannot be changed after column family creation.
+:::
 
 ## Error Handling
 
