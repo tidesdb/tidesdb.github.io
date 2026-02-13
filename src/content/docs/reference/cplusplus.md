@@ -808,7 +808,9 @@ db.createColumnFamily("reverse_cf", cfConfig);
 - `"reverse"` · Reverse binary comparison
 - `"case_insensitive"` · Case-insensitive ASCII comparison
 
-**Important**: Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
+:::caution[Important]
+Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
+:::
 
 ## Testing
 

@@ -117,14 +117,14 @@ Clone a column family. Creates a complete copy of an existing column family with
 cf-clone <source_name> <destination_name>
 ```
 
-**Behavior:**
+**Behavior**
 - Flushes the source column family's memtable to ensure all data is on disk
 - Waits for any in-progress flush or compaction to complete
 - Copies all SSTable files (`.klog` and `.vlog`) to the new directory
 - Copies manifest and configuration files
 - The clone is completely independent; modifications to one do not affect the other
 
-**Use cases:**
+**Use cases**
 - Testing with a copy of production data
 - Creating a snapshot before experimental changes
 - Data migration before configuration changes
@@ -141,7 +141,7 @@ Show column family statistics and configuration.
 cf-stats <name>
 ```
 
-**Output includes:**
+**Output includes**
 - Memtable size, levels, total keys
 - Data size, avg key/value sizes
 - Read amplification, cache hit rate

@@ -124,9 +124,9 @@ db:create_column_family("btree_cf", cf_config)
 - Workloads where read latency is more important than write throughput
 - Large SSTables where block scanning becomes expensive
 
-**Important notes**
-- `use_btree` **cannot be changed** after column family creation
-- Different column families can use different formats
+:::caution[Important]
+`use_btree` **cannot be changed** after column family creation. Different column families can use different formats.
+:::
 
 ### Renaming Column Families
 

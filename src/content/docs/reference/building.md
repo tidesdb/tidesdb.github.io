@@ -213,7 +213,9 @@ cmake --build build --clean-first --verbose
 
 ### Illumos/OmniOS/Solaris
 
-**Note:** Snappy is not available in OmniOS repositories. TidesDB automatically disables Snappy compression on SunOS builds.
+:::note
+Snappy is not available in OmniOS repositories. TidesDB automatically disables Snappy compression on SunOS builds.
+:::
 
 ```bash
 # Install dependencies (packages in /opt/ooce)
@@ -457,7 +459,9 @@ vcpkg install gperftools:x64-windows
 - Excellent thread-local caching reduces lock contention
 - Minimal overhead when disabled (default)
 
-**Note:** You cannot enable both mimalloc and tcmalloc simultaneously. Choose one based on your workload characteristics.
+:::note
+You cannot enable both mimalloc and tcmalloc simultaneously. Choose one based on your workload characteristics.
+:::
 
 ### Read Profiling
 
