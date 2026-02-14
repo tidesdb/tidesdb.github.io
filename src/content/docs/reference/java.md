@@ -349,7 +349,7 @@ db.checkpoint("./mydb_checkpoint");
 
 | | `backup()` | `checkpoint()` |
 |--|---|---|
-| Speed** | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links, O(1) per file) |
 | Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
 | Portability | Can be moved to another filesystem or machine | Same filesystem only (hard link requirement) |
 | Use case | Archival, disaster recovery, remote shipping | Fast local snapshots, point-in-time reads, streaming backups |
