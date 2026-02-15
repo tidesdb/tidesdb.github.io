@@ -54,7 +54,7 @@ Just to see how the systems performed here and then rebenchmarked on the below e
 - XFS raw NVMe(SAMSUNG MZVLB512HAJQ-00000) w/discard, inode64, nodiratime, noatime, logbsize=256k, logbufs=8
 
 
-In the first environment the results show TidesDB wins 29 out of 33 workloads in the runner which is pretty good.  No regressions.
+In the first environment the results show TidesDB wins 20 out of 22 workloads in the runner which is pretty good.  No regressions.
 
 I ran the runner 3 times.
 
@@ -96,7 +96,7 @@ I've run it twice and the results are very consistent.
 
 
 
-So the latest minor of TidesDB is showing very stable and very consistent across runs though the next upcoming patch will be focusing on the clock cache differences on old CPUs that degrade reads. 
+So the latest minor of TidesDB is showing very stable and very consistent across runs though the next upcoming patch will be focusing on the clock cache differences on old CPUs that degrade reads, there is an open issue for it [here](https://github.com/tidesdb/tidesdb/issues/559).
 
 That's all for today folks.
 
