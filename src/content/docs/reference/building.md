@@ -418,7 +418,7 @@ cmake -S . -B build -DTIDESDB_WITH_MIMALLOC=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\s
 - Memory-constrained environments (mimalloc has lower fragmentation)
 
 **Performance impact**
-- Typical improvement: 5-15% reduction in allocation overhead
+- Typical improvement - 5-15% reduction in allocation overhead
 - Best results with many small allocations (skip list nodes, block buffers)
 - Minimal overhead when disabled (default)
 
@@ -455,7 +455,7 @@ vcpkg install gperftools:x64-windows
 - When you need detailed heap profiling (gperftools includes profiling tools)
 
 **Performance impact**
-- Typical improvement: 5-20% reduction in allocation overhead for multi-threaded code
+- Typical improvement - 5-20% reduction in allocation overhead for multi-threaded code
 - Excellent thread-local caching reduces lock contention
 - Minimal overhead when disabled (default)
 
@@ -521,22 +521,22 @@ int main() {
 When profiling is enabled, TidesDB tracks:
 
 #### Read Hit Location
-- **`total_reads`** · Total number of read operations
-- **`memtable_hits`** · Reads served from active memtable (fastest)
-- **`immutable_hits`** · Reads served from immutable memtables
-- **`sstable_hits`** · Reads served from SSTables on disk
+- `total_reads` · Total number of read operations
+- `memtable_hits` · Reads served from active memtable (fastest)
+- `immutable_hits` · Reads served from immutable memtables
+- `sstable_hits` · Reads served from SSTables on disk
 
 #### SSTable Search Efficiency
-- **`levels_searched`** · Total LSM levels searched across all reads
-- **`sstables_checked`** · Total SSTables examined (bloom filter + range checks)
-- **`bloom_checks`** ·- Number of bloom filter checks performed
-- **`bloom_hits`** · Bloom filter checks that indicated key might exist
+- `levels_searched` · Total LSM levels searched across all reads
+- `sstables_checked` · Total SSTables examined (bloom filter + range checks)
+- `bloom_checks` · Number of bloom filter checks performed
+- `bloom_hits` · Bloom filter checks that indicated key might exist
 
 #### Block-Level Cache Performance
-- **`cache_block_hits`** · Blocks served from cache (zero I/O)
-- **`cache_block_misses`** · Blocks read from disk
-- **`disk_reads`** · Total disk read operations
-- **`blocks_read`** · Total blocks read from disk
+- `cache_block_hits` · Blocks served from cache (zero I/O)
+- `cache_block_misses` · Blocks read from disk
+- `disk_reads` · Total disk read operations
+- `blocks_read` · Total blocks read from disk
 
 ### Example Output
 
@@ -566,17 +566,17 @@ Block-Level Cache:
 ### Interpreting Results
 
 #### Good Performance Indicators
-- **High memtable/immutable hit rate** (>20%) · Recent data is being accessed
-- **High cache hit rate** (>80%) · Block cache is sized appropriately
-- **High bloom hit rate** (>90%) · Bloom filters are effective at filtering non-existent keys
-- **Low avg levels per read** (<2.0) · LSM tree is well-compacted
-- **Low avg blocks per read** (<1.0) · Good data locality
+- High memtable/immutable hit rate (>20%) · Recent data is being accessed
+- High cache hit rate (>80%) · Block cache is sized appropriately
+- High bloom hit rate (>90%) · Bloom filters are effective at filtering non-existent keys
+- Low avg levels per read (<2.0) · LSM tree is well-compacted
+- Low avg blocks per read (<1.0) · Good data locality
 
 #### Performance Issues
-- **Low cache hit rate** (<50%) · Consider increasing `block_cache_size`
-- **High avg levels per read** (>3.0) · May need more aggressive compaction
-- **Low bloom hit rate** (<80%) · Increase bloom filter size or reduce false positive rate
-- **High avg SSTables per read** (>5.0) · Compaction may be falling behind
+- Low cache hit rate (<50%) · Consider increasing `block_cache_size`
+- High avg levels per read (>3.0) · May need more aggressive compaction
+- Low bloom hit rate (<80%) · Increase bloom filter size or reduce false positive rate
+- High avg SSTables per read (>5.0) · Compaction may be falling behind
 
 ### Performance Impact
 
@@ -700,8 +700,8 @@ The benchmark supports three key distribution patterns to simulate different wor
 
 #### Sequential
 Keys are generated in order: `key_0000000000000000`, `key_0000000000000001`, etc.
-- **Use case** · Testing sequential write/read performance
-- **Best for** · Measuring raw throughput with optimal cache behavior
+- Use case · Testing sequential write/read performance
+- Best for · Measuring raw throughput with optimal cache behavior
 
 ```bash
 cmake -B build -DBENCH_KEY_PATTERN=sequential
@@ -709,8 +709,8 @@ cmake -B build -DBENCH_KEY_PATTERN=sequential
 
 #### Random (Default)
 Keys are randomly generated alphanumeric strings.
-- **Use case** · Testing random access patterns
-- **Best for** · Simulating unpredictable workloads with poor cache locality
+- Use case · Testing random access patterns
+- Best for · Simulating unpredictable workloads with poor cache locality
 
 ```bash
 cmake -B build -DBENCH_KEY_PATTERN=random
@@ -718,8 +718,8 @@ cmake -B build -DBENCH_KEY_PATTERN=random
 
 #### Zipfian
 Keys follow a Zipfian distribution (80/20 rule) where 80% of accesses go to 20% of keys.
-- **Use case** · Simulating real-world workloads with "hot" keys
-- **Best for** · Testing cache effectiveness and realistic access patterns
+- Use case · Simulating real-world workloads with "hot" keys
+- Best for · Testing cache effectiveness and realistic access patterns
 
 ```bash
 cmake -B build -DBENCH_KEY_PATTERN=zipfian
