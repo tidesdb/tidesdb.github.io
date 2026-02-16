@@ -61,7 +61,7 @@ nohup env \
   ./sqlbench.sh > sqlbench.log 2>&1
 ```
 
-Data in these benchmarks live in memory and disk based on the configuration.  Caches are set to 64mb for both engines, sync off (durability off).
+Data in these benchmarks live in memory and disk based on the configuration.  Caches are set to 64mb for both engines, sync off (durability off).  Both engines are using RR (Repeatable read) isolation level for transactions.  Last bit both engines are utilziing the same compression (LZ4).
 
 **Throughput Comparison**
 
