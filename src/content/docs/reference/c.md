@@ -571,7 +571,7 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 | `level_sizes` | `size_t*` | Array of per-level total sizes |
 | `level_num_sstables` | `int*` | Array of per-level SSTable counts |
 | `level_key_counts` | `uint64_t*` | Array of per-level key counts |
-| `config` | `tidesdb_column_family_config_t*` | Full column family configuration |
+| `config` | `tidesdb_column_family_config_t*` | Full column family configuration. This includes column family name if you need it! |
 | `total_keys` | `uint64_t` | Total keys across memtable and all SSTables |
 | `total_data_size` | `uint64_t` | Total data size (klog + vlog) in bytes |
 | `avg_key_size` | `double` | Estimated average key size in bytes |
