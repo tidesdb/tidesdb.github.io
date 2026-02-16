@@ -123,7 +123,7 @@ The pattern from Environment 1 repeats here. At batch size 1, RocksDB leads with
 
 ![Seek throughput](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots2/04_seek_throughput.png)
 
-At 8 threads zipfian seeks show the widest gap with TidesDB at 1.14M versus 314K on RocksDB, a 3.62x lead. Sequential seeks run at 2.44M versus 1.62M. At 16 threads sequential seeks widen to 4.31M versus 1.28M, a 3.36x difference. Random seeks at 16 threads converge to near parity at 790K versus 772K. Zipfian seeks at 16 threads are also close at 1.20M versus 1.11M. The advantage narrows significantly under higher parallelism for non-sequential access patterns.
+At 8 threads zipfian seeks show the widest gap with TidesDB at 1.14M versus 314K on RocksDB, a 3.62x lead. Sequential seeks run at 2.44M versus 1.62M. At 16 threads sequential seeks widen to 4.31M versus 1.28M, a 3.36x difference. Random seeks at 16 threads converge to near parity at 790K versus 772K. Zipfian seeks at 16 threads are also close at 1.20M versus 1.11M. 
 
 ![Range scan throughput](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots2/05_range_scan_throughput.png)
 
@@ -151,7 +151,7 @@ At 8 threads TidesDB's write amplification ranges from 1.04 to 1.20 while RocksD
 
 ![Sync write performance](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots2/16_sync_write_performance.png)
 
-Sync writes with fsync enabled show how each engine handles durable writes as thread count scales from 1 to 16. At 1 thread TidesDB reaches 588K ops/sec against RocksDB at 161K, a 3.66x lead. At 4 threads TidesDB jumps to 1.51M while RocksDB stays at 305K. At 8 threads TidesDB hits 2.55M versus 321K, a 7.94x gap. At 16 threads TidesDB peaks at 4.43M while RocksDB remains flat at 305K, producing a 14.56x advantage. RocksDB's sync write throughput essentially plateaus past 1 thread while TidesDB scales nearly linearly with core count. This is one of the widest performance gaps in the entire benchmark and highlights how TidesDB's write path amortizes fsync cost across concurrent batches.
+Sync writes with fsync/fdatasync enabled show how each engine handles durable writes as thread count scales from 1 to 16. At 1 thread TidesDB reaches 588K ops/sec against RocksDB at 161K, a 3.66x lead. At 4 threads TidesDB jumps to 1.51M while RocksDB stays at 305K. At 8 threads TidesDB hits 2.55M versus 321K, a 7.94x gap. At 16 threads TidesDB peaks at 4.43M while RocksDB remains flat at 305K, producing a 14.56x advantage. RocksDB's sync write throughput essentially plateaus past 1 thread while TidesDB scales nearly linearly with core count. This is one of the widest performance gaps in the entire benchmark and highlights how TidesDB's write path amortizes fsync cost across concurrent batches because of the atomic lock-free block manager design.
 
 On the Threadripper 2950X with 128GB RAM and NVMe storage, TidesDB maintains strong advantages across write, seek, range, and delete workloads at both 8 and 16 threads. Write throughput leads by 4-11x and scales with thread count while RocksDB shows minimal scaling. 
 
@@ -159,9 +159,9 @@ The standout exception is random reads at 40M keys with 16 threads where RocksDB
 
 ## Summary
 
-Across two different hardware environments TidesDB v8.5.0 demonstrates consistent and often substantial performance advantages over RocksDB v10.10.1. On the modern i7-11700K, TidesDB leads every throughput metric by 1.3-5x and the higher clock speed plays directly into its cache-friendly design. On the older Threadripper 2950X, TidesDB still outperforms RocksDB on the vast majority of workloads and scales well to 16 threads, though a few configurations like random reads at high concurrency show RocksDB pulling ahead. 
+Across two different hardware environments the latest minor of TidesDB demonstrates consistent and often substantial performance advantages over the latest version of RocksDB. On the modern i7-11700K, TidesDB leads every throughput metric by 1.3-5x and the higher clock speed plays directly into its cache-friendly design. On the older Threadripper 2950X, TidesDB still outperforms RocksDB on the vast majority of workloads and scales well to 16 threads, though a few configurations like random reads at high concurrency show RocksDB pulling ahead. 
 
-TidesDB is designed to leverage modern hardware with fast single-threaded performance and efficient multi-core scaling, and these results validate that design. The only consistent RocksDB advantages are single-key batch-1 operations across both environments. Write amplification, tail latency, and storage efficiency all favor TidesDB regardless of platform. These benchmarks confirm that TidesDB's clock cache, MVCC, atomic and lock-less design, and batch-oriented write path deliver real-world throughput gains against a mature and well-optimized baseline!
+TidesDB is designed to leverage modern hardware with fast single-threaded performance and efficient multi-core scaling, and these results validate that design. The only consistent RocksDB advantages are single-key batch-1 operations across both environments. Write amplification, tail latency, and storage efficiency all favor TidesDB regardless of platform. These benchmarks confirm that TidesDB's clock cache, MVCC, atomic and lock-less design, and batch-oriented write path deliver real-world throughput gains against a mature and well-optimized baseline.
 
 *Thank you for reading!*
 
