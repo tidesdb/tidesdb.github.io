@@ -40,11 +40,11 @@ First off I ran the <a href="https://github.com/tidesdb/benchtool">benchtool</a>
 | <a href="/tidesdb-v8-5-0-rocksdb-v10-10-1/tidesdb_rocksdb_benchmark_results_20260216_002045.csv">tidesdb_rocksdb_benchmark_results_20260216_002045.csv</a> | CSV | 10c90cbe11353c17ddc20bbfcaad3bc8651b33112f71f5967d59e8819fc4aae2 |
 | <a href="/tidesdb-v8-5-0-rocksdb-v10-10-1/tidesdb_rocksdb_benchmark_results_20260216_002045.txt">tidesdb_rocksdb_benchmark_results_20260216_002045.txt</a> | TXT | 0d47492d5601f89426d79b30cefdca361b40b51e3080386a1832e327828cf523 |
 
-The results on this environment tell a wild story. TidesDB v8.5.0 outperforms RocksDB v10.10.1 on every measured workload at 8 threads with batch sizes ranging from 1 to 10000. 
+The results on this environment tell a wild story. TidesDB v8.5.0 outperforms RocksDB v10.10.1 on pretty much every measured workload at 8 threads with batch sizes ranging from 1 to 10000. 
 
 ![Speedup Summary](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots1/00_speedup_summary.png)
 
-TidesDB is faster than RocksDB on every workload tested in this environment. The largest gains appear on sequential writes at 4.57x and large value writes at 4.41x. Seek workloads range from 1.27x on random seeks up to 5.01x on zipfian seeks. Even the tightest result, random deletes at 1.40x, still falls in favor of TidesDB. Nothing here finishes slower.
+The largest gains appear on sequential writes at 4.57x and large value writes at 4.41x. Seek workloads range from 1.27x on random seeks up to 5.01x on zipfian seeks. Even the tightest result, random deletes at 1.40x, still falls in favor of TidesDB. Nothing here finishes slower.
 
 ![Write throughput](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots1/01_write_throughput.png)
 
@@ -80,7 +80,7 @@ Write latencies on TidesDB run 3-5x lower than RocksDB across all access pattern
 
 ![Latency percentiles](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots1/09_latency_percentiles.png)
 
-Tail latencies tell the stability story. On sequential writes TidesDB's p99 sits at 1082us against RocksDB at 3623us. Random read p99 is 4us on TidesDB versus 11us on RocksDB. The spread between p50 and p99 on TidesDB remains tight across all six workloads. RocksDB shows wider p50-to-p99 gaps especially on write-heavy tests where background compaction can introduce jitter. Delete p99 on TidesDB lands at 3000us versus 3730us on RocksDB.
+On sequential writes TidesDB's p99 sits at 1082us against RocksDB at 3623us. Random read p99 is 4us on TidesDB versus 11us on RocksDB. The spread between p50 and p99 on TidesDB remains tight across all six workloads. RocksDB shows wider p50-to-p99 gaps especially on write-heavy tests where background compaction can introduce jitter. Delete p99 on TidesDB lands at 3000us versus 3730us on RocksDB.
 
 ![Write amplification](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots1/10_write_amplification.png)
 
@@ -103,7 +103,7 @@ In environment 2 I run the benchtool as well but tidesdb_rocksdb.sh the standard
 | <a href="/tidesdb-v8-5-0-rocksdb-v10-10-1/tidesdb_rocksdb_benchmark_results_20260216_061038.csv">tidesdb_rocksdb_benchmark_results_20260216_061038.csv</a> | CSV | a21851cab4531fc3200aac7ed9c28688002c356bfb1460371d0763a0e827bb93 |
 | <a href="/tidesdb-v8-5-0-rocksdb-v10-10-1/tidesdb_rocksdb_benchmark_results_20260216_061038.txt">tidesdb_rocksdb_benchmark_results_20260216_061038.txt</a> | TXT | 65d671b8d933fc28a501dac1b032247e15ba63276dc504ebefe0d14effab3a01 |
 
-This environment exercises both 8-thread and 16-thread configurations across the full benchtool suite. The Threadripper 2950X is an older platform with more cores at a lower clock speed than the i7-11700K and the NVMe storage gives both engines faster I/O than the SATA drive in Environment 1. The additional 16-thread tests reveal how each engine handles NUMA topology and higher parallelism.
+This environment exercises both 8-thread and 16-thread configurations the full benchtool suite, with and 6GB caches across on the second half of the runs. The Threadripper 2950X is an older platform with more cores at a lower clock speed than the i7-11700K and the NVMe storage gives both engines faster I/O than the SATA drive in Environment 1. The additional 16-thread tests reveal how each engine handles NUMA topology and higher parallelism.
 
 ![Speedup Summary](/tidesdb-v8-5-0-rocksdb-v10-10-1/plots2/00_speedup_summary.png)
 
@@ -168,3 +168,4 @@ TidesDB is designed to leverage modern hardware with fast single-threaded perfor
 --
 - v8.5.0: <a href="https://github.com/tidesdb/tidesdb/releases/tag/v8.5.0">https://github.com/tidesdb/tidesdb/releases/tag/v8.5.0</a>
 - v10.10.1: <a href="https://github.com/facebook/rocksdb/releases/tag/v10.10.1">https://github.com/facebook/rocksdb/releases/tag/v10.10.1</a>
+- benchtool: <a href="https://github.com/tidesdb/benchtool">https://github.com/tidesdb/benchtool</a>
