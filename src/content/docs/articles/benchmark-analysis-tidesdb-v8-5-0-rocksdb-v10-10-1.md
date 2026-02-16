@@ -161,7 +161,7 @@ The standout exception is random reads at 40M keys with 16 threads where RocksDB
 
 Across two different hardware environments TidesDB v8.5.0 demonstrates consistent and often substantial performance advantages over RocksDB v10.10.1. On the modern i7-11700K, TidesDB leads every throughput metric by 1.3-5x and the higher clock speed plays directly into its cache-friendly design. On the older Threadripper 2950X, TidesDB still outperforms RocksDB on the vast majority of workloads and scales well to 16 threads, though a few configurations like random reads at high concurrency show RocksDB pulling ahead. 
 
-TidesDB is designed to leverage modern hardware with fast single-threaded performance and efficient multi-core scaling, and these results validate that design. The only consistent RocksDB advantages are single-key batch-1 operations across both environments. Write amplification, tail latency, and storage efficiency all favor TidesDB regardless of platform. These benchmarks confirm that TidesDB's clock cache, MVCC isolation, and batch-oriented write path deliver real-world throughput gains against a mature and well-optimized baseline!
+TidesDB is designed to leverage modern hardware with fast single-threaded performance and efficient multi-core scaling, and these results validate that design. The only consistent RocksDB advantages are single-key batch-1 operations across both environments. Write amplification, tail latency, and storage efficiency all favor TidesDB regardless of platform. These benchmarks confirm that TidesDB's clock cache, MVCC, atomic and lock-less design, and batch-oriented write path deliver real-world throughput gains against a mature and well-optimized baseline!
 
 *Thank you for reading!*
 
