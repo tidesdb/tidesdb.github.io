@@ -415,12 +415,31 @@ if (tidesdb_create_column_family(db, "sorted_cf", &cf_config) != 0)
 
 ### Dropping a Column Family
 
+**By name** (looks up column family internally):
+
 ```c
 if (tidesdb_drop_column_family(db, "my_cf") != 0)
 {
     return -1;
 }
 ```
+
+**By pointer** (skips name lookup when you already have the pointer):
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+if (tidesdb_delete_column_family(db, cf) != 0)
+{
+    return -1;
+}
+```
+
+:::tip[Which to use]
+- `tidesdb_drop_column_family(db, name)` · convenient when you only have the name
+- `tidesdb_delete_column_family(db, cf)` · faster when you already hold a `tidesdb_column_family_t*`, avoids a redundant linear scan
+:::
 
 ### Renaming a Column Family
 
@@ -537,6 +556,9 @@ if (tidesdb_get_stats(cf, &stats) == 0)
     printf("Avg Value Size: %.1f bytes\n", stats->avg_value_size);
     printf("Read Amplification: %.2f\n", stats->read_amp);
     printf("Cache Hit Rate: %.1f%%\n", stats->hit_rate * 100.0);
+    
+    /* Column family name is available via config */
+    printf("Column Family: %s\n", stats->config->name);
     
     for (int i = 0; i < stats->num_levels; i++)
     {
