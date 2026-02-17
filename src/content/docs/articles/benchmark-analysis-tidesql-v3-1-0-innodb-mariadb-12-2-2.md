@@ -93,6 +93,8 @@ TidesDB shows consistently lower latency with higher throughput across workloads
 
 **Thread Scaling**
 
+![Thread Scaling](/tidesql-v3-1-0-innodb-mariadb-12-2-2/06_thread_scaling.png)
+
 Thread scaling from 4 to 8 shows workload-dependent patterns. TidesDB achieves 62% efficiency on read-write and near-linear (93%) on insert, while InnoDB shows weaker scaling (23-52%). Point-select hits scaling limits for both engines (54-55%), likely due to contention or memory bandwidth saturation but this could be transient.
 
 Overall, the plugin is shaping up really well, and I'm excited to conduct further benchmarks. The dedicated Threadripper server for TidesDB isn't even optimal, which isn't reflected in these results. If you benchmark against a more modern CPU and environment, you'll see even greater differences. In a modern, highly optimized environment, TidesDB will deliver excellent throughput and low latency as seen in past benchmarks like <a href="/articles/benchmark-analysis-tidesdb-v8-5-0-rocksdb-v10-10-1">see here</a>.
