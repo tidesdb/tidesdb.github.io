@@ -625,6 +625,73 @@ if (tidesdb_get_cache_stats(db, &cache_stats) == 0)
 The block cache is a database-level resource shared across all column families. It caches deserialized klog blocks to avoid repeated disk I/O and deserialization. Configure cache size via `config.block_cache_size` when opening the database. Set to 0 to disable caching.
 :::
 
+### Range Cost Estimation
+
+`tidesdb_range_cost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+
+```c
+int tidesdb_range_cost(tidesdb_column_family_t *cf,
+                       const uint8_t *key_a, size_t key_a_size,
+                       const uint8_t *key_b, size_t key_b_size,
+                       double *cost);
+```
+
+**Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `cf` | `tidesdb_column_family_t*` | Column family to estimate cost for |
+| `key_a` | `const uint8_t*` | First key (bound of range) |
+| `key_a_size` | `size_t` | Size of first key |
+| `key_b` | `const uint8_t*` | Second key (bound of range) |
+| `key_b_size` | `size_t` | Size of second key |
+| `cost` | `double*` | Output: estimated traversal cost (higher = more expensive) |
+
+**Returns**
+- `TDB_SUCCESS` on success
+- `TDB_ERR_INVALID_ARGS` on bad input (NULL pointers, zero-length keys)
+
+**Example**
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+double cost_a = 0.0, cost_b = 0.0;
+
+tidesdb_range_cost(cf, (uint8_t *)"user:0000", 9,
+                       (uint8_t *)"user:0999", 9, &cost_a);
+
+tidesdb_range_cost(cf, (uint8_t *)"user:1000", 9,
+                       (uint8_t *)"user:1099", 9, &cost_b);
+
+if (cost_a < cost_b)
+{
+    printf("Range A is cheaper to iterate\n");
+}
+```
+
+**How it works**
+
+The function walks all SSTable levels and uses in-memory metadata to estimate how many blocks and entries fall within the given key range:
+
+- With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to find the block slots containing each key bound. The block span between slots, scaled by `index_sample_ratio`, gives the estimated block count.
+- Without block indexes · Falls back to byte-level key interpolation. The leading 8 bytes of each key are converted to a numeric position within the SSTable's min/max key range to estimate the fraction of blocks covered.
+- B+tree SSTables (`use_btree=1`) · Uses the same key interpolation against tree node counts, plus tree height as a seek cost. Only applies to column families configured with B+tree klog format.
+- Compression · Compressed SSTables receive a 1.5× weight multiplier to account for decompression overhead.
+- Merge overhead · Each overlapping SSTable adds a small fixed cost for merge-heap operations.
+- Memtable · The active memtable's entry count contributes a small in-memory cost.
+
+Key order does not matter — the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`.
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
+:::note[Cost Values]
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `tidesdb_range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+:::
+
 ### Compression Algorithms
 
 TidesDB supports multiple compression algorithms to reduce storage footprint and I/O bandwidth. Compression is applied to both klog (key-log) and vlog (value-log) blocks before writing to disk.
