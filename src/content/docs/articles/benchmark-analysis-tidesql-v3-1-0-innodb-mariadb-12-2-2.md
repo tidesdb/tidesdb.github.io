@@ -108,6 +108,6 @@ That's all for now.
 Data:
 | File Name | Format | SHA256 Checksum |
 |-----------|--------|----------------|
-| <a href="tidesql-v3-1-0-innodb-mariadb-12-2-2/detail_20260216_215126.csv">detail_20260216_215126.csv</a> | CSV | ca9bc0adf999be76cc1acaad702565f3cd0aa3cc17400e291737e5265b750c07 |
-| <a href="tidesql-v3-1-0-innodb-mariadb-12-2-2/summary_20260216_215126.csv">summary_20260216_215126.csv</a> | CSV | 74e7373c8a5c7a6b7538b2b3fbdcbb2479d741b475e90d520365ffb948c789d0 |
+| <a href="/tidesql-v3-1-0-innodb-mariadb-12-2-2/detail_20260216_215126.csv">detail_20260216_215126.csv</a> | CSV | ca9bc0adf999be76cc1acaad702565f3cd0aa3cc17400e291737e5265b750c07 |
+| <a href="/tidesql-v3-1-0-innodb-mariadb-12-2-2/summary_20260216_215126.csv">summary_20260216_215126.csv</a> | CSV | 74e7373c8a5c7a6b7538b2b3fbdcbb2479d741b475e90d520365ffb948c789d0 |
 
