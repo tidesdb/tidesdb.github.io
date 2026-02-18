@@ -31,6 +31,21 @@ Or loaded dynamically:
 INSTALL SONAME 'ha_tidesdb';
 ```
 
+Once loaded, the engine appears in `SHOW ENGINES`:
+
+```
+MariaDB [(none)]> SHOW ENGINES\G
+...
+*************************** 1. row ***************************
+      Engine: TIDESDB
+     Support: YES
+     Comment: Supports ACID transactions, lock-free concurrency, indexing, and encryption for tables
+Transactions: YES
+          XA: NO
+  Savepoints: NO
+...
+```
+
 After that, creating a table with TidesDB is straightforward:
 
 ```sql
@@ -81,7 +96,7 @@ CREATE TABLE logs (
 
 Secondary indexes are stored in their own column families, separate from the main data. Each index entry consists of a key that concatenates the comparable-format index column bytes with the comparable-format primary key bytes. The value is empty (a single zero byte). This design means that every secondary index entry is self-contained, given an index key, the engine can extract the primary key from its tail and perform a point lookup into the main data CF to fetch the full row.
 
-When you insert, update, or delete a row, the engine transactionally maintains all secondary indexes within the same transaction. For updates, the old index entry is deleted and the new one is inserted. For deletes, the corresponding index entries are removed.
+When you insert, update, or delete a row, the engine transactionally maintains all secondary indexes within the same transaction. For updates, the engine builds the old and new comparable index key for each secondary index and compares them with `memcmp`; if the indexed columns and PK bytes are identical, that index is skipped entirely, avoiding a redundant delete-then-reinsert round-trip into the library. This is a significant optimization for updates that only touch non-indexed columns. For deletes, the corresponding index entries are removed.
 
 ```sql
 CREATE TABLE products (
@@ -99,10 +114,14 @@ SELECT * FROM products WHERE category = 10;
 
 The optimizer is aware of these indexes. The engine reports cost estimates based on the LSM-tree's read amplification factor, which it obtains from TidesDB's internal statistics. Point lookups through a secondary index cost roughly one seek into the index CF plus one point-get into the data CF.
 
+### Index Condition Pushdown (ICP)
+
+The engine supports Index Condition Pushdown for secondary index scans. When the optimizer pushes a WHERE condition down to the storage engine, the engine evaluates it on the index key columns before performing the expensive primary key point-lookup into the data column family. Index entries that fail the condition are skipped without touching the data CF at all. This is the same pattern used by InnoDB -- the engine decodes the index key columns into the record buffer and calls MariaDB's `handler_index_cond_check()` evaluator. ICP is currently supported for indexes on integer column types (`TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT`) where the comparable key encoding is bijectively reversible. For indexes on string columns, the engine falls through to the standard PK-lookup path.
+
 
 ## Auto-Increment
 
-Auto-increment works in a similar way to InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`, and the default `get_auto_increment()` handler method uses `index_last` on the primary key to discover the current maximum value. There is no separate metadata key for the auto-increment counter; it is derived from the data at runtime.
+Auto-increment works in a similar way to InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`. Rather than calling `index_last()` on every INSERT (which would create and destroy a TidesDB merge-heap iterator each time), the engine maintains an in-memory atomic counter on the shared table descriptor. The counter is seeded once at table open time by seeking to the last key in the primary key column family, and is atomically incremented via a CAS loop on each INSERT — making auto-increment assignment O(1). When a user inserts an explicit value larger than the current counter, `write_row()` bumps the counter to match.
 
 ```sql
 CREATE TABLE tickets (
@@ -122,9 +141,13 @@ SELECT * FROM tickets ORDER BY id;
 
 ## Transactions and Concurrency
 
-TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction that provides MVCC-based isolation at the level configured for the table. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. At statement end, dirty transactions are committed and then freed. Read-only transactions are rolled back and reset for reuse, which avoids the overhead of allocating a fresh transaction object for the next read statement.
+TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction that provides MVCC-based isolation at the level configured for the table. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. At statement end, dirty transactions are committed and then freed. Read-only transactions are rolled back and freed so that the next statement begins with a fresh read snapshot.
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
+
+### Iterator Reuse
+
+Creating a new TidesDB iterator is expensive because it builds a merge heap from all active SSTables. The engine caches iterators across statements within a multi-statement transaction (`BEGIN ... COMMIT`). When a statement ends, the cached iterator is kept alive if the transaction survives (i.e. not autocommit mode and the statement was read-only). The next statement that scans the same column family reuses the cached iterator with a cheap `seek()` instead of constructing a new merge heap. The iterator is invalidated when the transaction changes (detected via pointer comparison on `scan_iter_txn_`), when the column family changes, or when the preceding statement performed writes (because the merge heap snapshots the transaction's write buffer at creation time and would not see subsequent writes). This optimization eliminates the catastrophic cost of repeated iterator construction that would otherwise dominate latency on large tables.
 
 The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`:
 
@@ -377,8 +400,23 @@ The engine explicitly rejects `ALGORITHM=INPLACE` for these operations with a cl
 
 Running `ANALYZE TABLE` on a TidesDB table produces detailed internal statistics as note-level messages in the result set:
 
-```sql
-ANALYZE TABLE products;
+```
+MariaDB [demo]> ANALYZE TABLE products;
++---------------+---------+----------+-------------------------------------------------------------------------------------+
+| Table         | Op      | Msg_type | Msg_text                                                                            |
++---------------+---------+----------+-------------------------------------------------------------------------------------+
+| demo.products | analyze | Note     | TIDESDB: CF 'demo__products'  total_keys=10  data_size=636 bytes  memtable=0 bytes  |
+|               |         |          |   levels=5  read_amp=2.00  cache_hit=0.0%                                           |
+| demo.products | analyze | Note     | TIDESDB: avg_key=18.8 bytes  avg_value=44.0 bytes                                   |
+| demo.products | analyze | Note     | TIDESDB: level 1  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | TIDESDB: level 2  sstables=1  size=636 bytes  keys=10                               |
+| demo.products | analyze | Note     | TIDESDB: level 3  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | TIDESDB: level 4  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | TIDESDB: level 5  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | TIDESDB: idx CF 'demo__products__idx_idx_category'  keys=10  data_size=449 bytes     |
+|               |         |          |   levels=5                                                                          |
+| demo.products | analyze | status   | OK                                                                                  |
++---------------+---------+----------+-------------------------------------------------------------------------------------+
 ```
 
 The output includes the total number of keys, data size, memtable size, number of LSM levels, read amplification factor, cache hit rate, average key and value sizes, and per-level SSTable counts and sizes. For tables with secondary indexes, each index CF's statistics are reported separately.
@@ -465,11 +503,25 @@ For tables without an explicit primary key, the engine generates a hidden 8-byte
 
 ## Statistics and the Optimizer
 
-The engine maintains cached statistics that are refreshed at most every two seconds. These statistics include the total number of keys, total data size, average key and value sizes, and the LSM-tree's read amplification factor. They feed into MariaDB's cost-based optimizer through the `info()`, `scan_time()`, `keyread_time()`, and `records_in_range()` methods.
+The engine maintains cached statistics that are refreshed at most every two seconds. These statistics include the total number of keys, total data size, average key and value sizes, and the LSM-tree's read amplification factor. They are stored as atomic variables on the shared table descriptor and feed into MariaDB's cost-based optimizer through `info()`, `scan_time()`, `keyread_time()`, `rnd_pos_time()`, and `records_in_range()`.
 
-The cost model accounts for the fact that LSM-tree reads may need to consult multiple levels. A higher read amplification (more levels with overlapping key ranges) increases the cost of point lookups, which nudges the optimizer toward sequential scans when the amplification is high. Conversely, when the data is well-compacted and the read amplification is low, index lookups are cheap.
+The cost model accounts for the fact that LSM-tree reads may need to consult multiple levels. The read amplification factor — obtained from `tidesdb_get_stats()` — scales the cost of point lookups and random-position reads. A higher read amplification nudges the optimizer toward sequential scans; when the data is well-compacted and the amplification is low, index lookups are cheap.
 
-For `records_in_range()`, the engine returns a rough estimate (one quarter of the cached total row count) rather than performing an expensive exact count. This is a pragmatic tradeoff, the optimizer needs a reasonable estimate to choose between index scan and table scan, but an exact count would require iterating through the range, which defeats the purpose.
+### Cost Methods
+
+- `scan_time()` uses `tidesdb_range_cost()` over the full data column family key space, giving the optimizer an LSM-aware full-table-scan cost that accounts for the actual number of levels, SSTables, compression overhead, and merge complexity. The cost is split 90% I/O / 10% CPU. Falls back to the base `handler::scan_time()` when the library cannot produce a meaningful estimate.
+
+- `keyread_time()` models index reads as `rows × 0.00003 × read_amp + ranges × 0.0001`. Each point lookup touches `read_amp` levels; range scans amortize the merge-heap setup cost across rows.
+
+- `rnd_pos_time()` models random-position lookups as `rows × 0.00005 × read_amp`, reflecting that each random fetch is a point-get through the full LSM stack.
+
+### Range-Aware Cardinality Estimation
+
+`records_in_range()` uses a two-path strategy:
+
+1. Equality detection · When both key bounds convert to identical comparable bytes (a point equality like `WHERE k = 5`), the engine returns the `rec_per_key` estimate directly. This avoids the `tidesdb_range_cost()` path, which is an I/O cost metric rather than a cardinality metric — for memtable-only data it cannot distinguish a point range from a full scan, so the proportional estimate would be meaningless.
+
+2. Range estimation · For range predicates the engine calls `tidesdb_range_cost()` for the requested key range and for the full key space, then returns `total_records × (range_cost / full_cost)`. The function examines in-memory metadata — block indexes, SSTable min/max keys, and entry counts — without any disk I/O. A narrow range returns a small estimate while a wide range returns a proportionally larger one, allowing the optimizer to make informed decisions about index selection and join ordering.
 
 
 ## OPTIMIZE TABLE
