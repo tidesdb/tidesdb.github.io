@@ -329,6 +329,43 @@ print(f"Cache hits: {cache_stats.hits}, misses: {cache_stats.misses}")
 print(f"Hit rate: {cache_stats.hit_rate:.2%}")
 ```
 
+### Range Cost Estimation
+
+`range_cost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
+
+```python
+cf = db.get_column_family("my_cf")
+
+cost_a = cf.range_cost(b"user:0000", b"user:0999")
+cost_b = cf.range_cost(b"user:1000", b"user:1099")
+
+if cost_a < cost_b:
+    print("Range A is cheaper to iterate")
+```
+
+**How it works**
+
+The method walks all SSTable levels and uses in-memory metadata to estimate how many blocks and entries fall within the given key range:
+
+- With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to find the block slots containing each key bound
+- Without block indexes · Falls back to byte-level key interpolation within the SSTable's min/max key range
+- B+tree SSTables (`use_btree=True`) · Uses key interpolation against tree node counts, plus tree height as a seek cost
+- Compression · Compressed SSTables receive a 1.5× weight multiplier to account for decompression overhead
+- Merge overhead · Each overlapping SSTable adds a small fixed cost for merge-heap operations
+- Memtable · The active memtable's entry count contributes a small in-memory cost
+
+Key order does not matter — `range_cost(a, b)` produces the same result as `range_cost(b, a)`.
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
+:::note[Cost Values]
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+:::
+
 ### Backup
 
 ```python
@@ -401,6 +438,10 @@ cf.update_runtime_config(new_config, persist_to_disk=True)
 
 # Save config to custom INI file
 tidesdb.save_config_to_ini("custom_config.ini", "my_cf", new_config)
+
+# Load config from INI file
+loaded_config = tidesdb.load_config_from_ini("custom_config.ini", "my_cf")
+db.create_column_family("restored_cf", loaded_config)
 ```
 
 ### B+tree KLog Format (Optional)

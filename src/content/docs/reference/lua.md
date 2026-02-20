@@ -381,6 +381,38 @@ else
 end
 ```
 
+### Range Cost Estimation
+
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local cost_a = cf:range_cost("user:0000", "user:0999")
+local cost_b = cf:range_cost("user:1000", "user:1099")
+
+if cost_a < cost_b then
+    print("Range A is cheaper to iterate")
+end
+```
+
+**How it works**
+- With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to find the block slots containing each key bound
+- Without block indexes · Falls back to byte-level key interpolation using the leading 8 bytes of each key
+- B+tree SSTables · Uses key interpolation against tree node counts, plus tree height as a seek cost
+- Compression · Compressed SSTables receive a 1.5× weight multiplier to account for decompression overhead
+- Key order does not matter — the function normalizes the range internally
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
+:::note[Cost Values]
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `cf:range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+:::
+
 ### Listing Column Families
 
 ```lua
@@ -843,6 +875,7 @@ lua test_tidesdb.lua
 | `cf:is_flushing()` | Check if flush is in progress |
 | `cf:is_compacting()` | Check if compaction is in progress |
 | `cf:get_stats()` | Get column family statistics |
+| `cf:range_cost(key_a, key_b)` | Estimate range iteration cost between two keys |
 | `cf:update_runtime_config(config, persist)` | Update runtime configuration |
 
 ### Transaction Class

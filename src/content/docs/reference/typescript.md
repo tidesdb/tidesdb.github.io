@@ -518,6 +518,47 @@ cf.updateRuntimeConfig({
 **Non-updatable settings** (would corrupt existing data):
 - `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
 
+### Range Cost Estimation
+
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const costA = cf.rangeCost(Buffer.from('user:0000'), Buffer.from('user:0999'));
+const costB = cf.rangeCost(Buffer.from('user:1000'), Buffer.from('user:1099'));
+
+if (costA < costB) {
+  console.log('Range A is cheaper to iterate');
+}
+```
+
+**Parameters**
+- `keyA` · `Buffer` — First key (bound of range)
+- `keyB` · `Buffer` — Second key (bound of range)
+
+**Returns** · `number` — Estimated traversal cost (higher = more expensive)
+
+**How it works**
+- With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to estimate block count
+- Without block indexes · Falls back to byte-level key interpolation against SSTable min/max keys
+- B+tree SSTables · Uses key interpolation against tree node counts, plus tree height as a seek cost
+- Compressed SSTables receive a 1.5× weight multiplier to account for decompression overhead
+- Each overlapping SSTable adds a small fixed cost for merge-heap operations
+- The active memtable's entry count contributes a small in-memory cost
+
+Key order does not matter — the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
+:::note[Cost Values]
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `rangeCost` results. A cost of 0 means no overlapping SSTables or memtable entries were found for the range.
+:::
+
 ### Sync Modes
 
 Control the durability vs performance tradeoff.

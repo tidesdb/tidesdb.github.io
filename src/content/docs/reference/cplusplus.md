@@ -468,6 +468,39 @@ if (cacheStats.enabled) {
 - `hitRate` · Hit rate as a decimal (0.0 to 1.0)
 - `numPartitions` · Number of cache partitions
 
+### Range Cost Estimation
+
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+double costA = cf.rangeCost("user:0000", "user:0999");
+double costB = cf.rangeCost("user:1000", "user:1099");
+
+if (costA < costB) {
+    std::cout << "Range A is cheaper to iterate" << std::endl;
+}
+```
+
+**Key order does not matter** — the function normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
+
+**How it works**
+- With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to estimate block span
+- Without block indexes · Falls back to byte-level key interpolation against SSTable min/max keys
+- B+tree SSTables (`useBtree=true`) · Uses key interpolation against tree node counts, plus tree height as a seek cost
+- Compressed SSTables receive a 1.5× weight multiplier for decompression overhead
+- Each overlapping SSTable adds a small fixed cost for merge-heap operations
+- The active memtable's entry count contributes a small in-memory cost
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
+A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+
 ### Sync Modes
 
 Control the durability vs performance tradeoff.
