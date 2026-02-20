@@ -735,6 +735,50 @@ Console.WriteLine($"Hit rate: {cacheStats.HitRate * 100:F1}%");
 Console.WriteLine($"Partitions: {cacheStats.NumPartitions}");
 ```
 
+## Range Cost Estimation
+
+`RangeCost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+var costA = cf.RangeCost(
+    Encoding.UTF8.GetBytes("user:0000"),
+    Encoding.UTF8.GetBytes("user:0999"));
+
+var costB = cf.RangeCost(
+    Encoding.UTF8.GetBytes("user:1000"),
+    Encoding.UTF8.GetBytes("user:1099"));
+
+if (costA < costB)
+{
+    Console.WriteLine("Range A is cheaper to iterate");
+}
+```
+
+**How it works**
+
+The function walks all SSTable levels and uses in-memory metadata to estimate how many blocks and entries fall within the given key range:
+
+- With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to find the block slots containing each key bound
+- Without block indexes · Falls back to byte-level key interpolation against the SSTable's min/max key range
+- B+tree SSTables (`UseBtree=true`) · Uses key interpolation against tree node counts, plus tree height as a seek cost
+- Compression · Compressed SSTables receive a 1.5× weight multiplier to account for decompression overhead
+- Merge overhead · Each overlapping SSTable adds a small fixed cost for merge-heap operations
+- Memtable · The active memtable's entry count contributes a small in-memory cost
+
+Key order does not matter — the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
+:::note[Cost Values]
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `RangeCost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+:::
+
 ## Testing
 
 ```bash

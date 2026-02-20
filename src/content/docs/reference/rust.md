@@ -542,6 +542,48 @@ fn main() -> tidesdb::Result<()> {
 }
 ```
 
+### Range Cost Estimation
+
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other `range_cost` results. It uses only in-memory metadata and performs no disk I/O.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let cf = db.get_column_family("my_cf")?;
+
+    let cost_a = cf.range_cost(b"user:0000", b"user:0999")?;
+    let cost_b = cf.range_cost(b"user:1000", b"user:1099")?;
+
+    if cost_a < cost_b {
+        println!("Range A is cheaper to iterate");
+    }
+
+    Ok(())
+}
+```
+
+**Behavior**
+- Key order does not matter — the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`
+- A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range
+- With block indexes enabled, uses O(log B) binary search per overlapping SSTable
+- Without block indexes, falls back to byte-level key interpolation
+- B+tree SSTables use key interpolation against tree node counts plus tree height as seek cost
+- Compressed SSTables receive a 1.5× weight multiplier for decompression overhead
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
+:::note[Cost Values]
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `range_cost` results.
+:::
+
 ### Listing Column Families
 
 ```rust

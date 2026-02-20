@@ -302,6 +302,29 @@ boolean flushing = cf.isFlushing();
 boolean compacting = cf.isCompacting();
 ```
 
+### Range Cost Estimation
+
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. Uses only in-memory metadata and performs no disk I/O.
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+double costA = cf.rangeCost("user:0000".getBytes(), "user:0999".getBytes());
+double costB = cf.rangeCost("user:1000".getBytes(), "user:1099".getBytes());
+
+if (costA < costB) {
+    System.out.println("Range A is cheaper to iterate");
+}
+```
+
+Key order does not matter — the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across threads by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
+
 ### Updating Runtime Configuration
 
 Update runtime-safe configuration settings for a column family:

@@ -183,6 +183,20 @@ if err != nil {
 }
 ```
 
+**Dropping by pointer** (faster when you already hold the `ColumnFamily` pointer, skips internal name lookup):
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+err = db.DeleteColumnFamily(cf)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
 ### Renaming a Column Family
 
 Atomically rename a column family and its underlying directory. The operation waits for any in-progress flush or compaction to complete before renaming.
@@ -634,6 +648,45 @@ if cacheStats.Enabled {
 | `Misses` | `uint64` | Number of cache misses |
 | `HitRate` | `float64` | Hit rate as a decimal (0.0 to 1.0) |
 | `NumPartitions` | `uint64` | Number of cache partitions |
+
+### Range Cost Estimation
+
+`RangeCost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+costA, err := cf.RangeCost([]byte("user:0000"), []byte("user:0999"))
+if err != nil {
+    log.Fatal(err)
+}
+
+costB, err := cf.RangeCost([]byte("user:1000"), []byte("user:1099"))
+if err != nil {
+    log.Fatal(err)
+}
+
+if costA < costB {
+    fmt.Println("Range A is cheaper to iterate")
+}
+```
+
+**Behavior**
+- Key order does not matter — the function normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`
+- With block indexes enabled, uses O(log B) binary search per overlapping SSTable
+- Without block indexes, falls back to byte-level key interpolation
+- B+tree SSTables use key interpolation against tree node counts plus tree height as seek cost
+- Compressed SSTables receive a 1.5× weight multiplier for decompression overhead
+- A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range
+
+**Use cases**
+- Query planning · Compare candidate key ranges to find the cheapest one to scan
+- Load balancing · Distribute range scan work across goroutines by estimating per-range cost
+- Adaptive prefetching · Decide how aggressively to prefetch based on range size
+- Monitoring · Track how data distribution changes across key ranges over time
 
 ### Listing Column Families
 
@@ -1122,4 +1175,10 @@ go test -v -run TestTransactionReset
 
 # Run checkpoint test
 go test -v -run TestCheckpoint
+
+# Run range cost estimation test
+go test -v -run TestRangeCost
+
+# Run delete column family by pointer test
+go test -v -run TestDeleteColumnFamily
 ```
