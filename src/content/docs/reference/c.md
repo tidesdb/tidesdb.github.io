@@ -415,7 +415,7 @@ if (tidesdb_create_column_family(db, "sorted_cf", &cf_config) != 0)
 
 ### Dropping a Column Family
 
-**By name** (looks up column family internally):
+By name (looks up column family internally):
 
 ```c
 if (tidesdb_drop_column_family(db, "my_cf") != 0)
@@ -424,7 +424,7 @@ if (tidesdb_drop_column_family(db, "my_cf") != 0)
 }
 ```
 
-**By pointer** (skips name lookup when you already have the pointer):
+By pointer (skips name lookup when you already have the pointer):
 
 ```c
 tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
@@ -885,6 +885,122 @@ if (tidesdb_cf_config_load_from_ini("custom_config.ini", "my_cf", &loaded_config
 
 :::tip[Important Notes]
 Changes apply immediately to new operations. Existing SSTables and memtables retain their original settings. The update operation is thread-safe.
+:::
+
+### Commit Hook (Change Data Capture)
+
+`tidesdb_cf_set_commit_hook` registers an optional callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
+
+```c
+int tidesdb_cf_set_commit_hook(tidesdb_column_family_t *cf,
+                                tidesdb_commit_hook_fn fn,
+                                void *ctx);
+```
+
+**Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `cf` | `tidesdb_column_family_t*` | Column family handle |
+| `fn` | `tidesdb_commit_hook_fn` | Commit hook callback (or `NULL` to disable) |
+| `ctx` | `void*` | User-provided context passed to the callback |
+
+**Returns**
+- `TDB_SUCCESS` on success
+- `TDB_ERR_INVALID_ARGS` if `cf` is NULL
+
+**Callback signature**
+
+```c
+typedef int (*tidesdb_commit_hook_fn)(const tidesdb_commit_op_t *ops, int num_ops,
+                                      uint64_t commit_seq, void *ctx);
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ops` | `const tidesdb_commit_op_t*` | Array of committed operations (valid only during callback) |
+| `num_ops` | `int` | Number of operations in the array |
+| `commit_seq` | `uint64_t` | Monotonic commit sequence number |
+| `ctx` | `void*` | User-provided context pointer |
+
+The callback returns `0` on success. A non-zero return is logged as a warning but does not roll back the commit.
+
+**Operation struct**
+
+```c
+typedef struct tidesdb_commit_op_t
+{
+    const uint8_t *key;
+    size_t key_size;
+    const uint8_t *value;      /* NULL for deletes */
+    size_t value_size;         /* 0 for deletes */
+    time_t ttl;
+    int is_delete;             /* 1 for delete, 0 for put */
+} tidesdb_commit_op_t;
+```
+
+**Example (replication sink)**
+```c
+typedef struct
+{
+    int socket_fd;
+    uint8_t *send_buf;
+    size_t buf_size;
+} replication_ctx_t;
+
+static int replication_hook(const tidesdb_commit_op_t *ops, int num_ops,
+                            uint64_t commit_seq, void *ctx)
+{
+    replication_ctx_t *rctx = (replication_ctx_t *)ctx;
+    for (int i = 0; i < num_ops; i++)
+    {
+        /* Serialize and send each op to replica */
+        send_to_replica(rctx->socket_fd, commit_seq, &ops[i]);
+    }
+    return 0;
+}
+
+/* Attach hook at runtime */
+replication_ctx_t rctx = { .socket_fd = replica_fd };
+tidesdb_cf_set_commit_hook(cf, replication_hook, &rctx);
+
+/* Normal writes now trigger the hook automatically */
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+tidesdb_txn_put(txn, cf, key, key_size, value, value_size, -1);
+tidesdb_txn_commit(txn);  /* replication_hook fires here */
+tidesdb_txn_free(txn);
+
+/* Detach hook */
+tidesdb_cf_set_commit_hook(cf, NULL, NULL);
+```
+
+**Setting hook via config at creation time**
+```c
+tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
+cf_config.commit_hook_fn = replication_hook;
+cf_config.commit_hook_ctx = &rctx;
+
+tidesdb_create_column_family(db, "replicated_cf", &cf_config);
+```
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- Hook failure (non-zero return) is logged but does not affect the commit result
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
+- Pointers in `tidesdb_commit_op_t` are valid only during the callback invocation — copy any data you need to retain
+- The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
+- Setting the hook to `NULL` disables it immediately with no restart required
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+:::note[Runtime-Only]
+The `commit_hook_fn` and `commit_hook_ctx` fields are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
 :::
 
 ## Transactions
