@@ -559,6 +559,66 @@ Key order does not matter — the method normalizes the range so `keyA > keyB` p
 The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `rangeCost` results. A cost of 0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
+### Commit Hook (Change Data Capture)
+
+`setCommitHook` registers an optional callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
+
+```typescript
+import { CommitOp } from 'tidesdb';
+
+const cf = db.getColumnFamily('my_cf');
+
+// Attach a commit hook
+cf.setCommitHook((ops: CommitOp[], commitSeq: number): number => {
+  for (const op of ops) {
+    if (op.isDelete) {
+      console.log(`[${commitSeq}] DELETE key=${op.key.toString()}`);
+    } else {
+      console.log(`[${commitSeq}] PUT key=${op.key.toString()} value=${op.value!.toString()}`);
+    }
+  }
+  return 0; // 0 = success
+});
+
+// Normal writes now trigger the hook automatically
+const txn = db.beginTransaction();
+txn.put(cf, Buffer.from('key1'), Buffer.from('value1'), -1);
+txn.commit(); // hook fires here
+txn.free();
+
+// Detach the hook
+cf.clearCommitHook();
+```
+
+**Parameters** (`setCommitHook`)
+- `callback` · `CommitHookCallback` — Function invoked with `(ops, commitSeq)`. Return `0` on success; non-zero is logged as a warning but does not roll back the commit.
+
+**CommitOp fields**
+- `key` · `Buffer` — Key data
+- `value` · `Buffer | null` — Value data (`null` for deletes)
+- `ttl` · `number` — Time-to-live (Unix timestamp, `-1` = no expiry)
+- `isDelete` · `boolean` — Whether this is a delete operation
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- Hook failure (non-zero return) is logged but does not affect the commit result
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commitSeq` is monotonically increasing across commits and can be used as a replication cursor
+- Data in `CommitOp` is copied and safe to retain beyond the callback
+- The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
+- Calling `clearCommitHook()` disables it immediately with no restart required
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+:::note[Runtime-Only]
+Commit hooks are not persisted. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+:::
+
 ### Sync Modes
 
 Control the durability vs performance tradeoff.

@@ -352,6 +352,57 @@ cf.updateRuntimeConfig(newConfig, true);
 - `syncMode` · Durability mode
 - `syncIntervalUs` · Sync interval in microseconds
 
+### Commit Hook (Change Data Capture)
+
+Register a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing.
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+cf.setCommitHook((ops, commitSeq) -> {
+    for (CommitOp op : ops) {
+        if (op.isDelete()) {
+            System.out.println("DELETE key=" + new String(op.getKey()));
+        } else {
+            System.out.println("PUT key=" + new String(op.getKey())
+                + " value=" + new String(op.getValue()));
+        }
+    }
+    System.out.println("Commit seq: " + commitSeq);
+    return 0;
+});
+
+// Normal writes now trigger the hook automatically
+try (Transaction txn = db.beginTransaction()) {
+    txn.put(cf, "key1".getBytes(), "value1".getBytes());
+    txn.commit();  // hook fires here
+}
+
+// Detach hook
+cf.clearCommitHook();
+```
+
+The `CommitHook` functional interface receives a `CommitOp[]` array and a monotonic `commitSeq` number. Each `CommitOp` contains:
+- `getKey()` · Key bytes
+- `getValue()` · Value bytes (null for deletes)
+- `getTtl()` · Time-to-live (-1 for no expiry)
+- `isDelete()` · True if this is a delete operation
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking — data is fully durable before the callback runs
+- Hook failure (non-zero return) is logged but does not roll back the commit
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commitSeq` is monotonically increasing and can be used as a replication cursor
+- The hook executes synchronously on the committing thread — keep the callback fast to avoid stalling writers
+- Hooks are runtime-only and not persisted. After a database restart, hooks must be re-registered by the application
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
 ### Database Backup
 
 Create an on-disk snapshot without blocking normal reads/writes:

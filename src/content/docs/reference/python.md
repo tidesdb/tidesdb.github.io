@@ -366,6 +366,70 @@ Key order does not matter — `range_cost(a, b)` produces the same result as `ra
 The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
+### Commit Hook (Change Data Capture)
+
+`set_commit_hook` registers a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
+
+```python
+cf = db.get_column_family("my_cf")
+
+def on_commit(ops: list[tidesdb.CommitOp], commit_seq: int) -> int:
+    for op in ops:
+        if op.is_delete:
+            print(f"[seq={commit_seq}] DELETE key={op.key}")
+        else:
+            print(f"[seq={commit_seq}] PUT key={op.key} value={op.value} ttl={op.ttl}")
+    return 0  # 0 = success
+
+cf.set_commit_hook(on_commit)
+
+# Normal writes now trigger the hook automatically
+with db.begin_txn() as txn:
+    txn.put(cf, b"user:1000", b"Alice")
+    txn.put(cf, b"user:1001", b"Bob")
+    txn.commit()   # on_commit fires here with both ops
+
+# Disable the hook
+cf.clear_commit_hook()
+```
+
+**CommitOp fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | `bytes` | Key data |
+| `value` | `bytes \| None` | Value data (`None` for deletes) |
+| `ttl` | `int` | Time-to-live as Unix timestamp (-1 = no expiry) |
+| `is_delete` | `bool` | `True` if this is a delete operation |
+
+**Callback signature**
+
+```python
+def callback(ops: list[tidesdb.CommitOp], commit_seq: int) -> int:
+    ...
+```
+
+Return `0` on success. A non-zero return is logged as a warning but does **not** roll back the commit — the data is already durable before the callback runs.
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
+- The hook executes synchronously on the committing thread — keep the callback fast to avoid stalling writers
+- Python exceptions in the callback are caught internally and treated as non-zero return (logged, commit unaffected)
+- Calling `clear_commit_hook()` disables it immediately with no restart required
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+:::note[Runtime-Only]
+Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+:::
+
 ### Backup
 
 ```python

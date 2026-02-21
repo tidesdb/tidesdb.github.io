@@ -779,6 +779,68 @@ Key order does not matter — the method normalizes the range so `keyA > keyB` p
 The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `RangeCost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
+## Commit Hook (Change Data Capture)
+
+`SetCommitHook` registers a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+cf.SetCommitHook((ops, commitSeq) =>
+{
+    foreach (var op in ops)
+    {
+        if (op.IsDelete)
+        {
+            Console.WriteLine($"[{commitSeq}] DELETE {Encoding.UTF8.GetString(op.Key)}");
+        }
+        else
+        {
+            Console.WriteLine($"[{commitSeq}] PUT {Encoding.UTF8.GetString(op.Key)} = {Encoding.UTF8.GetString(op.Value!)}");
+        }
+    }
+});
+
+// Normal writes now trigger the hook automatically
+using (var txn = db.BeginTransaction())
+{
+    txn.Put(cf, Encoding.UTF8.GetBytes("key1"), Encoding.UTF8.GetBytes("value1"), -1);
+    txn.Commit(); // hook fires here
+}
+
+// Detach hook
+cf.ClearCommitHook();
+```
+
+**Operation fields**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Key` | byte[] | The key data |
+| `Value` | byte[]? | The value data (null for deletes) |
+| `Ttl` | long | Time-to-live (0 = no expiry) |
+| `IsDelete` | bool | True if this is a delete operation |
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- Hook exceptions are caught internally and do not affect the commit result
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commitSeq` is monotonically increasing across commits and can be used as a replication cursor
+- Data in `CommitOp` is copied from native memory — safe to retain after the callback returns
+- The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
+- Calling `ClearCommitHook()` disables the hook immediately with no restart required
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+:::note[Runtime-Only]
+Commit hooks are not persisted across database restarts. After reopening a database, hooks must be re-registered by the application. This is by design — delegates cannot be serialized.
+:::
+
 ## Testing
 
 ```bash
@@ -806,6 +868,10 @@ using TidesDB;
 // -- ColumnFamilyConfig
 // -- Stats
 // -- CacheStats
+
+// Change data capture
+// -- CommitOp
+// -- CommitHookHandler
 
 // Enums
 // -- CompressionAlgorithm

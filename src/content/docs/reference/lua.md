@@ -592,6 +592,70 @@ cf:update_runtime_config(new_config, true)
 **Non-updatable settings** (would corrupt existing data):
 - `compression_algorithm`, `enable_block_indexes`, `enable_bloom_filter`, `comparator_name`, `level_size_ratio`, `klog_value_threshold`, `min_levels`, `dividing_level_offset`, `block_index_prefix_len`, `l1_file_count_trigger`, `l0_queue_stall_threshold`, `use_btree`
 
+### Commit Hook (Change Data Capture)
+
+`cf:set_commit_hook` registers a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing.
+
+```lua
+local ffi = require("ffi")
+
+local cf = db:get_column_family("my_cf")
+
+local my_hook = ffi.cast("tidesdb_commit_hook_fn", function(ops, num_ops, commit_seq, ctx)
+    for i = 0, num_ops - 1 do
+        local key = ffi.string(ops[i].key, ops[i].key_size)
+        if ops[i].is_delete ~= 0 then
+            print(string.format("[seq=%d] DELETE %s", tonumber(commit_seq), key))
+        else
+            local value = ffi.string(ops[i].value, ops[i].value_size)
+            print(string.format("[seq=%d] PUT %s = %s", tonumber(commit_seq), key, value))
+        end
+    end
+    return 0
+end)
+
+-- Attach hook
+cf:set_commit_hook(my_hook, nil)
+
+-- Normal writes now trigger the hook automatically
+local txn = db:begin_txn()
+txn:put(cf, "key1", "value1", -1)
+txn:commit()  -- my_hook fires here
+txn:free()
+
+-- Detach hook
+cf:clear_commit_hook()
+
+-- Free the callback when no longer needed
+my_hook:free()
+```
+
+**Operation fields** (available inside the callback)
+- `ops[i].key` / `ops[i].key_size` · Key data and size
+- `ops[i].value` / `ops[i].value_size` · Value data and size (`NULL`/0 for deletes)
+- `ops[i].ttl` · Time-to-live for the entry
+- `ops[i].is_delete` · 1 for delete operations, 0 for puts
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete — data is fully durable before the callback runs
+- Hook failure (non-zero return) is logged but does not affect the commit result
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
+- Pointers in the operation struct are valid only during the callback invocation — copy any data you need to retain
+- The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
+- Setting the hook to `nil` via `cf:clear_commit_hook()` disables it immediately
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+:::note[Runtime-Only]
+Commit hooks are not persisted. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+:::
+
 ### Configuration File Operations
 
 Load and save column family configurations from/to INI files.
@@ -876,6 +940,8 @@ lua test_tidesdb.lua
 | `cf:is_compacting()` | Check if compaction is in progress |
 | `cf:get_stats()` | Get column family statistics |
 | `cf:range_cost(key_a, key_b)` | Estimate range iteration cost between two keys |
+| `cf:set_commit_hook(fn, ctx)` | Set commit hook callback for change data capture |
+| `cf:clear_commit_hook()` | Clear (disable) the commit hook |
 | `cf:update_runtime_config(config, persist)` | Update runtime configuration |
 
 ### Transaction Class

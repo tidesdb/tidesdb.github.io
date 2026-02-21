@@ -391,6 +391,83 @@ cf.updateRuntimeConfig(newConfig, persistToDisk);
 **Non-updatable settings** (would corrupt existing data):
 - `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
 
+### Commit Hook (Change Data Capture)
+
+`ColumnFamily::setCommitHook` registers a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+// Define a commit hook
+auto myHook = [](const tidesdb_commit_op_t* ops, int num_ops,
+                 uint64_t commit_seq, void* ctx) -> int {
+    for (int i = 0; i < num_ops; ++i) {
+        std::string key(reinterpret_cast<const char*>(ops[i].key), ops[i].key_size);
+        if (ops[i].is_delete) {
+            std::cout << "[" << commit_seq << "] DELETE " << key << std::endl;
+        } else {
+            std::string value(reinterpret_cast<const char*>(ops[i].value), ops[i].value_size);
+            std::cout << "[" << commit_seq << "] PUT " << key << " = " << value << std::endl;
+        }
+    }
+    return 0;
+};
+
+// Attach hook at runtime
+cf.setCommitHook(myHook, nullptr);
+
+// Normal writes now trigger the hook automatically
+auto txn = db.beginTransaction();
+txn.put(cf, "user:1", "Alice", -1);
+txn.commit();  // myHook fires here
+
+// Detach hook
+cf.clearCommitHook();
+```
+
+**Setting hook via config at creation time**
+
+```cpp
+auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+cfConfig.commitHookFn = myHook;
+cfConfig.commitHookCtx = nullptr;
+
+db.createColumnFamily("replicated_cf", cfConfig);
+```
+
+**Callback signature**
+
+```cpp
+int (*tidesdb_commit_hook_fn)(const tidesdb_commit_op_t* ops, int num_ops,
+                               uint64_t commit_seq, void* ctx);
+```
+
+The callback returns `0` on success. A non-zero return is logged as a warning but does not roll back the commit.
+
+**Operation struct fields** (`tidesdb_commit_op_t`)
+- `key` / `key_size` · Key bytes (valid only during callback)
+- `value` / `value_size` · Value bytes (`NULL` / `0` for deletes, valid only during callback)
+- `ttl` · Time-to-live for the entry
+- `is_delete` · `1` for delete, `0` for put
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete — data is fully durable before the callback runs
+- Hook failure (non-zero return) is logged but does not affect the commit result
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
+- Pointers in `tidesdb_commit_op_t` are valid only during the callback invocation — copy any data you need to retain
+- The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
+- Setting the hook to `NULL` via `clearCommitHook()` disables it immediately with no restart required
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+The `commitHookFn` and `commitHookCtx` config fields are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+
 ### Backup
 
 Create an on-disk snapshot of an open database without blocking normal reads/writes.

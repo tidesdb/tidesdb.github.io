@@ -785,6 +785,74 @@ if err != nil {
 - `SyncMode` · Durability mode
 - `SyncIntervalUs` · Sync interval in microseconds
 
+### Commit Hook (Change Data Capture)
+
+`SetCommitHook` registers a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+err = cf.SetCommitHook(func(ops []tidesdb.CommitOp, commitSeq uint64) int {
+    for _, op := range ops {
+        if op.IsDelete {
+            fmt.Printf("[seq=%d] DELETE key=%s\n", commitSeq, string(op.Key))
+        } else {
+            fmt.Printf("[seq=%d] PUT key=%s value=%s ttl=%d\n",
+                commitSeq, string(op.Key), string(op.Value), op.TTL)
+        }
+    }
+    return 0 // 0 = success; non-zero is logged as warning
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+// Normal writes now trigger the hook automatically
+txn, _ := db.BeginTxn()
+txn.Put(cf, []byte("user:1000"), []byte("John Doe"), -1)
+txn.Commit() // hook fires here
+txn.Free()
+
+// Detach the hook
+err = cf.ClearCommitHook()
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**CommitOp fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Key` | `[]byte` | Key data (copied; safe to retain after callback returns) |
+| `Value` | `[]byte` | Value data (`nil` for deletes; copied; safe to retain) |
+| `TTL` | `int64` | Time-to-live Unix timestamp (0 = no expiry) |
+| `IsDelete` | `bool` | `true` if this is a delete operation, `false` for put |
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- Hook failure (non-zero return) is logged but does not affect the commit result
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commitSeq` is monotonically increasing across commits and can be used as a replication cursor
+- Data in `CommitOp` is copied from C memory — safe to retain after the callback returns
+- The hook executes synchronously on the committing goroutine; keep the callback fast to avoid stalling writers
+- Setting the hook to `nil` or calling `ClearCommitHook` disables it immediately with no restart required
+- Setting a new hook replaces any previously set hook for the same column family
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+:::note[Runtime-Only]
+Commit hooks are not persisted across database restarts. After reopening the database, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+:::
+
 ### Sync Modes
 
 Control the durability vs performance tradeoff.
@@ -1181,4 +1249,9 @@ go test -v -run TestRangeCost
 
 # Run delete column family by pointer test
 go test -v -run TestDeleteColumnFamily
+
+# Run commit hook (CDC) tests
+go test -v -run TestCommitHook
+go test -v -run TestCommitHookReplace
+go test -v -run TestCommitHookClear
 ```
