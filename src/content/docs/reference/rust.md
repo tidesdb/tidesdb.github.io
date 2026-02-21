@@ -817,6 +817,75 @@ fn main() -> tidesdb::Result<()> {
 }
 ```
 
+### Commit Hook (Change Data Capture)
+
+`ColumnFamily::set_commit_hook` registers a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
+
+```rust
+use std::sync::{Arc, Mutex};
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig, CommitOp};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let mut cf = db.get_column_family("my_cf")?;
+
+    // Track all committed operations
+    let log: Arc<Mutex<Vec<CommitOp>>> = Arc::new(Mutex::new(Vec::new()));
+    let log_clone = log.clone();
+
+    cf.set_commit_hook(move |ops, commit_seq| {
+        println!("Commit seq {}: {} ops", commit_seq, ops.len());
+        let mut l = log_clone.lock().unwrap();
+        for op in ops {
+            l.push(op.clone());
+        }
+        0 // return 0 on success
+    })?;
+
+    // Normal writes now trigger the hook automatically
+    let mut txn = db.begin_transaction()?;
+    txn.put(&cf, b"key1", b"value1", -1)?;
+    txn.put(&cf, b"key2", b"value2", -1)?;
+    txn.commit()?; // hook fires here
+
+    // Detach hook
+    cf.clear_commit_hook()?;
+
+    Ok(())
+}
+```
+
+**`CommitOp` fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | `Vec<u8>` | The key |
+| `value` | `Option<Vec<u8>>` | The value (`None` for deletes) |
+| `ttl` | `i64` | TTL as Unix timestamp (0 = no expiry) |
+| `is_delete` | `bool` | Whether this is a delete operation |
+
+**Behavior**
+- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- Hook failure (non-zero return) is logged but does not affect the commit result
+- Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
+- `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
+- The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
+- Calling `set_commit_hook` again replaces the previous hook (the old callback is freed automatically)
+- Calling `clear_commit_hook` or dropping the `ColumnFamily` disables the hook immediately
+
+**Use cases**
+- Replication · Ship committed batches to replicas in commit order
+- Event streaming · Publish mutations to Kafka, NATS, or any message broker
+- Secondary indexing · Maintain a reverse index or materialized view
+- Audit logging · Record every mutation with key, value, TTL, and sequence number
+- Debugging · Attach a temporary hook in production to inspect live writes
+
+:::note[Runtime-Only]
+Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — closures cannot be serialized.
+:::
+
 ### INI Configuration Files
 
 Load and save column family configurations from/to INI files:
