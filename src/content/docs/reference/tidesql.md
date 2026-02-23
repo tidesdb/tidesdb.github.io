@@ -191,7 +191,7 @@ CREATE TABLE high_write (
 ) ENGINE=TIDESDB WRITE_BUFFER_SIZE=16777216;  -- 16 MB
 ```
 
-The default is 128 MB.
+The default is 32 MB.
 
 ### Bloom Filters
 
@@ -475,15 +475,18 @@ The engine exposes several global system variables that control TidesDB's runtim
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `tidesdb_flush_threads` | 2 | Number of background threads flushing memtables to SSTables |
-| `tidesdb_compaction_threads` | 2 | Number of background threads performing LSM compaction |
-| `tidesdb_log_level` | WARN | TidesDB internal log level (DEBUG, INFO, WARN, ERROR, FATAL, NONE) |
+| `tidesdb_flush_threads` | 4 | Number of background threads flushing memtables to SSTables |
+| `tidesdb_compaction_threads` | 4 | Number of background threads performing LSM compaction |
+| `tidesdb_log_level` | DEBUG | TidesDB internal log level (DEBUG, INFO, WARN, ERROR, FATAL, NONE) |
 | `tidesdb_block_cache_size` | 256 MB | Size of the global block cache shared across all column families |
 | `tidesdb_max_open_sstables` | 256 | Maximum number of SSTable file handles cached in the LRU |
+| `tidesdb_max_memory_usage` | 0 (auto) | Global memory limit in bytes; 0 lets the library auto-detect (~80% system RAM) |
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup |
 | `tidesdb_debug_trace` | OFF | Enables per-operation trace logging to the error log |
 
-The block cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of available CPU cores and the I/O bandwidth of the storage device.
+The block cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use — only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families: data + one secondary index each). TidesDB logs to a `LOG` file in the data directory by default, with automatic truncation at 24 MB.
+
+The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets roughly 80% of it. In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. The per-table `WRITE_BUFFER_SIZE` (default 32 MB) and `L0_QUEUE_STALL_THRESHOLD` (default 4) together determine worst-case memtable memory per column family: `WRITE_BUFFER_SIZE × (1 + L0_QUEUE_STALL_THRESHOLD)`. With 8 tables (16 column families), the worst case is 16 × 32 MB × 5 = 2.5 GB.
 
 
 ## How It Stores Data Internally
