@@ -288,7 +288,7 @@ Environment 2 also exposed a new weak spot not visible at 8 threads. Under extre
 
 ### Regression Check
 
-I compared the current v8.6.0 results against prior-release in article [Benchmark Analysis: TidesDB v8.5.0 vs RocksDB v10.10.1](/articles/benchmark-analysis-tidesdb-v8-5-0-rocksdb-v10-10-1).
+I compared the current v8.6.0 results against prior-release in article [Benchmark Analysis on TidesDB v8.5.0 and RocksDB v10.10.1](/articles/benchmark-analysis-tidesdb-v8-5-0-rocksdb-v10-10-1).
 
 Environment 1 shows no regressions. 
 
