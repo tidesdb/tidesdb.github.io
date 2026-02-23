@@ -172,6 +172,7 @@ tidesdb_config_t config = {
     .log_level = TDB_LOG_INFO,             /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
     .max_open_sstables = 256,              /* Max cached SSTable structures (default: 256) */
+    .max_memory_usage = 0,                 /* Global memory limit in bytes (default: 0 = auto, 80% of system RAM; minimum: 50% of system RAM) */
     .log_to_file = 0,                      /* Write logs to file instead of stderr (default: 0) */
     .log_truncation_at = 24 * (1024*1024), /* Log file truncation size (default: 24MB), 0 = no truncation */
 };
