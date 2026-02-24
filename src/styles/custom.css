@@ -606,6 +606,11 @@ input[type="select"]:focus, select:focus {
 	border-bottom: none;
 }
 
+/* Make logo white in header (header has dark background in both themes) */
+.site-title img {
+	filter: brightness(0) invert(1);
+}
+
 .social-icons a {
 	border-bottom: none;
 }

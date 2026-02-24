@@ -16,8 +16,8 @@ export default defineConfig({
 				// Allow custom components to be used in content
 			},
 			logo: {
-				light: './src/assets/tidesdb-logo-v0.1.svg',
-				dark: './src/assets/tidesdb-logo-v0.1.svg',
+				light: './src/assets/tidesdb-logo-v8.svg',
+				dark: './src/assets/tidesdb-logo-v8.svg',
 				replacesTitle: true,
 			},
 			social: {
