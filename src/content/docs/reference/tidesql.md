@@ -77,11 +77,21 @@ If you create a table without an explicit primary key, the engine generates a hi
 
 Inside the column family, every row's key is prefixed with a single namespace byte (`0x01` for data rows, `0x00` for metadata). The value is stored in a packed binary format. A null bitmap is written first, followed by each non-null field serialized using MariaDB's `Field::pack()` method. Fixed-size fields like `INT` and `BIGINT` are stored at their native pack length. `CHAR` fields have trailing spaces stripped. `VARCHAR` fields store only the actual data length rather than padding to the declared maximum. `BLOB` and `TEXT` fields are inlined with a length prefix followed by the data bytes. This packed format is more compact than the raw record buffer and reduces I/O and storage costs, especially for tables with variable-length columns.
 
+Composite primary keys are fully supported. Each key part is encoded in comparable format and concatenated, so a composite key like `(dept_id, emp_id)` sorts first by department, then by employee within each department. The optimizer can use prefix lookups on the leading columns of a composite PK (e.g., `WHERE dept_id = 3` on a `PRIMARY KEY (dept_id, emp_id)`) via an iterator-based prefix scan.
+
 ```sql
 -- With explicit PK (comparable key ordering)
 CREATE TABLE users (
   id   INT NOT NULL PRIMARY KEY,
   name VARCHAR(100)
+) ENGINE=TIDESDB;
+
+-- Composite PK (multi-column ordering)
+CREATE TABLE emp_projects (
+  emp_id  INT NOT NULL,
+  proj_id INT NOT NULL,
+  hours   INT NOT NULL,
+  PRIMARY KEY (emp_id, proj_id)
 ) ENGINE=TIDESDB;
 
 -- Without PK (hidden auto-generated row ID)
@@ -141,17 +151,19 @@ SELECT * FROM tickets ORDER BY id;
 
 ## Transactions and Concurrency
 
-TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction that provides MVCC-based isolation at the level configured for the table. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. For autocommit statements, the server calls the engine's commit callback after the statement completes, which flushes the transaction to storage and frees it. Inside a multi-statement transaction (`BEGIN ... COMMIT`), statement-level commits simply create a savepoint for potential rollback; the real commit happens when the server calls the commit callback with `all=true`. Read-only transactions are rolled back and freed at commit time so that the next transaction begins with a fresh read snapshot.
+TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. For autocommit statements, the server calls the engine's commit callback after the statement completes, which flushes the transaction to storage and frees it. Inside a multi-statement transaction (`BEGIN ... COMMIT`), statement-level commits simply create a savepoint for potential rollback; the real commit happens when the server calls the commit callback with `all=true`. Read-only transactions are rolled back and freed at commit time so that the next transaction begins with a fresh read snapshot.
+
+Autocommit single-statement transactions are automatically downgraded to `READ_COMMITTED` isolation. At this level, the TidesDB library skips write-set and read-set conflict checks at commit time, which eliminates the `ER_ERROR_DURING_COMMIT` (ERROR 1180) errors that ORMs and applications cannot easily retry. A single autocommit statement has no multi-statement consistency window to protect, so `READ_COMMITTED` is safe and effectively conflict-free. Multi-statement transactions (`BEGIN ... COMMIT`) retain the table's configured isolation level so that application-level retry logic handles the (rare) OCC conflicts.
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
 
-Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB — which detects deadlocks during row-level locking and never fails at commit — there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves.
+Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB — which detects deadlocks during row-level locking and never fails at commit — there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. In practice, the autocommit `READ_COMMITTED` downgrade means these conflicts only arise inside explicit `BEGIN ... COMMIT` blocks at `REPEATABLE_READ` or higher isolation.
 
 ### Iterator Reuse
 
 Creating a new TidesDB iterator is expensive because it builds a merge heap from all active SSTables. The engine caches iterators across statements within a multi-statement transaction (`BEGIN ... COMMIT`). When a statement ends, the cached iterator is kept alive if the transaction is purely read-only (no writes in the entire transaction). The next statement that scans the same column family reuses the cached iterator with a cheap `seek()` instead of constructing a new merge heap. The iterator is invalidated when the transaction changes (detected via pointer comparison on `scan_iter_txn_`), when the column family changes, or when the transaction has performed any writes. Write transactions always free the iterator at statement end because the iterator's merge heap includes a snapshot of the transaction's write buffer (`MERGE_SOURCE_TXN_OPS`); when `COMMIT` frees the transaction, those pointers would dangle. This optimization eliminates the catastrophic cost of repeated iterator construction that would otherwise dominate latency in read-only transaction workloads.
 
-The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`:
+The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`. This level is used for multi-statement transactions; autocommit statements always run at `READ_COMMITTED` regardless of this setting:
 
 ```sql
 CREATE TABLE ledger (
@@ -564,6 +576,8 @@ Changing the primary key of a table requires a full copy rebuild. The engine doe
 Adding or dropping columns also requires a copy rebuild. Only secondary index operations and metadata changes can be done inplace or instantly.
 
 The statistics cache refreshes every two seconds, so immediately after a bulk load, the optimizer may briefly see stale row counts. Running `ANALYZE TABLE` forces an immediate refresh.
+
+Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail at commit time with `ER_ERROR_DURING_COMMIT` (ERROR 1180) due to optimistic concurrency control conflicts. Autocommit single-statement transactions are not affected because they run at `READ_COMMITTED`. Applications using explicit `BEGIN ... COMMIT` blocks should implement retry logic for this error.
 
 --
 
