@@ -58,7 +58,7 @@ A column family maintains:
 
 ### Sorted String Tables
 
-Each sorted string table (SSTable) consists of two files: a key log (.klog) and a value log (.vlog). The key log stores keys, metadata, and values smaller than the configured threshold (default 512 bytes). Values exceeding this threshold reside in the value log, with the key log storing only file offsets. This separation keeps the key log compact for efficient scanning while accommodating arbitrarily large values.
+Each sorted string table (SSTable) consists of two files: a key log (.klog) and a value log (.vlog). The key log stores keys, metadata, and values smaller than the configured threshold (default 512 bytes). Values meeting or exceeding this threshold reside in the value log, with the key log storing only file offsets. This separation keeps the key log compact for efficient scanning while accommodating arbitrarily large values.
 
 <br/>
 
@@ -90,7 +90,7 @@ The B+tree format excels at point lookups and range scans with seeks. Point look
 
 When `block_cache_size` is configured, TidesDB creates a dedicated clock cache for B+tree nodes. Frequently accessed nodes remain in memory as fully deserialized structures, avoiding repeated disk reads and deserialization overhead. Cache keys combine the SSTable ID and node offset to ensure uniqueness across tables. On eviction, the callback frees the node's memory via arena destruction. Cached nodes use arena allocation - all node memory (keys, values, metadata) is allocated from a single arena, enabling O(1) bulk deallocation when the node is evicted. When an SSTable is closed or deleted, all its cached nodes are invalidated by prefix scan to prevent stale references.
 
-Large values exceeding the configured threshold (default 512 bytes) are written to the value log, with the leaf entry storing only the vlog offset. Nodes compress independently using LZ4, LZ4-FAST, or Zstd. When bloom filters are enabled, they are checked before tree traversal - a negative result skips the B+tree lookup entirely, which is critical for LSM-trees where most SSTables won't contain the requested key. SSTable metadata persists five additional fields for B+tree format: root offset, first leaf offset, last leaf offset, node count, and tree height, which are restored when reopening the SSTable.
+Large values meeting or exceeding the configured threshold (default 512 bytes) are written to the value log, with the leaf entry storing only the vlog offset. Nodes compress independently using LZ4, LZ4-FAST, Zstd, or Snappy. When bloom filters are enabled, they are checked before tree traversal - a negative result skips the B+tree lookup entirely, which is critical for LSM-trees where most SSTables won't contain the requested key. SSTable metadata persists five additional fields for B+tree format: root offset, first leaf offset, last leaf offset, node count, and tree height, which are restored when reopening the SSTable.
 
 Serialization optimizations · The B+tree uses several techniques to minimize serialized node size:
 
@@ -232,7 +232,7 @@ When a memtable exceeds the flush threshold, the system atomically swaps in a ne
 
 Adaptive flush threshold · The flush threshold is not a fixed value. At transaction commit, the system adjusts the threshold based on L0 immutable queue pressure to balance write batching against memory pressure. When the L0 queue is empty (idle), the threshold is 150% of `write_buffer_size` (50% headroom), allowing the memtable to accumulate more data before flushing for better batching. When 1 or more immutables are pending but below half the stall threshold (moderate), the threshold drops to 125% of `write_buffer_size` (25% headroom). When the L0 queue depth reaches 50% or more of `l0_queue_stall_threshold` (high pressure), the threshold equals `write_buffer_size` exactly (0% headroom), triggering an immediate flush. This adaptive mechanism reduces flush frequency during idle periods (improving write throughput) while ensuring rapid flushing under pressure (preventing memory buildup). With the default 64MB write buffer, the effective threshold ranges from 64MB under pressure to 96MB when idle.
 
-A flush worker dequeues the immutable memtable and creates an SSTable. It iterates the skip list in sorted order, writing entries to 64KB blocks. Values exceeding the threshold (default 512 bytes) go to the value log; the key log stores only the file offset. The worker compresses each block optionally, writes the block index and bloom filter, and appends metadata. It then fsyncs both files, adds the SSTable to level 1, commits to the manifest, and deletes the write-ahead log.
+A flush worker dequeues the immutable memtable and creates an SSTable. It iterates the skip list in sorted order, writing entries to 64KB blocks. Values meeting or exceeding the threshold (default 512 bytes) go to the value log; the key log stores only the file offset. The worker compresses each block optionally, writes the block index and bloom filter, and appends metadata. It then fsyncs both files, adds the SSTable to level 1, commits to the manifest, and deletes the write-ahead log.
 
 The ordering is critical: fsync before manifest commit ensures the SSTable is durable before it becomes discoverable. Manifest commit before WAL deletion ensures crash recovery can find the data.
 
@@ -265,7 +265,7 @@ Coordination with L1 · The backpressure mechanism considers both L0 queue depth
 
 Memory protection · Each immutable memtable holds the full contents of a flushed memtable (default 64MB). With a stall threshold of 20, the system allows up to 1.28GB of immutable memtables plus the active memtable (64MB) before blocking writes. This bounds memory usage to roughly 1.34GB per column family under maximum write pressure, preventing out-of-memory conditions.
 
-Global memory pressure · Per-column-family backpressure alone cannot prevent OOM when many column families accumulate memory simultaneously. The system maintains a global memory pressure level computed by the reaper thread every 100ms. The reaper sums all active memtables, immutable memtable estimates, bloom filter bitsets, block index arrays, and cache memory across all column families, then computes the ratio against a resolved memory limit (configurable via `max_memory_usage`, default 80% of system RAM, minimum 50% of system RAM). The pressure level is graduated: normal (< 60%), elevated (60-75%), high (75-90%), critical (≥ 90%). The write path reads this level with a single atomic load per operation - zero overhead at normal pressure. At elevated pressure, the adaptive flush threshold tightens to 100% of `write_buffer_size` (no headroom) and the write path proactively triggers a non-forced flush on the current column family if it is not already flushing, plus a 0.2ms yield to slow ingestion and prevent escalation. At high pressure, the write path force-flushes the current column family and sleeps for 2ms, while the reaper force-flushes the largest non-flushing active memtable. At critical pressure, the write path performs a self-help flush on the current column family (if not already flushing) and then blocks writes entirely until the reaper brings pressure below critical, timing out after 10 seconds with `TDB_ERR_MEMORY_LIMIT`. The reaper responds to critical pressure with a nuclear flush -- force-flushing every column family that is not already flushing -- plus aggressive compaction on the column family with the most SSTables. The `is_flushing` and `is_compacting` atomic flags are checked at every level to prevent redundant operations and ensure relief efforts target actionable column families. An OS-level safety net polls `get_available_memory()` every ~5 seconds and overrides the pressure level to critical if real available memory drops below 10% of total system RAM, catching memory consumption from sources outside TidesDB's tracking.
+Global memory pressure · Per-column-family backpressure alone cannot prevent OOM when many column families accumulate memory simultaneously. The system maintains a global memory pressure level computed by the reaper thread every 100ms. The reaper sums all active memtables, immutable memtable estimates, bloom filter bitsets, block index arrays, and cache memory across all column families, then computes the ratio against a resolved memory limit (configurable via `max_memory_usage`, default 50% of system RAM, minimum 5% of system RAM). The pressure level is graduated: normal (< 60%), elevated (60-75%), high (75-90%), critical (≥ 90%). The write path reads this level with a single atomic load per operation - zero overhead at normal pressure. At elevated pressure, the adaptive flush threshold tightens to 100% of `write_buffer_size` (no headroom) and the write path proactively triggers a non-forced flush on the current column family if it is not already flushing, plus a 0.2ms yield to slow ingestion and prevent escalation. At high pressure, the write path force-flushes the current column family and sleeps for 2ms, while the reaper force-flushes the largest non-flushing active memtable. At critical pressure, the write path performs a self-help flush on the current column family (if not already flushing) and then blocks writes entirely until the reaper brings pressure below critical, timing out after 10 seconds with `TDB_ERR_MEMORY_LIMIT`. The reaper responds to critical pressure with a nuclear flush -- force-flushing every column family that is not already flushing -- plus aggressive compaction on the column family with the most SSTables. The `is_flushing` and `is_compacting` atomic flags are checked at every level to prevent redundant operations and ensure relief efforts target actionable column families. An OS-level safety net polls `get_available_memory()` every ~5 seconds and overrides the pressure level to critical if real available memory drops below 5% of total system RAM, catching memory consumption from sources outside TidesDB's tracking.
 
 Worker coordination · The throttling mechanism assumes flush workers are making progress. If the queue depth remains at or above the stall threshold for 10 seconds (1000 iterations × 10ms), the system returns an error indicating the flush worker may be stuck. This typically indicates disk I/O failure, insufficient disk space, or a deadlock in the flush path.
 
@@ -449,7 +449,7 @@ This is the standard, large-scale compaction method for maintaining the overall 
 *   **What it does**
     *   Merges all levels from Level 1 through the dividing level X into level X+1.
     *   If X is the largest level in the database, the system first invokes Dynamic Capacity Adaptation (DCA) to add a new level before performing the merge. This ensures there's always a destination level available.
-    *   The merge is intelligent about partitioning. It examines the largest level in the database and extracts the minimum and maximum keys from each SSTable at that level. These key ranges serve as partition boundaries.
+    *   The merge is intelligent about partitioning. It examines level X+1 (the destination level) and extracts the minimum and maximum keys from each SSTable at that level. These key ranges serve as partition boundaries.
     *   The key space is divided into ranges based on these boundaries, and the merge is performed in chunks. Each chunk produces SSTables that cover only a single key range.
     *   This partitioning prevents the creation of monolithic SSTables and distributes data more evenly across the target level.
     *   If no partitioning boundaries can be determined (e.g., the target level is empty), the function falls back to calling `tidesdb_full_preemptive_merge`.
@@ -533,12 +533,14 @@ DCA removes a level when:
 
 1.  After compaction, the largest level becomes completely empty.
 2.  The number of active levels exceeds the configured minimum (default 5 levels).
+3.  The level was not just added in the current compaction cycle (newly added levels are intentionally empty).
+4.  No pending flushes are queued and no SSTables exist at level 1 (prevents removing a level that incoming data is about to flow into).
 
 **Process**
 
 1.  The system verifies that `num_active_levels > min_levels` to prevent thrashing (repeatedly adding and removing levels).
-2.  It frees the empty level structure.
-3.  It updates the new largest level's capacity using the formula: `new_capacity = old_capacity / level_size_ratio`.
+2.  It updates the new largest level's capacity using the formula: `new_capacity = old_capacity / level_size_ratio`.
+3.  It frees the empty level structure.
 4.  It atomically decrements `num_active_levels`.
 5.  It invokes `tidesdb_apply_dca()` to rebalance all level capacities based on the new level count and the actual size of the new largest level.
 
@@ -578,7 +580,7 @@ All three merge policies share a common merge execution path with slight variati
 6.  Write to new SSTables
     *   Surviving entries are written to new SSTables at the target level.
     *   Data is written in blocks (fixed size 64KB).
-    *   Values exceeding the configured threshold (default 512 bytes) are written to the value log (.vlog), while the key log (.klog) stores only the file offset.
+    *   Values meeting or exceeding the configured threshold (default 512 bytes) are written to the value log (.vlog), while the key log (.klog) stores only the file offset.
     *   Values smaller than the threshold are stored inline in the key log.
     *   Blocks are optionally compressed using the column family's configured compression algorithm (LZ4, LZ4-FAST, Zstd, or Snappy).
 
@@ -588,7 +590,7 @@ All three merge policies share a common merge execution path with slight variati
 
 8.  Update manifest
     *   The new SSTables are committed to the manifest file, which tracks which SSTables belong to which levels.
-    *   This operation is atomic - the manifest file is updated in a single write and fsync.
+    *   This operation is atomic - the manifest is written to a temporary file, fsynced, and atomically renamed over the original.
 
 9.  Delete old SSTables
     *   The old SSTables from the source and target levels are marked for deletion.
@@ -606,7 +608,7 @@ If a source encounters corruption while its cursor is advancing:
 
 ### Value Recompression
 
-Large values (those exceeding the value log threshold) flow through compaction rather than being copied byte-for-byte:
+Large values (those meeting or exceeding the value log threshold) flow through compaction rather than being copied byte-for-byte:
 
 *   The system reads the value from the source value log.
 *   It recompresses the value according to the current column family configuration (which may differ from the original compression setting).
@@ -748,7 +750,7 @@ Read amplification · Worst case reads one SSTable per level. With 7 levels, tha
 
 ### Value Log Threshold
 
-Values exceeding the configured threshold (default 512 bytes) go to the value log. This keeps the key log compact for efficient scanning. The threshold balances two costs: small thresholds cause many value log lookups (extra disk seeks); large thresholds bloat the key log (more data to scan during iteration). The default 512 bytes is a heuristic - it's roughly the size where the indirection cost (reading vlog offset, seeking to vlog, reading value) becomes cheaper than scanning a large inline value during iteration.
+Values meeting or exceeding the configured threshold (default 512 bytes) go to the value log. This keeps the key log compact for efficient scanning. The threshold balances two costs: small thresholds cause many value log lookups (extra disk seeks); large thresholds bloat the key log (more data to scan during iteration). The default 512 bytes is a heuristic - it's roughly the size where the indirection cost (reading vlog offset, seeking to vlog, reading value) becomes cheaper than scanning a large inline value during iteration.
 
 ### Bloom Filter FPR
 
@@ -789,7 +791,7 @@ Per column family:
 
 For a column family with 10M keys across 100 SSTables using defaults: ~12MB bloom filters, ~2MB block indexes, 128MB memtables. Total: ~150MB plus block cache share.
 
-Global memory limit · The `max_memory_usage` configuration (default 0 = auto) sets an upper bound on total tracked memory across all column families. When set to 0, the system resolves this to 80% of total system RAM at startup. The reaper thread monitors the aggregate of memtables, caches, bloom filters, and block indexes against this limit, applying graduated pressure to the write path and triggering force-flushes and aggressive compaction when usage exceeds thresholds. This prevents OOM in multi-column-family deployments where per-CF limits alone cannot bound aggregate memory consumption.
+Global memory limit · The `max_memory_usage` configuration (default 0 = auto) sets an upper bound on total tracked memory across all column families. When set to 0, the system resolves this to 50% of total system RAM at startup, with a minimum floor of 5% of total RAM. The reaper thread monitors the aggregate of memtables, caches, bloom filters, and block indexes against this limit, applying graduated pressure to the write path and triggering force-flushes and aggressive compaction when usage exceeds thresholds. This prevents OOM in multi-column-family deployments where per-CF limits alone cannot bound aggregate memory consumption.
 
 ### Compaction Lag
 
@@ -918,7 +920,7 @@ Integration · TidesDB uses skip lists for memtables. The lock-free design allow
 
 </div>
 
-The queue provides a thread-safe FIFO with node pooling and blocking dequeue. Operations use a mutex for writes and atomic operations for lock-free size queries. The queue maintains both a regular head pointer (protected by lock) and an atomic_head pointer for lock-free reads.
+The queue provides a thread-safe FIFO with node pooling and blocking dequeue. It uses separate head and tail locks to reduce contention between enqueue and dequeue operations, plus an atomic size field for lock-free size queries.
 
 Node pooling · The queue maintains a free list of reusable nodes (up to 64). When dequeuing, nodes are returned to the pool instead of freed. When enqueuing, nodes are allocated from the pool if available. This reduces malloc/free overhead for high-throughput workloads.
 
@@ -940,7 +942,7 @@ The manifest tracks SSTable metadata in a simple text format with reader-writer 
 
 In-memory representation · The manifest maintains an array of entries with dynamic resizing (starts at 64, doubles when full). Entries are unsorted - lookups are O(n). This is acceptable because manifest operations are infrequent (only during flush/compaction) and the number of SSTables per column family is typically < 1000.
 
-Atomic commits · The manifest file is kept open for efficient commits. `tidesdb_manifest_commit()` seeks to the beginning, writes all entries, truncates to the new size, and fsyncs. This ensures the manifest is always consistent - either the old version or the new version is visible, never a partial update.
+Atomic commits · `tidesdb_manifest_commit()` writes all entries to a temporary file, fsyncs it, and then atomically renames it over the original path. The manifest file is kept open for reading after each commit. This ensures the manifest is always consistent - either the old version or the new version is visible, never a partial update.
 
 Concurrency control · Reader-writer locks allow multiple concurrent readers (checking if an SSTable exists) but exclusive writers (adding/removing SSTables). The `active_ops` counter tracks ongoing operations - `tidesdb_manifest_close()` waits for active_ops to reach zero before closing.
 

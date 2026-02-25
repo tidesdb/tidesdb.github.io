@@ -16,7 +16,7 @@ Check the [latest release](https://github.com/tidesdb/tidesdb/releases/latest) o
 TidesDB is tested and supported on the following platforms:
 
 ### Operating Systems
-- **Linux** (x86, x64, PowerPC 32-bit)
+- **Linux** (x86, x64, PowerPC 32-bit, RISC-V 64-bit)
 - **macOS** (x64, ARM64/Apple Silicon)
 - **Windows** (x86, x64 with MSVC or MinGW)
 - **FreeBSD** 14.0+ (x64)
@@ -31,6 +31,7 @@ TidesDB is tested and supported on the following platforms:
 - **x64** (64-bit Intel/AMD)
 - **ARM64** (Apple Silicon, ARM v8)
 - **PowerPC** (32-bit, cross-compiled)
+- **RISC-V** (64-bit, cross-compiled)
 
 ### Compilers
 - **GCC** 7.0+ (Linux, MinGW, cross-compilation)
@@ -245,6 +246,30 @@ cmake -S . -B build \
   -DCMAKE_CXX_COMPILER=powerpc-linux-gnu-g++ \
   -DCMAKE_SYSTEM_NAME=Linux \
   -DCMAKE_SYSTEM_PROCESSOR=powerpc
+
+# Build
+cmake --build build --clean-first --verbose
+```
+
+### RISC-V (64-bit)
+
+Cross-compilation for RISC-V 64-bit requires building dependencies from source.
+
+```bash
+# Install cross-compilation toolchain
+sudo apt install -y crossbuild-essential-riscv64 \
+  gcc-riscv64-linux-gnu g++-riscv64-linux-gnu \
+  qemu-user-static
+
+# Build dependencies from source (LZ4, Zstandard, Snappy)
+# See .github/workflows/build_and_test_tidesdb.yml for complete build script
+
+# Configure with RISC-V toolchain
+cmake -S . -B build \
+  -DCMAKE_C_COMPILER=riscv64-linux-gnu-gcc \
+  -DCMAKE_CXX_COMPILER=riscv64-linux-gnu-g++ \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_SYSTEM_PROCESSOR=riscv64
 
 # Build
 cmake --build build --clean-first --verbose
@@ -662,6 +687,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_CF_NAME` | Column family name | "benchmark_cf" |
 | `BENCH_DB_PATH` | Directory path | "benchmark_db" |
 | `BENCH_DB_LOG_LEVEL` | Database log level | TDB_LOG_DEBUG |
+| `BENCH_DB_MAX_MEMORY` | Global memory limit in bytes (0 = auto, 50% of system RAM) | 0 |
 | `BENCH_DB_FLUSH_POOL_THREADS` | Flush thread pool size | 2 |
 | `BENCH_DB_COMPACTION_POOL_THREADS` | Compaction thread pool size | 2 |
 
@@ -672,7 +698,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_WRITE_BUFFER_SIZE` | Memtable flush threshold (bytes) | 67108864 (64MB) |
 | `BENCH_LEVEL_RATIO` | Level size multiplier | 10 |
 | `BENCH_DIVIDING_LEVEL_OFFSET` | Compaction dividing level offset | 2 |
-| `BENCH_MIN_LEVELS` | Minimum LSM levels, TidesDB can scale up levels if need be. | 4 |
+| `BENCH_MIN_LEVELS` | Minimum LSM levels, TidesDB can scale up levels if need be. | 5 |
 | `BENCH_SKIP_LIST_MAX_LEVEL` | Skip list max level | 12 |
 | `BENCH_SKIP_LIST_PROBABILITY` | Skip list probability | 0.25 |
 | `BENCH_ENABLE_COMPRESSION` | Enable compression (0=off, 1=on) | 1 |
@@ -687,10 +713,10 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_COMPARATOR_NAME` | Key comparator | "memcmp" |
 | `BENCH_BLOCK_CACHE_SIZE` | Global block cache size (bytes) | 67108864 (64MB) |
 | `BENCH_ISOLATION_LEVEL` | Transaction isolation level | TDB_ISOLATION_READ_COMMITTED |
-| `BENCH_KLOG_VALUE_THRESHOLD` | Key-log value separation threshold (bytes) | 4096 (4KB) |
+| `BENCH_KLOG_VALUE_THRESHOLD` | Key-log value separation threshold (bytes) | 512 |
 | `BENCH_MIN_DISK_SPACE` | Minimum free disk space required (bytes) | 104857600 (100MB) |
 | `BENCH_L1_FILE_COUNT_TRIGGER` | L1 file count trigger for compaction | 4 |
-| `BENCH_L0_QUEUE_STALL_THRESHOLD` | L0 queue stall threshold for backpressure | 10 (benchmark default; runtime default is 20) |
+| `BENCH_L0_QUEUE_STALL_THRESHOLD` | L0 queue stall threshold for backpressure | 20 |
 | `BENCH_MAX_OPEN_SSTABLES` | Maximum number of open SSTables | 256 |
 | `BENCH_USE_BTREE` | Use B+tree format for klog instead of block-based (0=off, 1=on) | 0 |
 
