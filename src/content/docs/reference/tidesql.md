@@ -11,7 +11,7 @@ If you want to download the source of this document, you can find it [here](http
 
 TideSQL is a pluggable storage engine for <a href="https://mariadb.org/">MariaDB</a>, built on top of TidesDB.
 
-The engine supports ACID transactions through multi-version concurrency control (MVCC), letting readers proceed without blocking writers. It handles primary keys, secondary indexes, auto-increment columns, virtual and stored generated columns, TTL-based expiration, data-at-rest encryption, online DDL, partitioning, and online backups. All of these features are accessible through standard SQL, so switching from InnoDB to TidesDB for a particular table requires nothing more than changing the `ENGINE` clause.
+The engine supports ACID transactions through multi-version concurrency control (MVCC), letting readers proceed without blocking writers. It handles primary keys, secondary indexes, auto-increment columns, virtual and stored generated columns, savepoints, TTL-based expiration, data-at-rest encryption, online DDL, partitioning, and online backups. All of these features are accessible through standard SQL, so switching from InnoDB to TidesDB for a particular table requires nothing more than changing the `ENGINE` clause.
 
 The TidesDB data files live in a sibling directory next to the MariaDB data directory, named `tidesdb_data`. The engine manages its own file layout entirely, and MariaDB's schema discovery mechanism does not interfere with it. 
 
@@ -42,7 +42,7 @@ MariaDB [(none)]> SHOW ENGINES\G
      Comment: Supports ACID transactions, lock-free concurrency, indexing, and encryption for tables
 Transactions: YES
           XA: NO
-  Savepoints: NO
+  Savepoints: YES
 ...
 ```
 
@@ -154,6 +154,8 @@ SELECT * FROM tickets ORDER BY id;
 TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. For autocommit statements, the server calls the engine's commit callback after the statement completes, which flushes the transaction to storage and frees it. Inside a multi-statement transaction (`BEGIN ... COMMIT`), statement-level commits simply create a savepoint for potential rollback; the real commit happens when the server calls the commit callback with `all=true`. Read-only transactions are rolled back and freed at commit time so that the next transaction begins with a fresh read snapshot.
 
 Autocommit single-statement transactions are automatically downgraded to `READ_COMMITTED` isolation. At this level, the TidesDB library skips write-set and read-set conflict checks at commit time, which eliminates the `ER_ERROR_DURING_COMMIT` (ERROR 1180) errors that ORMs and applications cannot easily retry. A single autocommit statement has no multi-statement consistency window to protect, so `READ_COMMITTED` is safe and effectively conflict-free. Multi-statement transactions (`BEGIN ... COMMIT`) retain the table's configured isolation level so that application-level retry logic handles the (rare) OCC conflicts.
+
+TidesDB supports SQL savepoints (`SAVEPOINT`, `ROLLBACK TO SAVEPOINT`, `RELEASE SAVEPOINT`) inside explicit multi-statement transactions. Savepoints are only meaningful inside `BEGIN ... COMMIT` blocks.
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
 
@@ -364,6 +366,39 @@ INSERT INTO orders (id, price, qty) VALUES (1, 49.99, 3);
 SELECT * FROM orders;
 -- total = 149.97, category = 'standard'
 ```
+
+
+## JSON
+
+MariaDB's `JSON` type is an alias for a text type (typically `LONGTEXT`), so JSON storage and JSON querying work normally on TidesDB tables. JSON functions like `JSON_VALUE()`, `JSON_EXTRACT()`, `JSON_SET()`, and `JSON_CONTAINS()` are evaluated by the MariaDB server.
+
+For efficient filtering on JSON paths, the recommended pattern is to use generated columns that extract the JSON paths you care about, then index those generated columns:
+
+```sql
+CREATE TABLE docs (
+  id   INT NOT NULL PRIMARY KEY,
+  data LONGTEXT,
+  name VARCHAR(100) AS (JSON_VALUE(data, '$.name')) PERSISTENT,
+  age  INT AS (JSON_VALUE(data, '$.age')) PERSISTENT,
+  KEY idx_name (name),
+  KEY idx_age (age)
+) ENGINE=TIDESDB;
+
+INSERT INTO docs (id, data) VALUES
+  (1, '{"name":"Alice","age":30,"tags":["admin","dev"]}'),
+  (2, '{"name":"Bob","age":25,"tags":["dev"]}');
+
+-- Uses idx_name
+SELECT * FROM docs WHERE name='Alice';
+
+-- Uses idx_age
+SELECT * FROM docs WHERE age >= 30;
+
+-- Server-evaluated JSON predicate (typically not indexable unless you extract it)
+SELECT * FROM docs WHERE JSON_CONTAINS(data, '"admin"', '$.tags');
+```
+
+This pattern provides engine-native indexing via normal secondary indexes, while keeping JSON manipulation and path extraction in standard SQL.
 
 
 ## Online DDL
