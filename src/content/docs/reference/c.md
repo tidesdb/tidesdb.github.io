@@ -172,7 +172,7 @@ tidesdb_config_t config = {
     .log_level = TDB_LOG_INFO,             /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
     .max_open_sstables = 256,              /* Max cached SSTable structures (default: 256) */
-    .max_memory_usage = 0,                 /* Global memory limit in bytes (default: 0 = auto, 80% of system RAM; minimum: 50% of system RAM) */
+    .max_memory_usage = 0,                 /* Global memory limit in bytes (default: 0 = auto, 50% of system RAM; minimum: 5% of system RAM) */
     .log_to_file = 0,                      /* Write logs to file instead of stderr (default: 0) */
     .log_truncation_at = 24 * (1024*1024), /* Log file truncation size (default: 24MB), 0 = no truncation */
 };
@@ -385,7 +385,7 @@ tidesdb_column_family_config_t cf_config = {
     .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
     .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
     .comparator_name = {0},                     /* Empty = use default "memcmp" */
-    .klog_value_threshold = 512,                /* Values > 512 bytes go to vlog (default: 512) */
+    .klog_value_threshold = 512,                /* Values >= 512 bytes go to vlog (default: 512) */
     .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
     .l1_file_count_trigger = 4,                 /* L1 file count trigger for compaction (default: 4) */
@@ -767,7 +767,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 ```
 
 :::caution[Important]
-Compression algorithm **cannot be changed** after column family creation without corrupting existing SSTables. Compression is applied at the block level (both klog and vlog blocks).
+Compression algorithm can be changed at runtime via `tidesdb_cf_update_runtime_config`, but the change only affects **new** SSTables. Existing SSTables retain their original compression and are decompressed correctly during reads. Compression is applied at the block level (both klog and vlog blocks).
 :::
 - Decompression happens automatically during reads
 - Block cache stores **decompressed** blocks to avoid repeated decompression overhead
@@ -790,8 +790,8 @@ tidesdb_create_column_family(db, "btree_cf", &cf_config);
 - Point lookups · O(log N) tree traversal with binary search at each node, compared to potentially scanning multiple 64KB blocks in block-based format
 - Range scans · Doubly-linked leaf nodes enable efficient bidirectional iteration
 - Immutable · Tree is bulk-loaded from sorted memtable data during flush and never modified afterward
-- Compression · Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd)
-- Large values · Values exceeding `klog_value_threshold` are stored in vlog, same as block-based format
+- Compression · Nodes compress independently using the same algorithms (LZ4, LZ4-FAST, Zstd, Snappy)
+- Large values · Values meeting or exceeding `klog_value_threshold` are stored in vlog, same as block-based format
 - Bloom filter · Works identically -- checked before tree traversal to skip lookups for absent keys
 
 **When to use B+tree format**
@@ -832,7 +832,7 @@ new_config.write_buffer_size = 256 * 1024 * 1024;
 new_config.skip_list_max_level = 16;
 new_config.skip_list_probability = 0.25f;
 new_config.bloom_fpr = 0.001;       /* 0.1% false positive rate */
-new_config.index_sample_ratio = 8;  /* sample 1 in 8 keys */
+new_config.index_sample_ratio = 8;  /* sample 1 in 8 blocks */
 
 int persist_to_disk = 1;            /* save to config.ini */
 if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
@@ -841,28 +841,31 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 }
 ```
 
-**Updatable settings** (safe to change at runtime):
+**Updatable settings** (all applied by `tidesdb_cf_update_runtime_config`):
 - `write_buffer_size` · Memtable flush threshold
 - `skip_list_max_level` · Skip list level for **new** memtables
 - `skip_list_probability` · Skip list probability for **new** memtables
 - `bloom_fpr` · False positive rate for **new** SSTables
+- `enable_bloom_filter` · Enable/disable bloom filters for **new** SSTables
+- `enable_block_indexes` · Enable/disable block indexes for **new** SSTables
+- `block_index_prefix_len` · Block index prefix length for **new** SSTables
 - `index_sample_ratio` · Index sampling ratio for **new** SSTables
-- `sync_mode` · Durability mode (TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL)
+- `compression_algorithm` · Compression for **new** SSTables (existing SSTables retain their original compression)
+- `klog_value_threshold` · Value log threshold for **new** writes
+- `sync_mode` · Durability mode (TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL). Also updates the active WAL's sync mode immediately.
 - `sync_interval_us` · Sync interval in microseconds (only used when sync_mode is TDB_SYNC_INTERVAL)
+- `level_size_ratio` · LSM level sizing (DCA recalculates capacities dynamically)
+- `min_levels` · Minimum LSM levels
+- `dividing_level_offset` · Compaction dividing level offset
+- `l1_file_count_trigger` · L1 file count compaction trigger
+- `l0_queue_stall_threshold` · Backpressure stall threshold
+- `default_isolation_level` · Default transaction isolation level
+- `min_disk_space` · Minimum disk space required
+- `commit_hook_fn` / `commit_hook_ctx` · Commit hook callback and context
 
-**Non-updatable settings** (would corrupt existing data):
-- `compression_algorithm` · Cannot change on existing SSTables
-- `enable_block_indexes` · Cannot change index structure
-- `enable_bloom_filter` · Cannot change bloom filter presence
-- `comparator_name` · Cannot change sort order
-- `level_size_ratio` · Cannot change LSM level sizing
-- `klog_value_threshold` · Cannot change klog/vlog separation
-- `min_levels` · Cannot change minimum LSM levels
-- `dividing_level_offset` · Cannot change compaction strategy
-- `block_index_prefix_len` · Cannot change block index structure
-- `l1_file_count_trigger` · Cannot change compaction trigger
-- `l0_queue_stall_threshold` · Cannot change backpressure threshold
-- `use_btree` · Cannot change klog format after creation
+**Non-updatable settings** (not modified by this function):
+- `comparator_name` · Cannot change sort order after creation (would corrupt key ordering in existing SSTables)
+- `use_btree` · Cannot change klog format after creation (existing SSTables use the original format)
 
 :::note[Backpressure Defaults]
 The default `l0_queue_stall_threshold` is 20. The default `l1_file_count_trigger` is 4.
