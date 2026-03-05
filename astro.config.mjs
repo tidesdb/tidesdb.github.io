@@ -296,6 +296,9 @@ export default defineConfig({
 				},
 				{
 					label: 'Licensing', link: '/licensing'
+				},
+				{
+					label: 'Partners', link: '/partners'
 				}
 			],
 		}),
