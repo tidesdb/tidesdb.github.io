@@ -98,6 +98,57 @@ export DYLD_LIBRARY_PATH="/opt/tidesdb/lib:$DYLD_LIBRARY_PATH"  # macOS
 cargo build
 ```
 
+## Initialization
+
+TidesDB supports optional custom memory allocators for integration with custom memory managers (e.g., jemalloc, mimalloc).
+
+### `init`
+
+Initializes TidesDB with the system allocator. Must be called exactly once before any other TidesDB function when using the explicit initialization path.
+
+```rust
+use tidesdb;
+
+fn main() -> tidesdb::Result<()> {
+    tidesdb::init()?;
+
+    // ... use TidesDB ...
+
+    tidesdb::finalize();
+    Ok(())
+}
+```
+
+### `init_with_allocator`
+
+Initializes TidesDB with custom C-level memory allocator functions. This is an `unsafe` function for advanced use cases.
+
+```rust
+use tidesdb;
+
+// Example with custom allocator function pointers
+unsafe {
+    tidesdb::init_with_allocator(
+        Some(my_malloc),
+        Some(my_calloc),
+        Some(my_realloc),
+        Some(my_free),
+    )?;
+}
+```
+
+### `finalize`
+
+Finalizes TidesDB and resets the allocator. Should be called after all TidesDB operations are complete (all databases closed). After calling this, `init()` or `init_with_allocator()` can be called again.
+
+```rust
+tidesdb::finalize();
+```
+
+:::note[Auto-initialization]
+If `init()` is not called, TidesDB will auto-initialize with the system allocator on the first call to `TidesDB::open()`.
+:::
+
 ## Usage
 
 ### Opening and Closing a Database
@@ -111,7 +162,10 @@ fn main() -> tidesdb::Result<()> {
         .num_compaction_threads(2)
         .log_level(LogLevel::Info)
         .block_cache_size(64 * 1024 * 1024)
-        .max_open_sstables(256);
+        .max_open_sstables(256)
+        .max_memory_usage(0)                   // 0 = auto (50% of system RAM)
+        .log_to_file(false)                    // Write logs to file instead of stderr
+        .log_truncation_at(24 * 1024 * 1024);  // Log file truncation threshold (24MB)
 
     let db = TidesDB::open(config)?;
 
@@ -154,6 +208,20 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+#### Dropping by Pointer
+
+When you already hold a `ColumnFamily`, you can skip the name lookup:
+
+```rust
+let cf = db.get_column_family("my_cf")?;
+db.delete_column_family(cf)?; // cf is consumed and cannot be used after this
+```
+
+:::tip[Which to use]
+- `drop_column_family(name)` · Convenient when you only have the name
+- `delete_column_family(cf)` · Faster when you already hold a `ColumnFamily`, avoids a redundant linear scan
+:::
 
 ### CRUD Operations
 
@@ -308,6 +376,39 @@ fn main() -> tidesdb::Result<()> {
 }
 ```
 
+### Multi-Column-Family Transactions
+
+TidesDB supports atomic transactions across multiple column families with true all-or-nothing semantics.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("users", ColumnFamilyConfig::default())?;
+    db.create_column_family("orders", ColumnFamilyConfig::default())?;
+
+    let users_cf = db.get_column_family("users")?;
+    let orders_cf = db.get_column_family("orders")?;
+
+    let mut txn = db.begin_transaction()?;
+
+    txn.put(&users_cf, b"user:1000", b"John Doe", -1)?;
+    txn.put(&orders_cf, b"order:5000", b"user:1000|product:A", -1)?;
+
+    // Commit atomically -- all or nothing
+    txn.commit()?;
+
+    Ok(())
+}
+```
+
+**Multi-CF guarantees**
+- Either all CFs commit or none do (atomic)
+- Automatically detected when operations span multiple CFs
+- Uses global sequence numbers for atomic ordering
+- Each CF's WAL receives operations with the same commit sequence number
+
 ### Transaction Reset
 
 `Transaction::reset` resets a committed or aborted transaction for reuse with a new isolation level. This avoids the overhead of freeing and reallocating transaction resources in hot loops.
@@ -418,6 +519,8 @@ fn main() -> tidesdb::Result<()> {
 
 #### Seek Operations
 
+**`seek(key)`** positions the iterator at the first key >= target key:
+
 ```rust
 use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
 
@@ -430,6 +533,7 @@ fn main() -> tidesdb::Result<()> {
     let txn = db.begin_transaction()?;
     let mut iter = txn.new_iterator(&cf)?;
 
+    // Seek to prefix and iterate all matching keys
     iter.seek(b"user:")?;
 
     while iter.is_valid() {
@@ -448,6 +552,25 @@ fn main() -> tidesdb::Result<()> {
     }
 
     Ok(())
+}
+```
+
+**`seek_for_prev(key)`** positions the iterator at the last key <= target key:
+
+```rust
+let txn = db.begin_transaction()?;
+let mut iter = txn.new_iterator(&cf)?;
+
+// Seek for reverse iteration from a specific key
+iter.seek_for_prev(b"user:2000")?;
+
+while iter.is_valid() {
+    let key = iter.key()?;
+    let value = iter.value()?;
+    println!("Key: {:?}, Value: {:?}",
+        String::from_utf8_lossy(&key),
+        String::from_utf8_lossy(&value));
+    iter.prev()?;
 }
 ```
 
@@ -544,7 +667,7 @@ fn main() -> tidesdb::Result<()> {
 
 ### Range Cost Estimation
 
-Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other `range_cost` results. It uses only in-memory metadata and performs no disk I/O.
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other `range_cost` results. It uses only in-memory metadata and performs no disk I/O.
 
 ```rust
 use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
@@ -567,7 +690,7 @@ fn main() -> tidesdb::Result<()> {
 ```
 
 **Behavior**
-- Key order does not matter — the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`
+- Key order does not matter - the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`
 - A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range
 - With block indexes enabled, uses O(log B) binary search per overlapping SSTable
 - Without block indexes, falls back to byte-level key interpolation
@@ -581,7 +704,7 @@ fn main() -> tidesdb::Result<()> {
 - Monitoring · Track how data distribution changes across key ranges over time
 
 :::note[Cost Values]
-The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `range_cost` results.
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar - only meaningful when compared with other `range_cost` results.
 :::
 
 ### Listing Column Families
@@ -867,7 +990,7 @@ fn main() -> tidesdb::Result<()> {
 | `is_delete` | `bool` | Whether this is a delete operation |
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - the data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
@@ -883,7 +1006,7 @@ fn main() -> tidesdb::Result<()> {
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — closures cannot be serialized.
+Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design - closures cannot be serialized.
 :::
 
 ### INI Configuration Files
@@ -1020,6 +1143,89 @@ fn main() -> tidesdb::Result<()> {
 `use_btree` **cannot be changed** after column family creation. Different column families can use different formats.
 :::
 
+### Custom Comparators
+
+A comparator defines the sort order of keys throughout the entire system: memtables, SSTables, block indexes, and iterators. TidesDB ships with six built-in comparators and supports registering custom ones.
+
+**Built-in comparators:** `memcmp` (default), `lexicographic`, `uint64`, `int64`, `reverse`, `case_insensitive`
+
+#### Registering a Custom Comparator
+
+Register a custom comparator **after** opening the database but **before** creating any column family that uses it. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+
+    // Register a reverse byte comparator
+    db.register_comparator("my_reverse", |key1, key2| {
+        let min_len = key1.len().min(key2.len());
+        for i in 0..min_len {
+            if key1[i] != key2[i] {
+                return key2[i] as i32 - key1[i] as i32;
+            }
+        }
+        key2.len() as i32 - key1.len() as i32
+    })?;
+
+    // Use the custom comparator in a column family
+    let cf_config = ColumnFamilyConfig::new()
+        .comparator_name("my_reverse");
+    db.create_column_family("reverse_cf", cf_config)?;
+
+    Ok(())
+}
+```
+
+The comparator function receives two key byte slices and must return:
+- **< 0** if `key1 < key2`
+- **0** if `key1 == key2`
+- **> 0** if `key1 > key2`
+
+#### Checking if a Comparator Exists
+
+```rust
+if db.has_comparator("my_reverse") {
+    println!("Comparator is registered");
+}
+
+// Built-in comparators are always available
+assert!(db.has_comparator("memcmp"));
+assert!(db.has_comparator("reverse"));
+```
+
+:::caution[Comparator Permanence]
+Once a column family is created with a specific comparator, it **must always** be opened with the same comparator. Changing or removing a comparator after column family creation will corrupt the data ordering.
+:::
+
+### Utility Functions
+
+#### `tidesdb::free`
+
+Frees memory allocated by TidesDB. This is primarily useful for advanced FFI scenarios. For normal Rust usage, the safe wrappers handle memory management automatically.
+
+```rust
+// Safety: ptr must have been allocated by TidesDB
+unsafe { tidesdb::free(ptr); }
+```
+
+## Database Configuration Reference
+
+All available `Config` builder methods:
+
+| Method | Type | Default | Description |
+|--------|------|---------|-------------|
+| `num_flush_threads(n)` | `i32` | 2 | Number of background flush threads |
+| `num_compaction_threads(n)` | `i32` | 2 | Number of background compaction threads |
+| `log_level(level)` | `LogLevel` | Info | Minimum log level (`Debug`, `Info`, `Warn`, `Error`, `Fatal`, `None`) |
+| `block_cache_size(size)` | `usize` | 64MB | Global block cache size in bytes |
+| `max_open_sstables(n)` | `usize` | 256 | Maximum number of open SSTable file descriptors |
+| `max_memory_usage(size)` | `usize` | 0 | Global memory limit in bytes (0 = auto, 50% of system RAM) |
+| `log_to_file(enable)` | `bool` | false | Write logs to file instead of stderr |
+| `log_truncation_at(size)` | `usize` | 24MB | Log file truncation threshold in bytes (0 = no truncation) |
+
 ## Column Family Configuration Reference
 
 All available `ColumnFamilyConfig` builder methods:
@@ -1048,15 +1254,17 @@ All available `ColumnFamilyConfig` builder methods:
 | `l0_queue_stall_threshold(threshold)` | `i32` | 20 | L0 queue stall threshold |
 | `use_btree(enable)` | `bool` | false | Use B+tree format for klog |
 
-**Non-updatable settings** (cannot be changed after column family creation):
-- `compression_algorithm`, `enable_block_indexes`, `enable_bloom_filter`
-- `comparator_name`, `level_size_ratio`, `klog_value_threshold`
-- `min_levels`, `dividing_level_offset`, `block_index_prefix_len`
-- `l1_file_count_trigger`, `l0_queue_stall_threshold`, `use_btree`
-
 **Updatable at runtime** (via `update_runtime_config`):
 - `write_buffer_size`, `skip_list_max_level`, `skip_list_probability`
-- `bloom_fpr`, `index_sample_ratio`, `sync_mode`, `sync_interval_us`
+- `bloom_fpr`, `enable_bloom_filter`, `enable_block_indexes`, `block_index_prefix_len`
+- `index_sample_ratio`, `compression_algorithm`, `klog_value_threshold`
+- `sync_mode`, `sync_interval_us`, `level_size_ratio`, `min_levels`
+- `dividing_level_offset`, `l1_file_count_trigger`, `l0_queue_stall_threshold`
+- `default_isolation_level`, `min_disk_space`
+
+**Non-updatable settings** (cannot be changed after column family creation):
+- `comparator_name` · Cannot change sort order after creation (would corrupt key ordering in existing SSTables)
+- `use_btree` · Cannot change klog format after creation (existing SSTables use the original format)
 
 ## Error Handling
 
@@ -1124,7 +1332,8 @@ fn main() -> tidesdb::Result<()> {
         .num_compaction_threads(1)
         .log_level(LogLevel::Info)
         .block_cache_size(64 * 1024 * 1024)
-        .max_open_sstables(256);
+        .max_open_sstables(256)
+        .max_memory_usage(0); // 0 = auto (50% of system RAM)
 
     let db = TidesDB::open(config)?;
 
