@@ -100,7 +100,7 @@ cargo build
 
 ## Initialization
 
-TidesDB supports **optional** custom memory allocators for integration with custom memory managers (e.g., jemalloc, mimalloc). You don't need to do this — this is completely optional.
+TidesDB supports optional custom memory allocators for integration with custom memory managers (e.g., jemalloc, mimalloc).
 
 ### `init`
 
@@ -667,7 +667,7 @@ fn main() -> tidesdb::Result<()> {
 
 ### Range Cost Estimation
 
-Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other `range_cost` results. It uses only in-memory metadata and performs no disk I/O.
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other `range_cost` results. It uses only in-memory metadata and performs no disk I/O.
 
 ```rust
 use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
@@ -690,7 +690,7 @@ fn main() -> tidesdb::Result<()> {
 ```
 
 **Behavior**
-- Key order does not matter — the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`
+- Key order does not matter - the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`
 - A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range
 - With block indexes enabled, uses O(log B) binary search per overlapping SSTable
 - Without block indexes, falls back to byte-level key interpolation
@@ -704,7 +704,7 @@ fn main() -> tidesdb::Result<()> {
 - Monitoring · Track how data distribution changes across key ranges over time
 
 :::note[Cost Values]
-The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `range_cost` results.
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar - only meaningful when compared with other `range_cost` results.
 :::
 
 ### Listing Column Families
@@ -990,7 +990,7 @@ fn main() -> tidesdb::Result<()> {
 | `is_delete` | `bool` | Whether this is a delete operation |
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - the data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
@@ -1006,7 +1006,7 @@ fn main() -> tidesdb::Result<()> {
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — closures cannot be serialized.
+Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design - closures cannot be serialized.
 :::
 
 ### INI Configuration Files
