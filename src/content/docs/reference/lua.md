@@ -69,6 +69,9 @@ local db = tidesdb.TidesDB.open("./mydb", {
     log_level = tidesdb.LogLevel.LOG_INFO,
     block_cache_size = 64 * 1024 * 1024,
     max_open_sstables = 256,
+    max_memory_usage = 0,                  -- Global memory limit in bytes (0 = auto, 50% of system RAM)
+    log_to_file = false,                   -- Write logs to file instead of stderr
+    log_truncation_at = 24 * 1024 * 1024,  -- Log file truncation size (24MB), 0 = no truncation
 })
 
 print("Database opened successfully")
@@ -88,19 +91,43 @@ local cf_config = tidesdb.default_column_family_config()
 cf_config.write_buffer_size = 128 * 1024 * 1024
 cf_config.level_size_ratio = 10
 cf_config.min_levels = 5
+cf_config.dividing_level_offset = 2
+cf_config.skip_list_max_level = 12
+cf_config.skip_list_probability = 0.25
 cf_config.compression_algorithm = tidesdb.CompressionAlgorithm.LZ4_COMPRESSION
 cf_config.enable_bloom_filter = true
 cf_config.bloom_fpr = 0.01
 cf_config.enable_block_indexes = true
+cf_config.index_sample_ratio = 1
+cf_config.block_index_prefix_len = 16
 cf_config.sync_mode = tidesdb.SyncMode.SYNC_INTERVAL
 cf_config.sync_interval_us = 128000
+cf_config.klog_value_threshold = 512         -- Values >= 512 bytes go to vlog
+cf_config.min_disk_space = 100 * 1024 * 1024 -- Minimum disk space required (100MB)
 cf_config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
-cf_config.use_btree = false  -- Use B+tree format for klog (default: false)
+cf_config.l1_file_count_trigger = 4          -- L1 file count trigger for compaction
+cf_config.l0_queue_stall_threshold = 20      -- L0 queue stall threshold
+cf_config.use_btree = false                  -- Use B+tree format for klog (default: false)
 
 db:create_column_family("my_cf", cf_config)
 
 db:drop_column_family("my_cf")
 ```
+
+### Dropping a Column Family by Pointer
+
+When you already hold a column family handle, use `delete_column_family` to skip the name lookup.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+db:delete_column_family(cf)
+```
+
+:::tip[Which to use]
+- `db:drop_column_family(name)` · convenient when you only have the name
+- `db:delete_column_family(cf)` · faster when you already hold a column family handle, avoids a redundant linear scan
+:::
 
 ### B+tree KLog Format (Optional)
 
@@ -253,6 +280,29 @@ txn:commit()
 txn:free()
 ```
 
+#### Multi-Column-Family Transactions
+
+TidesDB supports atomic transactions across multiple column families with true all-or-nothing semantics.
+
+```lua
+local users_cf = db:get_column_family("users")
+local orders_cf = db:get_column_family("orders")
+
+local txn = db:begin_txn()
+
+txn:put(users_cf, "user:1000", "John Doe", -1)
+txn:put(orders_cf, "order:5000", "user:1000|product:A", -1)
+
+txn:commit()
+txn:free()
+```
+
+**Multi-CF guarantees**
+- Either all CFs commit or none do (atomic)
+- Automatically detected when operations span multiple CFs
+- Uses global sequence numbers for atomic ordering
+- Each CF's WAL receives operations with the same commit sequence number
+
 ### Iterating Over Data
 
 Iterators provide efficient bidirectional traversal over key-value pairs.
@@ -299,6 +349,77 @@ while iter:valid() do
     print(string.format("Key: %s, Value: %s", key, value))
     
     iter:prev()
+end
+
+iter:free()
+txn:free()
+```
+
+#### Seek to Specific Key
+
+`iter:seek(key)` positions the iterator at the first key >= target key.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local txn = db:begin_txn()
+
+local iter = txn:new_iterator(cf)
+
+iter:seek("user:1000")
+
+if iter:valid() then
+    local key = iter:key()
+    print("Found: " .. key)
+end
+
+iter:free()
+txn:free()
+```
+
+`iter:seek_for_prev(key)` positions the iterator at the last key <= target key.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local txn = db:begin_txn()
+
+local iter = txn:new_iterator(cf)
+
+iter:seek_for_prev("user:2000")
+
+while iter:valid() do
+    local key = iter:key()
+    print("Found: " .. key)
+    iter:prev()
+end
+
+iter:free()
+txn:free()
+```
+
+#### Prefix Seeking
+
+Since `iter:seek(key)` positions the iterator at the first key >= target, you can use a prefix as the seek target to efficiently scan all keys sharing that prefix:
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local txn = db:begin_txn()
+
+local iter = txn:new_iterator(cf)
+
+local prefix = "user:"
+iter:seek(prefix)
+
+while iter:valid() do
+    local key = iter:key()
+    if key:sub(1, #prefix) ~= prefix then break end
+    
+    local value = iter:value()
+    print(string.format("Key: %s, Value: %s", key, value))
+    
+    iter:next()
 end
 
 iter:free()
@@ -918,6 +1039,7 @@ lua test_tidesdb.lua
 | `db:close()` | Close the database |
 | `db:create_column_family(name, config)` | Create a column family |
 | `db:drop_column_family(name)` | Drop a column family |
+| `db:delete_column_family(cf)` | Drop a column family by handle (skips name lookup) |
 | `db:rename_column_family(old_name, new_name)` | Rename a column family |
 | `db:clone_column_family(source_name, dest_name)` | Clone a column family |
 | `db:get_column_family(name)` | Get a column family handle |

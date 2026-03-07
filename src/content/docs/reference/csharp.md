@@ -65,6 +65,7 @@ var config = new Config
     LogLevel = LogLevel.Info,
     BlockCacheSize = 64 * 1024 * 1024,
     MaxOpenSstables = 256,
+    MaxMemoryUsage = 0, // 0 = auto (50% of system RAM)
     LogToFile = false,
     LogTruncationAt = 0
 };
@@ -371,6 +372,60 @@ foreach (var name in cfList)
 }
 ```
 
+### Updating Column Family Configuration
+
+Update runtime-safe configuration settings for a column family. Changes apply to new operations only.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+cf.UpdateRuntimeConfig(new ColumnFamilyConfig
+{
+    WriteBufferSize = 256 * 1024 * 1024,
+    SkipListMaxLevel = 16,
+    SkipListProbability = 0.25f,
+    BloomFpr = 0.001,
+    IndexSampleRatio = 8,
+});
+```
+
+**Without persisting to disk**
+```csharp
+cf.UpdateRuntimeConfig(new ColumnFamilyConfig
+{
+    WriteBufferSize = 256 * 1024 * 1024,
+}, persistToDisk: false);
+```
+
+**Updatable settings**
+- `WriteBufferSize` · Memtable flush threshold
+- `SkipListMaxLevel` · Skip list level for **new** memtables
+- `SkipListProbability` · Skip list probability for **new** memtables
+- `BloomFpr` · False positive rate for **new** SSTables
+- `EnableBloomFilter` · Enable/disable bloom filters for **new** SSTables
+- `EnableBlockIndexes` · Enable/disable block indexes for **new** SSTables
+- `BlockIndexPrefixLen` · Block index prefix length for **new** SSTables
+- `IndexSampleRatio` · Index sampling ratio for **new** SSTables
+- `CompressionAlgorithm` · Compression for **new** SSTables (existing SSTables retain their original compression)
+- `KlogValueThreshold` · Value log threshold for **new** writes
+- `SyncMode` · Durability mode. Also updates the active WAL's sync mode immediately
+- `SyncIntervalUs` · Sync interval in microseconds (only used when SyncMode is Interval)
+- `LevelSizeRatio` · LSM level sizing
+- `MinLevels` · Minimum LSM levels
+- `DividingLevelOffset` · Compaction dividing level offset
+- `L1FileCountTrigger` · L1 file count compaction trigger
+- `L0QueueStallThreshold` · Backpressure stall threshold
+- `DefaultIsolationLevel` · Default transaction isolation level
+- `MinDiskSpace` · Minimum disk space required
+
+**Non-updatable settings**
+- `ComparatorName` · Cannot change sort order after creation
+- `UseBtree` · Cannot change klog format after creation
+
+:::tip[Important Notes]
+Changes apply immediately to new operations. Existing SSTables and memtables retain their original settings. The update operation is thread-safe.
+:::
+
 ### Compaction
 
 #### Manual Compaction
@@ -527,6 +582,7 @@ var config = new Config
     LogLevel = LogLevel.Info,
     BlockCacheSize = 64 * 1024 * 1024,
     MaxOpenSstables = 256,
+    MaxMemoryUsage = 0,
     LogToFile = false,
     LogTruncationAt = 0
 };
@@ -613,7 +669,7 @@ txn.Commit();
 
 ## Savepoints
 
-Savepoints allow partial rollback within a transaction:
+Savepoints allow partial rollback within a transaction. You can create named savepoints, rollback to them, or release them without rolling back.
 
 ```csharp
 var cf = db.GetColumnFamily("my_cf")!;
@@ -629,6 +685,27 @@ txn.RollbackToSavepoint("sp1");
 
 txn.Commit();
 ```
+
+**Releasing a savepoint** (frees resources without rolling back)
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+using var txn = db.BeginTransaction();
+
+txn.Put(cf, Encoding.UTF8.GetBytes("key1"), Encoding.UTF8.GetBytes("value1"), -1);
+txn.Savepoint("sp1");
+txn.Put(cf, Encoding.UTF8.GetBytes("key2"), Encoding.UTF8.GetBytes("value2"), -1);
+txn.ReleaseSavepoint("sp1");
+txn.Commit();
+```
+
+**Savepoint behavior**
+- `Savepoint(name)` · Create a savepoint
+- `RollbackToSavepoint(name)` · Rollback to savepoint, discarding all operations after it
+- `ReleaseSavepoint(name)` · Release savepoint without rolling back
+- Multiple savepoints can be created with different names
+- Creating a savepoint with an existing name updates that savepoint
+- Savepoints are automatically freed when the transaction commits or rolls back
 
 ## Transaction Reset
 
@@ -779,6 +856,48 @@ Key order does not matter — the method normalizes the range so `keyA > keyB` p
 The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `RangeCost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
+## Custom Comparators
+
+TidesDB provides six built-in comparators that are automatically registered on database open:
+
+- **`"memcmp"`** (default) · Binary byte-by-byte comparison
+- **`"lexicographic"`** · Null-terminated string comparison
+- **`"uint64"`** · Unsigned 64-bit integer comparison
+- **`"int64"`** · Signed 64-bit integer comparison
+- **`"reverse"`** · Reverse binary comparison
+- **`"case_insensitive"`** · Case-insensitive ASCII comparison
+
+### Registering a Comparator
+
+```csharp
+db.RegisterComparator("my_comparator");
+```
+
+### Getting a Registered Comparator
+
+Check if a comparator is registered by name:
+
+```csharp
+if (db.GetComparator("memcmp"))
+{
+    Console.WriteLine("memcmp comparator is registered");
+}
+
+if (!db.GetComparator("nonexistent"))
+{
+    Console.WriteLine("comparator not registered");
+}
+```
+
+**Use cases**
+- Validation · Check if a comparator is registered before creating a column family
+- Debugging · Verify comparator registration during development
+- Dynamic configuration · Query available comparators at runtime
+
+:::caution[Important]
+Comparators must be registered before creating column families that use them. Once set, a comparator cannot be changed for a column family.
+:::
+
 ## Commit Hook (Change Data Capture)
 
 `SetCommitHook` registers a callback that fires synchronously after every transaction commit on a column family. The hook receives the full batch of committed operations atomically, enabling real-time change data capture without WAL parsing or external log consumers.
@@ -873,6 +992,10 @@ using TidesDB;
 // -- CommitOp
 // -- CommitHookHandler
 
+// Methods
+// -- TidesDb.GetComparator(string name)
+// -- ColumnFamily.UpdateRuntimeConfig(ColumnFamilyConfig config, bool persistToDisk)
+
 // Enums
 // -- CompressionAlgorithm
 // -- SyncMode
@@ -892,6 +1015,7 @@ using TidesDB;
 | `LogLevel` | LogLevel | Info | Logging level |
 | `BlockCacheSize` | ulong | 64MB | Block cache size in bytes |
 | `MaxOpenSstables` | ulong | 256 | Maximum number of open SSTables |
+| `MaxMemoryUsage` | ulong | 0 | Global memory limit in bytes (0 = auto, 50% of system RAM; minimum: 5% of system RAM) |
 | `LogToFile` | bool | false | Write debug logging to a file |
 | `LogTruncationAt` | ulong | 0 | Log file truncation threshold (0 = no truncation) |
 

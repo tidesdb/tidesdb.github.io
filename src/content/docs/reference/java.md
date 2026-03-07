@@ -35,7 +35,7 @@ sudo cmake --install build
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-java</artifactId>
-    <version>0.3.0</version>
+    <version>0.6.5</version>
 </dependency>
 ```
 
@@ -54,6 +54,7 @@ public class Example {
             .logLevel(LogLevel.INFO)
             .blockCacheSize(64 * 1024 * 1024)
             .maxOpenSSTables(256)
+            .maxMemoryUsage(0)
             .build();
         
         try (TidesDB db = TidesDB.open(config)) {
@@ -158,6 +159,18 @@ try (Transaction txn = db.beginTransaction()) {
 }
 ```
 
+#### Transaction Rollback
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+try (Transaction txn = db.beginTransaction()) {
+    txn.put(cf, "key".getBytes(), "value".getBytes());
+    
+    txn.rollback();
+}
+```
+
 #### Multi-Operation Transactions
 
 ```java
@@ -231,6 +244,35 @@ try (TidesDBIterator iter = txn.newIterator(cf)) {
     iter.seekForPrev("prefix".getBytes());
 }
 ```
+
+#### Prefix Seeking
+
+Since `seek` positions the iterator at the first key >= target, you can use a prefix as the seek target to efficiently scan all keys sharing that prefix:
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+try (Transaction txn = db.beginTransaction()) {
+    try (TidesDBIterator iter = txn.newIterator(cf)) {
+        byte[] prefix = "user:".getBytes();
+        iter.seek(prefix);
+        
+        while (iter.isValid()) {
+            byte[] key = iter.key();
+            String keyStr = new String(key);
+            
+            if (!keyStr.startsWith("user:")) break;
+            
+            byte[] value = iter.value();
+            System.out.printf("Key: %s, Value: %s%n", keyStr, new String(value));
+            
+            iter.next();
+        }
+    }
+}
+```
+
+This pattern works across both memtables and SSTables. When block indexes are enabled, the seek operation uses binary search to jump directly to the relevant block, making prefix scans efficient even on large datasets.
 
 ### Getting Column Family Statistics
 
@@ -402,6 +444,57 @@ The `CommitHook` functional interface receives a `CommitOp[]` array and a monoto
 - Secondary indexing · Maintain a reverse index or materialized view
 - Audit logging · Record every mutation with key, value, TTL, and sequence number
 - Debugging · Attach a temporary hook in production to inspect live writes
+
+### Multi-Column-Family Transactions
+
+TidesDB supports atomic transactions across multiple column families with true all-or-nothing semantics.
+
+```java
+ColumnFamily usersCf = db.getColumnFamily("users");
+ColumnFamily ordersCf = db.getColumnFamily("orders");
+
+try (Transaction txn = db.beginTransaction()) {
+    txn.put(usersCf, "user:1000".getBytes(), "John Doe".getBytes());
+    txn.put(ordersCf, "order:5000".getBytes(), "user:1000|product:A".getBytes());
+    
+    txn.commit();
+}
+```
+
+**Multi-CF guarantees**
+- Either all CFs commit or none do (atomic)
+- Automatically detected when operations span multiple CFs
+- Uses global sequence numbers for atomic ordering
+- Each CF's WAL receives operations with the same commit sequence number
+- No two-phase commit or coordinator overhead
+
+### Custom Comparators
+
+TidesDB uses comparators to determine the sort order of keys. Once a comparator is set for a column family, it cannot be changed without corrupting data.
+
+**Built-in Comparators**
+- **`"memcmp"`** (default) · Binary byte-by-byte comparison
+- **`"lexicographic"`** · Null-terminated string comparison
+- **`"uint64"`** · Unsigned 64-bit integer comparison
+- **`"int64"`** · Signed 64-bit integer comparison
+- **`"reverse"`** · Reverse binary comparison (descending order)
+- **`"case_insensitive"`** · Case-insensitive ASCII comparison
+
+**Registering a Comparator**
+
+```java
+db.registerComparator("reverse", null);
+
+ColumnFamilyConfig cfConfig = ColumnFamilyConfig.builder()
+    .comparatorName("reverse")
+    .build();
+
+db.createColumnFamily("sorted_cf", cfConfig);
+```
+
+:::caution[Important]
+Comparators must be registered before creating column families that use them. Once set, a comparator cannot be changed for a column family.
+:::
 
 ### Database Backup
 
@@ -588,6 +681,7 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `maxOpenSSTables` | long | 256 | Maximum open SSTable files |
 | `logToFile` | boolean | false | Write logs to file instead of stderr |
 | `logTruncationAt` | long | 24MB | Log file truncation size (0 = no truncation) |
+| `maxMemoryUsage` | long | 0 | Global memory limit in bytes (0 = auto, 50% of system RAM) |
 
 ### Column Family Configuration
 

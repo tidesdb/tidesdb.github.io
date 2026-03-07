@@ -72,6 +72,7 @@ config = tidesdb.Config(
     log_level=tidesdb.LogLevel.LOG_INFO,
     block_cache_size=64 * 1024 * 1024,   # 64MB
     max_open_sstables=256,
+    max_memory_usage=0,                  # Global memory limit in bytes (0 = auto, 50% of system RAM)
     log_to_file=False,                   # Write logs to file instead of stderr
     log_truncation_at=24 * 1024 * 1024,  # Log file truncation size (24MB)
 )
@@ -124,6 +125,10 @@ if stats.use_btree:
 db.rename_column_family("my_cf", "new_cf")
 
 db.drop_column_family("new_cf")
+
+# Delete by pointer (skips name lookup, faster when you already have the handle)
+cf = db.get_column_family("my_cf")
+db.delete_column_family(cf)
 ```
 
 ### Cloning a Column Family
@@ -652,6 +657,10 @@ TidesDB uses comparators to determine the sort order of keys. Built-in comparato
 - `"case_insensitive"`: Case-insensitive ASCII comparison
 
 ```python
+# Check if a comparator is registered
+if db.get_comparator("memcmp"):
+    print("memcmp comparator is registered")
+
 # Use a built-in comparator
 config = tidesdb.default_column_family_config()
 config.comparator_name = "reverse"  # Descending order
