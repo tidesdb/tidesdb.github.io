@@ -108,6 +108,8 @@ Secondary indexes are stored in their own column families, separate from the mai
 
 When you insert, update, or delete a row, the engine transactionally maintains all secondary indexes within the same transaction. For updates, the engine builds the old and new comparable index key for each secondary index and compares them with `memcmp`; if the indexed columns and PK bytes are identical, that index is skipped entirely, avoiding a redundant delete-then-reinsert round-trip into the library. This is a significant optimization for updates that only touch non-indexed columns. For deletes, the corresponding index entries are removed.
 
+Duplicate key violations on primary keys and unique indexes are properly detected. Inserting a row with a primary key that already exists returns the standard `ER_DUP_ENTRY` error. The same applies to unique secondary indexes. `REPLACE INTO` and `INSERT ... ON DUPLICATE KEY UPDATE` work correctly, the duplicate check is bypassed and the existing row is replaced or updated as expected.
+
 ```sql
 CREATE TABLE products (
   id       INT NOT NULL PRIMARY KEY,
@@ -156,6 +158,19 @@ TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction. 
 Autocommit single-statement transactions are automatically downgraded to `READ_COMMITTED` isolation. At this level, the TidesDB library skips write-set and read-set conflict checks at commit time, which eliminates the `ER_ERROR_DURING_COMMIT` (ERROR 1180) errors that ORMs and applications cannot easily retry. A single autocommit statement has no multi-statement consistency window to protect, so `READ_COMMITTED` is safe and effectively conflict-free. Multi-statement transactions (`BEGIN ... COMMIT`) retain the table's configured isolation level so that application-level retry logic handles the (rare) OCC conflicts.
 
 TidesDB supports SQL savepoints (`SAVEPOINT`, `ROLLBACK TO SAVEPOINT`, `RELEASE SAVEPOINT`) inside explicit multi-statement transactions. Savepoints are only meaningful inside `BEGIN ... COMMIT` blocks.
+
+### Consistent Snapshots
+
+The engine supports `START TRANSACTION WITH CONSISTENT SNAPSHOT`. This eagerly creates a TidesDB transaction with `REPEATABLE_READ` isolation and captures the snapshot sequence number immediately, rather than waiting until the first data access. Rows committed by other connections after the snapshot are invisible to the transaction. This is useful for cross-engine consistency when TidesDB and InnoDB tables coexist in the same transaction:
+
+```sql
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+START TRANSACTION WITH CONSISTENT SNAPSHOT;
+-- snapshot is taken now, not at first SELECT
+SELECT * FROM tidesdb_table;   -- sees data as of snapshot time
+SELECT * FROM innodb_table;    -- InnoDB also snapshotted at the same time
+COMMIT;
+```
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
 
@@ -323,6 +338,24 @@ When a per-row TTL column is present and has a non-zero value, it takes preceden
 
 When a row is updated, its TTL is recomputed from the new column value, effectively refreshing its expiration.
 
+### Session-Level TTL
+
+A per-session TTL can be set with the `tidesdb_ttl` session variable. This applies a TTL to all inserts and updates on any TidesDB table for the duration of the session, even tables that were not created with a TTL option:
+
+```sql
+SET SESSION tidesdb_ttl = 300;  -- 5 minutes
+INSERT INTO events (id, data) VALUES (1, 'temporary');  -- expires in 300s
+SET SESSION tidesdb_ttl = 0;    -- back to table default
+```
+
+The `SET STATEMENT` syntax can scope the TTL to a single statement:
+
+```sql
+SET STATEMENT tidesdb_ttl = 60 FOR INSERT INTO events (id, data) VALUES (2, 'one-minute');
+```
+
+The priority order is: per-row TTL column > session `tidesdb_ttl` > table-level `TTL` option > no expiration.
+
 
 ## Data-at-Rest Encryption
 
@@ -421,7 +454,7 @@ ALTER TABLE events SYNC_MODE='NONE', ALGORITHM=INSTANT;
 
 ### Inplace Operations
 
-Adding or dropping secondary indexes is done inplace. When a new index is added, the engine creates a new column family for it, then performs a full table scan to populate all index entries. This runs with no server-level lock blocking (`HA_ALTER_INPLACE_NO_LOCK`), so concurrent reads and writes can proceed during the index build.
+Adding or dropping secondary indexes is done inplace. When a new index is added, the engine creates a new column family for it, then performs a full table scan to populate all index entries. This runs with no server-level lock blocking (`HA_ALTER_INPLACE_NO_LOCK`), so concurrent reads and writes can proceed during the index build. When adding a `UNIQUE` index, the engine checks for duplicate values during the population scan and aborts with `ER_DUP_ENTRY` if any are found, preserving all existing rows.
 
 ```sql
 ALTER TABLE events ADD INDEX idx_ts (ts), ALGORITHM=INPLACE;
@@ -529,6 +562,7 @@ The engine exposes several global system variables that control TidesDB's runtim
 | `tidesdb_max_open_sstables` | 256 | Maximum number of SSTable file handles cached in the LRU |
 | `tidesdb_max_memory_usage` | 0 (auto) | Global memory limit in bytes; 0 lets the library auto-detect (~80% system RAM) |
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup |
+| `tidesdb_ttl` | 0 | Per-session TTL in seconds applied to INSERT/UPDATE; 0 means use the table-level default. Can be set with `SET SESSION` or `SET STATEMENT`. |
 | `tidesdb_debug_trace` | OFF | Enables per-operation trace logging to the error log |
 
 The block cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use — only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families: data + one secondary index each). TidesDB logs to a `LOG` file in the data directory by default, with automatic truncation at 24 MB.
@@ -604,7 +638,13 @@ DROP TABLE event_log;
 
 There are a few things to be aware of when using TidesDB:
 
-The engine does not support foreign keys. Cross-table referential integrity must be enforced at the application level.
+The engine does not support foreign keys. Cross-table referential integrity must be enforced at the application level. When a `CREATE TABLE` statement includes `FOREIGN KEY` clauses, the constraint is silently ignored and only the supporting index is created. To convert an InnoDB table that has foreign keys to TidesDB, disable FK checks first:
+
+```sql
+SET FOREIGN_KEY_CHECKS = 0;
+ALTER TABLE t1 ENGINE = TidesDB;
+SET FOREIGN_KEY_CHECKS = 1;
+```
 
 Changing the primary key of a table requires a full copy rebuild. The engine does not support inplace primary key changes.
 
