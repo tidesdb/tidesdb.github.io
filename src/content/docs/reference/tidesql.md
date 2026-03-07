@@ -264,6 +264,53 @@ CREATE TABLE btree_table (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB USE_BTREE=1;
 
 When `ANALYZE TABLE` is run on a B+tree-formatted table, the output includes additional statistics about the tree structure (node counts, heights).
 
+### Block Indexes
+
+When using the default block-based key log format (i.e., `USE_BTREE=0`), TidesDB builds block-level indexes inside each SSTable to speed up key lookups. Block indexes are enabled by default. You can disable them, or tune their sampling ratio and prefix length:
+
+```sql
+-- Disable block indexes entirely
+CREATE TABLE no_block_idx (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB BLOCK_INDEXES=0;
+
+-- Tune block index parameters
+CREATE TABLE custom_idx (
+  id INT PRIMARY KEY,
+  v  VARCHAR(200)
+) ENGINE=TIDESDB
+  BLOCK_INDEXES=1
+  INDEX_SAMPLE_RATIO=4
+  BLOCK_INDEX_PREFIX_LEN=32;
+```
+
+`BLOCK_INDEXES` enables or disables block-level indexes within the SSTable key log (default enabled). `INDEX_SAMPLE_RATIO` controls how frequently index entries are sampled from the key log blocks (default 1, meaning every block is indexed). Higher values reduce index size at the cost of more binary search steps during lookups. `BLOCK_INDEX_PREFIX_LEN` sets the byte length of the key prefix stored in each block index entry (default 16). A longer prefix improves point-lookup accuracy but increases index memory usage.
+
+### Key Log Value Threshold
+
+Each SSTable consists of a key log and a value log. Small values are stored inline in the key log alongside the key, while larger values are written to the separate value log with only a pointer kept in the key log. The `KLOG_VALUE_THRESHOLD` option controls the cutoff in bytes:
+
+```sql
+-- Store values up to 1 KB inline in the key log
+CREATE TABLE inline_vals (
+  id  INT PRIMARY KEY,
+  val VARCHAR(200)
+) ENGINE=TIDESDB KLOG_VALUE_THRESHOLD=1024;
+```
+
+The default is 512 bytes. Raising the threshold keeps more data inline, which benefits workloads with small rows by avoiding an extra indirection through the value log. Lowering it reduces key log size, which can improve cache efficiency for tables with large row values.
+
+### Minimum Disk Space
+
+`MIN_DISK_SPACE` sets the minimum free disk space (in bytes) that TidesDB requires before it will flush memtables or run compaction. If free space drops below this threshold, background operations are paused to prevent filling the disk:
+
+```sql
+CREATE TABLE guarded (
+  id INT PRIMARY KEY,
+  v  INT
+) ENGINE=TIDESDB MIN_DISK_SPACE=1073741824;  -- 1 GB
+```
+
+The default is 100 MB.
+
 ### LSM-Tree Tuning
 
 Several options let you tune the shape and behavior of the LSM-tree:
@@ -275,12 +322,14 @@ CREATE TABLE tuned (
 ) ENGINE=TIDESDB
   LEVEL_SIZE_RATIO=8
   MIN_LEVELS=3
+  DIVIDING_LEVEL_OFFSET=1
   SKIP_LIST_MAX_LEVEL=16
   SKIP_LIST_PROBABILITY=25
-  L1_FILE_COUNT_TRIGGER=4;
+  L1_FILE_COUNT_TRIGGER=4
+  L0_QUEUE_STALL_THRESHOLD=8;
 ```
 
-`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 5). The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels.
+`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 5). `DIVIDING_LEVEL_OFFSET` sets the offset from the top of the LSM-tree that separates the tiered compaction region from the leveled compaction region (default 2); levels above the dividing level use tiered compaction (append new SSTables), while levels at or below use leveled compaction (merge-sort into one sorted run). The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 4). Together with `WRITE_BUFFER_SIZE`, this controls worst-case memtable memory per column family: `WRITE_BUFFER_SIZE × (1 + L0_QUEUE_STALL_THRESHOLD)`.
 
 ### Combining Multiple Options
 
@@ -296,6 +345,8 @@ CREATE TABLE optimized (
   BLOOM_FILTER=1
   BLOOM_FPR=50
   SYNC_MODE='FULL'
+  KLOG_VALUE_THRESHOLD=1024
+  L0_QUEUE_STALL_THRESHOLD=6
   ISOLATION_LEVEL='REPEATABLE_READ';
 ```
 
