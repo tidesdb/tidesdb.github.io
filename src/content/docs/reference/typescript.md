@@ -77,6 +77,7 @@ const db = TidesDB.open({
   logLevel: LogLevel.Info,
   blockCacheSize: 64 * 1024 * 1024,
   maxOpenSSTables: 256,
+  maxMemoryUsage: 0,                  // Global memory limit in bytes (0 = auto, 50% of system RAM)
   logToFile: false,                   // Write logs to file instead of stderr
   logTruncationAt: 24 * 1024 * 1024,  // Log file truncation size (24MB), 0 = no truncation
 });
@@ -665,7 +666,15 @@ db.createColumnFamily('lz4_fast_cf', {
 db.createColumnFamily('zstd_cf', {
   compressionAlgorithm: CompressionAlgorithm.ZstdCompression,
 });
+
+db.createColumnFamily('snappy_cf', {
+  compressionAlgorithm: CompressionAlgorithm.SnappyCompression,
+});
 ```
+
+:::note[Snappy Availability]
+Snappy compression is not available on SunOS/Illumos/OmniOS platforms.
+:::
 
 ### B+tree KLog Format (Optional)
 
@@ -868,7 +877,7 @@ txn.free();
 
 ## Savepoints
 
-Savepoints allow partial rollback within a transaction:
+Savepoints allow partial rollback within a transaction. You can create named savepoints and rollback to them without aborting the entire transaction.
 
 ```typescript
 const cf = db.getColumnFamily('my_cf');
@@ -887,6 +896,19 @@ txn.rollbackToSavepoint('sp1');
 txn.commit();
 txn.free();
 ```
+
+**Savepoint API**
+- `txn.savepoint('name')` · Create a savepoint
+- `txn.rollbackToSavepoint('name')` · Rollback to savepoint
+- `txn.releaseSavepoint('name')` · Release savepoint without rolling back
+
+**Savepoint behavior**
+- Savepoints capture the transaction state at a specific point
+- Rolling back to a savepoint discards all operations after that savepoint
+- Releasing a savepoint frees its resources without rolling back
+- Multiple savepoints can be created with different names
+- Creating a savepoint with an existing name updates that savepoint
+- Savepoints are automatically freed when the transaction commits or rolls back
 
 ## Transaction Reset
 
@@ -940,6 +962,77 @@ console.log(`Misses: ${cacheStats.misses}`);
 console.log(`Hit rate: ${(cacheStats.hitRate * 100).toFixed(1)}%`);
 console.log(`Partitions: ${cacheStats.numPartitions}`);
 ```
+
+## Multi-Column-Family Transactions
+
+TidesDB supports atomic transactions across multiple column families with true all-or-nothing semantics.
+
+```typescript
+const usersCf = db.getColumnFamily('users');
+const ordersCf = db.getColumnFamily('orders');
+
+const txn = db.beginTransaction();
+
+txn.put(usersCf, Buffer.from('user:1000'), Buffer.from('John Doe'), -1);
+txn.put(ordersCf, Buffer.from('order:5000'), Buffer.from('user:1000|product:A'), -1);
+
+txn.commit();
+txn.free();
+```
+
+**Multi-CF guarantees**
+- Either all CFs commit or none do (atomic)
+- Automatically detected when operations span multiple CFs
+- Uses global sequence numbers for atomic ordering
+- Each CF's WAL receives operations with the same commit sequence number
+- No two-phase commit or coordinator overhead
+
+## Custom Comparators
+
+TidesDB uses comparators to determine the sort order of keys throughout the entire system: memtables, SSTables, block indexes, and iterators all use the same comparison logic. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
+
+### Built-in Comparators
+
+TidesDB provides six built-in comparators that are automatically registered on database open:
+
+- **`"memcmp"` (default)** · Binary byte-by-byte comparison. Shorter key sorts first if bytes are equal.
+- **`"lexicographic"`** · Null-terminated string comparison using `strcmp()`. Keys must be null-terminated.
+- **`"uint64"`** · Unsigned 64-bit integer comparison. Interprets 8-byte keys as uint64 values. Falls back to memcmp if key size != 8.
+- **`"int64"`** · Signed 64-bit integer comparison. Interprets 8-byte keys as int64 values. Falls back to memcmp if key size != 8.
+- **`"reverse"`** · Reverse binary comparison. Sorts keys in descending order.
+- **`"case_insensitive"`** · Case-insensitive ASCII comparison. Converts A-Z to a-z during comparison.
+
+### Registering a Comparator
+
+```typescript
+// Register comparator after opening database but before creating CF
+db.registerComparator('reverse');
+
+db.createColumnFamily('sorted_cf', {
+  comparatorName: 'reverse',
+});
+```
+
+### Retrieving a Registered Comparator
+
+Use `getComparator` to check whether a comparator is registered:
+
+```typescript
+if (db.getComparator('reverse')) {
+  console.log('Comparator "reverse" is registered');
+} else {
+  console.log('Comparator not registered');
+}
+```
+
+**Use cases**
+- Validation · Check if a comparator is registered before creating a column family
+- Debugging · Verify comparator registration during development
+- Dynamic configuration · Query available comparators at runtime
+
+:::caution[Important]
+Comparators must be **registered before** creating column families that use them. Once set, a comparator **cannot be changed** for a column family. The same comparator is used across memtables, SSTables, block indexes, and iterators.
+:::
 
 ## Testing
 

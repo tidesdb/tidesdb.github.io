@@ -43,11 +43,14 @@ cmake --build build
 int main() {
     tidesdb::Config config;
     config.dbPath = "./mydb";
-    config.numFlushThreads = 2;
-    config.numCompactionThreads = 2;
-    config.logLevel = tidesdb::LogLevel::Info;
-    config.blockCacheSize = 64 * 1024 * 1024;
-    config.maxOpenSSTables = 256;
+    config.numFlushThreads = 2;                    // Flush thread pool size (default: 2)
+    config.numCompactionThreads = 2;               // Compaction thread pool size (default: 2)
+    config.logLevel = tidesdb::LogLevel::Info;      // Log level (default: Info)
+    config.blockCacheSize = 64 * 1024 * 1024;      // 64MB global block cache (default: 64MB)
+    config.maxOpenSSTables = 256;                   // Max cached SSTable structures (default: 256)
+    config.maxMemoryUsage = 0;                      // Global memory limit in bytes (default: 0 = auto, 50% of system RAM)
+    config.logToFile = false;                       // Write logs to file instead of stderr (default: false)
+    config.logTruncationAt = 24 * 1024 * 1024;     // Log file truncation size (default: 24MB), 0 = no truncation
 
     try {
         tidesdb::TidesDB db(config);
@@ -60,6 +63,70 @@ int main() {
     return 0;
 }
 ```
+
+**Using default configuration**
+
+Use `TidesDB::defaultConfig()` to get a configuration with sensible defaults, then override specific fields as needed:
+
+```cpp
+auto config = tidesdb::TidesDB::defaultConfig();
+config.dbPath = "./mydb";
+config.logLevel = tidesdb::LogLevel::Warn;  // Override: only warnings and errors
+
+tidesdb::TidesDB db(config);
+```
+
+### Logging
+
+TidesDB provides structured logging with multiple severity levels.
+
+**Log Levels**
+- `LogLevel::Debug` · Detailed diagnostic information
+- `LogLevel::Info` · General informational messages (default)
+- `LogLevel::Warn` · Warning messages for potential issues
+- `LogLevel::Error` · Error messages for failures
+- `LogLevel::Fatal` · Critical errors that may cause shutdown
+- `LogLevel::None` · Disable all logging
+
+**Configure at startup**
+```cpp
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.logLevel = tidesdb::LogLevel::Debug;  // Enable debug logging
+
+tidesdb::TidesDB db(config);
+```
+
+**Production configuration**
+```cpp
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.logLevel = tidesdb::LogLevel::Warn;  // Only warnings and errors
+
+tidesdb::TidesDB db(config);
+```
+
+**Output format**
+Logs are written to **stderr** by default with timestamps:
+```
+[HH:MM:SS.mmm] [LEVEL] filename:line: message
+```
+
+**Log to file**
+
+Enable `logToFile` to write logs to a `LOG` file in the database directory instead of stderr:
+
+```cpp
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.logLevel = tidesdb::LogLevel::Debug;
+config.logToFile = true;  // Write to ./mydb/LOG instead of stderr
+
+tidesdb::TidesDB db(config);
+// Logs are now written to ./mydb/LOG
+```
+
+The log file is opened in append mode and uses line buffering for real-time logging. If the log file cannot be opened, logging falls back to default.
 
 ### Creating and Dropping Column Families
 
@@ -162,6 +229,18 @@ txn.del(cf, "old_key");
 txn.commit();
 ```
 
+#### Transaction Rollback
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+auto txn = db.beginTransaction();
+txn.put(cf, "key", "value", -1);
+
+// Discard all operations
+txn.rollback();
+```
+
 ### Iterating Over Data
 
 Iterators provide efficient bidirectional traversal over key-value pairs.
@@ -208,13 +287,72 @@ while (iter.valid()) {
 
 #### Seeking
 
+**How Seek Works**
+
+**With Block Indexes Enabled** (`enableBlockIndexes = true`):
+- Uses compact block index with parallel arrays (min/max key prefixes and file positions)
+- Binary search through sampled keys at configurable ratio (default 1:1 via `indexSampleRatio`, meaning every block is indexed)
+- Jumps directly to the target block using the file position
+- Scans forward from that block to find the exact key
+- **Performance** · O(log n) binary search + O(k) entries per block scan
+
+Block indexes provide dramatic speedup for large SSTables at the cost of ~2-5% storage overhead for the compact index structure.
+
+**`seek(key)`** · Positions iterator at the first key >= target key
+
 ```cpp
 auto iter = txn.newIterator(cf);
 
 iter.seek("user:1000");
 
-iter.seekForPrev("user:2000");
+// Iterator is now positioned at "user:1000" or the next key after it
+if (iter.valid()) {
+    auto key = iter.key();
+    std::string keyStr(key.begin(), key.end());
+    std::cout << "Found: " << keyStr << std::endl;
+}
 ```
+
+**`seekForPrev(key)`** · Positions iterator at the last key <= target key
+
+```cpp
+auto iter = txn.newIterator(cf);
+
+iter.seekForPrev("user:2000");
+
+// Iterator is now positioned at "user:2000" or the previous key before it
+while (iter.valid()) {
+    // Iterate backwards from this point
+    iter.prev();
+}
+```
+
+#### Prefix Seeking
+
+Since `seek` positions the iterator at the first key >= target, you can use a prefix as the seek target to efficiently scan all keys sharing that prefix:
+
+```cpp
+auto iter = txn.newIterator(cf);
+
+std::string prefix = "user:";
+iter.seek(prefix);
+
+while (iter.valid()) {
+    auto key = iter.key();
+    std::string keyStr(key.begin(), key.end());
+
+    // Stop when keys no longer match prefix
+    if (keyStr.substr(0, prefix.size()) != prefix) break;
+
+    auto value = iter.value();
+    std::string valueStr(value.begin(), value.end());
+    std::cout << "Found: " << keyStr << " = " << valueStr << std::endl;
+
+    iter.next();
+}
+```
+
+This pattern works across both memtables and SSTables. When block indexes are enabled, the seek operation uses binary search to jump directly to the relevant block, making prefix scans efficient even on large datasets.
 
 ### Getting Column Family Statistics
 
@@ -379,17 +517,33 @@ bool persistToDisk = true;  // Save to config.ini
 cf.updateRuntimeConfig(newConfig, persistToDisk);
 ```
 
-**Updatable settings** (safe to change at runtime):
+**Updatable settings** (all applied by `updateRuntimeConfig`):
 - `writeBufferSize` · Memtable flush threshold
-- `skipListMaxLevel` · Skip list level for new memtables
-- `skipListProbability` · Skip list probability for new memtables
-- `bloomFPR` · False positive rate for new SSTables
-- `indexSampleRatio` · Index sampling ratio for new SSTables
-- `syncMode` · Durability mode
-- `syncIntervalUs` · Sync interval in microseconds
+- `skipListMaxLevel` · Skip list level for **new** memtables
+- `skipListProbability` · Skip list probability for **new** memtables
+- `bloomFPR` · False positive rate for **new** SSTables
+- `enableBloomFilter` · Enable/disable bloom filters for **new** SSTables
+- `enableBlockIndexes` · Enable/disable block indexes for **new** SSTables
+- `blockIndexPrefixLen` · Block index prefix length for **new** SSTables
+- `indexSampleRatio` · Index sampling ratio for **new** SSTables
+- `compressionAlgorithm` · Compression for **new** SSTables (existing SSTables retain their original compression)
+- `klogValueThreshold` · Value log threshold for **new** writes
+- `syncMode` · Durability mode. Also updates the active WAL's sync mode immediately
+- `syncIntervalUs` · Sync interval in microseconds (only used when syncMode is `SyncMode::Interval`)
+- `levelSizeRatio` · LSM level sizing (DCA recalculates capacities dynamically)
+- `minLevels` · Minimum LSM levels
+- `dividingLevelOffset` · Compaction dividing level offset
+- `l1FileCountTrigger` · L1 file count compaction trigger
+- `l0QueueStallThreshold` · Backpressure stall threshold
+- `defaultIsolationLevel` · Default transaction isolation level
+- `minDiskSpace` · Minimum disk space required
+- `commitHookFn` / `commitHookCtx` · Commit hook callback and context
 
-**Non-updatable settings** (would corrupt existing data):
-- `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
+**Non-updatable settings** (not modified by this function):
+- `comparatorName` · Cannot change sort order after creation (would corrupt key ordering in existing SSTables)
+- `useBtree` · Cannot change klog format after creation (existing SSTables use the original format)
+
+Changes apply immediately to new operations. Existing SSTables and memtables retain their original settings. The update operation is thread-safe.
 
 ### Commit Hook (Change Data Capture)
 
@@ -580,20 +734,58 @@ A cost of 0.0 means no overlapping SSTables or memtable entries were found for t
 
 ### Sync Modes
 
-Control the durability vs performance tradeoff.
+Control the durability vs performance tradeoff with three sync modes.
 
 ```cpp
 auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 
+// Fastest, least durable (OS handles flushing)
 cfConfig.syncMode = tidesdb::SyncMode::None;
 
+// Balanced performance with periodic background syncing
 cfConfig.syncMode = tidesdb::SyncMode::Interval;
-cfConfig.syncIntervalUs = 128000;  // Sync every 128ms
+cfConfig.syncIntervalUs = 128000;  // Sync every 128ms (default)
 
+// Most durable (fsync on every write)
 cfConfig.syncMode = tidesdb::SyncMode::Full;
 
 db.createColumnFamily("my_cf", cfConfig);
 ```
+
+**Sync Mode Details**
+
+- **`SyncMode::None`** · No explicit sync, relies on OS page cache (fastest, least durable)
+    - Best for · Maximum throughput, acceptable data loss on crash
+    - Use case · Caches, temporary data, reproducible workloads
+
+- **`SyncMode::Interval`** · Periodic background syncing at configurable intervals (balanced)
+    - Best for · Production workloads requiring good performance with bounded data loss
+    - Use case · Most applications, configurable durability window
+    - Single background sync thread monitors all column families using interval mode
+    - Structural operations (flush, compaction, WAL rotation) always enforce durability
+    - At most `syncIntervalUs` worth of data at risk on crash
+
+- **`SyncMode::Full`** · Fsync on every write operation (slowest, most durable)
+    - Best for · Critical data requiring maximum durability
+    - Use case · Financial transactions, audit logs, critical metadata
+
+**Sync Interval Examples**
+
+```cpp
+// Sync every 100ms (good for low-latency requirements)
+cfConfig.syncMode = tidesdb::SyncMode::Interval;
+cfConfig.syncIntervalUs = 100000;
+
+// Sync every 128ms (default)
+cfConfig.syncMode = tidesdb::SyncMode::Interval;
+cfConfig.syncIntervalUs = 128000;
+
+// Sync every 1 second (higher throughput, more data at risk)
+cfConfig.syncMode = tidesdb::SyncMode::Interval;
+cfConfig.syncIntervalUs = 1000000;
+```
+
+Regardless of sync mode, TidesDB **always** enforces durability for structural operations: memtable flush to SSTable, SSTable compaction and merging, WAL rotation, and column family metadata updates.
 
 ### Compression Algorithms
 
@@ -612,6 +804,19 @@ cfConfig.compressionAlgorithm = tidesdb::CompressionAlgorithm::Snappy;   // Snap
 
 db.createColumnFamily("my_cf", cfConfig);
 ```
+
+**Choosing a Compression Algorithm**
+
+| Workload | Recommended Algorithm | Rationale |
+|----------|----------------------|-----------|
+| General purpose | `CompressionAlgorithm::LZ4` | Best balance of speed and compression |
+| Write-heavy | `CompressionAlgorithm::LZ4Fast` | Minimize CPU overhead on writes |
+| Storage-constrained | `CompressionAlgorithm::Zstd` | Maximum compression ratio |
+| Read-heavy | `CompressionAlgorithm::Zstd` | Reduce I/O bandwidth, decompression is fast |
+| Pre-compressed data | `CompressionAlgorithm::None` | Avoid double compression overhead |
+| CPU-constrained | `CompressionAlgorithm::None` or `LZ4Fast` | Minimize CPU usage |
+
+Compression algorithm can be changed at runtime via `updateRuntimeConfig`, but the change only affects **new** SSTables. Existing SSTables retain their original compression and are decompressed correctly during reads. Different column families can use different compression algorithms.
 
 ### B+tree KLog Format (Optional)
 
@@ -675,6 +880,12 @@ try {
 - `ErrorCode::InvalidDB` (-10) · Invalid database handle
 - `ErrorCode::Unknown` (-11) · Unknown error
 - `ErrorCode::Locked` (-12) · Database is locked
+
+**Error categories**
+- `ErrorCode::Corruption` indicates data integrity issues requiring immediate attention
+- `ErrorCode::Conflict` indicates transaction conflicts (retry may succeed)
+- `ErrorCode::Memory`, `ErrorCode::MemoryLimit`, `ErrorCode::TooLarge` indicate resource constraints
+- `ErrorCode::NotFound`, `ErrorCode::Exists` are normal operational conditions, not failures
 
 ## Complete Example
 
@@ -797,6 +1008,14 @@ txn.commit();
 - `savepoint(name)` · Create a savepoint
 - `rollbackToSavepoint(name)` · Rollback to savepoint
 - `releaseSavepoint(name)` · Release savepoint without rolling back
+
+**Savepoint behavior**
+- Savepoints capture the transaction state at a specific point
+- Rolling back to a savepoint discards all operations after that savepoint
+- Releasing a savepoint frees its resources without rolling back
+- Multiple savepoints can be created with different names
+- Creating a savepoint with an existing name updates that savepoint
+- Savepoints are automatically freed when the transaction commits or rolls back
 
 ## Transaction Reset
 
@@ -921,6 +1140,50 @@ db.createColumnFamily("reverse_cf", cfConfig);
 :::caution[Important]
 Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
 :::
+
+### Retrieving a Registered Comparator
+
+Use `getComparator` to retrieve a previously registered comparator by name:
+
+```cpp
+tidesdb_comparator_fn fn = nullptr;
+void* ctx = nullptr;
+
+db.getComparator("timestamp_desc", &fn, &ctx);
+// fn and ctx are now populated
+```
+
+**Use cases**
+- Validation · Check if a comparator is registered before creating a column family
+- Debugging · Verify comparator registration during development
+- Dynamic configuration · Query available comparators at runtime
+
+## Thread Pools
+
+TidesDB uses separate thread pools for flush and compaction operations. Understanding the parallelism model is important for optimal configuration.
+
+**Parallelism semantics**
+- Cross-CF parallelism · Multiple flush/compaction workers CAN process different column families in parallel
+- Within-CF serialization · A single column family can only have one flush and one compaction running at any time (enforced by atomic `isFlushing` and `isCompacting` flags)
+- No intra-CF memtable parallelism · Even if a CF has multiple immutable memtables queued, they are flushed sequentially
+
+**Thread pool sizing guidance**
+- Single column family · Set `numFlushThreads = 1` and `numCompactionThreads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time
+- Multiple column families · Set thread counts up to the number of column families for maximum parallelism. With N column families and M workers (where M ≤ N), throughput scales linearly
+
+**Configuration**
+```cpp
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.numFlushThreads = 2;                    // Flush thread pool size (default: 2)
+config.numCompactionThreads = 2;               // Compaction thread pool size (default: 2)
+config.blockCacheSize = 64 * 1024 * 1024;      // 64MB global block cache (default: 64MB)
+config.maxOpenSSTables = 256;                   // LRU cache for SSTable objects (default: 256, each has 2 FDs)
+
+tidesdb::TidesDB db(config);
+```
+
+`maxOpenSSTables` is a **storage-engine-level** configuration, not a column family configuration. It controls the LRU cache size for SSTable structures. Each SSTable uses 2 file descriptors (klog + vlog), so 256 SSTables = 512 file descriptors.
 
 ## Testing
 

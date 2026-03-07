@@ -72,8 +72,9 @@ func main() {
         LogLevel:             tidesdb.LogInfo,
         BlockCacheSize:       64 * 1024 * 1024, 
         MaxOpenSSTables:      256,
-        LogToFile:            false,              // Write logs to file instead of stderr
-        LogTruncationAt:      24 * 1024 * 1024,   // Log file truncation size (24MB default)
+        MaxMemoryUsage:       0,                   // Global memory limit in bytes (0 = auto, 80% of system RAM)
+        LogToFile:            false,               // Write logs to file instead of stderr
+        LogTruncationAt:      24 * 1024 * 1024,    // Log file truncation size (24MB default)
     }
     
     db, err := tidesdb.Open(config)
@@ -84,6 +85,22 @@ func main() {
     
     fmt.Println("Database opened successfully")
 }
+```
+
+### Default Configuration
+
+Use `DefaultConfig()` to get a configuration with sensible defaults, then override specific fields as needed:
+
+```go
+config := tidesdb.DefaultConfig()
+config.DBPath = "./mydb"
+config.LogLevel = tidesdb.LogWarn  // Override: only warnings and errors
+
+db, err := tidesdb.Open(config)
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
 ```
 
 ### Backup
@@ -688,6 +705,34 @@ if costA < costB {
 - Adaptive prefetching · Decide how aggressively to prefetch based on range size
 - Monitoring · Track how data distribution changes across key ranges over time
 
+### Getting a Comparator
+
+Retrieve a registered comparator by name. Returns whether the comparator is registered.
+
+```go
+found, err := db.GetComparator("memcmp")
+if err != nil {
+    log.Fatal(err)
+}
+
+if found {
+    fmt.Println("Comparator 'memcmp' is registered")
+}
+```
+
+**Built-in comparators** (automatically registered on database open):
+- `"memcmp"` · Binary byte-by-byte comparison (default)
+- `"lexicographic"` · Null-terminated string comparison
+- `"uint64"` · Unsigned 64-bit integer comparison
+- `"int64"` · Signed 64-bit integer comparison
+- `"reverse"` · Reverse binary comparison
+- `"case_insensitive"` · Case-insensitive ASCII comparison
+
+**Use cases**
+- Validation · Check if a comparator is registered before creating a column family
+- Debugging · Verify comparator registration during development
+- Dynamic configuration · Query available comparators at runtime
+
 ### Listing Column Families
 
 ```go
@@ -1254,4 +1299,19 @@ go test -v -run TestDeleteColumnFamily
 go test -v -run TestCommitHook
 go test -v -run TestCommitHookReplace
 go test -v -run TestCommitHookClear
+
+# Run backup test
+go test -v -run TestBackup
+
+# Run rename column family test
+go test -v -run TestRenameColumnFamily
+
+# Run update runtime config test
+go test -v -run TestUpdateRuntimeConfig
+
+# Run flush/compaction status test
+go test -v -run TestIsFlushingIsCompacting
+
+# Run get comparator test
+go test -v -run TestGetComparator
 ```
