@@ -389,6 +389,26 @@ Or run tests directly
 ./build/tidesdb_tests
 ```
 
+### Running Individual Tests
+
+All test binaries support an optional filter argument to run only tests whose names contain a given substring. This works for every component test binary (`tidesdb_tests`, `block_manager_tests`, `skip_list_tests`, etc.).
+
+```bash
+# Run only checkpoint-related tests
+./build/tidesdb_tests checkpoint
+
+# Run only compaction tests
+./build/tidesdb_tests compaction
+
+# Run only bloom filter serialization tests
+./build/bloom_filter_tests serialize
+
+# Run a single test by exact name
+./build/tidesdb_tests test_purge_cf_basic
+```
+
+The filter uses substring matching — any test whose function name contains the filter string will run. Tests that don't match are skipped. The summary output shows passed, failed, and skipped counts along with the active filter.
+
 ## Consolidated Include
 
 After building, TidesDB creates a consolidated include directory in the build tree for easy consumption. This allows you to use:

@@ -610,6 +610,54 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 The B+tree stats (`btree_total_nodes`, `btree_max_height`, `btree_avg_height`) are only populated when `use_btree=1` in the column family configuration. These provide insight into the index structure overhead and lookup depth.
 :::
 
+### Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```c
+tidesdb_db_stats_t db_stats;
+if (tidesdb_get_db_stats(db, &db_stats) == 0)
+{
+    printf("Column families: %d\n", db_stats.num_column_families);
+    printf("Total memory: %" PRIu64 " bytes\n", db_stats.total_memory);
+    printf("Resolved memory limit: %zu bytes\n", db_stats.resolved_memory_limit);
+    printf("Memory pressure level: %d\n", db_stats.memory_pressure_level);
+    printf("Global sequence: %" PRIu64 "\n", db_stats.global_seq);
+    printf("Flush queue: %zu pending\n", db_stats.flush_queue_size);
+    printf("Compaction queue: %zu pending\n", db_stats.compaction_queue_size);
+    printf("Total SSTables: %d\n", db_stats.total_sstable_count);
+    printf("Total data size: %" PRIu64 " bytes\n", db_stats.total_data_size_bytes);
+    printf("Open SSTable handles: %d\n", db_stats.num_open_sstables);
+    printf("In-flight txn memory: %" PRId64 " bytes\n", db_stats.txn_memory_bytes);
+    printf("Immutable memtables: %d\n", db_stats.total_immutable_count);
+    printf("Memtable bytes: %" PRId64 "\n", db_stats.total_memtable_bytes);
+}
+```
+
+**Database statistics include**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `num_column_families` | `int` | Number of column families |
+| `total_memory` | `uint64_t` | System total memory |
+| `available_memory` | `uint64_t` | System available memory at open time |
+| `resolved_memory_limit` | `size_t` | Resolved memory limit (auto or configured) |
+| `memory_pressure_level` | `int` | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
+| `flush_pending_count` | `int` | Number of pending flush operations (queued + in-flight) |
+| `total_memtable_bytes` | `int64_t` | Total bytes in active memtables across all CFs |
+| `total_immutable_count` | `int` | Total immutable memtables across all CFs |
+| `total_sstable_count` | `int` | Total SSTables across all CFs and levels |
+| `total_data_size_bytes` | `uint64_t` | Total data size (klog + vlog) across all CFs |
+| `num_open_sstables` | `int` | Number of currently open SSTable file handles |
+| `global_seq` | `uint64_t` | Current global sequence number |
+| `txn_memory_bytes` | `int64_t` | Bytes held by in-flight transactions |
+| `compaction_queue_size` | `size_t` | Number of pending compaction tasks |
+| `flush_queue_size` | `size_t` | Number of pending flush tasks in queue |
+
+:::note[Stack Allocated]
+Unlike `tidesdb_get_stats` (which heap-allocates), `tidesdb_get_db_stats` fills a caller-provided struct on the stack. No free is needed.
+:::
+
 ### Block Cache Statistics
 
 Get statistics for the global block cache (shared across all column families).
@@ -645,7 +693,7 @@ if (tidesdb_get_cache_stats(db, &cache_stats) == 0)
 - `num_partitions` · Number of cache partitions (scales with CPU cores)
 
 :::note[Block Cache]
-The block cache is a database-level resource shared across all column families. It caches deserialized klog blocks to avoid repeated disk I/O and deserialization. Configure cache size via `config.block_cache_size` when opening the database. Set to 0 to disable caching.
+The block cache is a database-level resource shared across all column families. It caches raw klog block bytes (decompressed but not deserialized) to avoid repeated disk I/O. On cache hit, the block is deserialized on the fly. This yields much smaller cache entries compared to caching deserialized blocks, dramatically improving hit rates for a given cache size. Configure cache size via `config.block_cache_size` when opening the database. Set to 0 to disable caching.
 :::
 
 ### Range Cost Estimation
@@ -770,7 +818,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 Compression algorithm can be changed at runtime via `tidesdb_cf_update_runtime_config`, but the change only affects **new** SSTables. Existing SSTables retain their original compression and are decompressed correctly during reads. Compression is applied at the block level (both klog and vlog blocks).
 :::
 - Decompression happens automatically during reads
-- Block cache stores **decompressed** blocks to avoid repeated decompression overhead
+- Block cache stores **raw bytes** (decompressed but not deserialized) to maximize cache capacity and hit rates
 - Different column families can use different compression algorithms
 
 ### B+tree KLog Format (Optional)
@@ -1783,6 +1831,66 @@ if (tidesdb_compact(cf) != 0)
 - Multiple column families can compact in parallel up to the thread pool limit
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on compaction algorithms, merge strategies, and parallel compaction.
+
+### Purge Column Family
+
+`tidesdb_purge_cf` forces a synchronous flush and aggressive compaction for a single column family. Unlike `tidesdb_flush_memtable` and `tidesdb_compact` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+if (tidesdb_purge_cf(cf) != 0)
+{
+    fprintf(stderr, "Purge failed\n");
+    return -1;
+}
+/* All data is now flushed to SSTables and compacted */
+```
+
+**Behavior**
+1. Waits for any in-progress flush to complete
+2. Force-flushes the active memtable (even if below threshold)
+3. Waits for flush I/O to fully complete
+4. Waits for any in-progress compaction to complete
+5. Triggers synchronous compaction inline (bypasses the compaction queue)
+6. Waits for any queued compaction to drain
+
+**When to use**
+- Before backup or checkpoint · Ensure all data is on disk and compacted
+- After bulk deletes · Reclaim space immediately by compacting away tombstones
+- Manual maintenance · Force a clean state during a maintenance window
+- Pre-shutdown · Ensure all pending work is complete before closing
+
+**Return values**
+- `TDB_SUCCESS` on success
+- `TDB_ERR_INVALID_ARGS` if `cf` is NULL or has no associated database
+
+### Purge Database
+
+`tidesdb_purge` forces a synchronous flush and aggressive compaction for **all** column families, then drains both the global flush and compaction queues.
+
+```c
+if (tidesdb_purge(db) != 0)
+{
+    fprintf(stderr, "Database purge failed\n");
+}
+/* All CFs flushed and compacted, all queues drained */
+```
+
+**Behavior**
+1. Calls `tidesdb_purge_cf` on each column family
+2. Drains the global flush queue (waits for queue size and pending count to reach 0)
+3. Drains the global compaction queue (waits for queue size to reach 0)
+
+**Return values**
+- `TDB_SUCCESS` if all column families purged successfully
+- First non-zero error code if any CF fails (continues processing remaining CFs)
+- `TDB_ERR_INVALID_ARGS` if `db` is NULL
+
+:::tip[Purge vs Manual Flush + Compact]
+`tidesdb_flush_memtable` and `tidesdb_compact` are non-blocking — they enqueue work and return immediately. `tidesdb_purge_cf` and `tidesdb_purge` are synchronous — they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
 
 ## Thread Pools
 
