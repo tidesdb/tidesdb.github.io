@@ -171,11 +171,11 @@ Read Committed · performs no validation. Each read refreshes its snapshot to se
 
 Repeatable Read · detects if any read key changed between read and commit time. The transaction tracks each key it reads along with the sequence number of the version it saw. At commit, it checks whether a newer version exists.
 
-Snapshot Isolation · additionally checks for write-write conflicts. If another transaction committed a write to the same key after this transaction's snapshot time, the commit aborts.
+Snapshot Isolation · uses first-committer-wins semantics with write-write conflict detection only. No read set is tracked. If another transaction committed a write to the same key after this transaction's snapshot time, the commit aborts. Write skew anomalies (two transactions read overlapping data and write disjoint sets) are explicitly allowed — this matches standard database theory where snapshot isolation requires only write-write conflict detection.
 
-Serializable · implements serializable snapshot isolation (SSI). The system tracks read-write conflicts:
+Serializable · implements serializable snapshot isolation (SSI). In addition to the write-write conflict detection from snapshot isolation, the system tracks read-write conflicts:
 
-1. Each transaction maintains a read set (arrays of CF pointers, keys, key sizes, sequence numbers)
+1. Each transaction maintains a read set (arrays of CF pointers, keys, key sizes, sequence numbers) — only REPEATABLE_READ and SERIALIZABLE allocate read sets
 2. Creates a hash table (`tidesdb_read_set_hash_t`) using xxHash for O(1) conflict detection when the read set exceeds `TDB_TXN_READ_HASH_THRESHOLD` (64 reads)
 3. At commit, checks all concurrent transactions: if transaction T reads key K that another transaction T' writes, sets `T.has_rw_conflict_out = 1` and `T'.has_rw_conflict_in = 1`
 4. If both flags are set (transaction is a pivot in dangerous structure), aborts

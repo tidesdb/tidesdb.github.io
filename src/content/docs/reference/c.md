@@ -64,7 +64,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_IO` | `-4` | I/O operation failed (file read/write error) |
 | `TDB_ERR_CORRUPTION` | `-5` | Data corruption detected (checksum failure, invalid format version, truncated data) |
 | `TDB_ERR_EXISTS` | `-6` | Resource already exists (e.g., column family name collision) |
-| `TDB_ERR_CONFLICT` | `-7` | Transaction conflict detected (write-write or read-write conflict in SERIALIZABLE/SNAPSHOT isolation) |
+| `TDB_ERR_CONFLICT` | `-7` | Transaction conflict detected (write-write conflict in SNAPSHOT, read-write + write-write in REPEATABLE_READ, full SSI in SERIALIZABLE) |
 | `TDB_ERR_TOO_LARGE` | `-8` | Key or value size exceeds maximum allowed size |
 | `TDB_ERR_MEMORY_LIMIT` | `-9` | Operation would exceed memory limits (safety check to prevent OOM) |
 | `TDB_ERR_INVALID_DB` | `-10` | Database handle is invalid (e.g., after close) |
@@ -1243,7 +1243,7 @@ tidesdb_txn_free(txn);
 - Per-operation key/value data, arena buffers, hash tables, and savepoint children are freed
 - A fresh `txn_id` and `snapshot_seq` are assigned based on the new isolation level
 - The isolation level can be changed on each reset (e.g., `READ_COMMITTED` → `REPEATABLE_READ`)
-- If switching to an isolation level that requires read tracking (`REPEATABLE_READ` or higher), read set arrays are allocated automatically
+- If switching to an isolation level that requires read tracking (`REPEATABLE_READ` or `SERIALIZABLE`), read set arrays are allocated automatically
 - SERIALIZABLE transactions are correctly unregistered from and re-registered to the active transaction list
 
 **When to use**
@@ -1378,8 +1378,8 @@ tidesdb_txn_free(txn);
 - READ UNCOMMITTED · Maximum concurrency, minimal consistency
 - READ COMMITTED · Balanced for OLTP workloads (default)
 - REPEATABLE READ · Strong point read consistency
-- SNAPSHOT · Prevents lost updates with write-write conflict detection
-- SERIALIZABLE · Strongest guarantees with full SSI, higher abort rates
+- SNAPSHOT · First-committer-wins with write-write conflict detection only (allows write skew)
+- SERIALIZABLE · Strongest guarantees with full SSI (read-write + write-write + dangerous structure detection), higher abort rates
 
 ## Iterators
 
@@ -1718,6 +1718,48 @@ cf_config.sync_interval_us = 128000;
 cf_config.sync_mode = TDB_SYNC_INTERVAL;
 cf_config.sync_interval_us = 1000000;
 ```
+
+### Manual WAL Sync
+
+`tidesdb_sync_wal` forces an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `TDB_SYNC_NONE` or `TDB_SYNC_INTERVAL` modes.
+
+```c
+int tidesdb_sync_wal(tidesdb_column_family_t *cf);
+```
+
+**Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `cf` | `tidesdb_column_family_t*` | Column family handle |
+
+**Returns**
+- `TDB_SUCCESS` on success
+- `TDB_ERR_INVALID_ARGS` if `cf` is NULL or has no associated database
+- `TDB_ERR_IO` if the fsync operation fails
+
+**Example**
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+/* Force WAL durability after a batch of writes */
+if (tidesdb_sync_wal(cf) != 0)
+{
+    fprintf(stderr, "WAL sync failed\n");
+}
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points (e.g., after a batch of related writes) when using `TDB_SYNC_NONE` or `TDB_SYNC_INTERVAL`
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `TDB_SYNC_FULL` for all writes
+
+**Behavior**
+- Acquires a reference to the active memtable to safely access its WAL
+- Calls `fdatasync` on the WAL file descriptor
+- Thread-safe — can be called concurrently from multiple threads
+- If the memtable rotates during the call, retries with the new active memtable
 
 :::tip[Structural Operations]
 Regardless of sync mode, TidesDB **always** enforces durability for structural operations:
