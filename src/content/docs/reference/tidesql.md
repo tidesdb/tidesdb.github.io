@@ -75,7 +75,7 @@ If you define a `PRIMARY KEY` on a table, TidesDB uses it as the physical orderi
 
 If you create a table without an explicit primary key, the engine generates a hidden 8-byte row ID for each row, encoded in big-endian. These hidden IDs are monotonically increasing, assigned from an atomic counter that is recovered on restart by seeking to the last key in the column family.
 
-Inside the column family, every row's key is prefixed with a single namespace byte (`0x01` for data rows, `0x00` for metadata). The value is stored in a packed binary format. A null bitmap is written first, followed by each non-null field serialized using MariaDB's `Field::pack()` method. Fixed-size fields like `INT` and `BIGINT` are stored at their native pack length. `CHAR` fields have trailing spaces stripped. `VARCHAR` fields store only the actual data length rather than padding to the declared maximum. `BLOB` and `TEXT` fields are inlined with a length prefix followed by the data bytes. This packed format is more compact than the raw record buffer and reduces I/O and storage costs, especially for tables with variable-length columns.
+Inside the column family, every row's key is prefixed with a single namespace byte (`0x01` for data rows, `0x00` for metadata). The value is stored in a packed binary format with a 5-byte header (see "How It Stores Data Internally" for details), followed by the null bitmap and each non-null field serialized using MariaDB's `Field::pack()` method. Fixed-size fields like `INT` and `BIGINT` are stored at their native pack length. `CHAR` fields have trailing spaces stripped. `VARCHAR` fields store only the actual data length rather than padding to the declared maximum. `BLOB` and `TEXT` fields are inlined with a length prefix followed by the data bytes. This packed format is more compact than the raw record buffer and reduces I/O and storage costs, especially for tables with variable-length columns.
 
 Composite primary keys are fully supported. Each key part is encoded in comparable format and concatenated, so a composite key like `(dept_id, emp_id)` sorts first by department, then by employee within each department. The optimizer can use prefix lookups on the leading columns of a composite PK (e.g., `WHERE dept_id = 3` on a `PRIMARY KEY (dept_id, emp_id)`) via an iterator-based prefix scan.
 
@@ -108,7 +108,7 @@ Secondary indexes are stored in their own column families, separate from the mai
 
 When you insert, update, or delete a row, the engine transactionally maintains all secondary indexes within the same transaction. For updates, the engine builds the old and new comparable index key for each secondary index and compares them with `memcmp`; if the indexed columns and PK bytes are identical, that index is skipped entirely, avoiding a redundant delete-then-reinsert round-trip into the library. This is a significant optimization for updates that only touch non-indexed columns. For deletes, the corresponding index entries are removed.
 
-Duplicate key violations on primary keys and unique indexes are properly detected. Inserting a row with a primary key that already exists returns the standard `ER_DUP_ENTRY` error. The same applies to unique secondary indexes. `REPLACE INTO` and `INSERT ... ON DUPLICATE KEY UPDATE` work correctly, the duplicate check is bypassed and the existing row is replaced or updated as expected.
+Duplicate key violations on primary keys and unique indexes are properly detected. Inserting a row with a primary key that already exists returns the standard `ER_DUP_ENTRY` error. The same applies to unique secondary indexes. `REPLACE INTO` and `INSERT ... ON DUPLICATE KEY UPDATE` work correctly: `write_row()` returns `HA_ERR_FOUND_DUPP_KEY` with the conflicting row's PK in `dup_ref`, so the server can perform the delete-then-reinsert (REPLACE) or switch to `update_row()` (IODKU), properly cleaning up old secondary index entries in the process.
 
 ```sql
 CREATE TABLE products (
@@ -128,7 +128,7 @@ The optimizer is aware of these indexes. The engine reports cost estimates based
 
 ### Index Condition Pushdown (ICP)
 
-The engine supports Index Condition Pushdown for secondary index scans. When the optimizer pushes a WHERE condition down to the storage engine, the engine evaluates it on the index key columns before performing the expensive primary key point-lookup into the data column family. Index entries that fail the condition are skipped without touching the data CF at all. This is the same pattern used by InnoDB -- the engine decodes the index key columns into the record buffer and calls MariaDB's `handler_index_cond_check()` evaluator. ICP is currently supported for indexes on integer column types (`TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT`) where the comparable key encoding is bijectively reversible. For indexes on string columns, the engine falls through to the standard PK-lookup path.
+The engine supports Index Condition Pushdown for secondary index scans. When the optimizer pushes a WHERE condition down to the storage engine, the engine evaluates it on the index key columns before performing the expensive primary key point-lookup into the data column family. Index entries that fail the condition are skipped without touching the data CF at all. This is the same pattern used by InnoDB -- the engine decodes the index key columns into the record buffer and calls MariaDB's `handler_index_cond_check()` evaluator. ICP is supported for indexes on integer types (`TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT`), temporal types (`DATE`, `DATETIME`, `TIMESTAMP`, `YEAR`), and fixed-length `CHAR`/`BINARY` columns with binary or latin1 charset. For indexes on multi-byte charset string columns (e.g., `utf8mb4`), the engine falls through to the standard PK-lookup path.
 
 
 ## Auto-Increment
@@ -153,15 +153,26 @@ SELECT * FROM tickets ORDER BY id;
 
 ## Transactions and Concurrency
 
-TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. For autocommit statements, the server calls the engine's commit callback after the statement completes, which flushes the transaction to storage and frees it. Inside a multi-statement transaction (`BEGIN ... COMMIT`), statement-level commits simply create a savepoint for potential rollback; the real commit happens when the server calls the commit callback with `all=true`. Read-only transactions are rolled back and freed at commit time so that the next transaction begins with a fresh read snapshot.
+TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. For autocommit statements, the server calls the engine's commit callback after the statement completes, which flushes the transaction to storage and frees it so that the next statement begins with a fresh read snapshot. Inside a multi-statement transaction (`BEGIN ... COMMIT`), statement-level commits simply create a savepoint for potential rollback; the real commit happens when the server calls the commit callback with `all=true`.
 
-Autocommit single-statement transactions are automatically downgraded to `READ_COMMITTED` isolation. At this level, the TidesDB library skips write-set and read-set conflict checks at commit time, which eliminates the `ER_ERROR_DURING_COMMIT` (ERROR 1180) errors that ORMs and applications cannot easily retry. A single autocommit statement has no multi-statement consistency window to protect, so `READ_COMMITTED` is safe and effectively conflict-free. Multi-statement transactions (`BEGIN ... COMMIT`) retain the table's configured isolation level so that application-level retry logic handles the (rare) OCC conflicts.
+The engine respects the session's isolation level set via `SET TRANSACTION ISOLATION LEVEL`. The mapping from MariaDB isolation levels to TidesDB isolation levels is:
+
+| MariaDB | TidesDB |
+|---------|---------|
+| `READ UNCOMMITTED` | `TDB_ISOLATION_READ_UNCOMMITTED` |
+| `READ COMMITTED` | `TDB_ISOLATION_READ_COMMITTED` |
+| `REPEATABLE READ` | `TDB_ISOLATION_SNAPSHOT` |
+| `SERIALIZABLE` | `TDB_ISOLATION_SERIALIZABLE` |
+
+MariaDB's `REPEATABLE READ` maps to TidesDB's `SNAPSHOT` isolation, which is the semantic equivalent of InnoDB's repeatable-read: consistent read snapshot with write-write conflict detection only, no read-set tracking. TidesDB's own `REPEATABLE_READ` level is stricter (tracks read-set, detects read-write conflicts at commit) and would cause excessive conflicts under normal OLTP concurrency. TidesDB's `SNAPSHOT` level (which has no SQL equivalent) can also be selected explicitly via the table option `ISOLATION_LEVEL='SNAPSHOT'`.
+
+DDL operations (`ALTER TABLE`, `CREATE INDEX`, `DROP INDEX`, `TRUNCATE`, `OPTIMIZE`) always use `READ_COMMITTED` regardless of the session setting, to avoid unbounded read-set growth during large table scans.
 
 TidesDB supports SQL savepoints (`SAVEPOINT`, `ROLLBACK TO SAVEPOINT`, `RELEASE SAVEPOINT`) inside explicit multi-statement transactions. Savepoints are only meaningful inside `BEGIN ... COMMIT` blocks.
 
 ### Consistent Snapshots
 
-The engine supports `START TRANSACTION WITH CONSISTENT SNAPSHOT`. This eagerly creates a TidesDB transaction with `REPEATABLE_READ` isolation and captures the snapshot sequence number immediately, rather than waiting until the first data access. Rows committed by other connections after the snapshot are invisible to the transaction. This is useful for cross-engine consistency when TidesDB and InnoDB tables coexist in the same transaction:
+The engine supports `START TRANSACTION WITH CONSISTENT SNAPSHOT`. This eagerly creates a TidesDB transaction using the session's isolation level and captures the snapshot sequence number immediately, rather than waiting until the first data access. Rows committed by other connections after the snapshot are invisible to the transaction. This is useful for cross-engine consistency when TidesDB and InnoDB tables coexist in the same transaction:
 
 ```sql
 SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
@@ -174,13 +185,9 @@ COMMIT;
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
 
-Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB — which detects deadlocks during row-level locking and never fails at commit — there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. In practice, the autocommit `READ_COMMITTED` downgrade means these conflicts only arise inside explicit `BEGIN ... COMMIT` blocks at `REPEATABLE_READ` or higher isolation.
+Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB — which detects deadlocks during row-level locking and never fails at commit — there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. Conflicts are most likely under concurrent writes to the same rows at `REPEATABLE_READ` or higher isolation. Enabling `tidesdb_print_all_conflicts` logs every conflict event to the error log for diagnostics (see System Variables).
 
-### Iterator Reuse
-
-Creating a new TidesDB iterator is expensive because it builds a merge heap from all active SSTables. The engine caches iterators across statements within a multi-statement transaction (`BEGIN ... COMMIT`). When a statement ends, the cached iterator is kept alive if the transaction is purely read-only (no writes in the entire transaction). The next statement that scans the same column family reuses the cached iterator with a cheap `seek()` instead of constructing a new merge heap. The iterator is invalidated when the transaction changes (detected via pointer comparison on `scan_iter_txn_`), when the column family changes, or when the transaction has performed any writes. Write transactions always free the iterator at statement end because the iterator's merge heap includes a snapshot of the transaction's write buffer (`MERGE_SOURCE_TXN_OPS`); when `COMMIT` frees the transaction, those pointers would dangle. This optimization eliminates the catastrophic cost of repeated iterator construction that would otherwise dominate latency in read-only transaction workloads.
-
-The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`. This level is used for multi-statement transactions; autocommit statements always run at `READ_COMMITTED` regardless of this setting:
+The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`:
 
 ```sql
 CREATE TABLE ledger (
@@ -263,6 +270,22 @@ CREATE TABLE btree_table (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB USE_BTREE=1;
 ```
 
 When `ANALYZE TABLE` is run on a B+tree-formatted table, the output includes additional statistics about the tree structure (node counts, heights).
+
+### Per-Index USE_BTREE
+
+The B+tree format can also be set on individual secondary indexes, overriding the table-level default. This allows mixing LSM and B+tree indexes on the same table:
+
+```sql
+CREATE TABLE mixed (
+  id INT NOT NULL PRIMARY KEY,
+  a  INT,
+  b  INT,
+  KEY idx_a (a) USE_BTREE=1,   -- B+tree index
+  KEY idx_b (b)                 -- inherits table default (LSM)
+) ENGINE=TIDESDB;
+```
+
+`SHOW KEYS` reflects the per-index type: `idx_a` shows `BTREE`, `idx_b` shows `LSM`. The per-index option is also honoured during `ALTER TABLE ... ADD INDEX ... USE_BTREE=1`.
 
 ### Block Indexes
 
@@ -493,11 +516,17 @@ The engine classifies `ALTER TABLE` operations into three tiers, each with diffe
 
 These require no engine work at all. MariaDB rewrites the `.frm` metadata file, and the change takes effect immediately:
 
+- Adding a column (`ADD COLUMN`)
+- Dropping a column (`DROP COLUMN`)
 - Renaming a column or index
 - Changing a column's default value
 - Changing table-level options (like `SYNC_MODE`)
 
+Adding or dropping columns is instant because the packed row format includes a self-describing header that records the null bitmap size and field count at write time. When reading old rows written before the schema change, the engine adapts automatically: added columns receive their `DEFAULT` value, and dropped columns are silently skipped.
+
 ```sql
+ALTER TABLE events ADD COLUMN priority INT NOT NULL DEFAULT 0, ALGORITHM=INSTANT;
+ALTER TABLE events DROP COLUMN priority, ALGORITHM=INSTANT;
 ALTER TABLE events ALTER COLUMN data SET DEFAULT 'none', ALGORITHM=INSTANT;
 ALTER TABLE events CHANGE kind event_kind VARCHAR(50), ALGORITHM=INSTANT;
 ALTER TABLE events SYNC_MODE='NONE', ALGORITHM=INSTANT;
@@ -519,11 +548,11 @@ For large tables, the index population is batched in groups of 10,000 rows per t
 
 ### Copy Operations
 
-Structural changes like adding or dropping columns, changing column types, or altering the primary key require a full table copy:
+Changing column types or altering the primary key require a full table copy:
 
 ```sql
-ALTER TABLE events ADD COLUMN priority INT DEFAULT 0;
-ALTER TABLE events DROP COLUMN priority;
+ALTER TABLE events MODIFY COLUMN data MEDIUMTEXT;
+ALTER TABLE events DROP PRIMARY KEY, ADD PRIMARY KEY (id, ts);
 ```
 
 The engine explicitly rejects `ALGORITHM=INPLACE` for these operations with a clear error message, so you will never accidentally trigger a slow copy when you expected an instant change.
@@ -555,6 +584,19 @@ MariaDB [demo]> ANALYZE TABLE products;
 The output includes the total number of keys, data size, memtable size, number of LSM levels, read amplification factor, cache hit rate, average key and value sizes, and per-level SSTable counts and sizes. For tables with secondary indexes, each index CF's statistics are reported separately.
 
 This information is useful for understanding the physical layout of your data and diagnosing performance characteristics.
+
+
+## SHOW ENGINE TIDESDB STATUS
+
+The engine supports `SHOW ENGINE TIDESDB STATUS`, which displays database-level statistics and block cache metrics:
+
+```sql
+SHOW ENGINE TIDESDB STATUS\G
+```
+
+The output includes the data directory path, number of column families, global sequence number, memory usage (total system memory, resolved memory limit, memory pressure level, memtable bytes, transaction memory bytes), storage metrics (total SSTables, open SSTable handles, total data size, immutable memtable count), background queue sizes (flush pending, flush queue, compaction queue), and block cache statistics (enabled, entries, size, hits, misses, hit rate, partitions).
+
+When `tidesdb_print_all_conflicts` is enabled, the last conflict event is also displayed under a Conflicts section.
 
 
 ## Online Backup
@@ -602,7 +644,9 @@ ALTER TABLE metrics DROP PARTITION p_2024;  -- removes all data in that range
 
 ## System Variables
 
-The engine exposes several global system variables that control TidesDB's runtime behavior. These are set at server startup and are read-only (except for `backup_dir` and `debug_trace`):
+The engine exposes several system variables that control TidesDB's runtime behavior:
+
+### Global Variables (read-only, set at startup)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -612,9 +656,33 @@ The engine exposes several global system variables that control TidesDB's runtim
 | `tidesdb_block_cache_size` | 256 MB | Size of the global block cache shared across all column families |
 | `tidesdb_max_open_sstables` | 256 | Maximum number of SSTable file handles cached in the LRU |
 | `tidesdb_max_memory_usage` | 0 (auto) | Global memory limit in bytes; 0 lets the library auto-detect (~80% system RAM) |
-| `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup |
-| `tidesdb_ttl` | 0 | Per-session TTL in seconds applied to INSERT/UPDATE; 0 means use the table-level default. Can be set with `SET SESSION` or `SET STATEMENT`. |
-| `tidesdb_debug_trace` | OFF | Enables per-operation trace logging to the error log |
+| `tidesdb_data_home_dir` | (empty) | Override the TidesDB data directory; defaults to `<mysql_datadir>/../tidesdb_data` |
+
+### Global Variables (dynamic)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup; clear with empty string |
+| `tidesdb_print_all_conflicts` | OFF | Log every `TDB_ERR_CONFLICT` event to the error log (similar to `innodb_print_all_deadlocks`). Last conflict info also shown in `SHOW ENGINE TIDESDB STATUS` |
+
+### Session Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `tidesdb_ttl` | 0 | Per-session TTL in seconds applied to INSERT/UPDATE; 0 means use the table-level default. Can be set with `SET SESSION` or `SET STATEMENT` |
+| `tidesdb_skip_unique_check` | OFF | Skip uniqueness checks on primary key and unique secondary indexes during INSERT. Only safe when the application guarantees no duplicates (e.g., bulk loads with monotonic PKs) |
+| `tidesdb_default_compression` | LZ4 | Default compression algorithm for new tables (NONE, SNAPPY, LZ4, ZSTD, LZ4_FAST) |
+| `tidesdb_default_write_buffer_size` | 32 MB | Default write buffer size for new tables |
+| `tidesdb_default_bloom_filter` | ON | Default bloom filter setting for new tables |
+| `tidesdb_default_use_btree` | OFF | Default USE_BTREE setting for new tables |
+| `tidesdb_default_block_indexes` | ON | Default block indexes setting for new tables |
+
+The `tidesdb_default_*` session variables provide defaults for table options. When `CREATE TABLE` does not explicitly set an option, the session default is used. This allows setting per-session or per-global defaults without repeating options in every `CREATE TABLE`:
+
+```sql
+SET SESSION tidesdb_default_compression = 'ZSTD';
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses ZSTD
+```
 
 The block cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use — only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families: data + one secondary index each). TidesDB logs to a `LOG` file in the data directory by default, with automatic truncation at 24 MB.
 
@@ -631,9 +699,9 @@ Row keys inside the column family use a namespace prefix byte. Data rows use `0x
 
 Primary key bytes are encoded in a memcmp-comparable format. For a signed 32-bit integer, the encoding flips the sign bit and stores the result in big-endian byte order. This means that the integer -1 sorts before 0, and 0 sorts before 1, all under a simple byte comparison. The same principle extends to all numeric types and string collations.
 
-Row values are stored in a packed binary format. The null bitmap from MariaDB's record header is written first, then each non-null field is serialized using `Field::pack()`. On read, `Field::unpack()` restores the fields into MariaDB's record buffer. This format is more compact than storing the raw `reclength` bytes, particularly for tables with `VARCHAR` or `CHAR` columns.
+Row values are stored in a packed binary format. Each row begins with a 5-byte header: a magic byte (`0xFE`), followed by the null bitmap size (2 bytes LE) and field count (2 bytes LE) at the time the row was written. This header enables instant `ADD COLUMN` and `DROP COLUMN` by letting the deserializer adapt to rows written with any prior schema. After the header, the null bitmap is written, then each non-null field is serialized using `Field::pack()`. On read, `Field::unpack()` restores the fields into MariaDB's record buffer. If a row was written with fewer fields than the current schema (column was added), the missing fields receive their `DEFAULT` value. If a row was written with more fields (column was dropped), the extra data is skipped. This format is more compact than storing the raw `reclength` bytes, particularly for tables with `VARCHAR` or `CHAR` columns.
 
-Secondary index entries are stored in their own column family. The key format is the concatenation of the comparable index-column bytes and the comparable primary key bytes. The value is a single zero byte (effectively empty); all the information lives in the key. To resolve a secondary index lookup, the engine seeks into the index CF, reads the key, splits off the trailing PK bytes, and performs a point-get into the data CF. When the server indicates that only indexed columns are needed (a covering index scan), the engine can decode integer primary key and index column values directly from the index key bytes, skipping the data CF point-get entirely.
+Secondary index entries are stored in their own column family. The key format is the concatenation of the comparable index-column bytes and the comparable primary key bytes. The value is a single zero byte (effectively empty); all the information lives in the key. To resolve a secondary index lookup, the engine seeks into the index CF, reads the key, splits off the trailing PK bytes, and performs a point-get into the data CF. When the server indicates that only indexed columns are needed (a covering index scan), the engine can decode primary key and index column values directly from the comparable-format index key bytes — integers, temporal types (DATE, DATETIME, TIMESTAMP, YEAR), and fixed-length CHAR/BINARY (binary/latin1) — skipping the data CF point-get entirely.
 
 For tables without an explicit primary key, the engine generates a hidden 8-byte big-endian row ID, assigned from an atomic counter. This counter is recovered on table open by seeking to the last key in the column family.
 
@@ -697,13 +765,11 @@ ALTER TABLE t1 ENGINE = TidesDB;
 SET FOREIGN_KEY_CHECKS = 1;
 ```
 
-Changing the primary key of a table requires a full copy rebuild. The engine does not support inplace primary key changes.
-
-Adding or dropping columns also requires a copy rebuild. Only secondary index operations and metadata changes can be done inplace or instantly.
+Changing the primary key of a table requires a full copy rebuild. The engine does not support inplace primary key changes. Changing a column's type (e.g., `INT` to `BIGINT`) also requires a copy rebuild.
 
 The statistics cache refreshes every two seconds, so immediately after a bulk load, the optimizer may briefly see stale row counts. Running `ANALYZE TABLE` forces an immediate refresh.
 
-Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail at commit time with `ER_ERROR_DURING_COMMIT` (ERROR 1180) due to optimistic concurrency control conflicts. Autocommit single-statement transactions are not affected because they run at `READ_COMMITTED`. Applications using explicit `BEGIN ... COMMIT` blocks should implement retry logic for this error.
+Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail at commit time with `ER_ERROR_DURING_COMMIT` (ERROR 1180) due to optimistic concurrency control conflicts. Applications using explicit `BEGIN ... COMMIT` blocks should implement retry logic for this error.
 
 --
 
