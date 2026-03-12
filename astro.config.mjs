@@ -303,6 +303,9 @@ export default defineConfig({
 				},
 				{
 					label: 'Partners', link: '/partners'
+				},
+				{
+					label: 'Support', link: '/support'
 				}
 			],
 		}),
