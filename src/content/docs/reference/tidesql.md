@@ -672,7 +672,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_log_level` | DEBUG | TidesDB internal log level (DEBUG, INFO, WARN, ERROR, FATAL, NONE) |
 | `tidesdb_block_cache_size` | 256 MB | Size of the global block cache shared across all column families |
 | `tidesdb_max_open_sstables` | 256 | Maximum number of SSTable file handles cached in the LRU |
-| `tidesdb_max_memory_usage` | 0 (auto) | Global memory limit in bytes; 0 lets the library auto-detect (~80% system RAM) |
+| `tidesdb_max_memory_usage` | 0 (auto) | Global memory limit in bytes; 0 lets the library auto-detect (50% of system RAM; minimum 5%) |
 | `tidesdb_data_home_dir` | (empty) | Override the TidesDB data directory; defaults to `<mysql_datadir>/../tidesdb_data` |
 | `tidesdb_log_to_file` | ON | Write TidesDB logs to a LOG file in the data directory instead of stderr |
 | `tidesdb_log_truncation_at` | 24 MB | Log file truncation size in bytes; 0 disables truncation |
@@ -691,17 +691,50 @@ The engine exposes several system variables that control TidesDB's runtime behav
 |----------|---------|-------------|
 | `tidesdb_ttl` | 0 | Per-session TTL in seconds applied to INSERT/UPDATE; 0 means use the table-level default. Can be set with `SET SESSION` or `SET STATEMENT` |
 | `tidesdb_skip_unique_check` | OFF | Skip uniqueness checks on primary key and unique secondary indexes during INSERT. Only safe when the application guarantees no duplicates (e.g., bulk loads with monotonic PKs) |
-| `tidesdb_default_compression` | LZ4 | Default compression algorithm for new tables (NONE, SNAPPY, LZ4, ZSTD, LZ4_FAST) |
-| `tidesdb_default_write_buffer_size` | 32 MB | Default write buffer size for new tables |
-| `tidesdb_default_bloom_filter` | ON | Default bloom filter setting for new tables |
-| `tidesdb_default_use_btree` | OFF | Default USE_BTREE setting for new tables |
-| `tidesdb_default_block_indexes` | ON | Default block indexes setting for new tables |
+| `tidesdb_default_compression` | LZ4 | Default compression algorithm (NONE, SNAPPY, LZ4, ZSTD, LZ4_FAST) |
+| `tidesdb_default_write_buffer_size` | 32 MB | Default write buffer size in bytes |
+| `tidesdb_default_bloom_filter` | ON | Default bloom filter setting |
+| `tidesdb_default_use_btree` | OFF | Default USE_BTREE setting (0=LSM, 1=B-tree) |
+| `tidesdb_default_block_indexes` | ON | Default block indexes setting |
+| `tidesdb_default_sync_mode` | FULL | Default sync mode (NONE, INTERVAL, FULL) |
+| `tidesdb_default_sync_interval_us` | 128000 | Default sync interval in microseconds (for INTERVAL mode) |
+| `tidesdb_default_bloom_fpr` | 100 | Default bloom FPR in parts per 10,000 (100 = 1%) |
+| `tidesdb_default_klog_value_threshold` | 512 | Default klog value threshold in bytes (values >= this go to vlog) |
+| `tidesdb_default_l0_queue_stall_threshold` | 4 | Default L0 queue stall threshold |
+| `tidesdb_default_l1_file_count_trigger` | 4 | Default L1 file count compaction trigger |
+| `tidesdb_default_level_size_ratio` | 10 | Default level size ratio |
+| `tidesdb_default_min_levels` | 5 | Default minimum LSM-tree levels |
+| `tidesdb_default_dividing_level_offset` | 2 | Default dividing level offset |
+| `tidesdb_default_skip_list_max_level` | 12 | Default skip list max level |
+| `tidesdb_default_skip_list_probability` | 25 | Default skip list probability (percentage; 25 = 0.25) |
+| `tidesdb_default_index_sample_ratio` | 1 | Default block index sample ratio |
+| `tidesdb_default_block_index_prefix_len` | 16 | Default block index prefix length |
+| `tidesdb_default_min_disk_space` | 100 MB | Default minimum disk space in bytes |
+| `tidesdb_default_isolation_level` | REPEATABLE_READ | Default isolation level |
 
-The `tidesdb_default_*` session variables provide defaults for table options. When `CREATE TABLE` does not explicitly set an option, the session default is used. This allows setting per-session or per-global defaults without repeating options in every `CREATE TABLE`:
+Every table option has a corresponding `tidesdb_default_*` session variable. When `CREATE TABLE` does not explicitly set an option, the session (or global) default is used. Table-level options in `CREATE TABLE` override the default. This design mirrors InnoDB's approach of having global defaults that individual tables can override, and makes it straightforward to configure all tables uniformly for benchmarking or deployment without repeating options in every DDL statement:
+
+```ini
+# my.cnf -- set defaults for all new TidesDB tables
+[mysqld]
+plugin-load-add=ha_tidesdb.so
+tidesdb_default_sync_mode=NONE
+tidesdb_default_compression=NONE
+tidesdb_default_bloom_fpr=10
+tidesdb_default_klog_value_threshold=1024
+tidesdb_default_l0_queue_stall_threshold=8
+```
 
 ```sql
-SET SESSION tidesdb_default_compression = 'ZSTD';
-CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses ZSTD
+-- All new tables inherit the global defaults
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=TIDESDB;
+
+-- Override a specific option for one table
+CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=TIDESDB COMPRESSION='ZSTD';
+
+-- Change defaults for the current session only
+SET SESSION tidesdb_default_sync_mode = 'FULL';
+CREATE TABLE t3 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses FULL
 ```
 
 The block cache is a read cache backed by two independent clock caches: one for raw klog block bytes (used by the default block-based SSTable format) and one for deserialized B+tree nodes (used by column families with `USE_BTREE=1`). Both caches share the configured `tidesdb_block_cache_size` budget. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use — only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families: data + one secondary index each). When `tidesdb_log_to_file` is enabled (the default), TidesDB writes to a `LOG` file in the data directory with automatic truncation controlled by `tidesdb_log_truncation_at` (default 24 MB, 0 to disable truncation). When disabled, logs are written to stderr.
