@@ -698,7 +698,7 @@ The block cache is a database-level resource shared across all column families. 
 
 ### Range Cost Estimation
 
-`tidesdb_range_cost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+`tidesdb_range_cost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
 
 ```c
 int tidesdb_range_cost(tidesdb_column_family_t *cf,
@@ -751,7 +751,7 @@ The function walks all SSTable levels and uses in-memory metadata to estimate ho
 - Merge overhead · Each overlapping SSTable adds a small fixed cost for merge-heap operations.
 - Memtable · The active memtable's entry count contributes a small in-memory cost.
 
-Key order does not matter — the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`.
+Key order does not matter - the function normalizes the range so `key_a > key_b` produces the same result as `key_b > key_a`.
 
 **Use cases**
 - Query planning · Compare candidate key ranges to find the cheapest one to scan
@@ -760,7 +760,7 @@ Key order does not matter — the function normalizes the range so `key_a > key_
 - Monitoring · Track how data distribution changes across key ranges over time
 
 :::note[Cost Values]
-The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `tidesdb_range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar - only meaningful when compared with other `tidesdb_range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
 ### Compression Algorithms
@@ -1036,11 +1036,11 @@ tidesdb_create_column_family(db, "replicated_cf", &cf_config);
 ```
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - the data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
-- Pointers in `tidesdb_commit_op_t` are valid only during the callback invocation — copy any data you need to retain
+- Pointers in `tidesdb_commit_op_t` are valid only during the callback invocation - copy any data you need to retain
 - The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
 - Setting the hook to `NULL` disables it immediately with no restart required
 
@@ -1052,7 +1052,7 @@ tidesdb_create_column_family(db, "replicated_cf", &cf_config);
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-The `commit_hook_fn` and `commit_hook_ctx` fields are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+The `commit_hook_fn` and `commit_hook_ctx` fields are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design - function pointers cannot be serialized.
 :::
 
 ## Transactions
@@ -1252,7 +1252,7 @@ tidesdb_txn_free(txn);
 - High-throughput ingestion · Reduce malloc/free overhead in tight write loops
 
 :::tip[Reset vs Free + Begin]
-For a single transaction, `tidesdb_txn_reset` is functionally equivalent to calling `tidesdb_txn_free` followed by `tidesdb_txn_begin_with_isolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+For a single transaction, `tidesdb_txn_reset` is functionally equivalent to calling `tidesdb_txn_free` followed by `tidesdb_txn_begin_with_isolation`. The difference is performance, reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
 :::
 
 ### Savepoints
@@ -1544,7 +1544,7 @@ This pattern works across both memtables and SSTables. When block indexes are en
 
 ## Custom Comparators
 
-TidesDB uses comparators to determine the sort order of keys throughout the entire system: memtables, SSTables, block indexes, and iterators all use the same comparison logic. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
+TidesDB uses comparators to determine the sort order of keys throughout the entire system, memtables, SSTables, block indexes, and iterators all use the same comparison logic. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
 
 ### Built-in Comparators
 
@@ -1700,7 +1700,7 @@ tidesdb_create_column_family(db, "my_cf", &cf_config);
 - **TDB_SYNC_FULL** · Fsync on every write operation (slowest, most durable)
     - Best for · Critical data requiring maximum durability
     - Use case · Financial transactions, audit logs, critical metadata
-    - Note: Structural operations always use fsync regardless of sync mode
+    - Structural operations always use fsync regardless of sync mode
       :::
 
 ### Sync Interval Examples
@@ -1758,7 +1758,7 @@ if (tidesdb_sync_wal(cf) != 0)
 **Behavior**
 - Acquires a reference to the active memtable to safely access its WAL
 - Calls `fdatasync` on the WAL file descriptor
-- Thread-safe — can be called concurrently from multiple threads
+- Thread-safe - can be called concurrently from multiple threads
 - If the memtable rotates during the call, retries with the new active memtable
 
 :::tip[Structural Operations]
@@ -1931,7 +1931,7 @@ if (tidesdb_purge(db) != 0)
 - `TDB_ERR_INVALID_ARGS` if `db` is NULL
 
 :::tip[Purge vs Manual Flush + Compact]
-`tidesdb_flush_memtable` and `tidesdb_compact` are non-blocking — they enqueue work and return immediately. `tidesdb_purge_cf` and `tidesdb_purge` are synchronous — they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+`tidesdb_flush_memtable` and `tidesdb_compact` are non-blocking - they enqueue work and return immediately. `tidesdb_purge_cf` and `tidesdb_purge` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
 
 ## Thread Pools

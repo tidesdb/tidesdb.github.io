@@ -303,6 +303,140 @@ Flush memtable to disk.
 flush <cf>
 ```
 
+### purge-cf
+Purge a single column family. Forces a synchronous flush and aggressive compaction, blocking until all I/O is complete.
+```
+purge-cf <name>
+```
+
+**Behavior**
+1. Waits for any in-progress flush to complete
+2. Force-flushes the active memtable (even if below threshold)
+3. Waits for flush I/O to fully complete
+4. Waits for any in-progress compaction to complete
+5. Triggers synchronous compaction inline (bypasses the compaction queue)
+6. Waits for any queued compaction to drain
+
+**Use cases**
+- Before backup or checkpoint to ensure all data is on disk and compacted
+- After bulk deletes to reclaim space immediately
+- Manual maintenance during a maintenance window
+- Pre-shutdown to ensure all pending work is complete
+
+**Example**
+```
+admintool(./mydb)> purge-cf users
+Purging column family 'users' (synchronous flush + compaction)...
+Purge completed for 'users'
+```
+
+### purge
+Purge all column families. Forces a synchronous flush and aggressive compaction for every column family, then drains both the global flush and compaction queues.
+```
+purge
+```
+
+**Behavior**
+- Calls `purge-cf` on each column family
+- Drains the global flush queue
+- Drains the global compaction queue
+
+**Example**
+```
+admintool(./mydb)> purge
+Purging all column families (synchronous flush + compaction)...
+Database purge completed.
+```
+
+### sync-wal
+Force an immediate fsync of the active write-ahead log for a column family. Useful for explicit durability control when using `TDB_SYNC_NONE` or `TDB_SYNC_INTERVAL` modes.
+```
+sync-wal <cf>
+```
+
+**Use cases**
+- Application-controlled durability at specific points
+- Pre-checkpoint to ensure all buffered WAL data is on disk
+- Graceful shutdown to flush WAL buffers
+- Force durability for specific high-value writes
+
+**Example**
+```
+admintool(./mydb)> sync-wal users
+WAL synced for 'users'
+```
+
+### checkpoint
+Create a lightweight, near-instant snapshot of the open database using hard links instead of copying SSTable data.
+```
+checkpoint <destination_path>
+```
+
+**Behavior**
+- Requires destination to be a non-existent or empty directory
+- Flushes active memtables so all data is in SSTables
+- Halts compactions to ensure a consistent view
+- Hard links all SSTable files (`.klog` and `.vlog`) into the checkpoint directory
+- Copies small metadata files (manifest, config)
+- Resumes compactions
+- Falls back to file copy if hard linking fails (e.g., cross-filesystem)
+
+**Checkpoint vs Backup**
+
+| | `backup` | `checkpoint` |
+|--|---|---|
+| Speed | Copies every SSTable byte-by-byte | Near-instant (hard links) |
+| Disk usage | Full independent copy | No extra disk until compaction removes old SSTables |
+| Portability | Can be moved to another filesystem or machine | Same filesystem only |
+| Use case | Archival, disaster recovery | Fast local snapshots, point-in-time reads |
+
+**Example**
+```
+admintool(./mydb)> checkpoint ./mydb_checkpoint
+Creating checkpoint at './mydb_checkpoint'...
+Checkpoint completed successfully.
+```
+
+### db-stats
+Show aggregate statistics across the entire database instance.
+```
+db-stats
+```
+
+**Output includes**
+- Column family count
+- System total and available memory
+- Resolved memory limit and memory pressure level (normal/elevated/high/critical)
+- Global sequence number
+- Flush queue size and pending count
+- Compaction queue size
+- Total SSTables, total data size
+- Open SSTable handles
+- In-flight transaction memory
+- Immutable memtable count and total memtable bytes
+
+**Example**
+```
+admintool(./mydb)> db-stats
+Database Statistics:
+  Path: ./mydb
+  Column Families: 2
+  Total Memory: 16777216000 bytes (16000.00 MB)
+  Available Memory: 8388608000 bytes (8000.00 MB)
+  Resolved Memory Limit: 8388608000 bytes (8000.00 MB)
+  Memory Pressure Level: 0 (normal)
+  Global Sequence: 1042
+  Flush Queue Size: 0
+  Flush Pending Count: 0
+  Compaction Queue Size: 0
+  Total SSTables: 5
+  Total Data Size: 1048576 bytes (1.00 MB)
+  Open SSTable Handles: 5
+  In-Flight Txn Memory: 0 bytes
+  Immutable Memtables: 0
+  Total Memtable Bytes: 2048
+```
+
 ## Interactive Mode
 
 When run without `-c`, admintool enters interactive mode with a prompt:

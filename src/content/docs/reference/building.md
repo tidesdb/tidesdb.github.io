@@ -407,7 +407,7 @@ All test binaries support an optional filter argument to run only tests whose na
 ./build/tidesdb_tests test_purge_cf_basic
 ```
 
-The filter uses substring matching — any test whose function name contains the filter string will run. Tests that don't match are skipped. The summary output shows passed, failed, and skipped counts along with the active filter.
+The filter uses substring matching - any test whose function name contains the filter string will run. Tests that don't match are skipped. The summary output shows passed, failed, and skipped counts along with the active filter.
 
 ## Consolidated Include
 

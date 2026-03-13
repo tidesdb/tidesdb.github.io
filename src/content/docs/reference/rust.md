@@ -448,7 +448,7 @@ fn main() -> tidesdb::Result<()> {
 - High-throughput ingestion · Reduce allocation overhead in tight write loops
 
 :::tip[Reset vs Drop + Begin]
-For a single transaction, `reset` is functionally equivalent to dropping the transaction and calling `begin_transaction_with_isolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+For a single transaction, `reset` is functionally equivalent to dropping the transaction and calling `begin_transaction_with_isolation`. The difference is performance, reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
 :::
 
 ### Iterating Over Data
@@ -665,6 +665,61 @@ fn main() -> tidesdb::Result<()> {
 }
 ```
 
+### Getting Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let stats = db.get_db_stats()?;
+
+    println!("Column families: {}", stats.num_column_families);
+    println!("Total memory: {} bytes", stats.total_memory);
+    println!("Resolved memory limit: {} bytes", stats.resolved_memory_limit);
+    println!("Memory pressure level: {}", stats.memory_pressure_level);
+    println!("Global sequence: {}", stats.global_seq);
+    println!("Flush queue: {} pending", stats.flush_queue_size);
+    println!("Compaction queue: {} pending", stats.compaction_queue_size);
+    println!("Total SSTables: {}", stats.total_sstable_count);
+    println!("Total data size: {} bytes", stats.total_data_size_bytes);
+    println!("Open SSTable handles: {}", stats.num_open_sstables);
+    println!("In-flight txn memory: {} bytes", stats.txn_memory_bytes);
+    println!("Immutable memtables: {}", stats.total_immutable_count);
+    println!("Memtable bytes: {}", stats.total_memtable_bytes);
+
+    Ok(())
+}
+```
+
+**Database statistics include**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `num_column_families` | `i32` | Number of column families |
+| `total_memory` | `u64` | System total memory |
+| `available_memory` | `u64` | System available memory at open time |
+| `resolved_memory_limit` | `usize` | Resolved memory limit (auto or configured) |
+| `memory_pressure_level` | `i32` | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
+| `flush_pending_count` | `i32` | Number of pending flush operations (queued + in-flight) |
+| `total_memtable_bytes` | `i64` | Total bytes in active memtables across all CFs |
+| `total_immutable_count` | `i32` | Total immutable memtables across all CFs |
+| `total_sstable_count` | `i32` | Total SSTables across all CFs and levels |
+| `total_data_size_bytes` | `u64` | Total data size (klog + vlog) across all CFs |
+| `num_open_sstables` | `i32` | Number of currently open SSTable file handles |
+| `global_seq` | `u64` | Current global sequence number |
+| `txn_memory_bytes` | `i64` | Bytes held by in-flight transactions |
+| `compaction_queue_size` | `usize` | Number of pending compaction tasks |
+| `flush_queue_size` | `usize` | Number of pending flush tasks in queue |
+
+:::note[Stack Allocated]
+Unlike `ColumnFamily::get_stats` (which heap-allocates), `get_db_stats` fills a struct on the stack. No manual free is needed.
+:::
+
 ### Range Cost Estimation
 
 Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other `range_cost` results. It uses only in-memory metadata and performs no disk I/O.
@@ -857,6 +912,116 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+#### Purge Column Family
+
+`purge` forces a synchronous flush and aggressive compaction for a single column family. Unlike `flush_memtable` and `compact` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let cf = db.get_column_family("my_cf")?;
+
+    // Force synchronous flush + compaction
+    cf.purge()?;
+    // All data is now flushed to SSTables and compacted
+
+    Ok(())
+}
+```
+
+**Behavior**
+1. Waits for any in-progress flush to complete
+2. Force-flushes the active memtable (even if below threshold)
+3. Waits for flush I/O to fully complete
+4. Waits for any in-progress compaction to complete
+5. Triggers synchronous compaction inline (bypasses the compaction queue)
+6. Waits for any queued compaction to drain
+
+**When to use**
+- Before backup or checkpoint -- ensure all data is on disk and compacted
+- After bulk deletes -- reclaim space immediately by compacting away tombstones
+- Manual maintenance -- force a clean state during a maintenance window
+- Pre-shutdown -- ensure all pending work is complete before closing
+
+#### Purge Database
+
+`purge` on the database forces a synchronous flush and aggressive compaction for **all** column families, then drains both the global flush and compaction queues.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("cf_a", ColumnFamilyConfig::default())?;
+    db.create_column_family("cf_b", ColumnFamilyConfig::default())?;
+
+    // Purge all column families
+    db.purge()?;
+    // All CFs flushed and compacted, all queues drained
+
+    Ok(())
+}
+```
+
+:::tip[Purge vs Manual Flush + Compact]
+`flush_memtable` and `compact` are non-blocking -- they enqueue work and return immediately. `ColumnFamily::purge` and `TidesDB::purge` are synchronous -- they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
+
+### Manual WAL Sync
+
+`sync_wal` forces an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `SyncMode::None` or `SyncMode::Interval` modes.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig, SyncMode};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+
+    let cf_config = ColumnFamilyConfig::new()
+        .sync_mode(SyncMode::None);
+    db.create_column_family("my_cf", cf_config)?;
+
+    let cf = db.get_column_family("my_cf")?;
+
+    // Write some data
+    let mut txn = db.begin_transaction()?;
+    txn.put(&cf, b"key1", b"value1", -1)?;
+    txn.put(&cf, b"key2", b"value2", -1)?;
+    txn.commit()?;
+
+    // Force WAL durability after the batch
+    cf.sync_wal()?;
+
+    Ok(())
+}
+```
+
+**When to use**
+- Application-controlled durability -- sync the WAL at specific points (e.g., after a batch of related writes) when using `SyncMode::None` or `SyncMode::Interval`
+- Pre-checkpoint -- ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown -- flush WAL buffers before closing the database
+- Critical writes -- force durability for specific high-value writes without using `SyncMode::Full` for all writes
+
+**Behavior**
+- Acquires a reference to the active memtable to safely access its WAL
+- Calls `fdatasync` on the WAL file descriptor
+- Thread-safe -- can be called concurrently from multiple threads
+- If the memtable rotates during the call, retries with the new active memtable
+
+:::tip[Structural Operations]
+Regardless of sync mode, TidesDB **always** enforces durability for structural operations:
+- Memtable flush to SSTable
+- SSTable compaction and merging
+- WAL rotation
+- Column family metadata updates
+
+This ensures the database structure remains consistent even if user data syncing is delayed.
+:::
 
 ### Database Backup
 
@@ -1145,7 +1310,7 @@ fn main() -> tidesdb::Result<()> {
 
 ### Custom Comparators
 
-A comparator defines the sort order of keys throughout the entire system: memtables, SSTables, block indexes, and iterators. TidesDB ships with six built-in comparators and supports registering custom ones.
+A comparator defines the sort order of keys throughout the entire system, memtables, SSTables, block indexes, and iterators. TidesDB ships with six built-in comparators and supports registering custom ones.
 
 **Built-in comparators:** `memcmp` (default), `lexicographic`, `uint64`, `int64`, `reverse`, `case_insensitive`
 

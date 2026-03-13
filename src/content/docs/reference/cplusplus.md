@@ -412,6 +412,48 @@ if (stats.config.has_value()) {
 - `btreeAvgHeight` · Average tree height across all SSTables (only if `useBtree=true`)
 - `config` · Column family configuration (optional)
 
+### Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```cpp
+auto dbStats = db.getDbStats();
+
+std::cout << "Column families: " << dbStats.numColumnFamilies << std::endl;
+std::cout << "Total memory: " << dbStats.totalMemory << " bytes" << std::endl;
+std::cout << "Available memory: " << dbStats.availableMemory << " bytes" << std::endl;
+std::cout << "Resolved memory limit: " << dbStats.resolvedMemoryLimit << " bytes" << std::endl;
+std::cout << "Memory pressure level: " << dbStats.memoryPressureLevel << std::endl;
+std::cout << "Global sequence: " << dbStats.globalSeq << std::endl;
+std::cout << "Flush queue: " << dbStats.flushQueueSize << " pending" << std::endl;
+std::cout << "Compaction queue: " << dbStats.compactionQueueSize << " pending" << std::endl;
+std::cout << "Total SSTables: " << dbStats.totalSstableCount << std::endl;
+std::cout << "Total data size: " << dbStats.totalDataSizeBytes << " bytes" << std::endl;
+std::cout << "Open SSTable handles: " << dbStats.numOpenSstables << std::endl;
+std::cout << "In-flight txn memory: " << dbStats.txnMemoryBytes << " bytes" << std::endl;
+std::cout << "Immutable memtables: " << dbStats.totalImmutableCount << std::endl;
+std::cout << "Memtable bytes: " << dbStats.totalMemtableBytes << std::endl;
+```
+
+**Database statistics fields**
+- `numColumnFamilies` · Number of column families
+- `totalMemory` · System total memory
+- `availableMemory` · System available memory at open time
+- `resolvedMemoryLimit` · Resolved memory limit (auto or configured)
+- `memoryPressureLevel` · Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical)
+- `flushPendingCount` · Number of pending flush operations (queued + in-flight)
+- `totalMemtableBytes` · Total bytes in active memtables across all CFs
+- `totalImmutableCount` · Total immutable memtables across all CFs
+- `totalSstableCount` · Total SSTables across all CFs and levels
+- `totalDataSizeBytes` · Total data size (klog + vlog) across all CFs
+- `numOpenSstables` · Number of currently open SSTable file handles
+- `globalSeq` · Current global sequence number
+- `txnMemoryBytes` · Bytes held by in-flight transactions
+- `compactionQueueSize` · Number of pending compaction tasks
+- `flushQueueSize` · Number of pending flush tasks in queue
+
+Unlike `getStats()` (which heap-allocates internally), `getDbStats()` fills a stack-allocated struct. No free is needed.
+
 ### Listing Column Families
 
 ```cpp
@@ -500,6 +542,49 @@ if (cf.isCompacting()) {
 - Graceful shutdown · Wait for background operations to complete before closing
 - Maintenance windows · Check if operations are running before triggering manual compaction
 - Monitoring · Track background operation status for observability
+
+#### Purge Column Family
+
+`purge()` forces a synchronous flush and aggressive compaction for a single column family. Unlike `flushMemtable()` and `compact()` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+cf.purge();
+// All data is now flushed to SSTables and compacted
+```
+
+**Behavior**
+1. Waits for any in-progress flush to complete
+2. Force-flushes the active memtable (even if below threshold)
+3. Waits for flush I/O to fully complete
+4. Waits for any in-progress compaction to complete
+5. Triggers synchronous compaction inline (bypasses the compaction queue)
+6. Waits for any queued compaction to drain
+
+**When to use**
+- Before backup or checkpoint · Ensure all data is on disk and compacted
+- After bulk deletes · Reclaim space immediately by compacting away tombstones
+- Manual maintenance · Force a clean state during a maintenance window
+- Pre-shutdown · Ensure all pending work is complete before closing
+
+#### Purge Database
+
+`purge()` on the database forces a synchronous flush and aggressive compaction for **all** column families, then drains both the global flush and compaction queues.
+
+```cpp
+db.purge();
+// All CFs flushed and compacted, all queues drained
+```
+
+**Behavior**
+1. Calls `purge()` on each column family
+2. Drains the global flush queue (waits for queue size and pending count to reach 0)
+3. Drains the global compaction queue (waits for queue size to reach 0)
+
+:::tip[Purge vs Manual Flush + Compact]
+`flushMemtable()` and `compact()` are non-blocking, they enqueue work and return immediately. `ColumnFamily::purge()` and `TidesDB::purge()` are synchronous, they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
 
 ### Updating Runtime Configuration
 
@@ -605,11 +690,11 @@ The callback returns `0` on success. A non-zero return is logged as a warning bu
 - `is_delete` · `1` for delete, `0` for put
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
-- Pointers in `tidesdb_commit_op_t` are valid only during the callback invocation — copy any data you need to retain
+- Pointers in `tidesdb_commit_op_t` are valid only during the callback invocation - copy any data you need to retain
 - The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
 - Setting the hook to `NULL` via `clearCommitHook()` disables it immediately with no restart required
 
@@ -620,7 +705,7 @@ The callback returns `0` on success. A non-zero return is logged as a warning bu
 - Audit logging · Record every mutation with key, value, TTL, and sequence number
 - Debugging · Attach a temporary hook in production to inspect live writes
 
-The `commitHookFn` and `commitHookCtx` config fields are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+The `commitHookFn` and `commitHookCtx` config fields are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design - function pointers cannot be serialized.
 
 ### Backup
 
@@ -701,7 +786,7 @@ if (cacheStats.enabled) {
 
 ### Range Cost Estimation
 
-Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
 
 ```cpp
 auto cf = db.getColumnFamily("my_cf");
@@ -714,7 +799,7 @@ if (costA < costB) {
 }
 ```
 
-**Key order does not matter** — the function normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
+Key order does not matter - the function normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
 
 **How it works**
 - With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to estimate block span
@@ -786,6 +871,29 @@ cfConfig.syncIntervalUs = 1000000;
 ```
 
 Regardless of sync mode, TidesDB **always** enforces durability for structural operations: memtable flush to SSTable, SSTable compaction and merging, WAL rotation, and column family metadata updates.
+
+### Manual WAL Sync
+
+`syncWal()` forces an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `SyncMode::None` or `SyncMode::Interval`.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+// Force WAL durability after a batch of writes
+cf.syncWal();
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points (e.g., after a batch of related writes) when using `SyncMode::None` or `SyncMode::Interval`
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `SyncMode::Full` for all writes
+
+**Behavior**
+- Acquires a reference to the active memtable to safely access its WAL
+- Calls `fdatasync` on the WAL file descriptor
+- Thread-safe -- can be called concurrently from multiple threads
+- If the memtable rotates during the call, retries with the new active memtable
 
 ### Compression Algorithms
 

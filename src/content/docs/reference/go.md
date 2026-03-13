@@ -666,9 +666,57 @@ if cacheStats.Enabled {
 | `HitRate` | `float64` | Hit rate as a decimal (0.0 to 1.0) |
 | `NumPartitions` | `uint64` | Number of cache partitions |
 
+### Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```go
+dbStats, err := db.GetDbStats()
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Column families: %d\n", dbStats.NumColumnFamilies)
+fmt.Printf("Total memory: %d bytes\n", dbStats.TotalMemory)
+fmt.Printf("Resolved memory limit: %d bytes\n", dbStats.ResolvedMemoryLimit)
+fmt.Printf("Memory pressure level: %d\n", dbStats.MemoryPressureLevel)
+fmt.Printf("Global sequence: %d\n", dbStats.GlobalSeq)
+fmt.Printf("Flush queue: %d pending\n", dbStats.FlushQueueSize)
+fmt.Printf("Compaction queue: %d pending\n", dbStats.CompactionQueueSize)
+fmt.Printf("Total SSTables: %d\n", dbStats.TotalSstableCount)
+fmt.Printf("Total data size: %d bytes\n", dbStats.TotalDataSizeBytes)
+fmt.Printf("Open SSTable handles: %d\n", dbStats.NumOpenSstables)
+fmt.Printf("In-flight txn memory: %d bytes\n", dbStats.TxnMemoryBytes)
+fmt.Printf("Immutable memtables: %d\n", dbStats.TotalImmutableCount)
+fmt.Printf("Memtable bytes: %d\n", dbStats.TotalMemtableBytes)
+```
+
+**DbStats Fields**
+| Field | Type | Description |
+|-------|------|-------------|
+| `NumColumnFamilies` | `int` | Number of column families |
+| `TotalMemory` | `uint64` | System total memory |
+| `AvailableMemory` | `uint64` | System available memory at open time |
+| `ResolvedMemoryLimit` | `uint64` | Resolved memory limit (auto or configured) |
+| `MemoryPressureLevel` | `int` | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
+| `FlushPendingCount` | `int` | Number of pending flush operations (queued + in-flight) |
+| `TotalMemtableBytes` | `int64` | Total bytes in active memtables across all CFs |
+| `TotalImmutableCount` | `int` | Total immutable memtables across all CFs |
+| `TotalSstableCount` | `int` | Total SSTables across all CFs and levels |
+| `TotalDataSizeBytes` | `uint64` | Total data size (klog + vlog) across all CFs |
+| `NumOpenSstables` | `int` | Number of currently open SSTable file handles |
+| `GlobalSeq` | `uint64` | Current global sequence number |
+| `TxnMemoryBytes` | `int64` | Bytes held by in-flight transactions |
+| `CompactionQueueSize` | `uint64` | Number of pending compaction tasks |
+| `FlushQueueSize` | `uint64` | Number of pending flush tasks in queue |
+
+:::note[Stack Allocated]
+Unlike `GetStats` (which heap-allocates), `GetDbStats` fills a caller-provided struct. No free is needed.
+:::
+
 ### Range Cost Estimation
 
-`RangeCost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+`RangeCost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
 
 ```go
 cf, err := db.GetColumnFamily("my_cf")
@@ -692,7 +740,7 @@ if costA < costB {
 ```
 
 **Behavior**
-- Key order does not matter — the function normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`
+- Key order does not matter - the function normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`
 - With block indexes enabled, uses O(log B) binary search per overlapping SSTable
 - Without block indexes, falls back to byte-level key interpolation
 - B+tree SSTables use key interpolation against tree node counts plus tree height as seek cost
@@ -800,6 +848,62 @@ if cf.IsCompacting() {
 }
 ```
 
+#### Purge Column Family
+
+`PurgeCF` forces a synchronous flush and aggressive compaction for a single column family. Unlike `FlushMemtable` and `Compact` (which are non-blocking), `PurgeCF` blocks until all flush and compaction I/O is complete.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+err = cf.PurgeCF()
+if err != nil {
+    log.Fatal(err)
+}
+// All data is now flushed to SSTables and compacted
+```
+
+**Behavior**
+1. Waits for any in-progress flush to complete
+2. Force-flushes the active memtable (even if below threshold)
+3. Waits for flush I/O to fully complete
+4. Waits for any in-progress compaction to complete
+5. Triggers synchronous compaction inline (bypasses the compaction queue)
+6. Waits for any queued compaction to drain
+
+**When to use**
+- Before backup or checkpoint · Ensure all data is on disk and compacted
+- After bulk deletes · Reclaim space immediately by compacting away tombstones
+- Manual maintenance · Force a clean state during a maintenance window
+- Pre-shutdown · Ensure all pending work is complete before closing
+
+#### Purge Database
+
+`Purge` forces a synchronous flush and aggressive compaction for **all** column families, then drains both the global flush and compaction queues.
+
+```go
+err := db.Purge()
+if err != nil {
+    log.Fatal(err)
+}
+// All CFs flushed and compacted, all queues drained
+```
+
+**Behavior**
+1. Calls `PurgeCF` on each column family
+2. Drains the global flush queue (waits for queue size and pending count to reach 0)
+3. Drains the global compaction queue (waits for queue size to reach 0)
+
+**Return values**
+- `nil` if all column families purged successfully
+- First non-nil error if any CF fails (continues processing remaining CFs)
+
+:::tip[Purge vs Manual Flush + Compact]
+`FlushMemtable` and `Compact` are non-blocking - they enqueue work and return immediately. `PurgeCF` and `Purge` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
+
 ### Updating Runtime Configuration
 
 Update runtime-safe configuration settings for a column family. Changes apply to new operations only.
@@ -878,11 +982,11 @@ if err != nil {
 | `IsDelete` | `bool` | `true` if this is a delete operation, `false` for put |
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - the data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commitSeq` is monotonically increasing across commits and can be used as a replication cursor
-- Data in `CommitOp` is copied from C memory — safe to retain after the callback returns
+- Data in `CommitOp` is copied from C memory - safe to retain after the callback returns
 - The hook executes synchronously on the committing goroutine; keep the callback fast to avoid stalling writers
 - Setting the hook to `nil` or calling `ClearCommitHook` disables it immediately with no restart required
 - Setting a new hook replaces any previously set hook for the same column family
@@ -895,7 +999,7 @@ if err != nil {
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-Commit hooks are not persisted across database restarts. After reopening the database, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+Commit hooks are not persisted across database restarts. After reopening the database, hooks must be re-registered by the application. This is by design - function pointers cannot be serialized.
 :::
 
 ### Sync Modes
@@ -920,6 +1024,39 @@ if err != nil {
     log.Fatal(err)
 }
 ```
+
+### Manual WAL Sync
+
+`SyncWal` forces an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `SyncNone` or `SyncInterval` modes.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Force WAL durability after a batch of writes
+err = cf.SyncWal()
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points (e.g., after a batch of related writes) when using `SyncNone` or `SyncInterval`
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `SyncFull` for all writes
+
+**Behavior**
+- Acquires a reference to the active memtable to safely access its WAL
+- Calls `fdatasync` on the WAL file descriptor
+- Thread-safe - can be called concurrently from multiple goroutines
+- If the memtable rotates during the call, retries with the new active memtable
+
+:::tip[Structural Operations]
+Regardless of sync mode, TidesDB **always** enforces durability for structural operations, memtable flush to SSTable, SSTable compaction and merging, WAL rotation, and column family metadata updates.
+:::
 
 ### Compression Algorithms
 
@@ -1206,7 +1343,7 @@ txn.Free()
 
 **Reset vs Free + BeginTxn**
 
-For a single transaction, `Reset` is functionally equivalent to calling `Free` followed by `BeginTxnWithIsolation`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+For a single transaction, `Reset` is functionally equivalent to calling `Free` followed by `BeginTxnWithIsolation`. The difference is performance, reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
 
 ## B+tree KLog Format
 
@@ -1314,4 +1451,16 @@ go test -v -run TestIsFlushingIsCompacting
 
 # Run get comparator test
 go test -v -run TestGetComparator
+
+# Run WAL sync test
+go test -v -run TestSyncWal
+
+# Run purge column family test
+go test -v -run TestPurgeCF
+
+# Run purge database test
+go test -v -run TestPurge
+
+# Run database-level stats test
+go test -v -run TestGetDbStats
 ```
