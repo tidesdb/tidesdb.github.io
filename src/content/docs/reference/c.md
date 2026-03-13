@@ -3,6 +3,8 @@ title: TidesDB C API Reference
 description: Complete C API reference for TidesDB
 ---
 
+<div class="no-print">
+
 If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/c.md).
 
 <hr/>
@@ -14,6 +16,8 @@ If you want to download the source of this document, you can find it [here](http
 <iframe style="height: 420px;!important" width="720" height="420px" src="https://www.youtube.com/embed/uDIygMZTcLI?si=Axt_HSCFk8w8AKWx" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 </details>
+
+</div>
 
 ## Overview
 

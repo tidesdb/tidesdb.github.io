@@ -3,9 +3,13 @@ title: TidesDB Engine for MariaDB Reference
 description: Official TidesDB pluggable storage engine for MariaDB (TideSQL) reference
 ---
 
+<div class="no-print">
+
 If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/tidesql.md).
 
 <hr/>
+
+</div>
 
 ## Overview
 

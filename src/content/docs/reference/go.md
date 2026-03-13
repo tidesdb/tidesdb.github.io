@@ -3,9 +3,13 @@ title: TidesDB GO API Reference
 description: GO API reference for TidesDB
 ---
 
+<div class="no-print">
+
 If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/go.md).
 
 <hr/>
+
+</div>
 
 ## Getting Started
 
