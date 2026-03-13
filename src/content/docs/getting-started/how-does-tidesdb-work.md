@@ -3,6 +3,8 @@ title: How does TidesDB work?
 description: A comprehensive design overview of TidesDB's architecture, core components, and operational mechanisms.
 ---
 
+<div class="no-print">
+
 If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/getting-started/how-does-tidesdb-work.md).
 
 <hr/>
@@ -13,6 +15,8 @@ If you want to download the source of this document, you can find it [here](http
 <iframe style="height: 420px;!important" width="720" height="420" src="https://www.youtube.com/embed/7HROlAaiGVQ?si=uPNih8INjLamlvNG" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 </details>
+
+</div>
 
 ## Introduction
 

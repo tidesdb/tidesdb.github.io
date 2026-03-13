@@ -3,9 +3,13 @@ title: TidesDB Kafka Streams Plugin Reference
 description: Official TidesDB state store plugin for Apache Kafka Streams reference
 ---
 
+<div class="no-print">
+
 If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/kafka.md).
 
 <hr/>
+
+</div>
 
 ## Overview
 

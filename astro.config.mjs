@@ -13,7 +13,7 @@ export default defineConfig({
 				'./src/styles/custom.css',
 			  ],
 			components: {
-				// Allow custom components to be used in content
+				PageTitle: './src/components/PageTitle.astro',
 			},
 			logo: {
 				light: './src/assets/tidesdb-logo-v8.svg',
