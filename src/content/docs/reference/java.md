@@ -35,7 +35,7 @@ sudo cmake --install build
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-java</artifactId>
-    <version>0.6.5</version>
+    <version>0.6.6</version>
 </dependency>
 ```
 
@@ -331,6 +331,48 @@ System.out.println("Total entries: " + cacheStats.getTotalEntries());
 System.out.println("Hit rate: " + cacheStats.getHitRate());
 ```
 
+### Getting Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```java
+DbStats dbStats = db.getDbStats();
+
+System.out.println("Column families: " + dbStats.getNumColumnFamilies());
+System.out.println("Total memory: " + dbStats.getTotalMemory() + " bytes");
+System.out.println("Resolved memory limit: " + dbStats.getResolvedMemoryLimit() + " bytes");
+System.out.println("Memory pressure level: " + dbStats.getMemoryPressureLevel());
+System.out.println("Global sequence: " + dbStats.getGlobalSeq());
+System.out.println("Flush queue: " + dbStats.getFlushQueueSize() + " pending");
+System.out.println("Compaction queue: " + dbStats.getCompactionQueueSize() + " pending");
+System.out.println("Total SSTables: " + dbStats.getTotalSstableCount());
+System.out.println("Total data size: " + dbStats.getTotalDataSizeBytes() + " bytes");
+System.out.println("Open SSTable handles: " + dbStats.getNumOpenSstables());
+System.out.println("In-flight txn memory: " + dbStats.getTxnMemoryBytes() + " bytes");
+System.out.println("Immutable memtables: " + dbStats.getTotalImmutableCount());
+System.out.println("Memtable bytes: " + dbStats.getTotalMemtableBytes());
+```
+
+**DbStats Fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `numColumnFamilies` | int | Number of column families |
+| `totalMemory` | long | System total memory |
+| `availableMemory` | long | System available memory at open time |
+| `resolvedMemoryLimit` | long | Resolved memory limit (auto or configured) |
+| `memoryPressureLevel` | int | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
+| `flushPendingCount` | int | Number of pending flush operations (queued + in-flight) |
+| `totalMemtableBytes` | long | Total bytes in active memtables across all CFs |
+| `totalImmutableCount` | int | Total immutable memtables across all CFs |
+| `totalSstableCount` | int | Total SSTables across all CFs and levels |
+| `totalDataSizeBytes` | long | Total data size (klog + vlog) across all CFs |
+| `numOpenSstables` | int | Number of currently open SSTable file handles |
+| `globalSeq` | long | Current global sequence number |
+| `txnMemoryBytes` | long | Bytes held by in-flight transactions |
+| `compactionQueueSize` | long | Number of pending compaction tasks |
+| `flushQueueSize` | long | Number of pending flush tasks in queue |
+
 ### Manual Compaction and Flush
 
 ```java
@@ -343,6 +385,50 @@ cf.flushMemtable();
 boolean flushing = cf.isFlushing();
 boolean compacting = cf.isCompacting();
 ```
+
+### Purge Column Family
+
+Forces a synchronous flush and aggressive compaction for a single column family. Unlike `compact()` and `flushMemtable()` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+cf.purge();
+// All data is now flushed to SSTables and compacted
+```
+
+**When to use**
+- Before backup or checkpoint · Ensure all data is on disk and compacted
+- After bulk deletes · Reclaim space immediately by compacting away tombstones
+- Manual maintenance · Force a clean state during a maintenance window
+- Pre-shutdown · Ensure all pending work is complete before closing
+
+### Purge Database
+
+Forces a synchronous flush and aggressive compaction for **all** column families, then drains both the global flush and compaction queues.
+
+```java
+db.purge();
+// All CFs flushed and compacted, all queues drained
+```
+
+:::tip[Purge vs Manual Flush + Compact]
+`flushMemtable()` and `compact()` are non-blocking — they enqueue work and return immediately. `purge()` is synchronous — it blocks until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
+
+### Manual WAL Sync
+
+Forces an immediate fsync of the active write-ahead log for a column family. Useful for explicit durability control when using `SYNC_NONE` or `SYNC_INTERVAL` modes.
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+cf.syncWal();
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points after a batch of writes
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `SYNC_FULL` for all writes
 
 ### Range Cost Estimation
 
