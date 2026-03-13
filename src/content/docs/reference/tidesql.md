@@ -187,6 +187,8 @@ The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own ta
 
 Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB — which detects deadlocks during row-level locking and never fails at commit — there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. Conflicts are most likely under concurrent writes to the same rows at `REPEATABLE_READ` or higher isolation. Enabling `tidesdb_print_all_conflicts` logs every conflict event to the error log for diagnostics (see System Variables).
 
+This is a fundamental architectural difference between the two engines. InnoDB uses pessimistic row-level locks that serialize access to hot rows — when two transactions want to update the same row, the second one waits until the first commits or rolls back. TidesDB uses optimistic MVCC — both transactions proceed concurrently without blocking each other, and the second one to commit fails with a conflict error. In other words, InnoDB makes concurrent writers wait; TidesDB makes them fail and retry. Neither approach is inherently better. Pessimistic locking guarantees forward progress but introduces lock waits and potential deadlocks. Optimistic MVCC eliminates all lock waits and deadlocks but requires applications to handle retries. Workloads with low contention (most rows are touched by at most one writer at a time) see virtually no conflicts and benefit from the absence of lock overhead. Workloads with high contention on a small number of hot rows (e.g., a single counter row updated by every transaction) will see higher conflict rates and depend on efficient retry logic.
+
 The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`:
 
 ```sql
@@ -514,13 +516,15 @@ The engine classifies `ALTER TABLE` operations into three tiers, each with diffe
 
 ### Instant Operations
 
-These require no engine work at all. MariaDB rewrites the `.frm` metadata file, and the change takes effect immediately:
+These complete instantly without rebuilding data. MariaDB rewrites the `.frm` metadata file, and the change takes effect immediately:
 
 - Adding a column (`ADD COLUMN`)
 - Dropping a column (`DROP COLUMN`)
 - Renaming a column or index
 - Changing a column's default value
-- Changing table-level options (like `SYNC_MODE`)
+- Changing table-level options (like `SYNC_MODE`, `COMPRESSION`, `BLOOM_FPR`, etc.)
+
+When table-level options are changed, the engine applies the new configuration to all live column families (data CF and secondary index CFs) via `tidesdb_cf_update_runtime_config()` with `persist_to_disk=1`. The changes take effect immediately for new operations (new SSTables, new memtables, WAL sync mode). Existing SSTables retain their original settings and are read correctly. Share-level cached options such as isolation level, TTL, and encryption settings are also updated in memory.
 
 Adding or dropping columns is instant because the packed row format includes a self-describing header that records the null bitmap size and field count at write time. When reading old rows written before the schema change, the engine adapts automatically: added columns receive their `DEFAULT` value, and dropped columns are silently skipped.
 
@@ -614,6 +618,19 @@ SET GLOBAL tidesdb_backup_dir = '';
 ```
 
 
+## Checkpoint
+
+TidesDB also supports lightweight checkpoints that use hard links instead of copying SSTable data. Checkpoints are near-instant and consume no additional disk space until compaction removes old SSTables from the live database.
+
+```sql
+SET GLOBAL tidesdb_checkpoint_dir = '/path/to/checkpoint';
+```
+
+The checkpoint directory must not already exist or must be empty. Unlike a full backup, checkpoints require the target to be on the same filesystem as the data directory (hard link requirement). The checkpoint can be opened as a normal TidesDB database.
+
+For archival or cross-filesystem copies, use `tidesdb_backup_dir` instead.
+
+
 ## Partitioning
 
 TidesDB tables can be partitioned using MariaDB's standard partitioning syntax. Each partition becomes a separate TidesDB table (and therefore a separate column family), which means compaction and flushes happen independently per partition.
@@ -657,12 +674,15 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_max_open_sstables` | 256 | Maximum number of SSTable file handles cached in the LRU |
 | `tidesdb_max_memory_usage` | 0 (auto) | Global memory limit in bytes; 0 lets the library auto-detect (~80% system RAM) |
 | `tidesdb_data_home_dir` | (empty) | Override the TidesDB data directory; defaults to `<mysql_datadir>/../tidesdb_data` |
+| `tidesdb_log_to_file` | ON | Write TidesDB logs to a LOG file in the data directory instead of stderr |
+| `tidesdb_log_truncation_at` | 24 MB | Log file truncation size in bytes; 0 disables truncation |
 
 ### Global Variables (dynamic)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup; clear with empty string |
+| `tidesdb_checkpoint_dir` | (empty) | Set to a path to trigger a hard-link checkpoint (near-instant, same filesystem only); clear with empty string |
 | `tidesdb_print_all_conflicts` | OFF | Log every `TDB_ERR_CONFLICT` event to the error log (similar to `innodb_print_all_deadlocks`). Last conflict info also shown in `SHOW ENGINE TIDESDB STATUS` |
 
 ### Session Variables
@@ -684,7 +704,7 @@ SET SESSION tidesdb_default_compression = 'ZSTD';
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses ZSTD
 ```
 
-The block cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use — only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families: data + one secondary index each). TidesDB logs to a `LOG` file in the data directory by default, with automatic truncation at 24 MB.
+The block cache is a read cache that holds decompressed SSTable klog blocks or nodes (if CF is configured with B+tree layout) in memory. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use — only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families: data + one secondary index each). When `tidesdb_log_to_file` is enabled (the default), TidesDB writes to a `LOG` file in the data directory with automatic truncation controlled by `tidesdb_log_truncation_at` (default 24 MB, 0 to disable truncation). When disabled, logs are written to stderr.
 
 The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets roughly 80% of it. In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. The per-table `WRITE_BUFFER_SIZE` (default 32 MB) and `L0_QUEUE_STALL_THRESHOLD` (default 4) together determine worst-case memtable memory per column family: `WRITE_BUFFER_SIZE × (1 + L0_QUEUE_STALL_THRESHOLD)`. With 8 tables (16 column families), the worst case is 16 × 32 MB × 5 = 2.5 GB.
 
@@ -731,7 +751,7 @@ The cost model accounts for the fact that LSM-tree reads may need to consult mul
 
 ## OPTIMIZE TABLE
 
-Running `OPTIMIZE TABLE` triggers compaction on all column families associated with the table, both the main data CF and every secondary index CF. Compaction merges SSTables, removes tombstones from deleted rows, and reduces read amplification. TidesDB enqueues the work to its background compaction threads and the statement returns immediately. After compaction, the cached statistics are invalidated so the optimizer sees the post-compaction state sooner.
+Running `OPTIMIZE TABLE` triggers a synchronous flush and compaction on all column families associated with the table, both the main data CF and every secondary index CF. The engine calls `tidesdb_purge_cf()` for each column family, which flushes the active memtable to disk and then runs a full compaction inline, blocking until complete. This means the table is fully compacted when the statement returns. After compaction, the cached statistics are invalidated so the optimizer sees the post-compaction state sooner.
 
 ```sql
 OPTIMIZE TABLE products;
