@@ -482,6 +482,49 @@ end
 - `btree_avg_height` · Average tree height across all SSTables (only if use_btree=true)
 - `config` · Column family configuration
 
+### Getting Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```lua
+local db_stats = db:get_db_stats()
+
+print(string.format("Column families: %d", db_stats.num_column_families))
+print(string.format("Total memory: %d bytes", db_stats.total_memory))
+print(string.format("Resolved memory limit: %d bytes", db_stats.resolved_memory_limit))
+print(string.format("Memory pressure level: %d", db_stats.memory_pressure_level))
+print(string.format("Global sequence: %d", db_stats.global_seq))
+print(string.format("Flush queue: %d pending", db_stats.flush_queue_size))
+print(string.format("Compaction queue: %d pending", db_stats.compaction_queue_size))
+print(string.format("Total SSTables: %d", db_stats.total_sstable_count))
+print(string.format("Total data size: %d bytes", db_stats.total_data_size_bytes))
+print(string.format("Open SSTable handles: %d", db_stats.num_open_sstables))
+print(string.format("In-flight txn memory: %d bytes", db_stats.txn_memory_bytes))
+print(string.format("Immutable memtables: %d", db_stats.total_immutable_count))
+print(string.format("Memtable bytes: %d", db_stats.total_memtable_bytes))
+```
+
+**Database statistics fields**
+- `num_column_families` · Number of column families
+- `total_memory` · System total memory
+- `available_memory` · System available memory at open time
+- `resolved_memory_limit` · Resolved memory limit (auto or configured)
+- `memory_pressure_level` · Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical)
+- `flush_pending_count` · Number of pending flush operations (queued + in-flight)
+- `total_memtable_bytes` · Total bytes in active memtables across all CFs
+- `total_immutable_count` · Total immutable memtables across all CFs
+- `total_sstable_count` · Total SSTables across all CFs and levels
+- `total_data_size_bytes` · Total data size (klog + vlog) across all CFs
+- `num_open_sstables` · Number of currently open SSTable file handles
+- `global_seq` · Current global sequence number
+- `txn_memory_bytes` · Bytes held by in-flight transactions
+- `compaction_queue_size` · Number of pending compaction tasks
+- `flush_queue_size` · Number of pending flush tasks in queue
+
+:::note[Stack Allocated]
+Unlike `cf:get_stats()` (which heap-allocates), `db:get_db_stats()` fills a caller-provided struct on the stack. No free is needed.
+:::
+
 ### Getting Block Cache Statistics
 
 Get statistics for the global block cache (shared across all column families).
@@ -504,7 +547,7 @@ end
 
 ### Range Cost Estimation
 
-Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same function. It uses only in-memory metadata and performs no disk I/O.
 
 ```lua
 local cf = db:get_column_family("my_cf")
@@ -522,7 +565,7 @@ end
 - Without block indexes · Falls back to byte-level key interpolation using the leading 8 bytes of each key
 - B+tree SSTables · Uses key interpolation against tree node counts, plus tree height as a seek cost
 - Compression · Compressed SSTables receive a 1.5× weight multiplier to account for decompression overhead
-- Key order does not matter — the function normalizes the range internally
+- Key order does not matter - the function normalizes the range internally
 
 **Use cases**
 - Query planning · Compare candidate key ranges to find the cheapest one to scan
@@ -531,7 +574,7 @@ end
 - Monitoring · Track how data distribution changes across key ranges over time
 
 :::note[Cost Values]
-The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `cf:range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar - only meaningful when compared with other `cf:range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
 ### Listing Column Families
@@ -598,6 +641,72 @@ print("Background operations completed")
 - Graceful shutdown · Wait for background operations to complete before closing
 - Maintenance windows · Check if operations are running before triggering manual compaction
 - Monitoring · Track background operation status for observability
+
+#### Purge Column Family
+
+`cf:purge()` forces a synchronous flush and aggressive compaction for a single column family. Unlike `cf:flush_memtable()` and `cf:compact()` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+cf:purge()
+-- All data is now flushed to SSTables and compacted
+```
+
+**Behavior**
+1. Waits for any in-progress flush to complete
+2. Force-flushes the active memtable (even if below threshold)
+3. Waits for flush I/O to fully complete
+4. Waits for any in-progress compaction to complete
+5. Triggers synchronous compaction inline (bypasses the compaction queue)
+6. Waits for any queued compaction to drain
+
+**When to use**
+- Before backup or checkpoint · Ensure all data is on disk and compacted
+- After bulk deletes · Reclaim space immediately by compacting away tombstones
+- Manual maintenance · Force a clean state during a maintenance window
+- Pre-shutdown · Ensure all pending work is complete before closing
+
+#### Purge Database
+
+`db:purge()` forces a synchronous flush and aggressive compaction for **all** column families, then drains both the global flush and compaction queues.
+
+```lua
+db:purge()
+-- All CFs flushed and compacted, all queues drained
+```
+
+**Behavior**
+1. Calls `cf:purge()` on each column family
+2. Drains the global flush queue (waits for queue size and pending count to reach 0)
+3. Drains the global compaction queue (waits for queue size to reach 0)
+
+:::tip[Purge vs Manual Flush + Compact]
+`cf:flush_memtable()` and `cf:compact()` are non-blocking - they enqueue work and return immediately. `cf:purge()` and `db:purge()` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
+
+### Manual WAL Sync
+
+`cf:sync_wal()` forces an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `SYNC_NONE` or `SYNC_INTERVAL` modes.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+-- Force WAL durability after a batch of writes
+cf:sync_wal()
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points (e.g., after a batch of related writes) when using `SYNC_NONE` or `SYNC_INTERVAL`
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `SYNC_FULL` for all writes
+
+**Behavior**
+- Acquires a reference to the active memtable to safely access its WAL
+- Calls `fdatasync` on the WAL file descriptor
+- Thread-safe - can be called concurrently from multiple threads
+- If the memtable rotates during the call, retries with the new active memtable
 
 ### Sync Modes
 
@@ -758,11 +867,11 @@ my_hook:free()
 - `ops[i].is_delete` · 1 for delete operations, 0 for puts
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
-- Pointers in the operation struct are valid only during the callback invocation — copy any data you need to retain
+- Pointers in the operation struct are valid only during the callback invocation - copy any data you need to retain
 - The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
 - Setting the hook to `nil` via `cf:clear_commit_hook()` disables it immediately
 
@@ -774,7 +883,7 @@ my_hook:free()
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-Commit hooks are not persisted. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+Commit hooks are not persisted. After a database restart, hooks must be re-registered by the application. This is by design - function pointers cannot be serialized.
 :::
 
 ### Configuration File Operations
@@ -1047,6 +1156,8 @@ lua test_tidesdb.lua
 | `db:begin_txn()` | Begin a transaction |
 | `db:begin_txn_with_isolation(level)` | Begin transaction with isolation level |
 | `db:get_cache_stats()` | Get block cache statistics |
+| `db:get_db_stats()` | Get database-level aggregate statistics |
+| `db:purge()` | Synchronous flush and compaction for all column families |
 | `db:backup(dir)` | Create database backup |
 | `db:checkpoint(dir)` | Create lightweight database checkpoint using hard links |
 | `db:register_comparator(name, fn, ctx_str, ctx)` | Register custom comparator |
@@ -1062,6 +1173,8 @@ lua test_tidesdb.lua
 | `cf:is_compacting()` | Check if compaction is in progress |
 | `cf:get_stats()` | Get column family statistics |
 | `cf:range_cost(key_a, key_b)` | Estimate range iteration cost between two keys |
+| `cf:sync_wal()` | Force immediate fsync of the active WAL |
+| `cf:purge()` | Synchronous flush and aggressive compaction |
 | `cf:set_commit_hook(fn, ctx)` | Set commit hook callback for change data capture |
 | `cf:clear_commit_hook()` | Clear (disable) the commit hook |
 | `cf:update_runtime_config(config, persist)` | Update runtime configuration |

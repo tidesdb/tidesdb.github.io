@@ -60,6 +60,53 @@ CREATE TABLE events (
 This creates a column family inside TidesDB for the table's data. If you later drop the table, the column family and all of its SSTables are removed as well.
 
 
+## Quick Install
+
+The repository includes `install.sh`, a cross-platform script that clones MariaDB, builds it with the TidesDB plugin, and sets up a ready-to-run server. It handles dependencies, submodules, and configuration automatically.
+
+```bash
+git clone https://github.com/tidesdb/tidesql.git
+cd tidesql
+./install.sh --mariadb-prefix ~/mariadb-tidesdb
+```
+
+The script accepts several options:
+
+| Option | Description |
+|--------|-------------|
+| `--mariadb-prefix <path>` | MariaDB installation directory (default: `/usr/local/mariadb-tidesdb`) |
+| `--tidesdb-prefix <path>` | TidesDB library installation directory (default: `/usr/local`) |
+| `--mariadb-version <tag>` | MariaDB version/branch to build (default: `mariadb-11.4.5`) |
+| `--tidesdb-version <tag>` | TidesDB library version/tag (default: `v0.5.1`) |
+| `--build-dir <path>` | Build directory (default: `./build`) |
+| `--jobs <n>` | Parallel build jobs (default: number of CPU cores) |
+| `--skip-deps` | Skip system dependency installation |
+| `--skip-tidesdb` | Skip building the TidesDB library (use if already installed) |
+| `--skip-engines <list>` | Comma-separated storage engines to exclude from the build |
+| `--list-engines` | List available storage engines and exit |
+| `--pgo` | Enable profile-guided optimization (longer build, faster binaries) |
+
+After installation, start the server:
+
+```bash
+~/mariadb-tidesdb/bin/mariadbd --defaults-file=~/mariadb-tidesdb/my.cnf &
+```
+
+Connect via socket (faster for local access):
+
+```bash
+~/mariadb-tidesdb/bin/mariadb -S /tmp/mariadb.sock
+```
+
+Or via TCP:
+
+```bash
+~/mariadb-tidesdb/bin/mariadb -h 127.0.0.1 -P 3306
+```
+
+The installer creates a `my.cnf` that loads the TidesDB plugin automatically. For user-owned prefixes, the server runs as your current user; for system prefixes, it runs as `mysql`.
+
+
 ## Tables and Column Families
 
 Every TidesDB table corresponds to one main column family that holds the row data. Each secondary index gets its own separate column family. The naming convention is rather deterministic, a table `test.events` maps to the column family `test__events`, and a secondary index named `idx_ts` on that table maps to `test__events__idx_idx_ts`.
@@ -108,7 +155,7 @@ Secondary indexes are stored in their own column families, separate from the mai
 
 When you insert, update, or delete a row, the engine transactionally maintains all secondary indexes within the same transaction. For updates, the engine builds the old and new comparable index key for each secondary index and compares them with `memcmp`; if the indexed columns and PK bytes are identical, that index is skipped entirely, avoiding a redundant delete-then-reinsert round-trip into the library. This is a significant optimization for updates that only touch non-indexed columns. For deletes, the corresponding index entries are removed.
 
-Duplicate key violations on primary keys and unique indexes are properly detected. Inserting a row with a primary key that already exists returns the standard `ER_DUP_ENTRY` error. The same applies to unique secondary indexes. `REPLACE INTO` and `INSERT ... ON DUPLICATE KEY UPDATE` work correctly: `write_row()` returns `HA_ERR_FOUND_DUPP_KEY` with the conflicting row's PK in `dup_ref`, so the server can perform the delete-then-reinsert (REPLACE) or switch to `update_row()` (IODKU), properly cleaning up old secondary index entries in the process.
+Duplicate key violations on primary keys and unique indexes are properly detected. Inserting a row with a primary key that already exists returns the standard `ER_DUP_ENTRY` error. The same applies to unique secondary indexes. `REPLACE INTO` and `INSERT ... ON DUPLICATE KEY UPDATE` work correctly, `write_row()` returns `HA_ERR_FOUND_DUPP_KEY` with the conflicting row's PK in `dup_ref`, so the server can perform the delete-then-reinsert (REPLACE) or switch to `update_row()` (IODKU), properly cleaning up old secondary index entries in the process.
 
 ```sql
 CREATE TABLE products (
@@ -133,7 +180,7 @@ The engine supports Index Condition Pushdown for secondary index scans. When the
 
 ## Auto-Increment
 
-Auto-increment works in a similar way to InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`. Rather than calling `index_last()` on every INSERT (which would create and destroy a TidesDB merge-heap iterator each time), the engine maintains an in-memory atomic counter on the shared table descriptor. The counter is seeded once at table open time by seeking to the last key in the primary key column family, and is atomically incremented via a CAS loop on each INSERT — making auto-increment assignment O(1). When a user inserts an explicit value larger than the current counter, `write_row()` bumps the counter to match.
+Auto-increment works in a similar way to InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`. Rather than calling `index_last()` on every INSERT (which would create and destroy a TidesDB merge-heap iterator each time), the engine maintains an in-memory atomic counter on the shared table descriptor. The counter is seeded once at table open time by seeking to the last key in the primary key column family, and is atomically incremented via a CAS loop on each INSERT - making auto-increment assignment O(1). When a user inserts an explicit value larger than the current counter, `write_row()` bumps the counter to match.
 
 ```sql
 CREATE TABLE tickets (
@@ -164,7 +211,7 @@ The engine respects the session's isolation level set via `SET TRANSACTION ISOLA
 | `REPEATABLE READ` | `TDB_ISOLATION_SNAPSHOT` |
 | `SERIALIZABLE` | `TDB_ISOLATION_SERIALIZABLE` |
 
-MariaDB's `REPEATABLE READ` maps to TidesDB's `SNAPSHOT` isolation, which is the semantic equivalent of InnoDB's repeatable-read: consistent read snapshot with write-write conflict detection only, no read-set tracking. TidesDB's own `REPEATABLE_READ` level is stricter (tracks read-set, detects read-write conflicts at commit) and would cause excessive conflicts under normal OLTP concurrency. TidesDB's `SNAPSHOT` level (which has no SQL equivalent) can also be selected explicitly via the table option `ISOLATION_LEVEL='SNAPSHOT'`.
+MariaDB's `REPEATABLE READ` maps to TidesDB's `SNAPSHOT` isolation, which is the semantic equivalent of InnoDB's repeatable-read, consistent read snapshot with write-write conflict detection only, no read-set tracking. TidesDB's own `REPEATABLE_READ` level is stricter (tracks read-set, detects read-write conflicts at commit) and would cause excessive conflicts under normal OLTP concurrency. TidesDB's `SNAPSHOT` level (which has no SQL equivalent) can also be selected explicitly via the table option `ISOLATION_LEVEL='SNAPSHOT'`.
 
 DDL operations (`ALTER TABLE`, `CREATE INDEX`, `DROP INDEX`, `TRUNCATE`, `OPTIMIZE`) always use `READ_COMMITTED` regardless of the session setting, to avoid unbounded read-set growth during large table scans.
 
@@ -185,9 +232,9 @@ COMMIT;
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
 
-Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB — which detects deadlocks during row-level locking and never fails at commit — there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. Conflicts are most likely under concurrent writes to the same rows at `REPEATABLE_READ` or higher isolation. Enabling `tidesdb_print_all_conflicts` logs every conflict event to the error log for diagnostics (see System Variables).
+Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB - which detects deadlocks during row-level locking and never fails at commit - there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. Conflicts are most likely under concurrent writes to the same rows at `REPEATABLE_READ` or higher isolation. Enabling `tidesdb_print_all_conflicts` logs every conflict event to the error log for diagnostics (see System Variables).
 
-This is a fundamental architectural difference between the two engines. InnoDB uses pessimistic row-level locks that serialize access to hot rows — when two transactions want to update the same row, the second one waits until the first commits or rolls back. TidesDB uses optimistic MVCC — both transactions proceed concurrently without blocking each other, and the second one to commit fails with a conflict error. In other words, InnoDB makes concurrent writers wait; TidesDB makes them fail and retry. Neither approach is inherently better. Pessimistic locking guarantees forward progress but introduces lock waits and potential deadlocks. Optimistic MVCC eliminates all lock waits and deadlocks but requires applications to handle retries. Workloads with low contention (most rows are touched by at most one writer at a time) see virtually no conflicts and benefit from the absence of lock overhead. Workloads with high contention on a small number of hot rows (e.g., a single counter row updated by every transaction) will see higher conflict rates and depend on efficient retry logic.
+This is a fundamental architectural difference between the two engines. InnoDB uses pessimistic row-level locks that serialize access to hot rows - when two transactions want to update the same row, the second one waits until the first commits or rolls back. TidesDB uses optimistic MVCC - both transactions proceed concurrently without blocking each other, and the second one to commit fails with a conflict error. In other words, InnoDB makes concurrent writers wait; TidesDB makes them fail and retry. Neither approach is inherently better. Pessimistic locking guarantees forward progress but introduces lock waits and potential deadlocks. Optimistic MVCC eliminates all lock waits and deadlocks but requires applications to handle retries. Workloads with low contention (most rows are touched by at most one writer at a time) see virtually no conflicts and benefit from the absence of lock overhead. Workloads with high contention on a small number of hot rows (e.g., a single counter row updated by every transaction) will see higher conflict rates and depend on efficient retry logic.
 
 The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`:
 
@@ -287,7 +334,7 @@ CREATE TABLE mixed (
 ) ENGINE=TIDESDB;
 ```
 
-`SHOW KEYS` reflects the per-index type: `idx_a` shows `BTREE`, `idx_b` shows `LSM`. The per-index option is also honoured during `ALTER TABLE ... ADD INDEX ... USE_BTREE=1`.
+`SHOW KEYS` reflects the per-index type `idx_a` shows `BTREE`, `idx_b` shows `LSM`. The per-index option is also honoured during `ALTER TABLE ... ADD INDEX ... USE_BTREE=1`.
 
 ### Block Indexes
 
@@ -354,7 +401,7 @@ CREATE TABLE tuned (
   L0_QUEUE_STALL_THRESHOLD=8;
 ```
 
-`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 5). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 2). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies — full preemptive merge, dividing merge, and partitioned merge — that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 4). Note that the flush threshold is adaptive: under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`, with a hard cap of 16 immutable memtables regardless of the stall threshold.
+`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 5). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 2). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 4). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`, with a hard cap of 16 immutable memtables regardless of the stall threshold.
 
 ### Combining Multiple Options
 
@@ -430,7 +477,7 @@ The `SET STATEMENT` syntax can scope the TTL to a single statement:
 SET STATEMENT tidesdb_ttl = 60 FOR INSERT INTO events (id, data) VALUES (2, 'one-minute');
 ```
 
-The priority order is: per-row TTL column > session `tidesdb_ttl` > table-level `TTL` option > no expiration.
+The priority order is per-row TTL column > session `tidesdb_ttl` > table-level `TTL` option > no expiration.
 
 
 ## Data-at-Rest Encryption
@@ -526,7 +573,7 @@ These complete instantly without rebuilding data. MariaDB rewrites the `.frm` me
 
 When table-level options are changed, the engine applies the new configuration to all live column families (data CF and secondary index CFs) via `tidesdb_cf_update_runtime_config()` with `persist_to_disk=1`. The changes take effect immediately for new operations (new SSTables, new memtables, WAL sync mode). Existing SSTables retain their original settings and are read correctly. Share-level cached options such as isolation level, TTL, and encryption settings are also updated in memory.
 
-Adding or dropping columns is instant because the packed row format includes a self-describing header that records the null bitmap size and field count at write time. When reading old rows written before the schema change, the engine adapts automatically: added columns receive their `DEFAULT` value, and dropped columns are silently skipped.
+Adding or dropping columns is instant because the packed row format includes a self-describing header that records the null bitmap size and field count at write time. When reading old rows written before the schema change, the engine adapts automatically, added columns receive their `DEFAULT` value, and dropped columns are silently skipped.
 
 ```sql
 ALTER TABLE events ADD COLUMN priority INT NOT NULL DEFAULT 0, ALGORITHM=INSTANT;
@@ -649,7 +696,7 @@ PARTITION BY RANGE COLUMNS(ts) (
 );
 ```
 
-All partitioning schemes supported by MariaDB work with TidesDB: `HASH`, `KEY`, `RANGE`, `LIST`, and `RANGE COLUMNS`. Secondary indexes on partitioned tables also work correctly, with each partition maintaining its own index column family.
+All partitioning schemes supported by MariaDB work with TidesDB, `HASH`, `KEY`, `RANGE`, `LIST`, and `RANGE COLUMNS`. Secondary indexes on partitioned tables also work correctly, with each partition maintaining its own index column family.
 
 Partitions can be added and dropped with `ALTER TABLE`:
 
@@ -737,9 +784,9 @@ SET SESSION tidesdb_default_sync_mode = 'FULL';
 CREATE TABLE t3 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses FULL
 ```
 
-The block cache is a read cache backed by two independent clock caches: one for raw klog block bytes (used by the default block-based SSTable format) and one for deserialized B+tree nodes (used by column families with `USE_BTREE=1`). Both caches share the configured `tidesdb_block_cache_size` budget. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use — only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families: data + one secondary index each). When `tidesdb_log_to_file` is enabled (the default), TidesDB writes to a `LOG` file in the data directory with automatic truncation controlled by `tidesdb_log_truncation_at` (default 24 MB, 0 to disable truncation). When disabled, logs are written to stderr.
+The block cache is a read cache backed by two independent clock caches, one for raw klog block bytes (used by the default block-based SSTable format) and one for deserialized B+tree nodes (used by column families with `USE_BTREE=1`). Both caches share the configured `tidesdb_block_cache_size` budget. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use - only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families, data + one secondary index each). When `tidesdb_log_to_file` is enabled (the default), TidesDB writes to a `LOG` file in the data directory with automatic truncation controlled by `tidesdb_log_truncation_at` (default 24 MB, 0 to disable truncation). When disabled, logs are written to stderr.
 
-The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. The per-table `WRITE_BUFFER_SIZE` (default 32 MB) and `L0_QUEUE_STALL_THRESHOLD` (default 4) together determine worst-case memtable memory per column family: approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`, since the active memtable can grow to 150% of the write buffer size under idle conditions before flushing. A hard cap of 16 immutable memtables applies regardless of the stall threshold. With 8 tables (16 column families), the worst case is roughly 16 × (48 MB + 128 MB) = 2.8 GB.
+The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. The per-table `WRITE_BUFFER_SIZE` (default 32 MB) and `L0_QUEUE_STALL_THRESHOLD` (default 4) together determine worst-case memtable memory per column family, approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`, since the active memtable can grow to 150% of the write buffer size under idle conditions before flushing. A hard cap of 16 immutable memtables applies regardless of the stall threshold. With 8 tables (16 column families), the worst case is roughly 16 × (48 MB + 128 MB) = 2.8 GB.
 
 
 ## How It Stores Data Internally
@@ -752,9 +799,9 @@ Row keys inside the column family use a namespace prefix byte. Data rows use `0x
 
 Primary key bytes are encoded in a memcmp-comparable format. For a signed 32-bit integer, the encoding flips the sign bit and stores the result in big-endian byte order. This means that the integer -1 sorts before 0, and 0 sorts before 1, all under a simple byte comparison. The same principle extends to all numeric types and string collations.
 
-Row values are stored in a packed binary format. Each row begins with a 5-byte header: a magic byte (`0xFE`), followed by the null bitmap size (2 bytes LE) and field count (2 bytes LE) at the time the row was written. This header enables instant `ADD COLUMN` and `DROP COLUMN` by letting the deserializer adapt to rows written with any prior schema. After the header, the null bitmap is written, then each non-null field is serialized using `Field::pack()`. On read, `Field::unpack()` restores the fields into MariaDB's record buffer. If a row was written with fewer fields than the current schema (column was added), the missing fields receive their `DEFAULT` value. If a row was written with more fields (column was dropped), the extra data is skipped. This format is more compact than storing the raw `reclength` bytes, particularly for tables with `VARCHAR` or `CHAR` columns.
+Row values are stored in a packed binary format. Each row begins with a 5-byte header, a magic byte (`0xFE`), followed by the null bitmap size (2 bytes LE) and field count (2 bytes LE) at the time the row was written. This header enables instant `ADD COLUMN` and `DROP COLUMN` by letting the deserializer adapt to rows written with any prior schema. After the header, the null bitmap is written, then each non-null field is serialized using `Field::pack()`. On read, `Field::unpack()` restores the fields into MariaDB's record buffer. If a row was written with fewer fields than the current schema (column was added), the missing fields receive their `DEFAULT` value. If a row was written with more fields (column was dropped), the extra data is skipped. This format is more compact than storing the raw `reclength` bytes, particularly for tables with `VARCHAR` or `CHAR` columns.
 
-Secondary index entries are stored in their own column family. The key format is the concatenation of the comparable index-column bytes and the comparable primary key bytes. The value is a single zero byte (effectively empty); all the information lives in the key. To resolve a secondary index lookup, the engine seeks into the index CF, reads the key, splits off the trailing PK bytes, and performs a point-get into the data CF. When the server indicates that only indexed columns are needed (a covering index scan), the engine can decode primary key and index column values directly from the comparable-format index key bytes — integers, temporal types (DATE, DATETIME, TIMESTAMP, YEAR), and fixed-length CHAR/BINARY (binary/latin1) — skipping the data CF point-get entirely.
+Secondary index entries are stored in their own column family. The key format is the concatenation of the comparable index-column bytes and the comparable primary key bytes. The value is a single zero byte (effectively empty); all the information lives in the key. To resolve a secondary index lookup, the engine seeks into the index CF, reads the key, splits off the trailing PK bytes, and performs a point-get into the data CF. When the server indicates that only indexed columns are needed (a covering index scan), the engine can decode primary key and index column values directly from the comparable-format index key bytes - integers, temporal types (DATE, DATETIME, TIMESTAMP, YEAR), and fixed-length CHAR/BINARY (binary/latin1) - skipping the data CF point-get entirely.
 
 For tables without an explicit primary key, the engine generates a hidden 8-byte big-endian row ID, assigned from an atomic counter. This counter is recovered on table open by seeking to the last key in the column family.
 
@@ -763,7 +810,7 @@ For tables without an explicit primary key, the engine generates a hidden 8-byte
 
 The engine maintains cached statistics that are refreshed at most every two seconds. These statistics include the total number of keys, total data size, average key and value sizes, and the LSM-tree's read amplification factor. They are stored as atomic variables on the shared table descriptor and feed into MariaDB's cost-based optimizer through `info()`, `scan_time()`, `keyread_time()`, `rnd_pos_time()`, and `records_in_range()`.
 
-The cost model accounts for the fact that LSM-tree reads may need to consult multiple levels. The read amplification factor — obtained from `tidesdb_get_stats()` — scales the cost of point lookups and random-position reads. A higher read amplification nudges the optimizer toward sequential scans; when the data is well-compacted and the amplification is low, index lookups are cheap.
+The cost model accounts for the fact that LSM-tree reads may need to consult multiple levels. The read amplification factor - obtained from `tidesdb_get_stats()` - scales the cost of point lookups and random-position reads. A higher read amplification nudges the optimizer toward sequential scans; when the data is well-compacted and the amplification is low, index lookups are cheap.
 
 ### Cost Methods
 
@@ -777,9 +824,9 @@ The cost model accounts for the fact that LSM-tree reads may need to consult mul
 
 `records_in_range()` uses a two-path strategy:
 
-1. Equality detection · When both key bounds convert to identical comparable bytes (a point equality like `WHERE k = 5`), the engine returns the `rec_per_key` estimate directly. This avoids the `tidesdb_range_cost()` path, which is an I/O cost metric rather than a cardinality metric — for memtable-only data it cannot distinguish a point range from a full scan, so the proportional estimate would be meaningless.
+1. Equality detection · When both key bounds convert to identical comparable bytes (a point equality like `WHERE k = 5`), the engine returns the `rec_per_key` estimate directly. This avoids the `tidesdb_range_cost()` path, which is an I/O cost metric rather than a cardinality metric - for memtable-only data it cannot distinguish a point range from a full scan, so the proportional estimate would be meaningless.
 
-2. Range estimation · For range predicates the engine calls `tidesdb_range_cost()` for the requested key range and for the full key space, then returns `total_records × (range_cost / full_cost)`. The function examines in-memory metadata — block indexes, SSTable min/max keys, and entry counts — without any disk I/O. A narrow range returns a small estimate while a wide range returns a proportionally larger one, allowing the optimizer to make informed decisions about index selection and join ordering.
+2. Range estimation · For range predicates the engine calls `tidesdb_range_cost()` for the requested key range and for the full key space, then returns `total_records × (range_cost / full_cost)`. The function examines in-memory metadata - block indexes, SSTable min/max keys, and entry counts - without any disk I/O. A narrow range returns a small estimate while a wide range returns a proportionally larger one, allowing the optimizer to make informed decisions about index selection and join ordering.
 
 
 ## OPTIMIZE TABLE

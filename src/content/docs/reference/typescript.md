@@ -521,7 +521,7 @@ cf.updateRuntimeConfig({
 
 ### Range Cost Estimation
 
-Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
 
 ```typescript
 const cf = db.getColumnFamily('my_cf');
@@ -535,10 +535,10 @@ if (costA < costB) {
 ```
 
 **Parameters**
-- `keyA` · `Buffer` — First key (bound of range)
-- `keyB` · `Buffer` — Second key (bound of range)
+- `keyA` · `Buffer` · First key (bound of range)
+- `keyB` · `Buffer` · Second key (bound of range)
 
-**Returns** · `number` — Estimated traversal cost (higher = more expensive)
+Returns · `number` · Estimated traversal cost (higher = more expensive)
 
 **How it works**
 - With block indexes enabled · Uses O(log B) binary search per overlapping SSTable to estimate block count
@@ -548,7 +548,7 @@ if (costA < costB) {
 - Each overlapping SSTable adds a small fixed cost for merge-heap operations
 - The active memtable's entry count contributes a small in-memory cost
 
-Key order does not matter — the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
+Key order does not matter - the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
 
 **Use cases**
 - Query planning · Compare candidate key ranges to find the cheapest one to scan
@@ -557,7 +557,7 @@ Key order does not matter — the method normalizes the range so `keyA > keyB` p
 - Monitoring · Track how data distribution changes across key ranges over time
 
 :::note[Cost Values]
-The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `rangeCost` results. A cost of 0 means no overlapping SSTables or memtable entries were found for the range.
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar - only meaningful when compared with other `rangeCost` results. A cost of 0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
 ### Commit Hook (Change Data Capture)
@@ -592,16 +592,16 @@ cf.clearCommitHook();
 ```
 
 **Parameters** (`setCommitHook`)
-- `callback` · `CommitHookCallback` — Function invoked with `(ops, commitSeq)`. Return `0` on success; non-zero is logged as a warning but does not roll back the commit.
+- `callback` · `CommitHookCallback` - Function invoked with `(ops, commitSeq)`. Return `0` on success; non-zero is logged as a warning but does not roll back the commit.
 
 **CommitOp fields**
-- `key` · `Buffer` — Key data
-- `value` · `Buffer | null` — Value data (`null` for deletes)
-- `ttl` · `number` — Time-to-live (Unix timestamp, `-1` = no expiry)
-- `isDelete` · `boolean` — Whether this is a delete operation
+- `key` · `Buffer` - Key data
+- `value` · `Buffer | null` - Value data (`null` for deletes)
+- `ttl` · `number` - Time-to-live (Unix timestamp, `-1` = no expiry)
+- `isDelete` · `boolean` - Whether this is a delete operation
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - the data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commitSeq` is monotonically increasing across commits and can be used as a replication cursor
@@ -617,7 +617,87 @@ cf.clearCommitHook();
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-Commit hooks are not persisted. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+Commit hooks are not persisted. After a database restart, hooks must be re-registered by the application. This is by design - function pointers cannot be serialized.
+:::
+
+### Manual WAL Sync
+
+Force an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `SyncMode.None` or `SyncMode.Interval` modes.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+cf.syncWal();
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points (e.g., after a batch of related writes) when using `SyncMode.None` or `SyncMode.Interval`
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `SyncMode.Full` for all writes
+
+**Behavior**
+- Acquires a reference to the active memtable to safely access its WAL
+- Calls `fdatasync` on the WAL file descriptor
+- Thread-safe - can be called concurrently from multiple threads
+- If the memtable rotates during the call, retries with the new active memtable
+
+**Return values**
+- Throws `TidesDBError` with `ErrorCode.ErrInvalidArgs` if column family is invalid
+- Throws `TidesDBError` with `ErrorCode.ErrIO` if the fsync operation fails
+
+:::tip[Structural Operations]
+Regardless of sync mode, TidesDB **always** enforces durability for structural operations:
+- Memtable flush to SSTable
+- SSTable compaction and merging
+- WAL rotation
+- Column family metadata updates
+:::
+
+### Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```typescript
+const dbStats = db.getDbStats();
+
+console.log(`Column families: ${dbStats.numColumnFamilies}`);
+console.log(`Total memory: ${dbStats.totalMemory} bytes`);
+console.log(`Resolved memory limit: ${dbStats.resolvedMemoryLimit} bytes`);
+console.log(`Memory pressure level: ${dbStats.memoryPressureLevel}`);
+console.log(`Global sequence: ${dbStats.globalSeq}`);
+console.log(`Flush queue: ${dbStats.flushQueueSize} pending`);
+console.log(`Compaction queue: ${dbStats.compactionQueueSize} pending`);
+console.log(`Total SSTables: ${dbStats.totalSstableCount}`);
+console.log(`Total data size: ${dbStats.totalDataSizeBytes} bytes`);
+console.log(`Open SSTable handles: ${dbStats.numOpenSstables}`);
+console.log(`In-flight txn memory: ${dbStats.txnMemoryBytes} bytes`);
+console.log(`Immutable memtables: ${dbStats.totalImmutableCount}`);
+console.log(`Memtable bytes: ${dbStats.totalMemtableBytes}`);
+```
+
+**Database statistics include**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `numColumnFamilies` | `number` | Number of column families |
+| `totalMemory` | `number` | System total memory |
+| `availableMemory` | `number` | System available memory at open time |
+| `resolvedMemoryLimit` | `number` | Resolved memory limit (auto or configured) |
+| `memoryPressureLevel` | `number` | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
+| `flushPendingCount` | `number` | Number of pending flush operations (queued + in-flight) |
+| `totalMemtableBytes` | `number` | Total bytes in active memtables across all CFs |
+| `totalImmutableCount` | `number` | Total immutable memtables across all CFs |
+| `totalSstableCount` | `number` | Total SSTables across all CFs and levels |
+| `totalDataSizeBytes` | `number` | Total data size (klog + vlog) across all CFs |
+| `numOpenSstables` | `number` | Number of currently open SSTable file handles |
+| `globalSeq` | `number` | Current global sequence number |
+| `txnMemoryBytes` | `number` | Bytes held by in-flight transactions |
+| `compactionQueueSize` | `number` | Number of pending compaction tasks |
+| `flushQueueSize` | `number` | Number of pending flush tasks in queue |
+
+:::note[Stack Allocated]
+Unlike `cf.getStats()` (which heap-allocates), `db.getDbStats()` fills a caller-provided struct. No free is needed.
 :::
 
 ### Sync Modes
@@ -989,7 +1069,7 @@ txn.free();
 
 ## Custom Comparators
 
-TidesDB uses comparators to determine the sort order of keys throughout the entire system: memtables, SSTables, block indexes, and iterators all use the same comparison logic. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
+TidesDB uses comparators to determine the sort order of keys throughout the entire system, memtables, SSTables, block indexes, and iterators all use the same comparison logic. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
 
 ### Built-in Comparators
 
@@ -1064,6 +1144,7 @@ import {
   Config,
   ColumnFamilyConfig,
   Stats,
+  DbStats,
   CacheStats,
   
   // Enums

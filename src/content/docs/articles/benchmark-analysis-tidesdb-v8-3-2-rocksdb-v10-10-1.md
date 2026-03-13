@@ -89,7 +89,7 @@ With small 64-byte values (50M ops), TidesDB achieves 1.32M vs 757K ops/sec (1.7
 
 The most interesting and rather striking gap appears with large 4KB values (1M ops) where TidesDB reaches 276K vs 77K ops/sec (3.57x). 
 
-At large scale (16 threads), the pattern intensifies — 4KB values show TidesDB at 282K vs 76K (3.73x). The large-value advantage suggests TidesDB handles write amplification more efficiently when values are large, as confirmed by the write amplification metrics (1.05x vs 1.30x for 4KB values).
+At large scale (16 threads), the pattern intensifies - 4KB values show TidesDB at 282K vs 76K (3.73x). The large-value advantage suggests TidesDB handles write amplification more efficiently when values are large, as confirmed by the write amplification metrics (1.05x vs 1.30x for 4KB values).
 
 **Latency Overview**
 ![Latency Overview](/tidesdb-v8-3-2-rocksdb-10-10-1/08_latency_overview.png)
@@ -110,7 +110,7 @@ TidesDB maintains tighter latency distributions overall, though its coefficient 
 **Write Amplification**
 ![Write Amplification](/tidesdb-v8-3-2-rocksdb-10-10-1/10_write_amplification.png)
 
-Write amplification measures bytes written to disk divided by logical data written — lower is better for SSD longevity. TidesDB achieves near-ideal amplification, 1.13x for sequential writes, 1.09x for random, and 1.04x for zipfian at standard scale. 
+Write amplification measures bytes written to disk divided by logical data written - lower is better for SSD longevity. TidesDB achieves near-ideal amplification, 1.13x for sequential writes, 1.09x for random, and 1.04x for zipfian at standard scale. 
 
 RocksDB shows higher amplification at 1.48x, 1.34x, and 1.23x respectively. At large scale, the gap widens - sequential writes show 1.10x (TidesDB) vs 1.77x (RocksDB), and small-value writes show 1.27x vs 1.95x. 
 

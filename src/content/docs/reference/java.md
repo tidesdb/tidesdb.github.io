@@ -412,7 +412,7 @@ db.purge();
 ```
 
 :::tip[Purge vs Manual Flush + Compact]
-`flushMemtable()` and `compact()` are non-blocking — they enqueue work and return immediately. `purge()` is synchronous — it blocks until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+`flushMemtable()` and `compact()` are non-blocking - they enqueue work and return immediately. `purge()` is synchronous - it blocks until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
 
 ### Manual WAL Sync
@@ -432,7 +432,7 @@ cf.syncWal();
 
 ### Range Cost Estimation
 
-Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. Uses only in-memory metadata and performs no disk I/O.
+Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same method. Uses only in-memory metadata and performs no disk I/O.
 
 ```java
 ColumnFamily cf = db.getColumnFamily("my_cf");
@@ -445,7 +445,7 @@ if (costA < costB) {
 }
 ```
 
-Key order does not matter — the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+Key order does not matter - the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 
 **Use cases**
 - Query planning · Compare candidate key ranges to find the cheapest one to scan
@@ -517,11 +517,11 @@ The `CommitHook` functional interface receives a `CommitOp[]` array and a monoto
 - `isDelete()` · True if this is a delete operation
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking — data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking - data is fully durable before the callback runs
 - Hook failure (non-zero return) is logged but does not roll back the commit
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commitSeq` is monotonically increasing and can be used as a replication cursor
-- The hook executes synchronously on the committing thread — keep the callback fast to avoid stalling writers
+- The hook executes synchronously on the committing thread - keep the callback fast to avoid stalling writers
 - Hooks are runtime-only and not persisted. After a database restart, hooks must be re-registered by the application
 
 **Use cases**
@@ -609,7 +609,7 @@ db.checkpoint("./mydb_checkpoint");
 
 **Behavior**
 - Requires the directory to be non-existent or empty
-- For each column family: flushes the active memtable, halts compactions, hard links all SSTable files, copies small metadata files, then resumes compactions
+- For each column family, flushes the active memtable, halts compactions, hard links all SSTable files, copies small metadata files, then resumes compactions
 - Falls back to file copy if hard linking fails (e.g., cross-filesystem)
 - Database stays open and usable during checkpoint
 - The checkpoint can be opened as a normal TidesDB database with `TidesDB.open()`
@@ -751,7 +751,7 @@ txn.free();
 
 **Reset vs Free + Begin**
 
-For a single transaction, `reset` is functionally equivalent to calling `free` followed by `beginTransaction`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
+For a single transaction, `reset` is functionally equivalent to calling `free` followed by `beginTransaction`. The difference is performance, reset retains allocated buffers and avoids repeated allocation overhead. This matters most in loops that commit and restart thousands of transactions.
 
 ## Configuration Options
 

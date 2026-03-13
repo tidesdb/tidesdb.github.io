@@ -237,7 +237,7 @@ txn.close()
 - High-throughput ingestion · Reduce allocation overhead in tight write loops
 
 :::tip[Reset vs Close + Begin]
-`txn.reset()` is functionally equivalent to `txn.close()` followed by `db.begin_txn()`. The difference is performance: reset retains allocated buffers and avoids repeated allocation overhead.
+`txn.reset()` is functionally equivalent to `txn.close()` followed by `db.begin_txn()`. The difference is performance, reset retains allocated buffers and avoids repeated allocation overhead.
 :::
 
 ### TTL (Time-To-Live)
@@ -334,9 +334,118 @@ print(f"Cache hits: {cache_stats.hits}, misses: {cache_stats.misses}")
 print(f"Hit rate: {cache_stats.hit_rate:.2%}")
 ```
 
+### Manual WAL Sync
+
+`sync_wal()` forces an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `SYNC_NONE` or `SYNC_INTERVAL` modes.
+
+```python
+cf = db.get_column_family("my_cf")
+
+# Force WAL durability after a batch of writes
+cf.sync_wal()
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points (e.g., after a batch of related writes) when using `SYNC_NONE` or `SYNC_INTERVAL`
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `SYNC_FULL` for all writes
+
+:::tip[Structural Operations]
+Regardless of sync mode, TidesDB **always** enforces durability for structural operations, memtable flush, SSTable compaction, WAL rotation, and column family metadata updates.
+:::
+
+### Purge Column Family
+
+`purge()` forces a synchronous flush and aggressive compaction for a single column family. Unlike `flush_memtable()` and `compact()` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
+
+```python
+cf = db.get_column_family("my_cf")
+
+cf.purge()
+# All data is now flushed to SSTables and compacted
+```
+
+**Behavior**
+1. Waits for any in-progress flush to complete
+2. Force-flushes the active memtable (even if below threshold)
+3. Waits for flush I/O to fully complete
+4. Waits for any in-progress compaction to complete
+5. Triggers synchronous compaction inline (bypasses the compaction queue)
+6. Waits for any queued compaction to drain
+
+**When to use**
+- Before backup or checkpoint · Ensure all data is on disk and compacted
+- After bulk deletes · Reclaim space immediately by compacting away tombstones
+- Manual maintenance · Force a clean state during a maintenance window
+- Pre-shutdown · Ensure all pending work is complete before closing
+
+### Purge Database
+
+`purge()` on the database forces a synchronous flush and aggressive compaction for **all** column families, then drains both the global flush and compaction queues.
+
+```python
+db.purge()
+# All CFs flushed and compacted, all queues drained
+```
+
+**Behavior**
+1. Calls purge on each column family
+2. Drains the global flush queue (waits for queue size and pending count to reach 0)
+3. Drains the global compaction queue (waits for queue size to reach 0)
+
+:::tip[Purge vs Manual Flush + Compact]
+`flush_memtable()` and `compact()` are non-blocking - they enqueue work and return immediately. `cf.purge()` and `db.purge()` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
+
+### Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```python
+db_stats = db.get_db_stats()
+print(f"Column families: {db_stats.num_column_families}")
+print(f"Total memory: {db_stats.total_memory} bytes")
+print(f"Resolved memory limit: {db_stats.resolved_memory_limit} bytes")
+print(f"Memory pressure level: {db_stats.memory_pressure_level}")
+print(f"Global sequence: {db_stats.global_seq}")
+print(f"Flush queue: {db_stats.flush_queue_size} pending")
+print(f"Compaction queue: {db_stats.compaction_queue_size} pending")
+print(f"Total SSTables: {db_stats.total_sstable_count}")
+print(f"Total data size: {db_stats.total_data_size_bytes} bytes")
+print(f"Open SSTable handles: {db_stats.num_open_sstables}")
+print(f"In-flight txn memory: {db_stats.txn_memory_bytes} bytes")
+print(f"Immutable memtables: {db_stats.total_immutable_count}")
+print(f"Memtable bytes: {db_stats.total_memtable_bytes}")
+```
+
+**Database statistics include**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `num_column_families` | `int` | Number of column families |
+| `total_memory` | `int` | System total memory |
+| `available_memory` | `int` | System available memory at open time |
+| `resolved_memory_limit` | `int` | Resolved memory limit (auto or configured) |
+| `memory_pressure_level` | `int` | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
+| `flush_pending_count` | `int` | Number of pending flush operations (queued + in-flight) |
+| `total_memtable_bytes` | `int` | Total bytes in active memtables across all CFs |
+| `total_immutable_count` | `int` | Total immutable memtables across all CFs |
+| `total_sstable_count` | `int` | Total SSTables across all CFs and levels |
+| `total_data_size_bytes` | `int` | Total data size (klog + vlog) across all CFs |
+| `num_open_sstables` | `int` | Number of currently open SSTable file handles |
+| `global_seq` | `int` | Current global sequence number |
+| `txn_memory_bytes` | `int` | Bytes held by in-flight transactions |
+| `compaction_queue_size` | `int` | Number of pending compaction tasks |
+| `flush_queue_size` | `int` | Number of pending flush tasks in queue |
+
+:::note[Stack Allocated]
+Unlike `get_stats()` (which returns a heap-allocated struct), `get_db_stats()` fills a caller-provided struct. No manual free is needed - the Python binding handles this automatically.
+:::
+
 ### Range Cost Estimation
 
-`range_cost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
+`range_cost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
 
 ```python
 cf = db.get_column_family("my_cf")
@@ -359,7 +468,7 @@ The method walks all SSTable levels and uses in-memory metadata to estimate how 
 - Merge overhead · Each overlapping SSTable adds a small fixed cost for merge-heap operations
 - Memtable · The active memtable's entry count contributes a small in-memory cost
 
-Key order does not matter — `range_cost(a, b)` produces the same result as `range_cost(b, a)`.
+Key order does not matter - `range_cost(a, b)` produces the same result as `range_cost(b, a)`.
 
 **Use cases**
 - Query planning · Compare candidate key ranges to find the cheapest one to scan
@@ -368,7 +477,7 @@ Key order does not matter — `range_cost(a, b)` produces the same result as `ra
 - Monitoring · Track how data distribution changes across key ranges over time
 
 :::note[Cost Values]
-The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar - only meaningful when compared with other `range_cost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
 ### Commit Hook (Change Data Capture)
@@ -414,13 +523,13 @@ def callback(ops: list[tidesdb.CommitOp], commit_seq: int) -> int:
     ...
 ```
 
-Return `0` on success. A non-zero return is logged as a warning but does **not** roll back the commit — the data is already durable before the callback runs.
+Return `0` on success. A non-zero return is logged as a warning but does **not** roll back the commit - the data is already durable before the callback runs.
 
 **Behavior**
 - The hook fires after WAL write, memtable apply, and commit status marking are complete
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commit_seq` is monotonically increasing across commits and can be used as a replication cursor
-- The hook executes synchronously on the committing thread — keep the callback fast to avoid stalling writers
+- The hook executes synchronously on the committing thread - keep the callback fast to avoid stalling writers
 - Python exceptions in the callback are caught internally and treated as non-zero return (logged, commit unaffected)
 - Calling `clear_commit_hook()` disables it immediately with no restart required
 
@@ -432,7 +541,7 @@ Return `0` on success. A non-zero return is logged as a warning but does **not**
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design — function pointers cannot be serialized.
+Commit hooks are not persisted to `config.ini`. After a database restart, hooks must be re-registered by the application. This is by design - function pointers cannot be serialized.
 :::
 
 ### Backup
@@ -474,7 +583,7 @@ with tidesdb.TidesDB.open("./mydb_checkpoint") as checkpoint_db:
 
 **Behavior**
 - Requires `checkpoint_dir` to be a non-existent directory or an empty directory
-- For each column family: flushes the active memtable, halts compactions, hard links all SSTable files, copies small metadata files, then resumes compactions
+- For each column family, flushes the active memtable, halts compactions, hard links all SSTable files, copies small metadata files, then resumes compactions
 - Falls back to file copy if hard linking fails (e.g., cross-filesystem)
 - Database stays open and usable during checkpoint
 
@@ -649,12 +758,12 @@ config.use_btree = False                      # Use B+tree klog format (default:
 
 TidesDB uses comparators to determine the sort order of keys. Built-in comparators are automatically registered:
 
-- `"memcmp"` (default): Binary byte-by-byte comparison
-- `"lexicographic"`: Null-terminated string comparison
-- `"uint64"`: Unsigned 64-bit integer comparison
-- `"int64"`: Signed 64-bit integer comparison
-- `"reverse"`: Reverse binary comparison
-- `"case_insensitive"`: Case-insensitive ASCII comparison
+- `"memcmp"` (default) · Binary byte-by-byte comparison
+- `"lexicographic"` · Null-terminated string comparison
+- `"uint64"` · Unsigned 64-bit integer comparison
+- `"int64"` · Signed 64-bit integer comparison
+- `"reverse"` · Reverse binary comparison
+- `"case_insensitive"` · Case-insensitive ASCII comparison
 
 ```python
 # Check if a comparator is registered

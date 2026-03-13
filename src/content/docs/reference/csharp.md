@@ -444,6 +444,36 @@ var cf = db.GetColumnFamily("my_cf")!;
 cf.FlushMemtable();
 ```
 
+#### Purge Column Family
+
+Force a synchronous flush and aggressive compaction for a single column family. Unlike `FlushMemtable` and `Compact` (which are non-blocking), `Purge` blocks until all flush and compaction I/O is complete.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+cf.Purge();
+// All data is now flushed to SSTables and compacted
+```
+
+**When to use**
+- Before backup or checkpoint · Ensure all data is on disk and compacted
+- After bulk deletes · Reclaim space immediately by compacting away tombstones
+- Manual maintenance · Force a clean state during a maintenance window
+- Pre-shutdown · Ensure all pending work is complete before closing
+
+#### Purge Database
+
+Force a synchronous flush and aggressive compaction for **all** column families, then drain both the global flush and compaction queues.
+
+```csharp
+db.Purge();
+// All CFs flushed and compacted, all queues drained
+```
+
+:::tip[Purge vs Manual Flush + Compact]
+`FlushMemtable` and `Compact` are non-blocking - they enqueue work and return immediately. `Purge` (on both `ColumnFamily` and `TidesDb`) is synchronous - it blocks until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+:::
+
 ### Sync Modes
 
 Control the durability vs performance tradeoff.
@@ -467,6 +497,28 @@ db.CreateColumnFamily("durable_cf", new ColumnFamilyConfig
     SyncMode = SyncMode.Full,
 });
 ```
+
+### Manual WAL Sync
+
+`SyncWal` forces an immediate fsync of the active write-ahead log for a column family. Useful for explicit durability control when using `SyncMode.None` or `SyncMode.Interval`.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+// Force WAL durability after a batch of writes
+cf.SyncWal();
+```
+
+**When to use**
+- Application-controlled durability · Sync the WAL at specific points (e.g., after a batch of related writes) when using `SyncMode.None` or `SyncMode.Interval`
+- Pre-checkpoint · Ensure all buffered WAL data is on disk before taking a checkpoint
+- Graceful shutdown · Flush WAL buffers before closing the database
+- Critical writes · Force durability for specific high-value writes without using `SyncMode.Full` for all writes
+
+**Behavior**
+- Acquires a reference to the active memtable to safely access its WAL
+- Calls fdatasync on the WAL file descriptor
+- Thread-safe - can be called concurrently from multiple threads
 
 ### Compression Algorithms
 
@@ -798,6 +850,32 @@ if (cf.IsCompacting())
 }
 ```
 
+## Database-Level Statistics
+
+Get aggregate statistics across the entire database instance.
+
+```csharp
+var dbStats = db.GetDbStats();
+
+Console.WriteLine($"Column families: {dbStats.NumColumnFamilies}");
+Console.WriteLine($"Total memory: {dbStats.TotalMemory} bytes");
+Console.WriteLine($"Resolved memory limit: {dbStats.ResolvedMemoryLimit} bytes");
+Console.WriteLine($"Memory pressure level: {dbStats.MemoryPressureLevel}");
+Console.WriteLine($"Global sequence: {dbStats.GlobalSeq}");
+Console.WriteLine($"Flush queue: {dbStats.FlushQueueSize} pending");
+Console.WriteLine($"Compaction queue: {dbStats.CompactionQueueSize} pending");
+Console.WriteLine($"Total SSTables: {dbStats.TotalSstableCount}");
+Console.WriteLine($"Total data size: {dbStats.TotalDataSizeBytes} bytes");
+Console.WriteLine($"Open SSTable handles: {dbStats.NumOpenSstables}");
+Console.WriteLine($"In-flight txn memory: {dbStats.TxnMemoryBytes} bytes");
+Console.WriteLine($"Immutable memtables: {dbStats.TotalImmutableCount}");
+Console.WriteLine($"Memtable bytes: {dbStats.TotalMemtableBytes}");
+```
+
+:::note[Stack Allocated]
+Unlike column family `GetStats` (which heap-allocates), `GetDbStats` fills a caller-provided struct. No free is needed.
+:::
+
 ## Cache Statistics
 
 ```csharp
@@ -814,7 +892,7 @@ Console.WriteLine($"Partitions: {cacheStats.NumPartitions}");
 
 ## Range Cost Estimation
 
-`RangeCost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double — meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
+`RangeCost` estimates the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
 
 ```csharp
 var cf = db.GetColumnFamily("my_cf")!;
@@ -844,7 +922,7 @@ The function walks all SSTable levels and uses in-memory metadata to estimate ho
 - Merge overhead · Each overlapping SSTable adds a small fixed cost for merge-heap operations
 - Memtable · The active memtable's entry count contributes a small in-memory cost
 
-Key order does not matter — the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
+Key order does not matter - the method normalizes the range so `keyA > keyB` produces the same result as `keyB > keyA`.
 
 **Use cases**
 - Query planning · Compare candidate key ranges to find the cheapest one to scan
@@ -853,7 +931,7 @@ Key order does not matter — the method normalizes the range so `keyA > keyB` p
 - Monitoring · Track how data distribution changes across key ranges over time
 
 :::note[Cost Values]
-The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar — only meaningful when compared with other `RangeCost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
+The returned cost is not an absolute measure (it does not represent milliseconds, bytes, or entry counts). It is a relative scalar - only meaningful when compared with other `RangeCost` results. A cost of 0.0 means no overlapping SSTables or memtable entries were found for the range.
 :::
 
 ## Custom Comparators
@@ -941,11 +1019,11 @@ cf.ClearCommitHook();
 | `IsDelete` | bool | True if this is a delete operation |
 
 **Behavior**
-- The hook fires after WAL write, memtable apply, and commit status marking are complete — the data is fully durable before the callback runs
+- The hook fires after WAL write, memtable apply, and commit status marking are complete - the data is fully durable before the callback runs
 - Hook exceptions are caught internally and do not affect the commit result
 - Each column family has its own independent hook; a multi-CF transaction fires the hook once per CF with only that CF's operations
 - `commitSeq` is monotonically increasing across commits and can be used as a replication cursor
-- Data in `CommitOp` is copied from native memory — safe to retain after the callback returns
+- Data in `CommitOp` is copied from native memory - safe to retain after the callback returns
 - The hook executes synchronously on the committing thread; keep the callback fast to avoid stalling writers
 - Calling `ClearCommitHook()` disables the hook immediately with no restart required
 
@@ -957,7 +1035,7 @@ cf.ClearCommitHook();
 - Debugging · Attach a temporary hook in production to inspect live writes
 
 :::note[Runtime-Only]
-Commit hooks are not persisted across database restarts. After reopening a database, hooks must be re-registered by the application. This is by design — delegates cannot be serialized.
+Commit hooks are not persisted across database restarts. After reopening a database, hooks must be re-registered by the application. This is by design - delegates cannot be serialized.
 :::
 
 ## Testing
@@ -986,6 +1064,7 @@ using TidesDB;
 // -- Config
 // -- ColumnFamilyConfig
 // -- Stats
+// -- DbStats
 // -- CacheStats
 
 // Change data capture
@@ -994,7 +1073,11 @@ using TidesDB;
 
 // Methods
 // -- TidesDb.GetComparator(string name)
+// -- TidesDb.Purge()
+// -- TidesDb.GetDbStats()
 // -- ColumnFamily.UpdateRuntimeConfig(ColumnFamilyConfig config, bool persistToDisk)
+// -- ColumnFamily.Purge()
+// -- ColumnFamily.SyncWal()
 
 // Enums
 // -- CompressionAlgorithm
@@ -1065,3 +1148,23 @@ using TidesDB;
 | `BtreeTotalNodes` | ulong | Total B+tree nodes (only if UseBtree=true) |
 | `BtreeMaxHeight` | uint | Maximum tree height (only if UseBtree=true) |
 | `BtreeAvgHeight` | double | Average tree height (only if UseBtree=true) |
+
+### Database Statistics (DbStats)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `NumColumnFamilies` | int | Number of column families |
+| `TotalMemory` | ulong | System total memory |
+| `AvailableMemory` | ulong | System available memory at open time |
+| `ResolvedMemoryLimit` | ulong | Resolved memory limit (auto or configured) |
+| `MemoryPressureLevel` | int | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
+| `FlushPendingCount` | int | Number of pending flush operations (queued + in-flight) |
+| `TotalMemtableBytes` | long | Total bytes in active memtables across all CFs |
+| `TotalImmutableCount` | int | Total immutable memtables across all CFs |
+| `TotalSstableCount` | int | Total SSTables across all CFs and levels |
+| `TotalDataSizeBytes` | ulong | Total data size (klog + vlog) across all CFs |
+| `NumOpenSstables` | int | Number of currently open SSTable file handles |
+| `GlobalSeq` | ulong | Current global sequence number |
+| `TxnMemoryBytes` | long | Bytes held by in-flight transactions |
+| `CompactionQueueSize` | ulong | Number of pending compaction tasks |
+| `FlushQueueSize` | ulong | Number of pending flush tasks in queue |
