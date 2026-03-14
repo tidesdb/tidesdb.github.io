@@ -727,6 +727,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_data_home_dir` | (empty) | Override the TidesDB data directory; defaults to `<mysql_datadir>/../tidesdb_data` |
 | `tidesdb_log_to_file` | ON | Write TidesDB logs to a LOG file in the data directory instead of stderr |
 | `tidesdb_log_truncation_at` | 24 MB | Log file truncation size in bytes; 0 disables truncation |
+| `tidesdb_row_lock_stripes` | 1024 | Number of striped mutexes for pessimistic row locking (range 64-65536). Higher values reduce false contention between unrelated rows at the cost of memory. Only meaningful when `tidesdb_pessimistic_locking=ON`. Uses xxHash (XXH3_64bits) for fast PK-to-stripe distribution |
 
 ### Global Variables (dynamic)
 
@@ -735,6 +736,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup; clear with empty string |
 | `tidesdb_checkpoint_dir` | (empty) | Set to a path to trigger a hard-link checkpoint (near-instant, same filesystem only); clear with empty string |
 | `tidesdb_print_all_conflicts` | OFF | Log every `TDB_ERR_CONFLICT` event to the error log (similar to `innodb_print_all_deadlocks`). Last conflict info also shown in `SHOW ENGINE TIDESDB STATUS` |
+| `tidesdb_pessimistic_locking` | OFF | Enable plugin-level striped row locks for UPDATE/DELETE. OFF (default) uses pure optimistic MVCC where concurrent writers on the same row are detected at COMMIT time. ON acquires a mutex per PK hash before reading a row for write, serializing concurrent access like InnoDB's row locks. Enable for TPC-C or workloads that depend on `SELECT ... FOR UPDATE` semantics. When ON, the isolation level is automatically downgraded to READ_COMMITTED since the row locks already provide serialization |
 
 ### Session Variables
 
