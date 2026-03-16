@@ -179,6 +179,12 @@ tidesdb_config_t config = {
     .max_memory_usage = 0,                 /* Global memory limit in bytes (default: 0 = auto, 50% of system RAM; minimum: 5% of system RAM) */
     .log_to_file = 0,                      /* Write logs to file instead of stderr (default: 0) */
     .log_truncation_at = 24 * (1024*1024), /* Log file truncation size (default: 24MB), 0 = no truncation */
+    .unified_memtable = 0,                 /* Enable unified memtable mode (default: 0 = per-CF memtables) */
+    .unified_memtable_write_buffer_size = 0,    /* Unified memtable write buffer size (default: 0 = use TDB_DEFAULT_WRITE_BUFFER_SIZE, 64MB) */
+    .unified_memtable_skip_list_max_level = 0,    /* Skip list max level for unified memtable (default: 0 = 12) */
+    .unified_memtable_skip_list_probability = 0,  /* Skip list probability for unified memtable (default: 0 = 0.25) */
+    .unified_memtable_sync_mode = 0,              /* Sync mode for unified WAL (default: 0 = TDB_SYNC_NONE) */
+    .unified_memtable_sync_interval_us = 0,       /* Sync interval for unified WAL in microseconds (default: 0) */
 };
 
 tidesdb_t *db = NULL;
@@ -1971,6 +1977,102 @@ tidesdb_open(&config, &db);
 :::
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and work distribution.
+
+## Unified Memtable
+
+By default, each column family maintains its own skip list and WAL. A transaction touching N column families performs N WAL writes. Unified memtable mode replaces all per-CF skip lists and WALs with a single shared skip list and a single WAL at the database level, reducing N WAL writes per transaction to exactly one.
+
+### Enabling Unified Memtable
+
+```c
+tidesdb_config_t config = tidesdb_default_config();
+config.db_path = "./mydb";
+config.unified_memtable = 1;  /* Enable unified memtable mode */
+
+tidesdb_t *db = NULL;
+if (tidesdb_open(&config, &db) != 0)
+{
+    return -1;
+}
+```
+
+**With custom configuration**
+
+```c
+tidesdb_config_t config = tidesdb_default_config();
+config.db_path = "./mydb";
+config.unified_memtable = 1;
+config.unified_memtable_write_buffer_size = 128 * 1024 * 1024;  /* 128MB unified write buffer */
+config.unified_memtable_skip_list_max_level = 16;           /* Higher max level for larger datasets */
+config.unified_memtable_skip_list_probability = 0.25f;      /* Default probability */
+config.unified_memtable_sync_mode = TDB_SYNC_FULL;          /* Fsync on every WAL write */
+
+tidesdb_t *db = NULL;
+if (tidesdb_open(&config, &db) != 0)
+{
+    return -1;
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `unified_memtable` | `int` | `0` | Enable unified memtable mode (0 = per-CF, 1 = unified) |
+| `unified_memtable_write_buffer_size` | `size_t` | `0` (auto) | Write buffer size for unified memtable. 0 = `TDB_DEFAULT_WRITE_BUFFER_SIZE` (64MB) |
+| `unified_memtable_skip_list_max_level` | `int` | `0` (auto) | Skip list max level. 0 = default 12 |
+| `unified_memtable_skip_list_probability` | `float` | `0` (auto) | Skip list probability. 0 = default 0.25 |
+| `unified_memtable_sync_mode` | `int` | `0` | WAL sync mode (`TDB_SYNC_NONE`, `TDB_SYNC_FULL`, `TDB_SYNC_INTERVAL`) |
+| `unified_memtable_sync_interval_us` | `uint64_t` | `0` | Sync interval in microseconds (only for `TDB_SYNC_INTERVAL`) |
+
+### How It Works
+
+All column families write into a single shared skip list and a single WAL file. Keys in the unified skip list are prefixed with a 4-byte big-endian column family index to maintain isolation between column families.
+
+**Write path** · At transaction commit, all operations across all column families are serialized into a single WAL batch and written as one block. Operations are then applied to the unified skip list with prefixed keys. A transaction touching 5 column families results in 1 WAL write instead of 5.
+
+**Read path** · Reads construct the prefixed key (4-byte CF index + user key) and search the unified active skip list, then unified immutable memtables (newest to oldest), then fall back to per-CF SSTables on disk. Keys from other column families are never visible.
+
+**Flush** · When the unified memtable exceeds the write buffer, a flush worker iterates it in sorted order, demuxing entries by CF prefix into per-CF SSTables. The on-disk format is identical to per-CF mode — SSTables contain user keys without the prefix.
+
+### Usage
+
+All existing transaction, iterator, and column family APIs work identically in unified mode. No application code changes are needed beyond setting `unified_memtable = 1`:
+
+```c
+/* Normal transaction -- works identically in both modes */
+tidesdb_column_family_t *users = tidesdb_get_column_family(db, "users");
+tidesdb_column_family_t *orders = tidesdb_get_column_family(db, "orders");
+
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+/* In unified mode, both ops write to the same skip list + same WAL (1 WAL write total) */
+/* In per-CF mode, each op writes to its own skip list + own WAL (2 WAL writes total) */
+tidesdb_txn_put(txn, users, (uint8_t *)"user:1", 6, (uint8_t *)"Alice", 5, -1);
+tidesdb_txn_put(txn, orders, (uint8_t *)"order:1", 7, (uint8_t *)"item_A", 6, -1);
+
+tidesdb_txn_commit(txn);
+tidesdb_txn_free(txn);
+```
+
+### When to Use Unified Memtable
+
+- **Many column families per transaction** · Workloads where each transaction touches multiple CFs (e.g., a table with secondary indexes where each index is a separate CF)
+- **Write-heavy multi-CF workloads** · Reduces WAL I/O from N writes to 1 per transaction
+- **Plugin/binding scenarios** · Storage engine plugins (e.g., MariaDB) that map SQL tables to column families with automatic secondary index CFs
+
+### Constraints
+
+- All column families sharing the unified memtable must use the same comparator (enforced at CF creation)
+- The unified skip list always uses `memcmp` as its comparator for the prefixed keys
+- Per-CF backpressure still applies — each CF's L0 queue depth and L1 file count are checked independently at commit time
+
+:::note[SSTables Are Per-CF]
+Even in unified mode, SSTables on disk remain per-column-family. The unified memtable only affects the in-memory write path and WAL. Flush, compaction, reads from disk, iterators over SSTables, bloom filters, and block indexes all work identically to per-CF mode.
+:::
+
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#unified-memtable) for the full design rationale, flush demuxing details, and WAL format.
 
 ## Utility Functions
 

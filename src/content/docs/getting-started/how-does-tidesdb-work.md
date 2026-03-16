@@ -52,13 +52,15 @@ This isolation allows different column families to use different compression alg
 
 
 <br/><br/>
-A column family maintains:
+In the default per-column-family mode, a column family maintains:
 
 - One active memtable for new writes
 - A queue of immutable memtables awaiting flush to disk
 - A write-ahead log paired with each memtable
 - Up to 32 levels of sorted string tables on disk
 - A manifest file tracking which SSTables belong to which levels
+
+TidesDB also supports a unified memtable mode where all column families share a single skip list and single WAL. See the [Unified Memtable](#unified-memtable) section for details.
 
 ### Sorted String Tables
 
@@ -151,7 +153,9 @@ The flags byte encodes tombstones (0x01), TTL presence (0x02), value log indirec
 
 </div>
 
-Write-ahead logs use the same format. Each memtable has its own WAL file, named by the SSTable ID it will become. Recovery reads these files in sequence order, deserializes entries into skip lists, and enqueues them for asynchronous flushing.
+Write-ahead logs use the same format in per-column-family mode. Each memtable has its own WAL file, named by the SSTable ID it will become. Recovery reads these files in sequence order, deserializes entries into skip lists, and enqueues them for asynchronous flushing.
+
+Unified WAL format · When unified memtable mode is enabled, all column families share a single WAL per memtable generation. The unified WAL uses a different batch format, a 2-byte magic prefix (`0x55AA`) followed by entries where each entry is prefixed with a 4-byte big-endian column family index before the standard flags, varints, and key-value data. During recovery, the system detects unified WAL files by their filename prefix (`uwal_`) and magic bytes, deserializes entries back into the unified skip list with their CF index prefixes intact, and flushes them through the standard unified flush path.
 
 
 ## Transactions
@@ -245,6 +249,28 @@ Crash scenarios · If the system crashes after fsync but before manifest commit,
 Permissive validation · WAL files use `block_manager_validate_last_block(bm, 0)` (permissive mode). If the last block has invalid footer magic or incomplete data, the system truncates the file to the last valid block by walking backward through the file. This handles crashes during WAL writes. If no valid blocks exist, truncates to header only.
 
 Strict validation · SSTables use `block_manager_validate_last_block(bm, 1)` (strict mode). Any corruption in the last block causes the SSTable to be rejected entirely. This reflects that SSTables are permanent and must be correct.
+
+### Unified Memtable
+
+By default, each column family maintains its own skip list and WAL. This means a transaction touching N column families performs N WAL writes, one per column family. For workloads that create many column families per logical entity (e.g., a MariaDB plugin where each table has 1 data CF + N secondary index CFs), this multiplies WAL I/O linearly with the number of column families involved in each transaction.
+
+Unified memtable mode replaces all per-CF skip lists and WALs with a single shared skip list and a single WAL at the database level. All column families write into the same memtable and the same WAL file, reducing N WAL writes per transaction to exactly one regardless of how many column families are involved.
+
+Key isolation · Column families share the same skip list but must not see each other's keys. The system assigns each column family a unique 4-byte index (`unified_cf_index`) at creation time, allocated from an atomic counter (`next_cf_index`). Keys in the unified skip list are prefixed with this 4-byte big-endian index before the user key. The prefix ensures keys from different column families sort into contiguous groups (all keys for CF 0 come before CF 1, etc.) and that lookups and iterations only see keys belonging to the target column family. All column families sharing a unified memtable must use the same comparator (enforced at creation), because the shared skip list has a single sort order. The unified skip list itself always uses `memcmp` as its comparator, which correctly orders the 4-byte BE prefix numerically and then sorts the suffixed user keys in byte order.
+
+Write path · At transaction commit, the system serializes all operations across all column families into a single unified WAL batch. The batch begins with a 2-byte magic (`0x55AA`) followed by entries, each prefixed with the 4-byte BE column family index. The entire batch is written as a single block to the unified WAL. Operations are then applied to the unified skip list with prefixed keys using `tdb_build_prefixed_key()`, which prepends the 4-byte CF index to each user key. For a transaction touching 5 column families, this results in 1 WAL write instead of 5.
+
+Read path · When reading a key from a specific column family, the system constructs the prefixed key (4-byte CF index + user key) and searches the unified active skip list, then unified immutable memtables (newest to oldest), then falls back to the per-CF SSTable levels. The prefixed key lookup in the skip list is an exact match, so keys from other column families are never visible. Immutable unified memtables that have already been flushed are skipped (`flushed` flag check) to avoid returning stale data that is already durable in SSTables.
+
+Flush demuxing · When the unified memtable exceeds `unified_memtable_write_buffer_size` (default: same as `write_buffer_size`, 64MB), it becomes immutable and is enqueued for flushing. The flush worker processes the unified immutable by iterating it in sorted order. Since keys are sorted by [4-byte CF index][user key], consecutive entries with the same prefix belong to the same column family. For each CF group, the flush worker builds a temporary skip list with stripped keys (CF prefix removed) using the CF's own comparator, then flushes it to an SSTable in that CF's level 1 using the existing SSTable write machinery. This produces per-CF SSTables with user keys (no prefix), so the on-disk format and read path through SSTables are identical to per-CF mode. After all groups are flushed, the unified WAL file is deleted.
+
+Rotation · The rotation mechanism mirrors per-CF memtable rotation. A CAS-based admission gate (`unified_mt.is_flushing`) ensures only one thread enters rotation at a time. The rotating thread creates a new skip list and WAL, atomically swaps the active pointer, enqueues the old memtable as an immutable, and submits a flush work item with `cf=NULL` to signal unified flush dispatch. The flush worker detects `cf==NULL` and routes to `tidesdb_unified_flush_immutable()`.
+
+Backpressure · In unified mode, backpressure is still applied per column family. At commit time, the system iterates all CFs involved in the transaction and calls `tidesdb_apply_backpressure()` on each, which checks that CF's L0 immutable queue depth and L1 file count. This ensures that even though the memtable is shared, individual column families that are falling behind on flush or compaction still throttle writes appropriately.
+
+WAL lifetime · Each unified WAL has a 1:1 relationship with the unified immutable memtable it belongs to. There is no generation refcounting. The WAL is created when the unified memtable is created and deleted after the flush worker successfully demuxes all entries into per-CF SSTables and commits their manifests.
+
+Configuration · Unified memtable mode is enabled via `unified_memtable = 1` in `tidesdb_config_t`. Additional configuration fields control the write buffer size (`unified_memtable_write_buffer_size`), skip list parameters (`unified_memtable_skip_list_max_level`, `unified_memtable_skip_list_probability`), and WAL sync mode (`unified_memtable_sync_mode`, `unified_memtable_sync_interval_us`). When `unified_memtable_write_buffer_size` is 0, it defaults to `TDB_DEFAULT_WRITE_BUFFER_SIZE` (64MB).
 
 ### Write Backpressure and Flow Control
 
