@@ -33,13 +33,11 @@ The specs for the environment are
 
 I ran the TidesDB <a target="_blank" href="https://github.com/tidesdb/benchtool">benchtool</a> program using script <a target="_blank" href="https://github.com/tidesdb/tidesdb/blob/main/scripts/tidesdb_rocksdb_old.sh">tidesdb_rocksdb_old.sh</a>.
 
-Sync mode is disabled on both engines so we are measuring maximum throughput, not durability. All tests use 8 threads. Default batch size is 1000 unless the test is specifically varying batch size. Keys are 16 bytes, values are 100 bytes unless noted otherwise. Each test populates a fresh database, runs the workload, and then cleans up before the next test.
-
-Both engines are configured identically regarding clock cache, write buffers, and other relevant settings.
+Both engines are configured identically regarding block cache, write buffers, and other relevant settings. Both engines have durable writes disabled. Keys are 16 bytes, values are 100 bytes unless noted otherwise. 
 
 ## What's changed this latest minor?
 
-This release focused on performance. The biggest item is zero-copy block deserialization in the klog iterator hot path. Improved savepoint performance from O(n) to O(1) with reduced malloc usage, introduced large chunk coalescing in the transaction arena allocator for better locality. We also introduced a unified memtable engine option which is pretty useful in many column family use-cases like in the <a target="_blank" href="https://mariadb.org">MariaDB</a> plugin <a target="_blank" href="https://github.com/tidesdb/tidesql/">TideSQL</a>.
+This release focused on performance. The biggest item is zero-copy block deserialization in the klog iterator hot path. Improved savepoint performance from O(n) to O(1) with reduced malloc usage, introduced large chunk coalescing in the transaction arena allocator for better locality. We also introduced a unified memtable engine option which is pretty useful in many column family scenarios like in the <a target="_blank" href="https://mariadb.org">MariaDB</a> plugin <a target="_blank" href="https://github.com/tidesdb/tidesql/">TideSQL</a> where a table(column family) can have many indexes.
 
 ## Write throughput
 
