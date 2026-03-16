@@ -158,6 +158,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Benchmark Analysis on TidesDB v8.9.0 & RocksDB v11.0.3',
+							link: 'articles/benchmark-analysis-tidesdb-v8-9-0-rocksdb-v11-0-3'
+						},
+						{
 							label: 'Benchmark Analysis on TidesDB v8.7.1 & RocksDB v11.0.3',
 							link: 'articles/benchmark-analysis-tidesdb-v8-7-1-rocksdb-11-0-3'
 						},
