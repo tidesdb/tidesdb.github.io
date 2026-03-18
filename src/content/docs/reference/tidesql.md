@@ -179,7 +179,7 @@ The optimizer is aware of these indexes. The engine reports cost estimates based
 
 ### Index Condition Pushdown (ICP)
 
-The engine supports Index Condition Pushdown for secondary index scans. When the optimizer pushes a WHERE condition down to the storage engine, the engine evaluates it on the index key columns before performing the expensive primary key point-lookup into the data column family. Index entries that fail the condition are skipped without touching the data CF at all. This is the same pattern used by InnoDB -- the engine decodes the index key columns into the record buffer and calls MariaDB's `handler_index_cond_check()` evaluator. ICP is supported for indexes on integer types (`TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT`), temporal types (`DATE`, `DATETIME`, `TIMESTAMP`, `YEAR`), and fixed-length `CHAR`/`BINARY` columns with binary or latin1 charset. For indexes on multi-byte charset string columns (e.g., `utf8mb4`), the engine falls through to the standard PK-lookup path.
+The engine supports Index Condition Pushdown for secondary index scans. When the optimizer pushes a WHERE condition down to the storage engine, the engine evaluates it on the index key columns before performing the expensive primary key point-lookup into the data column family. Index entries that fail the condition are skipped without touching the data CF at all. This is the same pattern used by InnoDB - the engine decodes the index key columns into the record buffer and calls MariaDB's `handler_index_cond_check()` evaluator. ICP is supported for indexes on integer types (`TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT`), temporal types (`DATE`, `DATETIME`, `TIMESTAMP`, `YEAR`), and fixed-length `CHAR`/`BINARY` columns with binary or latin1 charset. For indexes on multi-byte charset string columns (e.g., `utf8mb4`), the engine falls through to the standard PK-lookup path.
 
 
 ## Auto-Increment
@@ -204,7 +204,7 @@ SELECT * FROM tickets ORDER BY id;
 
 ## Transactions and Concurrency
 
-TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. For autocommit statements, the server calls the engine's commit callback after the statement completes, which flushes the transaction to storage and frees it so that the next statement begins with a fresh read snapshot. Inside a multi-statement transaction (`BEGIN ... COMMIT`), statement-level commits simply create a savepoint for potential rollback; the real commit happens when the server calls the commit callback with `all=true`.
+TidesDB uses MVCC internally. Each statement runs inside a TidesDB transaction. The engine maintains a per-connection transaction context through MariaDB's handlerton callback interface, following the same pattern as InnoDB. A transaction object is allocated lazily on the first data access and registered with MariaDB's transaction coordinator. After commit or rollback, the transaction object is kept alive and reused via `tidesdb_txn_reset()` on the next statement, which obtains a fresh MVCC snapshot while preserving internal buffers (ops array, arenas, read-set arrays). This avoids the malloc/free overhead of creating a new transaction on every autocommit statement. Autocommit single-statement DML uses `READ_COMMITTED` isolation since there is no concurrent modification within a single-statement transaction, eliminating unnecessary conflict tracking overhead. Multi-statement transactions (`BEGIN ... COMMIT`) use the session's isolation level for proper write-write conflict detection.
 
 The engine respects the session's isolation level set via `SET TRANSACTION ISOLATION LEVEL`. The mapping from MariaDB isolation levels to TidesDB isolation levels is:
 
@@ -217,13 +217,13 @@ The engine respects the session's isolation level set via `SET TRANSACTION ISOLA
 
 MariaDB's `REPEATABLE READ` maps to TidesDB's `SNAPSHOT` isolation, which is the semantic equivalent of InnoDB's repeatable-read, consistent read snapshot with write-write conflict detection only, no read-set tracking. TidesDB's own `REPEATABLE_READ` level is stricter (tracks read-set, detects read-write conflicts at commit) and would cause excessive conflicts under normal OLTP concurrency. TidesDB's `SNAPSHOT` level (which has no SQL equivalent) can also be selected explicitly via the table option `ISOLATION_LEVEL='SNAPSHOT'`.
 
-DDL operations (`ALTER TABLE`, `CREATE INDEX`, `DROP INDEX`, `TRUNCATE`, `OPTIMIZE`) always use `READ_COMMITTED` regardless of the session setting, to avoid unbounded read-set growth during large table scans.
+DDL operations (`ALTER TABLE`, `CREATE INDEX`, `DROP INDEX`, `TRUNCATE`, `OPTIMIZE`) and autocommit single-statement DML always use `READ_COMMITTED` regardless of the session setting, to avoid unnecessary conflict tracking overhead and unbounded read-set growth during large scans.
 
 TidesDB supports SQL savepoints (`SAVEPOINT`, `ROLLBACK TO SAVEPOINT`, `RELEASE SAVEPOINT`) inside explicit multi-statement transactions. Savepoints are only meaningful inside `BEGIN ... COMMIT` blocks.
 
 ### Consistent Snapshots
 
-The engine supports `START TRANSACTION WITH CONSISTENT SNAPSHOT`. This eagerly creates a TidesDB transaction using the session's isolation level and captures the snapshot sequence number immediately, rather than waiting until the first data access. Rows committed by other connections after the snapshot are invisible to the transaction. This is useful for cross-engine consistency when TidesDB and InnoDB tables coexist in the same transaction:
+The engine supports `START TRANSACTION WITH CONSISTENT SNAPSHOT`. This eagerly creates a TidesDB transaction and captures the snapshot sequence number immediately, rather than waiting until the first data access. The isolation level is enforced to be at least `SNAPSHOT`, regardless of the session setting, since lower levels like `READ_COMMITTED` would refresh the snapshot on each read, violating the consistent snapshot semantics. Rows committed by other connections after the snapshot are invisible to the transaction. This is useful for cross-engine consistency when TidesDB and InnoDB tables coexist in the same transaction:
 
 ```sql
 SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
@@ -280,7 +280,7 @@ CREATE TABLE high_write (
 ) ENGINE=TIDESDB WRITE_BUFFER_SIZE=16777216;  -- 16 MB
 ```
 
-The default is 32 MB.
+The default is 128 MB.
 
 ### Bloom Filters
 
@@ -333,7 +333,7 @@ CREATE TABLE mixed (
   id INT NOT NULL PRIMARY KEY,
   a  INT,
   b  INT,
-  KEY idx_a (a) USE_BTREE=1,   -- B+tree index
+  KEY idx_a (a) USE_BTREE=1,    -- B+tree index
   KEY idx_b (b)                 -- inherits table default (LSM)
 ) ENGINE=TIDESDB;
 ```
@@ -402,10 +402,10 @@ CREATE TABLE tuned (
   SKIP_LIST_MAX_LEVEL=16
   SKIP_LIST_PROBABILITY=25
   L1_FILE_COUNT_TRIGGER=4
-  L0_QUEUE_STALL_THRESHOLD=8;
+  L0_QUEUE_STALL_THRESHOLD=20;
 ```
 
-`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 5). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 2). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 4). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`, with a hard cap of 16 immutable memtables regardless of the stall threshold.
+`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 5). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 2). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 20). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × min(L0_QUEUE_STALL_THRESHOLD, 16))`, with a hard cap of 16 immutable memtables regardless of the stall threshold.
 
 ### Combining Multiple Options
 
@@ -470,9 +470,9 @@ When a row is updated, its TTL is recomputed from the new column value, effectiv
 A per-session TTL can be set with the `tidesdb_ttl` session variable. This applies a TTL to all inserts and updates on any TidesDB table for the duration of the session, even tables that were not created with a TTL option:
 
 ```sql
-SET SESSION tidesdb_ttl = 300;  -- 5 minutes
+SET SESSION tidesdb_ttl = 300;                          -- 5 minutes
 INSERT INTO events (id, data) VALUES (1, 'temporary');  -- expires in 300s
-SET SESSION tidesdb_ttl = 0;    -- back to table default
+SET SESSION tidesdb_ttl = 0;                            -- back to table default
 ```
 
 The `SET STATEMENT` syntax can scope the TTL to a single statement:
@@ -727,7 +727,11 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_data_home_dir` | (empty) | Override the TidesDB data directory; defaults to `<mysql_datadir>/../tidesdb_data` |
 | `tidesdb_log_to_file` | ON | Write TidesDB logs to a LOG file in the data directory instead of stderr |
 | `tidesdb_log_truncation_at` | 24 MB | Log file truncation size in bytes; 0 disables truncation |
-| `tidesdb_row_lock_stripes` | 1024 | Number of striped mutexes for pessimistic row locking (range 64-65536). Higher values reduce false contention between unrelated rows at the cost of memory. Only meaningful when `tidesdb_pessimistic_locking=ON`. Uses xxHash (XXH3_64bits) for fast PK-to-stripe distribution |
+| `tidesdb_unified_memtable` | ON | Use a single shared WAL and memtable across all column families. Reduces WAL I/O from O(num_tables) to O(1) per commit. Requires all CFs to use the same comparator |
+| `tidesdb_unified_memtable_write_buffer_size` | 128 MB | Write buffer size for the unified memtable (0 = library default). Only meaningful when `tidesdb_unified_memtable=ON` |
+| `tidesdb_unified_memtable_sync_mode` | FULL | Sync mode for the unified WAL (NONE, INTERVAL, FULL). Controls durability of all commits when unified memtable is enabled. Per-CF `SYNC_MODE` is ignored in unified mode since per-CF WALs do not exist |
+| `tidesdb_unified_memtable_sync_interval` | 128000 | Sync interval in microseconds for the unified WAL (only used when `unified_memtable_sync_mode=INTERVAL`) |
+| `tidesdb_row_lock_stripes` | 1024 | Legacy compatibility variable. The lock manager now uses a 256-partition hash table with per-row granularity and wait-for-graph deadlock detection |
 
 ### Global Variables (dynamic)
 
@@ -736,7 +740,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup; clear with empty string |
 | `tidesdb_checkpoint_dir` | (empty) | Set to a path to trigger a hard-link checkpoint (near-instant, same filesystem only); clear with empty string |
 | `tidesdb_print_all_conflicts` | OFF | Log every `TDB_ERR_CONFLICT` event to the error log (similar to `innodb_print_all_deadlocks`). Last conflict info also shown in `SHOW ENGINE TIDESDB STATUS` |
-| `tidesdb_pessimistic_locking` | OFF | Enable plugin-level striped row locks for UPDATE/DELETE. OFF (default) uses pure optimistic MVCC where concurrent writers on the same row are detected at COMMIT time. ON acquires a mutex per PK hash before reading a row for write, serializing concurrent access like InnoDB's row locks. Enable for TPC-C or workloads that depend on `SELECT ... FOR UPDATE` semantics. When ON, the isolation level is automatically downgraded to READ_COMMITTED since the row locks already provide serialization |
+| `tidesdb_pessimistic_locking` | OFF | Enable plugin-level row locks for `SELECT ... FOR UPDATE` in multi-statement transactions. OFF (default) uses pure optimistic MVCC where concurrent writers on the same row are detected at COMMIT time. ON acquires per-row locks via a partitioned hash-table lock manager with deadlock detection (wait-for-graph traversal). Locks are only acquired during PK exact-match reads in `BEGIN ... COMMIT` blocks; autocommit statements skip locking entirely. Enable for TPC-C or workloads that depend on `SELECT ... FOR UPDATE` serialization semantics |
 
 ### Session Variables
 
@@ -745,7 +749,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_ttl` | 0 | Per-session TTL in seconds applied to INSERT/UPDATE; 0 means use the table-level default. Can be set with `SET SESSION` or `SET STATEMENT` |
 | `tidesdb_skip_unique_check` | OFF | Skip uniqueness checks on primary key and unique secondary indexes during INSERT. Only safe when the application guarantees no duplicates (e.g., bulk loads with monotonic PKs) |
 | `tidesdb_default_compression` | LZ4 | Default compression algorithm (NONE, SNAPPY, LZ4, ZSTD, LZ4_FAST) |
-| `tidesdb_default_write_buffer_size` | 32 MB | Default write buffer size in bytes |
+| `tidesdb_default_write_buffer_size` | 128 MB | Default write buffer size in bytes |
 | `tidesdb_default_bloom_filter` | ON | Default bloom filter setting |
 | `tidesdb_default_use_btree` | OFF | Default USE_BTREE setting (0=LSM, 1=B-tree) |
 | `tidesdb_default_block_indexes` | ON | Default block indexes setting |
@@ -753,7 +757,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_default_sync_interval_us` | 128000 | Default sync interval in microseconds (for INTERVAL mode) |
 | `tidesdb_default_bloom_fpr` | 100 | Default bloom FPR in parts per 10,000 (100 = 1%) |
 | `tidesdb_default_klog_value_threshold` | 512 | Default klog value threshold in bytes (values >= this go to vlog) |
-| `tidesdb_default_l0_queue_stall_threshold` | 4 | Default L0 queue stall threshold |
+| `tidesdb_default_l0_queue_stall_threshold` | 20 | Default L0 queue stall threshold |
 | `tidesdb_default_l1_file_count_trigger` | 4 | Default L1 file count compaction trigger |
 | `tidesdb_default_level_size_ratio` | 10 | Default level size ratio |
 | `tidesdb_default_min_levels` | 5 | Default minimum LSM-tree levels |
@@ -775,7 +779,7 @@ tidesdb_default_sync_mode=NONE
 tidesdb_default_compression=NONE
 tidesdb_default_bloom_fpr=10
 tidesdb_default_klog_value_threshold=1024
-tidesdb_default_l0_queue_stall_threshold=8
+tidesdb_default_l0_queue_stall_threshold=20
 ```
 
 ```sql
@@ -792,7 +796,7 @@ CREATE TABLE t3 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses FULL
 
 The block cache is a read cache backed by two independent clock caches, one for raw klog block bytes (used by the default block-based SSTable format) and one for deserialized B+tree nodes (used by column families with `USE_BTREE=1`). Both caches share the configured `tidesdb_block_cache_size` budget. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use - only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families, data + one secondary index each). When `tidesdb_log_to_file` is enabled (the default), TidesDB writes to a `LOG` file in the data directory with automatic truncation controlled by `tidesdb_log_truncation_at` (default 24 MB, 0 to disable truncation). When disabled, logs are written to stderr.
 
-The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. The per-table `WRITE_BUFFER_SIZE` (default 32 MB) and `L0_QUEUE_STALL_THRESHOLD` (default 4) together determine worst-case memtable memory per column family, approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`, since the active memtable can grow to 150% of the write buffer size under idle conditions before flushing. A hard cap of 16 immutable memtables applies regardless of the stall threshold. With 8 tables (16 column families), the worst case is roughly 16 × (48 MB + 128 MB) = 2.8 GB.
+The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. When `tidesdb_unified_memtable=ON` (the default), all column families share a single memtable with its own write buffer (`tidesdb_unified_memtable_write_buffer_size`, default 128 MB), so per-CF `WRITE_BUFFER_SIZE` does not affect memtable memory. The per-CF `L0_QUEUE_STALL_THRESHOLD` (default 20) still applies for backpressure. A hard cap of 16 immutable memtables applies regardless of the stall threshold. When unified memtable is disabled, each CF has its own memtable and worst-case memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × min(L0_QUEUE_STALL_THRESHOLD, 16))`.
 
 
 ## How It Stores Data Internally
