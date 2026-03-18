@@ -80,8 +80,8 @@ The script accepts several options:
 |--------|-------------|
 | `--mariadb-prefix <path>` | MariaDB installation directory (default: `/usr/local/mariadb-tidesdb`) |
 | `--tidesdb-prefix <path>` | TidesDB library installation directory (default: `/usr/local`) |
-| `--mariadb-version <tag>` | MariaDB version/branch to build (default: `mariadb-11.4.5`) |
-| `--tidesdb-version <tag>` | TidesDB library version/tag (default: `v0.5.1`) |
+| `--mariadb-version <tag>` | MariaDB version/branch to build (i.e: `mariadb-11.4.5`) |
+| `--tidesdb-version <tag>` | TidesDB library version/tag (i.e: `v8.9.2`) |
 | `--build-dir <path>` | Build directory (default: `./build`) |
 | `--jobs <n>` | Parallel build jobs (default: number of CPU cores) |
 | `--skip-deps` | Skip system dependency installation |
