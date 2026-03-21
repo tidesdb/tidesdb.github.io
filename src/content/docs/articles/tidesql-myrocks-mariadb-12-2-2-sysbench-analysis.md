@@ -24,7 +24,7 @@ head:
 
 In this article I will be comparing the performance of TidesDB (TideSQL) and RocksDB (MyRocks) in <a href="https://github.com/MariaDB/server/releases/tag/mariadb-12.2.2">MariaDB 12.2.2</a> using sysbench.  
 
-<a href="https://github.com/tidesdb/tidesdb/releases/tag/v4.0.0">TideSQL v4.0.0</a> and it is running latest <a href="https://github.com/tidesdb/tidesdb/releases/tag/v8.9.4">TidesDB v8.9.4</a> and RocksDB (@@rocksdb_git_hash=79f08d7ffa6d34d9ca3357777bcb335884a56cfb) which seems to be RocksDB <a href="https://github.com/facebook/rocksdb/releases/tag/v6.29.5">6.29.5</a>.
+I use <a href="https://github.com/tidesdb/tidesdb/releases/tag/v4.0.0">TideSQL v4.0.0</a> and it is running latest <a href="https://github.com/tidesdb/tidesdb/releases/tag/v8.9.4">TidesDB v8.9.4</a> and RocksDB (@@rocksdb_git_hash=79f08d7ffa6d34d9ca3357777bcb335884a56cfb) which seems to be RocksDB <a href="https://github.com/facebook/rocksdb/releases/tag/v6.29.5">6.29.5</a>.
 
 The MariaDB configs used can be found here (my.cnf):
 
