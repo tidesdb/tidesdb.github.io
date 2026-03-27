@@ -16,6 +16,15 @@ a, a:visited {
 	transition: all 0.2s ease;
 }
 
+.architecture-diagram {
+	max-width: 348px;
+	width: 100%;
+	margin: 0 auto;
+	height: auto !important;
+}
+
+
+
 #_top {
 	margin-bottom: 20px;
 }
@@ -502,6 +511,7 @@ input[type="search"]:focus, input[type="text"]:focus {
 	border: none;
 }
 
+
 :root[data-theme='light'] .architecture-diagram img {
 	filter: brightness(112%);
 	border: none;
@@ -510,7 +520,6 @@ input[type="search"]:focus, input[type="text"]:focus {
 
 /* Invert architecture diagram in dark mode for better visibility */
 :root .architecture-diagram img {
-	max-width: 488px;
 	margin: 0 auto;
 	filter: invert(100%) hue-rotate(180deg) brightness(100%);
 
@@ -997,9 +1006,7 @@ canvas {
 	/* Architecture diagrams - undo dark mode invert, ensure visible */
 	.architecture-diagram {
 		overflow: visible !important;
-		max-width: 100% !important;
 		float: none !important;
-		width: auto !important;
 		page-break-inside: avoid;
 	}
 
@@ -1007,8 +1014,6 @@ canvas {
 		filter: none !important;
 		box-shadow: none !important;
 		border-radius: 0 !important;
-		max-width: 488px !important;
-		height: auto !important;
 		display: block !important;
 		visibility: visible !important;
 		margin: 0 auto !important;
