@@ -1,0 +1,122 @@
+[mysqld]
+basedir = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb
+datadir = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/data
+port    = 3306
+socket  = /tmp/mariadb.sock
+user    = <your user>
+pid-file = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/data/mariadb.pid
+log-error = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/data/mariadb.err
+
+bind-address = 127.0.0.1
+max_connections = 1024
+thread_handling = pool-of-threads
+thread_pool_size = 16
+table_open_cache=2000
+table_open_cache_instances=16
+back_log=1500
+max_prepared_stmt_count=102400
+innodb_open_files=1024
+
+sort_buffer_size = 4M
+join_buffer_size = 4M
+read_buffer_size = 2M
+read_rnd_buffer_size = 2M
+tmp_table_size = 64M
+max_heap_table_size = 64M
+
+skip-log-bin
+sync_binlog = 0
+
+table_open_cache = 4096
+table_definition_cache = 2048
+
+# InnoDB (inspired by https://hammerdb.com/ci-config/maria.cnf)
+default_storage_engine = InnoDB
+innodb_buffer_pool_size = 64M
+#innodb_buffer_pool_instances = 4
+innodb_log_file_size = 24M
+innodb_log_buffer_size = 24M
+innodb_flush_log_at_trx_commit = 0
+innodb_file_per_table = ON
+innodb_doublewrite = 0
+innodb_flush_method = O_DIRECT
+innodb_io_capacity = 10000
+innodb_io_capacity_max = 20000
+innodb_purge_threads = 4
+innodb_max_purge_lag_wait=0
+innodb_max_purge_lag=0
+innodb_max_purge_lag_delay=1
+innodb_lru_scan_depth=128
+innodb_read_only=0
+innodb_adaptive_hash_index=0
+innodb_undo_log_truncate=on
+innodb_undo_tablespaces=1
+innodb_fast_shutdown=0
+innodb_max_dirty_pages_pct=1
+innodb_max_dirty_pages_pct_lwm=0.1
+innodb_adaptive_flushing=1
+innodb_adaptive_flushing_lwm=0.1
+innodb_flush_neighbors=0
+innodb_read_io_threads=4
+innodb_write_io_threads=4
+innodb_read_ahead_threshold=0
+innodb_buffer_pool_dump_at_shutdown=0
+innodb_buffer_pool_load_at_startup=0
+join_buffer_size=32K
+sort_buffer_size=32K
+innodb_use_native_aio=1
+innodb_stats_persistent=1
+innodb_log_write_ahead_size=4096
+performance_schema=OFF
+
+# innodb_adaptive_hash_index = ON
+# innodb_change_buffering = all
+
+# RocksDB  
+plugin_load_add = ha_rocksdb.so
+rocksdb_block_cache_size = 64M
+rocksdb_flush_log_at_trx_commit = 0
+rocksdb_write_disable_wal = ON
+rocksdb_use_fsync = OFF
+rocksdb_manual_wal_flush = ON
+rocksdb_max_background_jobs = 8
+rocksdb_max_subcompactions = 4
+rocksdb_default_cf_options = compression=kNoCompression
+rocksdb_db_write_buffer_size = 64M
+
+# TidesDB
+plugin_load_add = ha_tidesdb.so
+plugin_maturity = gamma
+
+# Row locking, optimistic by default
+tidesdb_pessimistic_locking = OFF 
+  
+tidesdb_block_cache_size = 64M
+tidesdb_max_open_sstables = 512
+tidesdb_unified_memtable_sync_mode = NONE
+tidesdb_unified_memtable_write_buffer_size = 64M
+tidesdb_default_write_buffer_size = 64M
+tidesdb_default_sync_mode = NONE
+tidesdb_default_compression = NONE
+tidesdb_flush_threads = 4
+tidesdb_compaction_threads = 4
+tidesdb_log_level = NONE
+# tidesdb_print_all_conflicts = ON
+
+slow_query_log = ON
+slow_query_log_file = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/data/slow.log
+long_query_time = 2
+
+character-set-server = utf8mb4
+collation-server = utf8mb4_general_ci
+
+[client]
+port = 3306
+socket = /tmp/mariadb.sock
+default-character-set = utf8mb4
+
+[mysqldump]
+quick
+max_allowed_packet = 64M
+
+[mariadb-backup]

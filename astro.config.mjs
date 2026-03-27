@@ -158,6 +158,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Benchmark Analysis on TidesDB 9 (TideSQL 4.1), MyRocks, InnoDB in MariaDB 11.8.6 TPC-C HammerDB',
+							link: 'articles/benchmark-analysis-tidesdb-9-rocksdb-innodb-mariadb-11-8-tpc-c-hammerdb'
+						},
+						{
 							label: 'Benchmark Analysis on TidesDB & RocksDB in MariaDB 11.8.6 TPC-C',
 							link: 'articles/tidesql-myrocks-mariadb-11-8-6-tpc-c-analysis'
 						},
