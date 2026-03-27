@@ -503,7 +503,6 @@ input[type="search"]:focus, input[type="text"]:focus {
 }
 
 :root[data-theme='light'] .architecture-diagram img {
-	border-radius: 12px;
 	filter: brightness(112%);
 	border: none;
 	box-shadow: none;
@@ -511,8 +510,8 @@ input[type="search"]:focus, input[type="text"]:focus {
 
 /* Invert architecture diagram in dark mode for better visibility */
 :root .architecture-diagram img {
-	border-radius: 12px;
-	box-shadow: rgba(9, 30, 66, 0.25) 0px 1px 1px, rgba(9, 30, 66, 0.13) 0px 0px 1px 1px;
+	max-width: 488px;
+	margin: 0 auto;
 	filter: invert(100%) hue-rotate(180deg) brightness(100%);
 
 }
@@ -604,6 +603,51 @@ input[type="select"]:focus, select:focus {
 	border-bottom: 2px solid #862a19;
 	transition: all 0.2s ease;
 	color: #862a19!important;
+}
+
+/* Version badge */
+.version-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	z-index: 1000;
+	padding: 0.5rem 1rem;
+	background: linear-gradient(135deg, #193EDC 0%, #1534b8 100%);
+	color: white !important;
+	text-decoration: none;
+	border-radius: 100px;
+	font-size: 0.875rem;
+	font-weight: 600;
+	transition: all 0.2s ease;
+	box-shadow: 0 2px 8px rgba(25, 62, 220, 0.3);
+	margin: 1rem 0;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.version-badge:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(25, 62, 220, 0.4);
+	background: linear-gradient(135deg, #1534b8 0%, #193EDC 100%);
+	color: white !important;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.version-label,
+.version-number {
+	color: white !important;
+}
+
+.version-label {
+	opacity: 0.95;
+}
+
+.version-number {
+	font-family: 'Courier New', monospace;
+	background: rgba(255, 255, 255, 0.2);
+	padding: 0.25rem 0.5rem;
+	border-radius: 100px;
+	font-weight: 700;
 }
 
 .site-title {
@@ -963,10 +1007,11 @@ canvas {
 		filter: none !important;
 		box-shadow: none !important;
 		border-radius: 0 !important;
-		max-width: 100% !important;
+		max-width: 488px !important;
 		height: auto !important;
 		display: block !important;
 		visibility: visible !important;
+		margin: 0 auto !important;
 	}
 
 	.article-image {
