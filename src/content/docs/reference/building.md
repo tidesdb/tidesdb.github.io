@@ -3,6 +3,27 @@ title: Building & Benchmarking TidesDB
 description: How to build and benchmark TidesDB.
 ---
 
+<div id="tidesdb-version" class="version-section"></div>
+
+<script>
+(function() {
+  var badge = document.getElementById('tidesdb-version');
+  fetch('https://api.github.com/repos/tidesdb/tidesdb/releases/latest')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var version = data.tag_name || 'v8.1.0';
+      var url = data.html_url || 'https://github.com/tidesdb/tidesdb/releases';
+      badge.innerHTML = 
+        '<span>' + version + '</span></a>';
+    })
+    .catch(function() {
+      badge.innerHTML = 
+        '<span>v9.0.0</span>';
+    });
+})();
+</script>
+
+
 <div class="no-print">
 
 If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/building.md).
@@ -438,6 +459,7 @@ TidesDB provides several CMake options to customize the build:
 | `TIDESDB_BUILD_TESTS` | Build test suite | `ON` |
 | `BUILD_SHARED_LIBS` | Build shared libraries instead of static | `ON` (Unix), `OFF` (Windows) |
 | `ENABLE_READ_PROFILING` | Enable read profiling instrumentation | `OFF` |
+| `TIDESDB_WITH_S3` | Build S3-compatible object store connector (requires libcurl + OpenSSL) | `OFF` |
 | `TIDESDB_WITH_MIMALLOC` | Use mimalloc as the memory allocator | `OFF` |
 | `TIDESDB_WITH_TCMALLOC` | Use tcmalloc as the memory allocator | `OFF` |
 | `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | (unset) |
@@ -511,6 +533,42 @@ vcpkg install gperftools:x64-windows
 :::note
 You cannot enable both mimalloc and tcmalloc simultaneously. Choose one based on your workload characteristics.
 :::
+
+### S3 Object Store Connector
+
+TidesDB optionally supports an S3-compatible object store connector for storing SSTables in remote storage (AWS S3, MinIO, Google Cloud Storage, or any S3-compatible endpoint). When enabled, TidesDB uses local disk as a cache and uploads SSTables to the object store for durable, replicated storage. The filesystem connector is always available without additional dependencies.
+
+**Enabling the S3 connector**
+
+```bash
+# Linux
+sudo apt install -y libcurl4-openssl-dev libssl-dev
+
+cmake -S . -B build -DTIDESDB_WITH_S3=ON
+cmake --build build --clean-first --verbose
+```
+
+```bash
+# macOS
+brew install curl openssl
+
+cmake -S . -B build -DTIDESDB_WITH_S3=ON
+cmake --build build --clean-first --verbose
+```
+
+**Requirements**
+- [libcurl](https://curl.se/libcurl/) for HTTP requests to S3 endpoints
+- [OpenSSL](https://www.openssl.org/) for AWS SigV4 request signing (HMAC-SHA256)
+
+**When to use object store mode**
+- Cloud-native deployments with separated compute and storage
+- Workloads that benefit from virtually unlimited storage capacity
+- Multi-node setups where cold start recovery from remote storage replaces traditional replication
+- Environments where local disk is ephemeral (containers, serverless)
+
+**Filesystem connector (no extra dependencies)**
+
+The filesystem connector stores objects as files under a root directory using the same path-like key structure. It is always available and requires no build flags. Use it for testing object store mode locally or for replication to a network-mounted filesystem.
 
 ### Read Profiling
 

@@ -3,11 +3,33 @@ title: TidesDB C API Reference
 description: Complete C API reference for TidesDB
 ---
 
+<div id="tidesdb-version" class="version-section"></div>
+
+<script>
+(function() {
+  var badge = document.getElementById('tidesdb-version');
+  fetch('https://api.github.com/repos/tidesdb/tidesdb/releases/latest')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var version = data.tag_name || 'v8.1.0';
+      var url = data.html_url || 'https://github.com/tidesdb/tidesdb/releases';
+      badge.innerHTML = 
+        '<span>' + version + '</span></a>';
+    })
+    .catch(function() {
+      badge.innerHTML = 
+        '<span>v9.0.0</span>';
+    });
+})();
+</script>
+
+
 <div class="no-print">
 
 If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/c.md).
 
 <hr/>
+
 
 
 <details>
@@ -2073,6 +2095,244 @@ Even in unified mode, SSTables on disk remain per-column-family. The unified mem
 :::
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#unified-memtable) for the full design rationale, flush demuxing details, and WAL format.
+
+## Object Store Mode
+
+Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
+
+### Enabling Object Store Mode (Filesystem Connector)
+
+```c
+#include <tidesdb/tidesdb.h>
+
+/* create a filesystem connector (for testing and local replication) */
+tidesdb_objstore_t *store = tidesdb_objstore_fs_create("/mnt/nfs/tidesdb-objects");
+
+tidesdb_objstore_config_t os_cfg = tidesdb_objstore_default_config();
+
+tidesdb_config_t config = tidesdb_default_config();
+config.db_path = "./mydb";
+config.object_store = store;
+config.object_store_config = &os_cfg;
+
+tidesdb_t *db = NULL;
+if (tidesdb_open(&config, &db) != 0)
+{
+    return -1;
+}
+
+/* use the database normally -- SSTables are uploaded after flush */
+
+tidesdb_close(db);
+```
+
+### Enabling Object Store Mode (S3/MinIO Connector)
+
+Build with `-DTIDESDB_WITH_S3=ON` to enable the S3 connector. This requires libcurl and OpenSSL.
+
+```c
+#include <tidesdb/tidesdb.h>
+
+tidesdb_objstore_t *s3 = tidesdb_objstore_s3_create(
+    "s3.amazonaws.com",      /* endpoint */
+    "my-tidesdb-bucket",     /* bucket */
+    "production/db1/",       /* key prefix (or NULL) */
+    "AKIAIOSFODNN7EXAMPLE",  /* access key */
+    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", /* secret key */
+    "us-east-1",             /* region */
+    1,                       /* use_ssl (HTTPS) */
+    0                        /* use_path_style (0 for AWS, 1 for MinIO) */
+);
+
+tidesdb_objstore_config_t os_cfg = tidesdb_objstore_default_config();
+os_cfg.local_cache_max_bytes = 512 * 1024 * 1024; /* 512MB local cache */
+os_cfg.max_concurrent_uploads = 8;
+
+tidesdb_config_t config = tidesdb_default_config();
+config.db_path = "./mydb";
+config.object_store = s3;
+config.object_store_config = &os_cfg;
+
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
+```
+
+### MinIO Example
+
+```c
+tidesdb_objstore_t *minio = tidesdb_objstore_s3_create(
+    "localhost:9000",   /* MinIO endpoint */
+    "tidesdb-bucket",   /* bucket */
+    NULL,               /* no key prefix */
+    "minioadmin",       /* access key */
+    "minioadmin",       /* secret key */
+    NULL,               /* region (NULL for MinIO) */
+    0,                  /* no SSL for local dev */
+    1                   /* path-style URLs (required for MinIO) */
+);
+```
+
+### Object Store Configuration
+
+Use `tidesdb_objstore_default_config()` for sensible defaults, then override fields as needed.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `local_cache_path` | `const char *` | `NULL` (uses db_path) | Local directory for cached SSTable files |
+| `local_cache_max_bytes` | `size_t` | `0` (unlimited) | Maximum local cache size in bytes |
+| `cache_on_read` | `int` | `1` | Cache downloaded files locally |
+| `cache_on_write` | `int` | `1` | Keep local copy after upload |
+| `max_concurrent_uploads` | `int` | `4` | Number of parallel upload threads |
+| `max_concurrent_downloads` | `int` | `8` | Number of parallel download threads |
+| `multipart_threshold` | `size_t` | `67108864` (64MB) | Use multipart upload above this size |
+| `multipart_part_size` | `size_t` | `8388608` (8MB) | Chunk size for multipart uploads |
+| `sync_manifest_to_object` | `int` | `1` | Upload MANIFEST after each compaction |
+| `replicate_wal` | `int` | `1` | Upload closed WAL segments for replication |
+| `wal_upload_sync` | `int` | `0` | 0 for background WAL upload, 1 to block flush |
+| `wal_sync_threshold_bytes` | `size_t` | `1048576` (1MB) | Sync active WAL to object store when it grows by this many bytes since last sync (0 to disable) |
+| `wal_sync_on_commit` | `int` | `0` | Upload WAL after every txn commit for RPO=0 replication |
+| `replica_mode` | `int` | `0` | Enable read-only replica mode (writes return TDB_ERR_READONLY) |
+| `replica_sync_interval_us` | `uint64_t` | `5000000` (5s) | MANIFEST poll interval for replica sync in microseconds |
+| `replica_replay_wal` | `int` | `1` | Replay WAL from object store for near-real-time reads on replicas |
+
+### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `object_target_file_size` | `size_t` | `0` (auto) | Target SSTable size in object store mode |
+| `object_lazy_compaction` | `int` | `0` | 1 to compact less aggressively for remote storage |
+| `object_prefetch_compaction` | `int` | `1` | 1 to download all inputs before compaction merge |
+
+### Object Store Statistics
+
+`tidesdb_get_db_stats` includes object store fields when a connector is active.
+
+```c
+tidesdb_db_stats_t stats;
+tidesdb_get_db_stats(db, &stats);
+
+if (stats.object_store_enabled)
+{
+    printf("connector: %s\n", stats.object_store_connector);
+    printf("total uploads: %" PRIu64 "\n", stats.total_uploads);
+    printf("upload failures: %" PRIu64 "\n", stats.total_upload_failures);
+    printf("upload queue depth: %" PRIu64 "\n", stats.upload_queue_depth);
+    printf("local cache: %zu / %zu bytes\n",
+           stats.local_cache_bytes_used, stats.local_cache_bytes_max);
+}
+```
+
+### Cold Start Recovery
+
+When the local database directory is empty but a connector is configured, TidesDB automatically discovers column families from the object store during recovery. It downloads MANIFEST and config files in parallel (one thread per CF), reconstructs the SSTable inventory, and fetches SSTable data on demand as queries arrive.
+
+```c
+/* delete all local state */
+remove_directory("./mydb");
+
+/* reopen with the same connector -- cold start recovery */
+tidesdb_config_t config = tidesdb_default_config();
+config.db_path = "./mydb";
+config.object_store = s3;
+config.object_store_config = &os_cfg;
+
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
+
+/* all data is available -- SSTables are fetched from the object store on demand */
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+```
+
+### How It Works
+
+- Object store mode requires unified memtable mode. Setting `object_store` on the config automatically enables `unified_memtable`
+- After each flush, SSTables are uploaded to the object store via an asynchronous upload pipeline with retry (3 attempts with exponential backoff) and post-upload verification (size check)
+- Point lookups on frozen SSTables (not present locally) fetch just the single needed klog block (~64KB) via one HTTP range request using `range_get`, bypassing the full file download. The block is cached in the clock cache so subsequent reads are pure memory hits. If the value is in the vlog, a second range request fetches just that vlog block
+- Iterators prefetch all needed SSTable files in parallel at creation time using bounded threads (`max_concurrent_downloads`, default 8), so sequential reads proceed at local disk speed. Prefetch runs at both initial iterator creation and after seek invalidation
+- A hash-indexed LRU local file cache manages disk usage, evicting least-recently-used SSTable file pairs (klog + vlog together) when `local_cache_max_bytes` is set
+- The MANIFEST is uploaded asynchronously after each flush and compaction so cold start recovery can reconstruct the SSTable inventory without blocking the flush worker
+- Compaction runs on local files. Input SSTables are downloaded if evicted, output SSTables are uploaded after the merge
+- The reaper thread periodically syncs the active WAL to the object store based on write volume (`wal_sync_threshold_bytes`, default 1MB). This reads the WAL's atomic file size lock-free and uploads when the delta since last sync exceeds the threshold, bounding the data loss window to write volume rather than wall clock time
+- Upload failures are tracked in `total_upload_failures` on `tidesdb_db_stats_t` for operator monitoring
+
+:::note[Build Requirement for S3]
+The S3 connector requires libcurl and OpenSSL. Enable it with `-DTIDESDB_WITH_S3=ON` during CMake configuration. The filesystem connector is always available without additional dependencies.
+:::
+
+## Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store. The primary handles all writes while replicas poll for MANIFEST updates and replay WAL segments for near-real-time reads.
+
+### Enabling Replica Mode
+
+```c
+tidesdb_objstore_config_t os_cfg = tidesdb_objstore_default_config();
+os_cfg.replica_mode = 1;
+os_cfg.replica_sync_interval_us = 1000000; /* 1 second sync interval */
+os_cfg.replica_replay_wal = 1;             /* replay WAL for fresh reads */
+
+tidesdb_config_t config = tidesdb_default_config();
+config.db_path = "./mydb_replica";
+config.object_store = s3; /* same bucket as the primary */
+config.object_store_config = &os_cfg;
+
+tidesdb_t *db = NULL;
+tidesdb_open(&config, &db);
+
+/* reads work normally */
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+uint8_t *val = NULL;
+size_t val_size = 0;
+tidesdb_txn_get(txn, cf, key, key_size, &val, &val_size);
+
+/* writes are rejected */
+int rc = tidesdb_txn_put(txn, cf, key, key_size, val, val_size, 0);
+/* rc == TDB_ERR_READONLY */
+```
+
+### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary so every committed write is uploaded to the object store immediately.
+
+```c
+tidesdb_objstore_config_t os_cfg = tidesdb_objstore_default_config();
+os_cfg.wal_sync_on_commit = 1; /* RPO = 0, every commit is durable in S3 */
+
+/* replica sees committed data within one replica_sync_interval_us */
+```
+
+### Promoting a Replica to Primary
+
+When the primary fails, promote a replica to accept writes.
+
+```c
+/* external health check detects primary is down */
+
+/* promote this replica */
+int rc = tidesdb_promote_to_primary(db);
+/* rc == TDB_SUCCESS */
+
+/* now writes are accepted */
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+tidesdb_txn_put(txn, cf, key, key_size, val, val_size, 0); /* succeeds */
+tidesdb_txn_commit(txn);
+```
+
+`tidesdb_promote_to_primary` performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. The function returns `TDB_ERR_INVALID_ARGS` if the node is already a primary.
+
+### How Replica Sync Works
+
+- The reaper thread polls the remote MANIFEST for each CF every `replica_sync_interval_us`
+- New SSTables from the primary's flushes and compactions are added to the replica's levels
+- SSTables compacted away on the primary are removed from the replica's levels
+- When `replica_replay_wal` is enabled, the latest WAL is downloaded and replayed into the memtable for near-real-time reads
+- WAL replay is idempotent using sequence numbers so entries already present are skipped
+- SSTable data is not downloaded during sync. It is fetched on demand via range_get for point lookups or prefetch for iterators
 
 ## Utility Functions
 

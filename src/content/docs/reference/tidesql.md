@@ -89,6 +89,13 @@ The script accepts several options:
 | `--skip-engines <list>` | Comma-separated storage engines to exclude from the build |
 | `--list-engines` | List available storage engines and exit |
 | `--pgo` | Enable profile-guided optimization (longer build, faster binaries) |
+| `--s3` | Build with S3 object store connector (requires libcurl + OpenSSL) |
+
+For object store mode with S3:
+
+```bash
+./install.sh --mariadb-prefix ~/mariadb-tidesdb --s3
+```
 
 After installation, start the server:
 
@@ -732,6 +739,20 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_unified_memtable_sync_mode` | FULL | Sync mode for the unified WAL (NONE, INTERVAL, FULL). Controls durability of all commits when unified memtable is enabled. Per-CF `SYNC_MODE` is ignored in unified mode since per-CF WALs do not exist |
 | `tidesdb_unified_memtable_sync_interval` | 128000 | Sync interval in microseconds for the unified WAL (only used when `unified_memtable_sync_mode=INTERVAL`) |
 | `tidesdb_row_lock_stripes` | 1024 | Legacy compatibility variable. The lock manager now uses a 256-partition hash table with per-row granularity and wait-for-graph deadlock detection |
+| `tidesdb_object_store_backend` | LOCAL | Object store backend (LOCAL disables, S3 enables S3-compatible storage) |
+| `tidesdb_s3_endpoint` | (empty) | S3 endpoint hostname (e.g. s3.amazonaws.com or minio.local:9000) |
+| `tidesdb_s3_bucket` | (empty) | S3 bucket name |
+| `tidesdb_s3_prefix` | (empty) | S3 key prefix for multi-tenant buckets (e.g. production/db1/) |
+| `tidesdb_s3_access_key` | (empty) | S3 access key ID |
+| `tidesdb_s3_secret_key` | (empty) | S3 secret access key |
+| `tidesdb_s3_region` | (empty) | S3 region (e.g. us-east-1, empty for MinIO) |
+| `tidesdb_s3_use_ssl` | ON | Use HTTPS for S3 connections |
+| `tidesdb_s3_path_style` | OFF | Use path-style S3 URLs (required for MinIO) |
+| `tidesdb_objstore_local_cache_max` | 0 | Maximum local cache size in bytes (0 = unlimited) |
+| `tidesdb_objstore_wal_sync_threshold` | 1 MB | Sync active WAL to object store when it grows by this many bytes (0 = disable) |
+| `tidesdb_objstore_wal_sync_on_commit` | OFF | Upload WAL after every commit for RPO=0 replication |
+| `tidesdb_replica_mode` | OFF | Enable read-only replica mode (writes return SQL error) |
+| `tidesdb_replica_sync_interval` | 5000000 | MANIFEST poll interval for replica sync in microseconds |
 
 ### Global Variables (dynamic)
 
@@ -741,6 +762,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_checkpoint_dir` | (empty) | Set to a path to trigger a hard-link checkpoint (near-instant, same filesystem only); clear with empty string |
 | `tidesdb_print_all_conflicts` | OFF | Log every `TDB_ERR_CONFLICT` event to the error log (similar to `innodb_print_all_deadlocks`). Last conflict info also shown in `SHOW ENGINE TIDESDB STATUS` |
 | `tidesdb_pessimistic_locking` | OFF | Enable plugin-level row locks for `SELECT ... FOR UPDATE` in multi-statement transactions. OFF (default) uses pure optimistic MVCC where concurrent writers on the same row are detected at COMMIT time. ON acquires per-row locks via a partitioned hash-table lock manager with deadlock detection (wait-for-graph traversal). Locks are only acquired during PK exact-match reads in `BEGIN ... COMMIT` blocks; autocommit statements skip locking entirely. Enable for TPC-C or workloads that depend on `SELECT ... FOR UPDATE` serialization semantics |
+| `tidesdb_promote_primary` | OFF | Set to ON to promote a replica to primary mode. Performs a final MANIFEST sync and WAL replay, creates a local WAL, and starts accepting writes. Resets to OFF after promotion |
 
 ### Session Variables
 
@@ -861,6 +883,120 @@ RENAME TABLE events TO event_log;
 TRUNCATE TABLE event_log;
 DROP TABLE event_log;
 ```
+
+
+## Object Store Mode
+
+TidesDB supports an optional object store backend that stores SSTables in S3-compatible storage (AWS S3, MinIO, Google Cloud Storage) while using local disk as a cache. This enables cloud-native deployments where storage capacity is virtually unlimited and compute nodes can be replaced without data loss.
+
+### Why Use Object Store Mode
+
+Object store mode is designed for deployments where local disk is either limited, ephemeral, or both. In container environments, Kubernetes pods, and serverless setups, local storage is temporary. Object store mode turns local disk into a bounded cache while S3 holds the durable copy of all data. A node with 1TB of NVMe and an S3 bucket can serve a 100TB dataset, with the hot working set at local disk speed and cold data fetched on demand.
+
+The storage engine maintains a four-tier hierarchy automatically. Hot data lives in the in-memory block cache (microsecond reads). Warm data lives on local disk with open file handles (microsecond to millisecond reads). Cold data is on local disk but closed (reopened on access). Frozen data is in the object store only and fetched via HTTP range requests for point lookups or parallel bulk download for scans. Data flows downward through these tiers as it ages and flows back up when accessed.
+
+### When to Use It
+
+- Cloud-native deployments with separated compute and storage
+- Workloads that benefit from virtually unlimited storage capacity
+- Environments where local disk is ephemeral (containers, serverless, spot instances)
+- Multi-node setups where cold start recovery from remote storage replaces traditional replication
+
+### When Not to Use It
+
+- Single-server deployments with abundant local storage and no cloud requirement
+- Latency-critical workloads where every read must be served from local disk
+- Air-gapped environments without network access to an object store
+
+### Enabling Object Store Mode
+
+Add the following to `my.cnf`:
+
+```ini
+[mariadb]
+tidesdb_object_store_backend = S3
+tidesdb_s3_endpoint = s3.amazonaws.com
+tidesdb_s3_bucket = my-tidesdb-bucket
+tidesdb_s3_access_key = AKIAIOSFODNN7EXAMPLE
+tidesdb_s3_secret_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+tidesdb_s3_region = us-east-1
+tidesdb_objstore_local_cache_max = 536870912
+```
+
+For MinIO:
+
+```ini
+tidesdb_object_store_backend = S3
+tidesdb_s3_endpoint = minio.local:9000
+tidesdb_s3_bucket = tidesdb-data
+tidesdb_s3_use_ssl = OFF
+tidesdb_s3_path_style = ON
+tidesdb_s3_access_key = minioadmin
+tidesdb_s3_secret_key = minioadmin
+```
+
+Object store mode automatically enables unified memtable mode. No other configuration changes are needed. Existing SQL, table options, indexes, transactions, and all engine features work identically.
+
+### Read Replicas
+
+A separate MariaDB instance can run as a read-only replica by pointing to the same S3 bucket with replica mode enabled:
+
+```ini
+tidesdb_replica_mode = ON
+tidesdb_replica_sync_interval = 1000000
+```
+
+The replica periodically polls S3 for MANIFEST updates and replays WAL segments for near-real-time reads. Writes are rejected with a clean SQL error. Multiple replicas can run simultaneously, each with its own local cache.
+
+### Primary Promotion
+
+When the primary fails, a replica can be promoted to accept writes:
+
+```sql
+SET GLOBAL tidesdb_promote_primary = ON;
+```
+
+This performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and starts accepting writes. The promotion is fast because the replica already has metadata in memory from the sync loop.
+
+### WAL Sync Options
+
+The data loss window on crash depends on WAL sync configuration:
+
+| Setting | RPO | Tradeoff |
+|---------|-----|----------|
+| `objstore_wal_sync_on_commit = ON` | Zero | One HTTP round-trip per commit |
+| `objstore_wal_sync_threshold = 1048576` (default) | ~1MB of writes | Periodic sync based on write volume |
+| `objstore_wal_sync_threshold = 0` | One full flush cycle | No periodic sync |
+
+On clean shutdown there is no data loss regardless of configuration.
+
+### Monitoring
+
+`SHOW ENGINE TIDESDB STATUS` includes an Object Store section when enabled:
+
+```
+--- Object Store ---
+Connector: s3
+Total uploads: 1234
+Upload failures: 0
+Upload queue depth: 2
+Local cache: 234567890 / 536870912 bytes (45 files)
+Replica mode: OFF
+```
+
+### Kubernetes Deployment
+
+The `k8s/` directory contains example manifests for deploying TidesQL with object store mode:
+
+- `primary.yaml` - StatefulSet for the primary MariaDB with S3 configuration
+- `replica.yaml` - Deployment for read replicas with replica mode
+- `failover-controller.yaml` - Automated failover controller that health-checks the primary and promotes a replica when unresponsive
+
+The failover controller runs as a separate pod, checks the primary every 5 seconds, and after 3 consecutive failures promotes a replica via `SET GLOBAL tidesdb_promote_primary = ON`.
+
+### Build Requirement
+
+The S3 connector requires TidesDB to be built with `-DTIDESDB_WITH_S3=ON`, which requires libcurl and OpenSSL. The filesystem connector is always available without additional dependencies and can be used for testing object store mode locally.
 
 
 ## Limitations
