@@ -96,6 +96,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_INVALID_DB` | `-10` | Database handle is invalid (e.g., after close) |
 | `TDB_ERR_UNKNOWN` | `-11` | Unknown or unspecified error |
 | `TDB_ERR_LOCKED` | `-12` | Database is locked by another process |
+| `TDB_ERR_READONLY` | `-13` | Database is in read-only replica mode (writes rejected) |
 
 **Error categories**
 - `TDB_ERR_CORRUPTION` indicates data integrity issues requiring immediate attention
@@ -2055,7 +2056,7 @@ All column families write into a single shared skip list and a single WAL file. 
 
 **Read path** · Reads construct the prefixed key (4-byte CF index + user key) and search the unified active skip list, then unified immutable memtables (newest to oldest), then fall back to per-CF SSTables on disk. Keys from other column families are never visible.
 
-**Flush** · When the unified memtable exceeds the write buffer, a flush worker iterates it in sorted order, demuxing entries by CF prefix into per-CF SSTables. The on-disk format is identical to per-CF mode — SSTables contain user keys without the prefix.
+**Flush** · When the unified memtable exceeds the write buffer, a flush worker iterates it in sorted order, demuxing entries by CF prefix into per-CF SSTables. The on-disk format is identical to per-CF mode - SSTables contain user keys without the prefix.
 
 ### Usage
 
@@ -2088,7 +2089,7 @@ tidesdb_txn_free(txn);
 
 - All column families sharing the unified memtable must use the same comparator (enforced at CF creation)
 - The unified skip list always uses `memcmp` as its comparator for the prefixed keys
-- Per-CF backpressure still applies — each CF's L0 queue depth and L1 file count are checked independently at commit time
+- Per-CF backpressure still applies - each CF's L0 queue depth and L1 file count are checked independently at commit time
 
 :::note[SSTables Are Per-CF]
 Even in unified mode, SSTables on disk remain per-column-family. The unified memtable only affects the in-memory write path and WAL. Flush, compaction, reads from disk, iterators over SSTables, bloom filters, and block indexes all work identically to per-CF mode.

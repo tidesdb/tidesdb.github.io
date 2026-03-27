@@ -671,7 +671,7 @@ if len(workloads) >= 2:
         ax.set_ylim(0, ymax * 1.18)
 
     axes[0].legend(frameon=True, framealpha=0.9, edgecolor="#CCCCCC", fontsize=9)
-    fig.suptitle("TidesDB vs RocksDB — sysbench OLTP", fontsize=14, fontweight="bold", y=1.02)
+    fig.suptitle("TidesDB vs RocksDB - sysbench OLTP", fontsize=14, fontweight="bold", y=1.02)
     fig.tight_layout()
     path = os.path.join(out_dir, "chart_summary.png")
     fig.savefig(path)

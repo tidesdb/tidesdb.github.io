@@ -39,7 +39,7 @@ sudo cmake --install build
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-java</artifactId>
-    <version>0.6.6</version>
+    <version>0.6.8</version>
 </dependency>
 ```
 
@@ -59,12 +59,37 @@ public class Example {
             .blockCacheSize(64 * 1024 * 1024)
             .maxOpenSSTables(256)
             .maxMemoryUsage(0)
+            .unifiedMemtable(false)
             .build();
         
         try (TidesDB db = TidesDB.open(config)) {
             System.out.println("Database opened successfully");
         }
     }
+}
+```
+
+### Unified Memtable Mode
+
+Enable unified memtable mode to share a single memtable and WAL across all column families. This reduces write amplification for workloads with many small column families.
+
+```java
+Config config = Config.builder("./mydb")
+    .numFlushThreads(2)
+    .numCompactionThreads(2)
+    .logLevel(LogLevel.INFO)
+    .blockCacheSize(64 * 1024 * 1024)
+    .maxOpenSSTables(256)
+    .unifiedMemtable(true)
+    .unifiedMemtableWriteBufferSize(0)       // 0 = auto (64MB default)
+    .unifiedMemtableSkipListMaxLevel(0)      // 0 = default (12)
+    .unifiedMemtableSkipListProbability(0)   // 0 = default (0.25)
+    .unifiedMemtableSyncMode(0)              // 0 = SYNC_NONE
+    .unifiedMemtableSyncIntervalUs(0)        // 0 = default
+    .build();
+
+try (TidesDB db = TidesDB.open(config)) {
+    // All column families share a single memtable
 }
 ```
 
@@ -94,6 +119,10 @@ ColumnFamilyConfig customConfig = ColumnFamilyConfig.builder()
 db.createColumnFamily("custom_cf", customConfig);
 
 db.dropColumnFamily("my_cf");
+
+// Delete via column family handle (alternative to dropColumnFamily)
+ColumnFamily cfToDelete = db.getColumnFamily("old_cf");
+db.deleteColumnFamily(cfToDelete);
 
 String[] cfNames = db.listColumnFamilies();
 for (String name : cfNames) {
@@ -239,6 +268,24 @@ try (Transaction txn = db.beginTransaction()) {
 }
 ```
 
+#### Combined Key-Value Retrieval
+
+For better performance when you need both the key and value, use `keyValue()` which retrieves both in a single JNI call:
+
+```java
+try (TidesDBIterator iter = txn.newIterator(cf)) {
+    iter.seekToFirst();
+
+    while (iter.isValid()) {
+        KeyValue kv = iter.keyValue();
+        System.out.printf("Key: %s, Value: %s%n",
+            new String(kv.getKey()), new String(kv.getValue()));
+
+        iter.next();
+    }
+}
+```
+
 #### Seeking to a Specific Key
 
 ```java
@@ -355,6 +402,20 @@ System.out.println("Open SSTable handles: " + dbStats.getNumOpenSstables());
 System.out.println("In-flight txn memory: " + dbStats.getTxnMemoryBytes() + " bytes");
 System.out.println("Immutable memtables: " + dbStats.getTotalImmutableCount());
 System.out.println("Memtable bytes: " + dbStats.getTotalMemtableBytes());
+
+// Unified memtable stats
+System.out.println("Unified memtable enabled: " + dbStats.isUnifiedMemtableEnabled());
+System.out.println("Unified memtable bytes: " + dbStats.getUnifiedMemtableBytes());
+System.out.println("Unified immutable count: " + dbStats.getUnifiedImmutableCount());
+System.out.println("Unified is flushing: " + dbStats.isUnifiedIsFlushing());
+System.out.println("Unified WAL generation: " + dbStats.getUnifiedWalGeneration());
+
+// Object store stats
+System.out.println("Object store enabled: " + dbStats.isObjectStoreEnabled());
+System.out.println("Object store connector: " + dbStats.getObjectStoreConnector());
+System.out.println("Local cache used: " + dbStats.getLocalCacheBytesUsed() + " bytes");
+System.out.println("Total uploads: " + dbStats.getTotalUploads());
+System.out.println("Replica mode: " + dbStats.isReplicaMode());
 ```
 
 **DbStats Fields**
@@ -376,6 +437,22 @@ System.out.println("Memtable bytes: " + dbStats.getTotalMemtableBytes());
 | `txnMemoryBytes` | long | Bytes held by in-flight transactions |
 | `compactionQueueSize` | long | Number of pending compaction tasks |
 | `flushQueueSize` | long | Number of pending flush tasks in queue |
+| `unifiedMemtableEnabled` | boolean | Whether unified memtable mode is active |
+| `unifiedMemtableBytes` | long | Bytes in unified active memtable |
+| `unifiedImmutableCount` | int | Number of unified immutable memtables |
+| `unifiedIsFlushing` | boolean | Whether unified memtable is currently flushing |
+| `unifiedNextCfIndex` | int | Next CF index to be assigned in unified mode |
+| `unifiedWalGeneration` | long | Current unified WAL generation counter |
+| `objectStoreEnabled` | boolean | Whether object store mode is active |
+| `objectStoreConnector` | String | Connector name ("s3", "gcs", "fs", etc.) |
+| `localCacheBytesUsed` | long | Current local file cache usage in bytes |
+| `localCacheBytesMax` | long | Configured maximum local cache size in bytes |
+| `localCacheNumFiles` | int | Number of files tracked in local cache |
+| `lastUploadedGeneration` | long | Highest WAL generation confirmed uploaded |
+| `uploadQueueDepth` | long | Number of pending upload jobs in the queue |
+| `totalUploads` | long | Lifetime count of objects uploaded to object store |
+| `totalUploadFailures` | long | Lifetime count of permanently failed uploads |
+| `replicaMode` | boolean | Whether running in read-only replica mode |
 
 ### Manual Compaction and Flush
 
@@ -618,6 +695,164 @@ db.checkpoint("./mydb_checkpoint");
 - Database stays open and usable during checkpoint
 - The checkpoint can be opened as a normal TidesDB database with `TidesDB.open()`
 
+## Object Store Mode
+
+Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
+
+### Enabling Object Store Mode (Filesystem Connector)
+
+```java
+ObjectStoreConfig osConfig = ObjectStoreConfig.defaultConfig();
+
+Config config = Config.builder("./mydb")
+    .numFlushThreads(2)
+    .numCompactionThreads(2)
+    .logLevel(LogLevel.INFO)
+    .blockCacheSize(64 * 1024 * 1024)
+    .maxOpenSSTables(256)
+    .objectStoreFsPath("/mnt/nfs/tidesdb-objects")
+    .objectStoreConfig(osConfig)
+    .build();
+
+try (TidesDB db = TidesDB.open(config)) {
+    // SSTables are uploaded after flush
+}
+```
+
+### Custom Object Store Configuration
+
+```java
+ObjectStoreConfig osConfig = ObjectStoreConfig.builder()
+    .localCacheMaxBytes(512 * 1024 * 1024)  // 512MB local cache
+    .maxConcurrentUploads(8)
+    .maxConcurrentDownloads(16)
+    .cacheOnRead(true)
+    .cacheOnWrite(true)
+    .syncManifestToObject(true)
+    .replicateWal(true)
+    .walSyncThresholdBytes(1048576)          // 1MB
+    .build();
+
+Config config = Config.builder("./mydb")
+    .numFlushThreads(2)
+    .numCompactionThreads(2)
+    .logLevel(LogLevel.INFO)
+    .objectStoreFsPath("/mnt/nfs/tidesdb-objects")
+    .objectStoreConfig(osConfig)
+    .build();
+
+try (TidesDB db = TidesDB.open(config)) {
+    // use the database normally
+}
+```
+
+### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields:
+
+```java
+ColumnFamilyConfig cfConfig = ColumnFamilyConfig.builder()
+    .writeBufferSize(128 * 1024 * 1024)
+    .compressionAlgorithm(CompressionAlgorithm.LZ4_COMPRESSION)
+    .objectTargetFileSize(256 * 1024 * 1024)  // 256MB target SSTable size
+    .objectLazyCompaction(true)                // compact less aggressively
+    .objectPrefetchCompaction(true)            // download all inputs before merge
+    .build();
+
+db.createColumnFamily("remote_cf", cfConfig);
+```
+
+### Object Store Statistics
+
+`getDbStats()` includes object store fields when a connector is active:
+
+```java
+DbStats dbStats = db.getDbStats();
+
+if (dbStats.isObjectStoreEnabled()) {
+    System.out.println("Connector: " + dbStats.getObjectStoreConnector());
+    System.out.println("Total uploads: " + dbStats.getTotalUploads());
+    System.out.println("Upload failures: " + dbStats.getTotalUploadFailures());
+    System.out.println("Upload queue depth: " + dbStats.getUploadQueueDepth());
+    System.out.println("Local cache: " + dbStats.getLocalCacheBytesUsed()
+        + " / " + dbStats.getLocalCacheBytesMax() + " bytes");
+}
+```
+
+### Cold Start Recovery
+
+When the local database directory is empty but a connector is configured, TidesDB automatically discovers column families from the object store during recovery.
+
+```java
+ObjectStoreConfig osConfig = ObjectStoreConfig.defaultConfig();
+
+Config config = Config.builder("./mydb")
+    .objectStoreFsPath("/mnt/nfs/tidesdb-objects")
+    .objectStoreConfig(osConfig)
+    .build();
+
+try (TidesDB db = TidesDB.open(config)) {
+    // all data is available -- SSTables are fetched on demand
+    ColumnFamily cf = db.getColumnFamily("my_cf");
+}
+```
+
+### How It Works
+
+- Object store mode requires unified memtable mode. Setting `objectStoreFsPath` automatically enables `unifiedMemtable`
+- After each flush, SSTables are uploaded via an asynchronous upload pipeline with retry and post-upload verification
+- Point lookups on frozen SSTables fetch just the needed klog block via one HTTP range request
+- Iterators prefetch all needed SSTable files in parallel at creation time
+- A hash-indexed LRU local file cache manages disk usage when `localCacheMaxBytes` is set
+- The MANIFEST is uploaded after each flush and compaction for cold start recovery
+- Upload failures are tracked in `totalUploadFailures` on `DbStats`
+
+### Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store.
+
+```java
+ObjectStoreConfig osConfig = ObjectStoreConfig.builder()
+    .replicaMode(true)
+    .replicaSyncIntervalUs(1000000)  // 1 second sync interval
+    .replicaReplayWal(true)          // replay WAL for fresh reads
+    .build();
+
+Config config = Config.builder("./mydb_replica")
+    .objectStoreFsPath("/mnt/nfs/tidesdb-objects")  // same path as primary
+    .objectStoreConfig(osConfig)
+    .build();
+
+try (TidesDB db = TidesDB.open(config)) {
+    // reads work normally
+    ColumnFamily cf = db.getColumnFamily("my_cf");
+    try (Transaction txn = db.beginTransaction()) {
+        byte[] value = txn.get(cf, "key".getBytes());
+        // writes throw TidesDBException with ERR_READONLY
+    }
+}
+```
+
+### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary:
+
+```java
+ObjectStoreConfig osConfig = ObjectStoreConfig.builder()
+    .walSyncOnCommit(true)  // RPO = 0, every commit is durable in object store
+    .build();
+// replica sees committed data within one replicaSyncIntervalUs
+```
+
+### Promote Replica to Primary
+
+When the primary fails, promote a replica to accept writes:
+
+```java
+db.promoteToPrimary();
+// now writes are accepted
+```
+
 ### Renaming Column Families
 
 Atomically rename a column family:
@@ -772,6 +1007,35 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `logToFile` | boolean | false | Write logs to file instead of stderr |
 | `logTruncationAt` | long | 24MB | Log file truncation size (0 = no truncation) |
 | `maxMemoryUsage` | long | 0 | Global memory limit in bytes (0 = auto, 50% of system RAM) |
+| `unifiedMemtable` | boolean | false | Enable unified memtable mode (single memtable + WAL for all CFs) |
+| `unifiedMemtableWriteBufferSize` | long | 0 | Unified memtable write buffer size (0 = auto, 64MB) |
+| `unifiedMemtableSkipListMaxLevel` | int | 0 | Skip list max level for unified memtable (0 = default 12) |
+| `unifiedMemtableSkipListProbability` | float | 0 | Skip list probability for unified memtable (0 = default 0.25) |
+| `unifiedMemtableSyncMode` | int | 0 | Sync mode for unified WAL (0 = SYNC_NONE) |
+| `unifiedMemtableSyncIntervalUs` | long | 0 | Sync interval for unified WAL in microseconds |
+| `objectStoreFsPath` | String | null | Filesystem connector root directory (null = no object store) |
+| `objectStoreConfig` | ObjectStoreConfig | null | Object store behavior configuration (null = use defaults) |
+
+### Object Store Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `localCachePath` | String | null | Local directory for cached SSTable files (null = use db_path) |
+| `localCacheMaxBytes` | long | 0 | Maximum local cache size in bytes (0 = unlimited) |
+| `cacheOnRead` | boolean | true | Cache downloaded files locally |
+| `cacheOnWrite` | boolean | true | Keep local copy after upload |
+| `maxConcurrentUploads` | int | 4 | Number of parallel upload threads |
+| `maxConcurrentDownloads` | int | 8 | Number of parallel download threads |
+| `multipartThreshold` | long | 64MB | Use multipart upload above this size |
+| `multipartPartSize` | long | 8MB | Chunk size for multipart uploads |
+| `syncManifestToObject` | boolean | true | Upload MANIFEST after each compaction |
+| `replicateWal` | boolean | true | Upload closed WAL segments for replication |
+| `walUploadSync` | boolean | false | false = background WAL upload, true = block flush until uploaded |
+| `walSyncThresholdBytes` | long | 1MB | Sync active WAL when it grows by this many bytes (0 = disable) |
+| `walSyncOnCommit` | boolean | false | Upload WAL after every txn commit for RPO=0 replication |
+| `replicaMode` | boolean | false | Enable read-only replica mode |
+| `replicaSyncIntervalUs` | long | 5000000 | MANIFEST poll interval for replica sync in microseconds |
+| `replicaReplayWal` | boolean | true | Replay WAL from object store for near-real-time reads on replicas |
 
 ### Column Family Configuration
 
@@ -798,6 +1062,9 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `l1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `l0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
 | `useBtree` | boolean | false | Use B+tree format for klog (faster point lookups) |
+| `objectTargetFileSize` | long | 0 | Target SSTable size in object store mode (0 = auto) |
+| `objectLazyCompaction` | boolean | false | Compact less aggressively for remote storage |
+| `objectPrefetchCompaction` | boolean | true | Download all inputs before compaction merge |
 
 ### Compression Algorithms
 
@@ -834,6 +1101,7 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `ERR_INVALID_DB` | -10 | Database handle is invalid |
 | `ERR_UNKNOWN` | -11 | Unknown error |
 | `ERR_LOCKED` | -12 | Database is locked |
+| `ERR_READONLY` | -13 | Database is read-only (replica mode) |
 
 ## Testing
 

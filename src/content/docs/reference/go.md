@@ -54,6 +54,27 @@ export DYLD_LIBRARY_PATH="/opt/tidesdb/lib:$DYLD_LIBRARY_PATH"  # macOS
 go get github.com/tidesdb/tidesdb-go
 ```
 
+## Initialization
+
+TidesDB supports **optional** explicit initialization. If not called, TidesDB auto-initializes with the system allocator on the first `Open`.
+
+```go
+// Initialize TidesDB (optional - auto-initializes if not called)
+err := tidesdb.Init()
+if err != nil {
+    log.Fatal(err)
+}
+
+// ... use TidesDB ...
+
+// Finalize after all operations are complete (optional)
+tidesdb.Finalize()
+```
+
+:::note[Auto-initialization]
+If `Init()` is not called, TidesDB will auto-initialize with the system allocator on the first call to `Open()`.
+:::
+
 ## Usage
 
 ### Opening and Closing a Database
@@ -74,11 +95,13 @@ func main() {
         NumFlushThreads:      2,
         NumCompactionThreads: 2,
         LogLevel:             tidesdb.LogInfo,
-        BlockCacheSize:       64 * 1024 * 1024, 
+        BlockCacheSize:       64 * 1024 * 1024,
         MaxOpenSSTables:      256,
         MaxMemoryUsage:       0,                   // Global memory limit in bytes (0 = auto, 80% of system RAM)
         LogToFile:            false,               // Write logs to file instead of stderr
         LogTruncationAt:      24 * 1024 * 1024,    // Log file truncation size (24MB default)
+        ObjectStore:          nil,                  // Object store connector (nil = local only)
+        ObjectStoreConfig:    nil,                  // Object store behavior config (nil = defaults)
     }
     
     db, err := tidesdb.Open(config)
@@ -192,6 +215,9 @@ cfConfig.MinDiskSpace = 100 * 1024 * 1024         // Minimum disk space required
 cfConfig.L1FileCountTrigger = 4                   // L1 file count trigger for compaction
 cfConfig.L0QueueStallThreshold = 20               // L0 queue stall threshold
 cfConfig.UseBtree = 0                             // Use B+tree format for klog (0 = block-based)
+cfConfig.ObjectTargetFileSize = 256 * 1024 * 1024  // Target SSTable size in object store mode (0 = auto)
+cfConfig.ObjectLazyCompaction = 0                  // Less aggressive compaction in object store mode
+cfConfig.ObjectPrefetchCompaction = 1              // Download all inputs before merge
 
 err = db.CreateColumnFamily("my_cf", cfConfig)
 if err != nil {
@@ -570,6 +596,31 @@ for iter.Valid() {
 }
 ```
 
+#### Combined Key-Value Retrieval
+
+`KeyValue` retrieves both the current key and value from the iterator in a single call. This is more efficient than calling `Key()` and `Value()` separately.
+
+```go
+iter, err := txn.NewIterator(cf)
+if err != nil {
+    log.Fatal(err)
+}
+defer iter.Free()
+
+iter.SeekToFirst()
+
+for iter.Valid() {
+    key, value, err := iter.KeyValue()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Key: %s, Value: %s\n", key, value)
+
+    iter.Next()
+}
+```
+
 ### Getting Column Family Statistics
 
 Retrieve detailed statistics about a column family.
@@ -713,6 +764,22 @@ fmt.Printf("Memtable bytes: %d\n", dbStats.TotalMemtableBytes)
 | `TxnMemoryBytes` | `int64` | Bytes held by in-flight transactions |
 | `CompactionQueueSize` | `uint64` | Number of pending compaction tasks |
 | `FlushQueueSize` | `uint64` | Number of pending flush tasks in queue |
+| `UnifiedMemtableEnabled` | `bool` | Whether unified memtable mode is active |
+| `UnifiedMemtableBytes` | `int64` | Bytes in unified active memtable |
+| `UnifiedImmutableCount` | `int` | Number of unified immutable memtables |
+| `UnifiedIsFlushing` | `bool` | Whether unified memtable is currently flushing/rotating |
+| `UnifiedNextCFIndex` | `uint32` | Next CF index to be assigned in unified mode |
+| `UnifiedWalGeneration` | `uint64` | Current unified WAL generation counter |
+| `ObjectStoreEnabled` | `bool` | Whether object store mode is active |
+| `ObjectStoreConnector` | `string` | Connector name ("s3", "gcs", "fs", etc.) |
+| `LocalCacheBytesUsed` | `uint64` | Current local file cache usage in bytes |
+| `LocalCacheBytesMax` | `uint64` | Configured maximum local cache size in bytes |
+| `LocalCacheNumFiles` | `int` | Number of files tracked in local cache |
+| `LastUploadedGeneration` | `uint64` | Highest WAL generation confirmed uploaded |
+| `UploadQueueDepth` | `uint64` | Number of pending upload jobs in the queue |
+| `TotalUploads` | `uint64` | Lifetime count of objects uploaded to object store |
+| `TotalUploadFailures` | `uint64` | Lifetime count of permanently failed uploads |
+| `ReplicaMode` | `bool` | Whether running in read-only replica mode |
 
 :::note[Stack Allocated]
 Unlike `GetStats` (which heap-allocates), `GetDbStats` fills a caller-provided struct. No free is needed.
@@ -1081,6 +1148,257 @@ if err != nil {
 }
 ```
 
+## Object Store
+
+TidesDB supports pluggable object store backends for cloud-native storage. The Go binding exposes the filesystem-backed connector for testing and local replication.
+
+### Object Store Backends
+
+```go
+tidesdb.BackendFS       // Filesystem-backed (for testing/local replication)
+tidesdb.BackendS3       // S3-compatible object store
+tidesdb.BackendUnknown  // Unknown backend
+```
+
+### Creating a Filesystem Object Store
+
+```go
+store, err := tidesdb.ObjStoreFsCreate("/path/to/object/root")
+if err != nil {
+    log.Fatal(err)
+}
+
+config := tidesdb.Config{
+    DBPath:               "./mydb",
+    NumFlushThreads:      2,
+    NumCompactionThreads: 2,
+    LogLevel:             tidesdb.LogInfo,
+    BlockCacheSize:       64 * 1024 * 1024,
+    MaxOpenSSTables:      256,
+    ObjectStore:          store,
+}
+
+db, err := tidesdb.Open(config)
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+```
+
+### Object Store Configuration
+
+Use `ObjStoreDefaultConfig()` to get a configuration with sensible defaults, then override specific fields:
+
+```go
+objConfig := tidesdb.ObjStoreDefaultConfig()
+objConfig.LocalCachePath = "/tmp/tidesdb-cache"
+objConfig.LocalCacheMaxBytes = 1024 * 1024 * 1024  // 1GB local cache
+objConfig.CacheOnRead = true
+objConfig.CacheOnWrite = true
+objConfig.MaxConcurrentUploads = 8
+objConfig.MaxConcurrentDownloads = 16
+
+config := tidesdb.Config{
+    DBPath:            "./mydb",
+    ObjectStore:       store,
+    ObjectStoreConfig: &objConfig,
+    // ... other fields ...
+}
+```
+
+**ObjStoreConfig Fields**
+| Field | Type | Description |
+|-------|------|-------------|
+| `LocalCachePath` | `string` | Local directory for cached SSTable files (empty = use db_path) |
+| `LocalCacheMaxBytes` | `uint64` | Max local cache size in bytes (0 = unlimited) |
+| `CacheOnRead` | `bool` | Cache downloaded files locally (default true) |
+| `CacheOnWrite` | `bool` | Keep local copy after upload (default true) |
+| `MaxConcurrentUploads` | `int` | Parallel upload threads (default 4) |
+| `MaxConcurrentDownloads` | `int` | Parallel download threads (default 8) |
+| `MultipartThreshold` | `uint64` | Use multipart upload above this size (default 64MB) |
+| `MultipartPartSize` | `uint64` | Multipart chunk size (default 8MB) |
+| `SyncManifestToObject` | `bool` | Upload MANIFEST after each compaction (default true) |
+| `ReplicateWal` | `bool` | Upload closed WAL segments for recovery (default true) |
+| `WalUploadSync` | `bool` | Block flush until WAL uploaded (default false) |
+| `WalSyncThresholdBytes` | `uint64` | Sync active WAL when it grows by this many bytes (default 1MB, 0 = off) |
+| `WalSyncOnCommit` | `bool` | Upload WAL after every txn commit for RPO=0 (default false) |
+| `ReplicaMode` | `bool` | Enable read-only replica mode (default false) |
+| `ReplicaSyncIntervalUs` | `uint64` | MANIFEST poll interval in microseconds (default 5000000) |
+| `ReplicaReplayWal` | `bool` | Replay WAL for near-real-time reads on replicas (default true) |
+
+### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `ObjectTargetFileSize` | `uint64` | `0` (auto) | Target SSTable size in object store mode |
+| `ObjectLazyCompaction` | `int` | `0` | 1 to compact less aggressively for remote storage |
+| `ObjectPrefetchCompaction` | `int` | `1` | 1 to download all inputs before compaction merge |
+
+### Object Store Statistics
+
+`GetDbStats` includes object store fields when a connector is active.
+
+```go
+dbStats, err := db.GetDbStats()
+if err != nil {
+    log.Fatal(err)
+}
+
+if dbStats.ObjectStoreEnabled {
+    fmt.Printf("Connector: %s\n", dbStats.ObjectStoreConnector)
+    fmt.Printf("Total uploads: %d\n", dbStats.TotalUploads)
+    fmt.Printf("Upload failures: %d\n", dbStats.TotalUploadFailures)
+    fmt.Printf("Upload queue depth: %d\n", dbStats.UploadQueueDepth)
+    fmt.Printf("Local cache: %d / %d bytes\n",
+        dbStats.LocalCacheBytesUsed, dbStats.LocalCacheBytesMax)
+}
+```
+
+### Cold Start Recovery
+
+When the local database directory is empty but a connector is configured, TidesDB automatically discovers column families from the object store during recovery. It downloads MANIFEST and config files in parallel, reconstructs the SSTable inventory, and fetches SSTable data on demand as queries arrive.
+
+```go
+// delete all local state
+os.RemoveAll("./mydb")
+
+// reopen with the same connector -- cold start recovery
+config := tidesdb.Config{
+    DBPath:            "./mydb",
+    ObjectStore:       store,
+    ObjectStoreConfig: &objConfig,
+}
+
+db, err := tidesdb.Open(config)
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+
+// all data is available -- SSTables are fetched from the object store on demand
+cf, err := db.GetColumnFamily("my_cf")
+```
+
+### How It Works
+
+- Object store mode requires unified memtable mode. Setting `ObjectStore` on the config automatically enables `UnifiedMemtable`
+- After each flush, SSTables are uploaded to the object store via an asynchronous upload pipeline with retry (3 attempts with exponential backoff) and post-upload verification (size check)
+- Point lookups on frozen SSTables (not present locally) fetch just the single needed klog block (~64KB) via one HTTP range request using `range_get`, bypassing the full file download. The block is cached in the clock cache so subsequent reads are pure memory hits. If the value is in the vlog, a second range request fetches just that vlog block
+- Iterators prefetch all needed SSTable files in parallel at creation time using bounded threads (`MaxConcurrentDownloads`, default 8), so sequential reads proceed at local disk speed
+- A hash-indexed LRU local file cache manages disk usage, evicting least-recently-used SSTable file pairs (klog + vlog together) when `LocalCacheMaxBytes` is set
+- The MANIFEST is uploaded asynchronously after each flush and compaction so cold start recovery can reconstruct the SSTable inventory without blocking the flush worker
+- Compaction runs on local files. Input SSTables are downloaded if evicted, output SSTables are uploaded after the merge
+- Upload failures are tracked in `TotalUploadFailures` on `DbStats` for operator monitoring
+
+## Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store. The primary handles all writes while replicas poll for MANIFEST updates and replay WAL segments for near-real-time reads.
+
+### Enabling Replica Mode
+
+```go
+store, err := tidesdb.ObjStoreFsCreate("/path/to/shared/objects")
+if err != nil {
+    log.Fatal(err)
+}
+
+objConfig := tidesdb.ObjStoreDefaultConfig()
+objConfig.ReplicaMode = true
+objConfig.ReplicaSyncIntervalUs = 1000000  // 1 second sync interval
+objConfig.ReplicaReplayWal = true          // replay WAL for fresh reads
+
+config := tidesdb.Config{
+    DBPath:            "./mydb_replica",
+    ObjectStore:       store,  // same object store as the primary
+    ObjectStoreConfig: &objConfig,
+}
+
+db, err := tidesdb.Open(config)
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+
+// reads work normally
+txn, _ := db.BeginTxn()
+value, _ := txn.Get(cf, []byte("key"))
+txn.Free()
+
+// writes are rejected with ErrReadonly
+```
+
+### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary so every committed write is uploaded to the object store immediately.
+
+```go
+objConfig := tidesdb.ObjStoreDefaultConfig()
+objConfig.WalSyncOnCommit = true  // RPO = 0, every commit is durable in object store
+
+// replica sees committed data within one ReplicaSyncIntervalUs
+```
+
+### Promoting a Replica to Primary
+
+When the primary fails, promote a replica to accept writes.
+
+```go
+err := db.PromoteToPrimary()
+if err != nil {
+    log.Fatal(err)
+}
+
+// now writes are accepted
+txn, _ := db.BeginTxn()
+txn.Put(cf, []byte("key"), []byte("value"), -1)
+txn.Commit()
+txn.Free()
+```
+
+`PromoteToPrimary` performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. The function returns an error if the node is already a primary.
+
+### How Replica Sync Works
+
+- The reaper thread polls the remote MANIFEST for each CF every `ReplicaSyncIntervalUs`
+- New SSTables from the primary's flushes and compactions are added to the replica's levels
+- SSTables compacted away on the primary are removed from the replica's levels
+- When `ReplicaReplayWal` is enabled, the latest WAL is downloaded and replayed into the memtable for near-real-time reads
+- WAL replay is idempotent using sequence numbers so entries already present are skipped
+- SSTable data is not downloaded during sync. It is fetched on demand via range_get for point lookups or prefetch for iterators
+
+## Configuration Persistence (INI)
+
+Column family configurations can be saved to and loaded from INI files.
+
+### Save Configuration to INI
+
+```go
+cfConfig := tidesdb.DefaultColumnFamilyConfig()
+cfConfig.WriteBufferSize = 128 * 1024 * 1024
+cfConfig.CompressionAlgorithm = tidesdb.ZstdCompression
+
+err := tidesdb.CfConfigSaveToIni("config.ini", "my_cf", cfConfig)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Load Configuration from INI
+
+```go
+loaded, err := tidesdb.CfConfigLoadFromIni("config.ini", "my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+err = db.CreateColumnFamily("my_cf", *loaded)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
 ## Error Handling
 
 ```go
@@ -1127,6 +1445,7 @@ if err != nil {
 - `ErrInvalidDB` (-10) · Invalid database handle
 - `ErrUnknown` (-11) · Unknown error
 - `ErrLocked` (-12) · Database is locked
+- `ErrReadonly` (-13) · Database is read-only (replica mode)
 
 ## Complete Example
 
@@ -1467,4 +1786,27 @@ go test -v -run TestPurge
 
 # Run database-level stats test
 go test -v -run TestGetDbStats
+
+# Run iterator key-value test
+go test -v -run TestIterKeyValue
+
+# Run init/finalize test
+go test -v -run TestInitFinalize
+
+# Run object store config tests
+go test -v -run TestObjStoreDefaultConfig
+go test -v -run TestObjStoreFsCreate
+go test -v -run TestObjStoreBackendConstants
+
+# Run column family config object store fields test
+go test -v -run TestColumnFamilyConfigObjectStoreFields
+
+# Run db stats object store fields test
+go test -v -run TestDbStatsObjectStoreFields
+
+# Run INI config test
+go test -v -run TestCfConfigIni
+
+# Run error code readonly test
+go test -v -run TestErrorCodeReadonly
 ```

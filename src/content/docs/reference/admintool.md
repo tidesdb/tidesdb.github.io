@@ -55,8 +55,37 @@ admintool -d ./mydb -c "cf-list"
 ### open
 Open or create a database.
 ```
-open <path>
+open <path> [options]
 ```
+
+**Options**
+| Option | Description |
+|--------|-------------|
+| `--unified` | Enable unified memtable mode |
+| `--unified-buffer-size <n>` | Unified memtable write buffer size (bytes) |
+| `--unified-sync <mode>` | Unified WAL sync mode (`none`\|`interval`\|`full`) |
+| `--unified-sync-interval <us>` | Unified WAL sync interval (microseconds) |
+| `--cache-size <n>` | Block cache size (bytes, 0 to disable) |
+| `--max-open-sstables <n>` | Max cached SSTable structures |
+| `--flush-threads <n>` | Flush thread pool size |
+| `--compaction-threads <n>` | Compaction thread pool size |
+| `--max-memory <n>` | Global memory limit (bytes, 0 = auto) |
+
+**Examples**
+```
+admintool> open ./mydb
+Opened database at './mydb'
+
+admintool> open ./mydb --unified
+Opened database at './mydb' (unified memtable)
+
+admintool> open ./mydb --unified --cache-size 134217728 --flush-threads 4
+Opened database at './mydb' (unified memtable)
+```
+
+:::note[Unified Memtable Mode]
+When `--unified` is set, all column families share a single skip list and WAL instead of each column family maintaining its own. A transaction touching N column families results in 1 WAL write instead of N. On-disk SSTables remain per-column-family. This mode is beneficial for write-heavy multi-CF workloads.
+:::
 
 ### close
 Close the current database.
@@ -65,10 +94,18 @@ close
 ```
 
 ### info
-Show database information including column families and cache stats.
+Show database information including column families, cache stats, and mode.
 ```
 info
 ```
+
+**Output includes**
+- Database path
+- Column family list
+- Block cache statistics (entries, size, hits, misses, hit rate, partitions)
+- Unified memtable status (enabled/disabled)
+- Object store status and connector type (if active)
+- Replica mode status (if active)
 
 ### backup
 Create a backup of the open database.
@@ -93,15 +130,69 @@ cf-list
 ### cf-create
 Create a new column family.
 ```
-cf-create <name> [--btree]
+cf-create <name> [options]
 ```
-- `--btree` · Use B+tree format for klog (faster point lookups)
 
-**Example**
+**Options**
+| Option | Description |
+|--------|-------------|
+| `--btree` | Use B+tree format for klog (faster point lookups) |
+| `--compression <algo>` | Compression algorithm: `none`\|`lz4`\|`lz4-fast`\|`zstd`\|`snappy` |
+| `--bloom-fpr <rate>` | Bloom filter false positive rate (e.g., `0.01` for 1%) |
+| `--no-bloom` | Disable bloom filters |
+| `--sync <mode>` | WAL sync mode: `none`\|`interval`\|`full` |
+| `--sync-interval <us>` | Sync interval in microseconds (for `interval` mode) |
+| `--comparator <name>` | Key comparator: `memcmp`\|`lexicographic`\|`uint64`\|`int64`\|`reverse`\|`case_insensitive` |
+| `--write-buffer-size <n>` | Memtable flush threshold (bytes) |
+| `--klog-value-threshold <n>` | Value size threshold for vlog storage (bytes) |
+| `--block-index-prefix-len <n>` | Block index prefix length |
+| `--index-sample-ratio <n>` | Block index sample ratio |
+| `--no-block-indexes` | Disable block indexes |
+| `--skip-list-max-level <n>` | Skip list max level |
+| `--skip-list-probability <f>` | Skip list probability |
+| `--isolation <level>` | Default transaction isolation level |
+| `--min-disk-space <n>` | Minimum required disk space (bytes) |
+| `--l1-trigger <n>` | L1 file count compaction trigger |
+| `--l0-stall <n>` | L0 queue stall threshold |
+| `--level-size-ratio <n>` | Level size multiplier |
+| `--min-levels <n>` | Minimum LSM levels |
+
+**Examples**
 ```
 cf-create users
 cf-create cache --btree
+cf-create logs --compression zstd --sync full --bloom-fpr 0.001
+cf-create events --comparator reverse --write-buffer-size 134217728
 ```
+
+**Compression algorithms**
+
+| Algorithm | Description | Use case |
+|-----------|-------------|----------|
+| `none` | No compression | Pre-compressed data, max write throughput |
+| `lz4` | LZ4 standard (default) | General purpose, balanced |
+| `lz4-fast` | LZ4 fast mode | Write-heavy, speed over ratio |
+| `zstd` | Zstandard | Best compression ratio, storage-constrained |
+| `snappy` | Snappy | Legacy compatibility (not available on SunOS) |
+
+**Sync modes**
+
+| Mode | Description | Use case |
+|------|-------------|----------|
+| `none` | No explicit sync, relies on OS page cache | Caches, temporary data |
+| `interval` | Periodic background syncing | Most production workloads |
+| `full` | Fsync on every write | Financial transactions, audit logs |
+
+**Built-in comparators**
+
+| Name | Description |
+|------|-------------|
+| `memcmp` | Binary byte-by-byte comparison (default) |
+| `lexicographic` | Null-terminated string comparison |
+| `uint64` | Unsigned 64-bit integer comparison |
+| `int64` | Signed 64-bit integer comparison |
+| `reverse` | Reverse binary comparison (descending order) |
+| `case_insensitive` | Case-insensitive ASCII comparison |
 
 ### cf-drop
 Drop a column family.
@@ -159,12 +250,63 @@ Show flush/compaction status.
 cf-status <name>
 ```
 
+### cf-update
+Update runtime-safe configuration settings for a column family. Changes apply to new operations only; existing SSTables and memtables retain their original settings.
+```
+cf-update <name> [options]
+```
+
+**Options**
+
+All options from `cf-create` are supported except `--btree` and `--comparator` (these cannot be changed after creation). Additionally:
+
+| Option | Description |
+|--------|-------------|
+| `--persist` | Save changes to disk (default) |
+| `--no-persist` | Apply changes in-memory only |
+
+**Updatable settings**
+- `--compression` · Compression for new SSTables (existing SSTables retain their original compression)
+- `--bloom-fpr`, `--no-bloom` · Bloom filter settings for new SSTables
+- `--sync`, `--sync-interval` · Durability mode (also updates the active WAL immediately)
+- `--write-buffer-size` · Memtable flush threshold
+- `--klog-value-threshold` · Value log threshold for new writes
+- `--block-index-prefix-len`, `--index-sample-ratio`, `--no-block-indexes` · Block index settings for new SSTables
+- `--skip-list-max-level`, `--skip-list-probability` · Skip list settings for new memtables
+- `--isolation` · Default transaction isolation level
+- `--level-size-ratio`, `--min-levels` · LSM level sizing
+- `--l1-trigger`, `--l0-stall` · Compaction and backpressure thresholds
+- `--min-disk-space` · Minimum disk space required
+
+**Non-updatable settings**
+- `--comparator` · Cannot change sort order after creation (would corrupt key ordering)
+- `--btree` · Cannot change klog format after creation (existing SSTables use the original format)
+
+**Examples**
+```
+admintool(./mydb)> cf-update users --compression zstd --bloom-fpr 0.001
+Configuration updated for 'users' (persisted to disk)
+
+admintool(./mydb)> cf-update cache --write-buffer-size 268435456 --no-persist
+Configuration updated for 'cache' (in-memory only)
+```
+
 ## Key-Value Operations
 
 ### put
 Insert or update a key-value pair.
 ```
-put <cf> <key> <value>
+put <cf> <key> <value> [--ttl <seconds>]
+```
+- `--ttl <seconds>` · Set time-to-live in seconds from now. The key expires after the specified duration. If omitted, the key does not expire.
+
+**Examples**
+```
+admintool(./mydb)> put users user:1 "John Doe"
+OK
+
+admintool(./mydb)> put sessions sess:abc "token123" --ttl 3600
+OK (expires at 1711584000)
 ```
 
 ### get
@@ -264,15 +406,53 @@ wal-info <wal_path>
 ```
 
 ### wal-dump
-Dump WAL entries.
+Dump WAL entries. Automatically detects per-CF and unified WAL formats.
 ```
 wal-dump <wal_path> [limit]
 ```
+Default limit: 1000
+
+For unified WAL files (created when using `--unified` mode), each entry is prefixed with `[CF:<index>]` showing which column family the entry belongs to. Unified WAL blocks can contain multiple entries per block.
+
+**Example (per-CF WAL)**
+```
+admintool(./mydb)> wal-dump ./mydb/users/wal_000001.log 5
+WAL Entries (limit: 5):
+1) [PUT] seq=1 key="user:1" value="John Doe"
+2) [PUT] [TTL:1711584000] seq=2 key="sess:abc" value="token123"
+3) [DELETE] seq=3 key="user:2"
+
+(3 WAL entries dumped)
+```
+
+**Example (unified WAL)**
+```
+admintool(./mydb)> wal-dump ./mydb/uwal_000001.log 5
+WAL Entries (limit: 5):
+1) [CF:0] [PUT] seq=10 key="user:1" value="Alice"
+2) [CF:1] [PUT] seq=10 key="order:1" value="item_A"
+3) [CF:0] [PUT] seq=11 key="user:2" value="Bob"
+
+(3 WAL entries dumped)
+```
 
 ### wal-verify
-Verify WAL integrity.
+Verify WAL integrity. Automatically detects per-CF and unified WAL formats and reports the format type.
 ```
 wal-verify <wal_path>
+```
+
+**Example**
+```
+admintool(./mydb)> wal-verify ./mydb/users/wal_000001.log
+Verifying WAL: ./mydb/users/wal_000001.log
+  File Size: 4096 bytes
+  Format: Per-CF WAL
+  Valid Entries: 42
+  Corrupted Entries: 0
+  Sequence Range: 1 - 42
+  Last Valid Position: 3840
+  Status: OK
 ```
 
 ### wal-checksum
@@ -418,6 +598,8 @@ db-stats
 - Open SSTable handles
 - In-flight transaction memory
 - Immutable memtable count and total memtable bytes
+- Unified memtable section (if enabled): memtable bytes, immutable count, flushing status, WAL generation, next CF index
+- Object store section (if enabled): connector type, replica mode, local cache usage, upload stats
 
 **Example**
 ```
@@ -439,18 +621,109 @@ Database Statistics:
   In-Flight Txn Memory: 0 bytes
   Immutable Memtables: 0
   Total Memtable Bytes: 2048
+  Unified Memtable:
+    Enabled: yes
+    Memtable Bytes: 4096
+    Immutable Count: 0
+    Is Flushing: no
+    Next CF Index: 3
+    WAL Generation: 7
 ```
+
+**Example with object store**
+```
+admintool(./mydb)> db-stats
+...
+  Object Store:
+    Enabled: yes
+    Connector: s3
+    Replica Mode: no
+    Local Cache: 524288000 / 1073741824 bytes (42 files)
+    Last Uploaded Generation: 6
+    Upload Queue Depth: 0
+    Total Uploads: 156
+    Total Upload Failures: 0
+```
+
+### cache-stats
+Show detailed block cache statistics.
+```
+cache-stats
+```
+
+**Output includes**
+- Whether cache is enabled
+- Total cached entries and size (bytes and MB)
+- Cache hits and misses
+- Hit rate percentage
+- Number of cache partitions
+
+**Example**
+```
+admintool(./mydb)> cache-stats
+Block Cache Statistics:
+  Enabled: yes
+  Entries: 128
+  Size: 8388608 bytes (8.00 MB)
+  Hits: 5432
+  Misses: 312
+  Hit Rate: 94.57%
+  Partitions: 8
+```
+
+### range-cost
+Estimate the computational cost of iterating between two keys in a column family. Uses only in-memory metadata with no disk I/O. The returned value is a relative scalar, meaningful only for comparison with other `range-cost` results.
+```
+range-cost <cf> <key_a> <key_b>
+```
+
+**Example**
+```
+admintool(./mydb)> range-cost users user:0000 user:0999
+Range cost for 'users' [user:0000 .. user:0999]: 42.500000
+
+admintool(./mydb)> range-cost users user:1000 user:1099
+Range cost for 'users' [user:1000 .. user:1099]: 8.250000
+```
+
+**Use cases**
+- Query planning: compare candidate key ranges to find the cheapest to scan
+- Load balancing: distribute range scan work across threads
+- Monitoring: track data distribution changes across key ranges
+
+:::note[Cost Values]
+A cost of 0.0 means no overlapping SSTables or memtable entries were found. Key order does not matter -- the function normalizes the range.
+:::
+
+### promote
+Promote a read-only replica to primary. This performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode.
+```
+promote
+```
+
+**Example**
+```
+admintool(./mydb_replica)> promote
+Promoted to primary successfully.
+```
+
+**Behavior**
+- Only valid when the database is in replica mode
+- Performs a final MANIFEST sync and WAL replay
+- Atomically transitions from replica to primary mode
+- After promotion, writes are accepted normally
+- Returns an error if the database is already a primary
 
 ## Interactive Mode
 
 When run without `-c`, admintool enters interactive mode with a prompt:
 ```
-admintool> 
+admintool>
 ```
 
 When a database is open:
 ```
-admintool(./mydb)> 
+admintool(./mydb)>
 ```
 
 Type `help` for available commands, `quit` or `exit` to leave.
@@ -465,12 +738,36 @@ admintool(./mydb)> cf-create users
 Created column family 'users'
 ```
 
+**Create database with unified memtable**
+```
+admintool> open ./mydb --unified --cache-size 134217728
+Opened database at './mydb' (unified memtable)
+```
+
+**Create column family with custom settings**
+```
+admintool(./mydb)> cf-create logs --compression zstd --sync interval --sync-interval 100000 --bloom-fpr 0.001
+Created column family 'logs'
+```
+
+**Update column family configuration at runtime**
+```
+admintool(./mydb)> cf-update users --compression zstd --write-buffer-size 268435456
+Configuration updated for 'users' (persisted to disk)
+```
+
 **Insert and retrieve data**
 ```
 admintool(./mydb)> put users user:1 "John Doe"
 OK
 admintool(./mydb)> get users user:1
 John Doe
+```
+
+**Insert with TTL**
+```
+admintool(./mydb)> put sessions sess:abc "token123" --ttl 3600
+OK (expires at 1711584000)
 ```
 
 **Inspect column family**
@@ -488,6 +785,14 @@ Column Family: users
 admintool(./mydb)> prefix users user: 10
 1) "user:1" -> "John Doe"
 (1 entries with prefix)
+```
+
+**Compare range scan costs**
+```
+admintool(./mydb)> range-cost users user:0000 user:0999
+Range cost for 'users' [user:0000 .. user:0999]: 42.500000
+admintool(./mydb)> range-cost users user:1000 user:1099
+Range cost for 'users' [user:1000 .. user:1099]: 8.250000
 ```
 
 **Verify integrity**

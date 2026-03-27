@@ -34,7 +34,7 @@ Switching from RocksDB to TidesDB requires no changes to your stream topology. Y
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-kafka</artifactId>
-    <version>0.3.0</version>
+    <version>0.3.1</version>
 </dependency>
 ```
 
@@ -134,6 +134,14 @@ These settings control the TidesDB database instance that backs the state store.
 | `maxMemoryUsage` | long | 0 (auto) | Global memory limit in bytes; 0 lets TidesDB auto-detect (50% of system RAM) |
 | `logToFile` | boolean | false | Write TidesDB logs to a file instead of stderr |
 | `logTruncationAt` | long | 24 MB | Log file truncation size; 0 disables truncation |
+| `objectStoreFsPath` | String | null | Filesystem path for object store connector; null disables object store mode |
+| `objectStoreConfig` | ObjectStoreConfig | null | Object store behavior configuration; null uses defaults |
+| `unifiedMemtable` | boolean | false | Enable unified memtable mode (single memtable + WAL for all CFs) |
+| `unifiedMemtableWriteBufferSize` | long | 0 (auto) | Unified memtable write buffer size; 0 uses 64 MB default |
+| `unifiedMemtableSkipListMaxLevel` | int | 0 (default 12) | Skip list max level for unified memtable |
+| `unifiedMemtableSkipListProbability` | float | 0 (default 0.25) | Skip list probability for unified memtable |
+| `unifiedMemtableSyncMode` | int | 0 (SYNC_NONE) | Sync mode for unified WAL |
+| `unifiedMemtableSyncIntervalUs` | long | 0 | Sync interval for unified WAL in microseconds |
 
 ### Column Family Configuration
 
@@ -160,6 +168,12 @@ Each state store maps to a single TidesDB column family. These settings control 
 | `klogValueThreshold` | long | 512 | Values larger than this go to the value log |
 | `l0QueueStallThreshold` | int | 20 | Number of L0 immutable memtables before stalling writes |
 | `l1FileCountTrigger` | int | 4 | Number of L1 files that triggers compaction |
+| `dividingLevelOffset` | int | 2 | Compaction dividing level offset |
+| `minDiskSpace` | long | 100 MB | Minimum free disk space required before writes are rejected |
+| `comparatorName` | String | "" (memcmp) | Custom comparator name; empty uses default binary comparison |
+| `objectTargetFileSize` | long | 0 (auto, 256 MB) | Target SSTable size in object store mode |
+| `objectLazyCompaction` | boolean | false | Compact less aggressively in object store mode |
+| `objectPrefetchCompaction` | boolean | true | Download all inputs before merge in object store mode |
 
 ### Store Behavior
 
@@ -198,6 +212,29 @@ The default sync mode for the Kafka plugin is `SYNC_NONE`. This is appropriate b
 | `SERIALIZABLE` | Full read-write conflict detection (SSI) |
 
 For most Kafka Streams workloads, `READ_COMMITTED` (the default) is sufficient. Higher isolation levels add overhead and are only needed when external threads access the store concurrently with custom logic.
+
+### Object Store Configuration
+
+When `objectStoreFsPath` is set, TidesDB operates in object store mode, storing SSTables in an external object store with a local file cache. The `ObjectStoreConfig` controls cache behavior, upload concurrency, WAL replication, and replica mode.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `localCachePath` | String | null (use db_path) | Local directory for cached SSTable files |
+| `localCacheMaxBytes` | long | 0 (unlimited) | Maximum local cache size in bytes |
+| `cacheOnRead` | boolean | true | Cache downloaded files locally |
+| `cacheOnWrite` | boolean | true | Keep local copy after upload |
+| `maxConcurrentUploads` | int | 4 | Parallel upload threads |
+| `maxConcurrentDownloads` | int | 8 | Parallel download threads |
+| `multipartThreshold` | long | 64 MB | Use multipart upload above this size |
+| `multipartPartSize` | long | 8 MB | Multipart chunk size |
+| `syncManifestToObject` | boolean | true | Upload MANIFEST after each compaction |
+| `replicateWal` | boolean | true | Upload closed WAL segments for recovery |
+| `walUploadSync` | boolean | false | Block flush until WAL is uploaded |
+| `walSyncThresholdBytes` | long | 1 MB | Sync active WAL when it grows by this many bytes; 0 disables |
+| `walSyncOnCommit` | boolean | false | Upload WAL after every commit for RPO=0 replication |
+| `replicaMode` | boolean | false | Enable read-only replica mode |
+| `replicaSyncIntervalUs` | long | 5000000 | MANIFEST poll interval in microseconds for replicas |
+| `replicaReplayWal` | boolean | true | Replay WAL for near-real-time reads on replicas |
 
 
 ## TTL Support
@@ -401,6 +438,154 @@ double costB = store.rangeCost("user:1000".getBytes(), "user:1099".getBytes());
 ```
 
 This is useful for query planning, load balancing range scan work across threads, and monitoring data distribution changes over time.
+
+
+## Unified Memtable Mode
+
+Enable unified memtable mode to share a single memtable and WAL across all column families. This reduces write amplification for workloads with many small column families.
+
+```java
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .unifiedMemtable(true)
+    .unifiedMemtableWriteBufferSize(0)       // 0 = auto (64 MB default)
+    .unifiedMemtableSkipListMaxLevel(0)      // 0 = default (12)
+    .unifiedMemtableSkipListProbability(0)   // 0 = default (0.25)
+    .unifiedMemtableSyncMode(0)              // 0 = SYNC_NONE
+    .unifiedMemtableSyncIntervalUs(0)        // 0 = default
+    .build();
+
+KTable<String, Long> counts = input
+    .groupByKey()
+    .count(Materialized.as(new TidesDBStoreSupplier("unified-counts", config)));
+```
+
+When unified memtable is enabled, all column families in the database instance share a single memtable and write-ahead log. This is useful when you have many column families with small write volumes, as it avoids per-CF WAL overhead.
+
+
+## Object Store Mode
+
+TidesDB supports storing SSTables in an external object store (filesystem-backed or S3-compatible) with a local file cache. This enables tiered storage, remote replication, and read-only replicas.
+
+### Basic Object Store Setup
+
+```java
+import com.tidesdb.ObjectStoreConfig;
+
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .objectStoreFsPath("/mnt/shared/tidesdb-objects")
+    .objectStoreConfig(ObjectStoreConfig.builder()
+        .localCacheMaxBytes(1024 * 1024 * 1024)   // 1 GB local cache
+        .maxConcurrentUploads(8)
+        .maxConcurrentDownloads(16)
+        .syncManifestToObject(true)
+        .replicateWal(true)
+        .build())
+    .build();
+
+KTable<String, Long> counts = input
+    .groupByKey()
+    .count(Materialized.as(new TidesDBStoreSupplier("object-store-counts", config)));
+```
+
+### Replica Mode
+
+Open a state store as a read-only replica that polls for updates from the object store:
+
+```java
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .objectStoreFsPath("/mnt/shared/tidesdb-objects")
+    .objectStoreConfig(ObjectStoreConfig.builder()
+        .replicaMode(true)
+        .replicaSyncIntervalUs(5000000)   // poll every 5 seconds
+        .replicaReplayWal(true)           // near-real-time reads
+        .build())
+    .build();
+```
+
+To switch a replica to primary mode at runtime:
+
+```java
+TidesDBStore store = (TidesDBStore) context.getStateStore("my-store");
+store.promoteToPrimary();
+```
+
+### Column Family Object Store Options
+
+Per-column-family options control SSTable sizing and compaction behavior in object store mode:
+
+```java
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .objectStoreFsPath("/mnt/shared/tidesdb-objects")
+    .objectTargetFileSize(512 * 1024 * 1024)  // 512 MB SSTables
+    .objectLazyCompaction(true)                // compact less aggressively
+    .objectPrefetchCompaction(true)            // download all inputs before merge
+    .build();
+```
+
+
+## Column Family Management
+
+The store exposes column family management operations for advanced use cases.
+
+### Listing Column Families
+
+```java
+TidesDBStore store = (TidesDBStore) context.getStateStore("my-store");
+String[] cfNames = store.listColumnFamilies();
+for (String name : cfNames) {
+    System.out.println("Column family: " + name);
+}
+```
+
+### Cloning a Column Family
+
+Create a complete, independent copy of an existing column family:
+
+```java
+store.cloneColumnFamily("default", "snapshot_cf");
+```
+
+The clone contains all data from the source at the time of cloning. Modifications to one do not affect the other.
+
+### Renaming a Column Family
+
+Atomically rename a column family. Waits for any in-progress flush or compaction to complete before renaming:
+
+```java
+store.renameColumnFamily("old_name", "new_name");
+```
+
+### Dropping a Column Family
+
+```java
+store.dropColumnFamily("old_cf");
+```
+
+### Custom Comparators
+
+Register a custom comparator for use with column families. Built-in comparators include `"memcmp"` (default), `"lexicographic"`, `"uint64"`, `"int64"`, `"reverse"`, and `"case_insensitive"`.
+
+```java
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .comparatorName("reverse")
+    .build();
+
+KTable<String, Long> counts = input
+    .groupByKey()
+    .count(Materialized.as(new TidesDBStoreSupplier("reverse-sorted", config)));
+```
+
+Comparators are set at column family creation time and cannot be changed afterward.
+
+
+## Replica Promotion
+
+If the database was opened in replica mode, switch to primary mode:
+
+```java
+TidesDBStore store = (TidesDBStore) context.getStateStore("my-store");
+store.promoteToPrimary();
+```
 
 
 ## Benchmarking

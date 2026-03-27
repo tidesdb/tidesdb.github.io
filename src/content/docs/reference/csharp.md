@@ -79,6 +79,120 @@ Console.WriteLine("Database opened successfully");
 
 ```
 
+### Opening with Unified Memtable
+
+Unified memtable mode uses a single shared memtable across all column families instead of per-CF memtables.
+
+```csharp
+using TidesDB;
+
+var config = new Config
+{
+    DbPath = "./mydb",
+    NumFlushThreads = 2,
+    NumCompactionThreads = 2,
+    LogLevel = LogLevel.Info,
+    BlockCacheSize = 64 * 1024 * 1024,
+    MaxOpenSstables = 256,
+    UnifiedMemtable = true,
+    UnifiedMemtableWriteBufferSize = 128 * 1024 * 1024,
+    UnifiedMemtableSkipListMaxLevel = 12,
+    UnifiedMemtableSkipListProbability = 0.25f,
+    UnifiedMemtableSyncMode = SyncMode.None,
+    UnifiedMemtableSyncIntervalUs = 0,
+};
+
+using var db = TidesDb.Open(config);
+```
+
+### Opening with Object Store
+
+Object store mode stores SSTables in a remote object store while using local disk as a cache. It automatically enables unified memtable mode.
+
+**Filesystem connector (testing/local replication)**
+
+```csharp
+using TidesDB;
+
+var config = new Config
+{
+    DbPath = "./mydb",
+    NumFlushThreads = 2,
+    NumCompactionThreads = 2,
+    LogLevel = LogLevel.Info,
+    BlockCacheSize = 64 * 1024 * 1024,
+    MaxOpenSstables = 256,
+    ObjectStoreConfig = new ObjectStoreConfig
+    {
+        ConnectorType = ObjectStoreConnectorType.Filesystem,
+        FsRootDir = "/mnt/nfs/tidesdb-objects",
+        LocalCacheMaxBytes = 512 * 1024 * 1024, // 512MB local cache
+        MaxConcurrentUploads = 8,
+        MaxConcurrentDownloads = 16,
+    },
+};
+
+using var db = TidesDb.Open(config);
+// SSTables are uploaded after flush
+```
+
+**Replica mode**
+
+```csharp
+using TidesDB;
+
+var config = new Config
+{
+    DbPath = "./mydb_replica",
+    ObjectStoreConfig = new ObjectStoreConfig
+    {
+        ConnectorType = ObjectStoreConnectorType.Filesystem,
+        FsRootDir = "/mnt/nfs/tidesdb-objects", // same store as primary
+        ReplicaMode = true,
+        ReplicaSyncIntervalUs = 1_000_000, // 1 second sync interval
+        ReplicaReplayWal = true,
+    },
+};
+
+using var db = TidesDb.Open(config);
+// reads work normally, writes return TDB_ERR_READONLY
+```
+
+**Promoting a replica to primary**
+
+```csharp
+// External health check detects primary is down
+db.PromoteToPrimary();
+// Now writes are accepted
+```
+
+**Object Store Configuration Options**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ConnectorType` | ObjectStoreConnectorType | Filesystem | Connector type (Filesystem or S3) |
+| `FsRootDir` | string? | null | Root directory for filesystem connector |
+| `LocalCachePath` | string? | null | Local directory for cached SSTable files (null = use db_path) |
+| `LocalCacheMaxBytes` | ulong | 0 | Maximum local cache size in bytes (0 = unlimited) |
+| `CacheOnRead` | bool | true | Cache downloaded files locally |
+| `CacheOnWrite` | bool | true | Keep local copy after upload |
+| `MaxConcurrentUploads` | int | 4 | Number of parallel upload threads |
+| `MaxConcurrentDownloads` | int | 8 | Number of parallel download threads |
+| `MultipartThreshold` | ulong | 64MB | Use multipart upload above this size |
+| `MultipartPartSize` | ulong | 8MB | Chunk size for multipart uploads |
+| `SyncManifestToObject` | bool | true | Upload MANIFEST after each compaction |
+| `ReplicateWal` | bool | true | Upload closed WAL segments for replication |
+| `WalUploadSync` | bool | false | Block flush until WAL is uploaded |
+| `WalSyncThresholdBytes` | ulong | 1MB | Sync active WAL when it grows by this many bytes (0 = off) |
+| `WalSyncOnCommit` | bool | false | Upload WAL after every txn commit for RPO=0 |
+| `ReplicaMode` | bool | false | Enable read-only replica mode |
+| `ReplicaSyncIntervalUs` | ulong | 5000000 | MANIFEST poll interval for replica sync in microseconds |
+| `ReplicaReplayWal` | bool | true | Replay WAL from object store for near-real-time reads |
+
+:::note[Object Store Mode]
+Object store mode automatically enables unified memtable mode. The S3 connector requires TidesDB built with `-DTIDESDB_WITH_S3=ON`. The filesystem connector is always available.
+:::
+
 ### Creating and Dropping Column Families
 
 Column families are isolated key-value stores with independent configuration.
@@ -104,6 +218,10 @@ db.CreateColumnFamily("my_cf", new ColumnFamilyConfig
 });
 
 db.DropColumnFamily("my_cf");
+
+// Or delete by pointer (faster when you already hold a ColumnFamily handle)
+var cf = db.GetColumnFamily("my_cf")!;
+db.DeleteColumnFamily(cf);
 ```
 
 ### Cloning a Column Family
@@ -308,6 +426,28 @@ while (iter.Valid())
 {
     Console.WriteLine($"Key: {Encoding.UTF8.GetString(iter.Key())}");
     iter.Prev();
+}
+```
+
+#### Combined Key-Value Retrieval
+
+Retrieve both key and value in a single native call, more efficient than calling `Key()` and `Value()` separately.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+using var txn = db.BeginTransaction();
+using var iter = txn.NewIterator(cf);
+
+iter.SeekToFirst();
+
+while (iter.Valid())
+{
+    var (key, value) = iter.KeyValue();
+
+    Console.WriteLine($"Key: {Encoding.UTF8.GetString(key)}, Value: {Encoding.UTF8.GetString(value)}");
+
+    iter.Next();
 }
 ```
 
@@ -623,6 +763,7 @@ catch (TidesDBException ex)
 - `TDB_ERR_INVALID_DB` (-10) · Invalid database handle
 - `TDB_ERR_UNKNOWN` (-11) · Unknown error
 - `TDB_ERR_LOCKED` (-12) · Database is locked
+- `TDB_ERR_READONLY` (-13) · Database is read-only
 
 ## Complete Example
 
@@ -874,6 +1015,16 @@ Console.WriteLine($"Open SSTable handles: {dbStats.NumOpenSstables}");
 Console.WriteLine($"In-flight txn memory: {dbStats.TxnMemoryBytes} bytes");
 Console.WriteLine($"Immutable memtables: {dbStats.TotalImmutableCount}");
 Console.WriteLine($"Memtable bytes: {dbStats.TotalMemtableBytes}");
+
+// Unified memtable stats
+Console.WriteLine($"Unified memtable enabled: {dbStats.UnifiedMemtableEnabled}");
+Console.WriteLine($"Unified memtable bytes: {dbStats.UnifiedMemtableBytes}");
+Console.WriteLine($"Unified immutable count: {dbStats.UnifiedImmutableCount}");
+Console.WriteLine($"Unified is flushing: {dbStats.UnifiedIsFlushing}");
+
+// Object store stats (when enabled)
+Console.WriteLine($"Object store enabled: {dbStats.ObjectStoreEnabled}");
+Console.WriteLine($"Replica mode: {dbStats.ReplicaMode}");
 ```
 
 :::note[Stack Allocated]
@@ -1067,6 +1218,7 @@ using TidesDB;
 // Configuration classes
 // -- Config
 // -- ColumnFamilyConfig
+// -- ObjectStoreConfig
 // -- Stats
 // -- DbStats
 // -- CacheStats
@@ -1077,17 +1229,21 @@ using TidesDB;
 
 // Methods
 // -- TidesDb.GetComparator(string name)
+// -- TidesDb.DeleteColumnFamily(ColumnFamily cf)
 // -- TidesDb.Purge()
 // -- TidesDb.GetDbStats()
+// -- TidesDb.PromoteToPrimary()
 // -- ColumnFamily.UpdateRuntimeConfig(ColumnFamilyConfig config, bool persistToDisk)
 // -- ColumnFamily.Purge()
 // -- ColumnFamily.SyncWal()
+// -- Iterator.KeyValue()
 
 // Enums
 // -- CompressionAlgorithm
 // -- SyncMode
 // -- LogLevel
 // -- IsolationLevel
+// -- ObjectStoreConnectorType
 ```
 
 ## Configuration Reference
@@ -1105,6 +1261,13 @@ using TidesDB;
 | `MaxMemoryUsage` | ulong | 0 | Global memory limit in bytes (0 = auto, 50% of system RAM; minimum: 5% of system RAM) |
 | `LogToFile` | bool | false | Write debug logging to a file |
 | `LogTruncationAt` | ulong | 0 | Log file truncation threshold (0 = no truncation) |
+| `UnifiedMemtable` | bool | false | Enable unified memtable mode |
+| `UnifiedMemtableWriteBufferSize` | ulong | 0 | Unified memtable write buffer size (0 = auto) |
+| `UnifiedMemtableSkipListMaxLevel` | int | 0 | Skip list max level for unified memtable (0 = 12) |
+| `UnifiedMemtableSkipListProbability` | float | 0 | Skip list probability for unified memtable (0 = 0.25) |
+| `UnifiedMemtableSyncMode` | SyncMode | None | Sync mode for unified WAL |
+| `UnifiedMemtableSyncIntervalUs` | ulong | 0 | Sync interval for unified WAL in microseconds |
+| `ObjectStoreConfig` | ObjectStoreConfig? | null | Object store behavior configuration (null = disabled) |
 
 ### Column Family Configuration (ColumnFamilyConfig)
 
@@ -1131,6 +1294,9 @@ using TidesDB;
 | `L1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `L0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
 | `UseBtree` | bool | false | Use B+tree format for klog |
+| `ObjectTargetFileSize` | ulong | 0 | Target SSTable size in object store mode (0 = auto/256MB) |
+| `ObjectLazyCompaction` | bool | false | Compact less aggressively in object store mode |
+| `ObjectPrefetchCompaction` | bool | true | Download all inputs before merge in object store mode |
 
 ### Column Family Statistics (Stats)
 
@@ -1172,3 +1338,19 @@ using TidesDB;
 | `TxnMemoryBytes` | long | Bytes held by in-flight transactions |
 | `CompactionQueueSize` | ulong | Number of pending compaction tasks |
 | `FlushQueueSize` | ulong | Number of pending flush tasks in queue |
+| `UnifiedMemtableEnabled` | bool | Whether unified memtable mode is active |
+| `UnifiedMemtableBytes` | long | Bytes in unified active memtable |
+| `UnifiedImmutableCount` | int | Number of unified immutable memtables |
+| `UnifiedIsFlushing` | bool | Whether unified memtable is currently flushing/rotating |
+| `UnifiedNextCfIndex` | uint | Next CF index to be assigned in unified mode |
+| `UnifiedWalGeneration` | ulong | Current unified WAL generation counter |
+| `ObjectStoreEnabled` | bool | Whether object store mode is active |
+| `ObjectStoreConnector` | string? | Connector name ("s3", "gcs", "fs", etc.) |
+| `LocalCacheBytesUsed` | ulong | Current local file cache usage in bytes |
+| `LocalCacheBytesMax` | ulong | Configured maximum local cache size in bytes |
+| `LocalCacheNumFiles` | int | Number of files tracked in local cache |
+| `LastUploadedGeneration` | ulong | Highest WAL generation confirmed uploaded |
+| `UploadQueueDepth` | ulong | Number of pending upload jobs in the queue |
+| `TotalUploads` | ulong | Lifetime count of objects uploaded to object store |
+| `TotalUploadFailures` | ulong | Lifetime count of permanently failed uploads |
+| `ReplicaMode` | bool | Whether running in read-only replica mode |

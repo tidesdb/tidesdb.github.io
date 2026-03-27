@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ============================================================
-#  TidesDB vs RocksDB — HammerDB TPC-C / TPC-H benchmark
+#  TidesDB vs RocksDB - HammerDB TPC-C / TPC-H benchmark
 #  Requires: HammerDB 5.0, MariaDB with TidesDB+RocksDB engines
 # ============================================================
 
@@ -230,7 +230,7 @@ export TMP="${LOG_DIR}/hammerdb_tmp"
 mkdir -p "$TMP"
 
 # ---------- conditional password lines for Tcl scripts ----------
-# HammerDB's diset requires a value — omit the line entirely if empty
+# HammerDB's diset requires a value - omit the line entirely if empty
 if [[ -n "$MYSQL_PASS" ]]; then
     DISET_TPCC_PASS="diset tpcc maria_pass $MYSQL_PASS"
     DISET_TPCH_PASS="diset tpch maria_tpch_pass $MYSQL_PASS"
@@ -496,13 +496,13 @@ set_default_engine() {
 }
 
 # ============================================================
-#  DEBUG RUN (optional) — short test with raiseerror=true
+#  DEBUG RUN (optional) - short test with raiseerror=true
 # ============================================================
 if [[ "$DEBUG_RUN" -eq 1 ]]; then
     DEBUG_VU=2
 
     echo "######################################################"
-    echo "  DEBUG RUN — checking for lock conflicts"
+    echo "  DEBUG RUN - checking for lock conflicts"
     echo "  VUs: $DEBUG_VU  |  Duration: 1 min (0 ramp)"
     echo "  raiseerror: TRUE  |  driver: timed"
     echo "######################################################"
@@ -573,18 +573,18 @@ TCLEOF
             echo ""
             echo "  Issues detected for $ENGINE."
             if [[ "$DEADLOCKS" -gt 0 || "$PROC_ERRORS" -gt 0 ]]; then
-                echo "  Lock conflicts found — the timed benchmark uses"
+                echo "  Lock conflicts found - the timed benchmark uses"
                 echo "  raiseerror=false (default) so these will be silently"
                 echo "  caught and skipped. High rates may deflate TPM."
             fi
             if [[ "$ABORTS" -gt 0 ]]; then
-                echo "  Some VUs FINISHED FAILED — check log for details."
+                echo "  Some VUs FINISHED FAILED - check log for details."
             fi
             echo ""
             echo "  Relevant lines:"
             grep -iE "deadlock|lock wait|Error 1213|Error 1180|Procedure Error|FINISHED FAILED" "${DBG_PREFIX}_run.log" | head -10 || true
         else
-            echo "  No lock conflicts detected — clean run."
+            echo "  No lock conflicts detected - clean run."
         fi
         echo "  ========================================="
         echo ""
@@ -599,7 +599,7 @@ TCLEOF
     done
 
     echo "######################################################"
-    echo "  DEBUG RUN COMPLETE — proceeding to benchmark"
+    echo "  DEBUG RUN COMPLETE - proceeding to benchmark"
     echo "######################################################"
     echo ""
 fi

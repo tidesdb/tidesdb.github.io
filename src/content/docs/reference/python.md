@@ -79,6 +79,14 @@ config = tidesdb.Config(
     max_memory_usage=0,                  # Global memory limit in bytes (0 = auto, 50% of system RAM)
     log_to_file=False,                   # Write logs to file instead of stderr
     log_truncation_at=24 * 1024 * 1024,  # Log file truncation size (24MB)
+    unified_memtable=False,              # Enable unified memtable mode
+    unified_memtable_write_buffer_size=0,            # Unified memtable buffer size (0 = default)
+    unified_memtable_skip_list_max_level=0,          # Unified memtable skip list max level
+    unified_memtable_skip_list_probability=0.0,      # Unified memtable skip list probability
+    unified_memtable_sync_mode=tidesdb.SyncMode.SYNC_NONE,  # Unified memtable WAL sync mode
+    unified_memtable_sync_interval_us=0,             # Unified memtable sync interval in microseconds
+    object_store=None,                               # Object store connector (from objstore_fs_create())
+    object_store_config=None,                        # Object store behavior config (ObjStoreConfig)
 )
 db = tidesdb.TidesDB(config)
 
@@ -311,7 +319,15 @@ with db.begin_txn() as txn:
         # Seek to specific key
         it.seek(b"user:")  # First key >= "user:"
         it.seek_for_prev(b"user:z")  # Last key <= "user:z"
-        
+
+        # Combined key+value retrieval (more efficient than separate key()/value())
+        it.seek_to_first()
+        while it.valid():
+            key, value = it.key_value()
+            print(f"{key} = {value}")
+            it.next()
+
+        # Python iteration protocol (uses key_value() internally)
         it.seek_to_first()
         for key, value in it:
             print(f"{key} = {value}")
@@ -421,6 +437,20 @@ print(f"Open SSTable handles: {db_stats.num_open_sstables}")
 print(f"In-flight txn memory: {db_stats.txn_memory_bytes} bytes")
 print(f"Immutable memtables: {db_stats.total_immutable_count}")
 print(f"Memtable bytes: {db_stats.total_memtable_bytes}")
+
+# Unified memtable stats (when enabled)
+if db_stats.unified_memtable_enabled:
+    print(f"Unified memtable bytes: {db_stats.unified_memtable_bytes}")
+    print(f"Unified immutable count: {db_stats.unified_immutable_count}")
+    print(f"Unified is flushing: {db_stats.unified_is_flushing}")
+    print(f"Unified WAL generation: {db_stats.unified_wal_generation}")
+
+# Object store stats (when enabled)
+if db_stats.object_store_enabled:
+    print(f"Object store connector: {db_stats.object_store_connector}")
+    print(f"Local cache: {db_stats.local_cache_bytes_used}/{db_stats.local_cache_bytes_max} bytes")
+    print(f"Total uploads: {db_stats.total_uploads}")
+    print(f"Replica mode: {db_stats.replica_mode}")
 ```
 
 **Database statistics include**
@@ -442,6 +472,22 @@ print(f"Memtable bytes: {db_stats.total_memtable_bytes}")
 | `txn_memory_bytes` | `int` | Bytes held by in-flight transactions |
 | `compaction_queue_size` | `int` | Number of pending compaction tasks |
 | `flush_queue_size` | `int` | Number of pending flush tasks in queue |
+| `unified_memtable_enabled` | `bool` | Whether unified memtable mode is active |
+| `unified_memtable_bytes` | `int` | Bytes in the unified memtable |
+| `unified_immutable_count` | `int` | Number of unified immutable memtables |
+| `unified_is_flushing` | `bool` | Whether the unified memtable is flushing |
+| `unified_next_cf_index` | `int` | Next column family index for unified memtable |
+| `unified_wal_generation` | `int` | Current unified WAL generation number |
+| `object_store_enabled` | `bool` | Whether object store mode is active |
+| `object_store_connector` | `str` | Object store connector identifier |
+| `local_cache_bytes_used` | `int` | Bytes used in local cache |
+| `local_cache_bytes_max` | `int` | Maximum local cache size in bytes |
+| `local_cache_num_files` | `int` | Number of files in local cache |
+| `last_uploaded_generation` | `int` | Last uploaded WAL generation |
+| `upload_queue_depth` | `int` | Pending uploads in queue |
+| `total_uploads` | `int` | Total successful uploads |
+| `total_upload_failures` | `int` | Total failed uploads |
+| `replica_mode` | `bool` | Whether the database is in replica mode |
 
 :::note[Stack Allocated]
 Unlike `get_stats()` (which returns a heap-allocated struct), `get_db_stats()` fills a caller-provided struct. No manual free is needed - the Python binding handles this automatically.
@@ -756,6 +802,11 @@ config.l0_queue_stall_threshold = 20          # L0 queue stall threshold (defaul
 
 # B+tree klog format (optional)
 config.use_btree = False                      # Use B+tree klog format (default: False)
+
+# Object store settings (for object store mode)
+config.object_target_file_size = 0            # Target file size for object store (0 = auto)
+config.object_lazy_compaction = False         # Enable lazy compaction for object store
+config.object_prefetch_compaction = True      # Prefetch data during compaction (default: True)
 ```
 
 ### Custom Comparators
@@ -813,6 +864,203 @@ db.create_column_family("events", config)
 :::note
 Comparators must be registered **before** creating column families that use them. Once set, a comparator **cannot be changed** for a column family.
 :::
+
+### Unified Memtable Mode
+
+TidesDB supports a unified memtable mode where all column families share a single memtable and WAL. This can reduce write amplification and improve throughput for workloads that write to many column families simultaneously.
+
+```python
+# Open with unified memtable enabled
+db = tidesdb.TidesDB.open(
+    "./mydb",
+    unified_memtable=True,
+    unified_memtable_write_buffer_size=32 * 1024 * 1024,  # 32MB
+    unified_memtable_skip_list_max_level=12,
+    unified_memtable_skip_list_probability=0.25,
+    unified_memtable_sync_mode=tidesdb.SyncMode.SYNC_INTERVAL,
+    unified_memtable_sync_interval_us=128000,  # 128ms
+)
+
+# Or via Config object
+config = tidesdb.Config(
+    db_path="./mydb",
+    unified_memtable=True,
+    unified_memtable_write_buffer_size=32 * 1024 * 1024,
+)
+db = tidesdb.TidesDB(config)
+
+# Check if unified memtable is active
+stats = db.get_db_stats()
+if stats.unified_memtable_enabled:
+    print(f"Unified memtable: {stats.unified_memtable_bytes} bytes")
+```
+
+**Configuration options**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `unified_memtable` | `bool` | `False` | Enable unified memtable mode |
+| `unified_memtable_write_buffer_size` | `int` | `0` | Write buffer size (0 = default) |
+| `unified_memtable_skip_list_max_level` | `int` | `0` | Skip list max level (0 = default) |
+| `unified_memtable_skip_list_probability` | `float` | `0.0` | Skip list probability (0.0 = default) |
+| `unified_memtable_sync_mode` | `SyncMode` | `SYNC_NONE` | WAL sync mode |
+| `unified_memtable_sync_interval_us` | `int` | `0` | Sync interval in microseconds |
+
+### Object Store Mode
+
+Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
+
+#### Enabling Object Store Mode (Filesystem Connector)
+
+```python
+import tidesdb
+
+# Create a filesystem connector (for testing and local replication)
+store = tidesdb.objstore_fs_create("/mnt/nfs/tidesdb-objects")
+
+# Get default object store config, then customize
+os_cfg = tidesdb.objstore_default_config()
+os_cfg.local_cache_max_bytes = 512 * 1024 * 1024  # 512MB local cache
+os_cfg.max_concurrent_uploads = 8
+
+# Open database with object store
+db = tidesdb.TidesDB.open(
+    "./mydb",
+    object_store=store,
+    object_store_config=os_cfg,
+)
+
+# Use the database normally -- SSTables are uploaded after flush
+db.close()
+```
+
+#### Using Config Object
+
+```python
+import tidesdb
+
+store = tidesdb.objstore_fs_create("/mnt/nfs/tidesdb-objects")
+
+os_cfg = tidesdb.ObjStoreConfig(
+    local_cache_max_bytes=512 * 1024 * 1024,
+    max_concurrent_uploads=8,
+    max_concurrent_downloads=16,
+)
+
+config = tidesdb.Config(
+    db_path="./mydb",
+    object_store=store,
+    object_store_config=os_cfg,
+)
+
+db = tidesdb.TidesDB(config)
+```
+
+#### Object Store Configuration
+
+Use `objstore_default_config()` for sensible defaults, then override fields as needed.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `local_cache_path` | `str \| None` | `None` (uses db_path) | Local directory for cached SSTable files |
+| `local_cache_max_bytes` | `int` | `0` (unlimited) | Maximum local cache size in bytes |
+| `cache_on_read` | `bool` | `True` | Cache downloaded files locally |
+| `cache_on_write` | `bool` | `True` | Keep local copy after upload |
+| `max_concurrent_uploads` | `int` | `4` | Number of parallel upload threads |
+| `max_concurrent_downloads` | `int` | `8` | Number of parallel download threads |
+| `multipart_threshold` | `int` | `67108864` (64MB) | Use multipart upload above this size |
+| `multipart_part_size` | `int` | `8388608` (8MB) | Chunk size for multipart uploads |
+| `sync_manifest_to_object` | `bool` | `True` | Upload MANIFEST after each compaction |
+| `replicate_wal` | `bool` | `True` | Upload closed WAL segments for replication |
+| `wal_upload_sync` | `bool` | `False` | `False` for background WAL upload, `True` to block flush |
+| `wal_sync_threshold_bytes` | `int` | `1048576` (1MB) | Sync active WAL to object store when it grows by this many bytes (0 to disable) |
+| `wal_sync_on_commit` | `bool` | `False` | Upload WAL after every txn commit for RPO=0 replication |
+| `replica_mode` | `bool` | `False` | Enable read-only replica mode (writes raise `TidesDBError`) |
+| `replica_sync_interval_us` | `int` | `5000000` (5s) | MANIFEST poll interval for replica sync in microseconds |
+| `replica_replay_wal` | `bool` | `True` | Replay WAL from object store for near-real-time reads on replicas |
+
+#### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `object_target_file_size` | `int` | `0` (auto) | Target SSTable size in object store mode |
+| `object_lazy_compaction` | `bool` | `False` | Compact less aggressively for remote storage |
+| `object_prefetch_compaction` | `bool` | `True` | Download all inputs before compaction merge |
+
+#### Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store.
+
+```python
+import tidesdb
+
+store = tidesdb.objstore_fs_create("/mnt/shared/tidesdb-objects")
+
+os_cfg = tidesdb.ObjStoreConfig(
+    replica_mode=True,
+    replica_sync_interval_us=1000000,  # 1 second sync interval
+    replica_replay_wal=True,
+)
+
+db = tidesdb.TidesDB.open(
+    "./mydb_replica",
+    object_store=store,
+    object_store_config=os_cfg,
+)
+
+# Reads work normally
+cf = db.get_column_family("my_cf")
+with db.begin_txn() as txn:
+    value = txn.get(cf, b"key")
+    txn.commit()
+
+# Writes raise TidesDBError with code TDB_ERR_READONLY
+```
+
+#### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary so every committed write is uploaded to the object store immediately.
+
+```python
+os_cfg = tidesdb.ObjStoreConfig(
+    wal_sync_on_commit=True,  # RPO = 0, every commit is durable in object store
+)
+```
+
+#### Cold Start Recovery
+
+When the local database directory is empty but a connector is configured, TidesDB automatically discovers column families from the object store during recovery. It downloads MANIFEST and config files in parallel, reconstructs the SSTable inventory, and fetches SSTable data on demand as queries arrive.
+
+```python
+import shutil
+shutil.rmtree("./mydb", ignore_errors=True)
+
+# Reopen with the same connector -- cold start recovery
+db = tidesdb.TidesDB.open(
+    "./mydb",
+    object_store=store,
+    object_store_config=os_cfg,
+)
+
+# All data is available -- SSTables are fetched from the object store on demand
+cf = db.get_column_family("my_cf")
+```
+
+### Promote to Primary
+
+When a database is opened with an object store in replica mode, it is read-only. Use `promote_to_primary()` to switch to primary mode and enable writes.
+
+```python
+# Promote a replica to primary
+db.promote_to_primary()
+
+# Now writes are allowed
+with db.begin_txn() as txn:
+    txn.put(cf, b"key", b"value")
+    txn.commit()
+```
 
 ## Error Handling
 
