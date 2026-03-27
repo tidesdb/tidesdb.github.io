@@ -103,7 +103,7 @@ A key indirection table in each leaf node contains 2-byte offsets pointing to ea
 
 Delta sequence encoding stores sequence numbers within a leaf as signed deltas from a base sequence number (the minimum in the node). Since entries in a leaf typically have similar sequence numbers, deltas are small and compress well with varint encoding. TTL values use zigzag encoding for efficient signed integer representation.
 
-Internal nodes store child offsets as cumulative signed deltas. Each offset is encoded as the difference from the previous child's offset, starting from a base offset (the first child). Since child nodes are typically written sequentially, deltas are small positive values that compress efficiently.
+Internal nodes store child offsets as sequential signed deltas. Each offset is encoded as the difference from the previous child's offset, starting from a base offset (the first child). Since child nodes are typically written sequentially, deltas are small positive values that compress efficiently.
 
 **Leaf node format**
 ```
@@ -206,7 +206,7 @@ The ordering of these steps is critical. Fsync before manifest commit ensures th
 
 #### Crash Scenarios
 
-If the system crashes after fsync but before manifest commit, the SSTable exists on disk but is not discoverable. It becomes garbage and the reaper eventually deletes it. If it crashes after manifest commit but before WAL deletion, recovery finds both the SSTable and the WAL. It flushes the WAL again, creating a duplicate SSTable. The manifest deduplicates by SSTable ID.
+If the system crashes after fsync but before manifest commit, the SSTable exists on disk but is not discoverable. Recovery detects it is not in the manifest and deletes it at startup. If it crashes after manifest commit but before WAL deletion, recovery finds both the SSTable and the WAL. It flushes the WAL again, creating a duplicate SSTable. The manifest deduplicates by SSTable ID.
 
 #### Validation Modes
 
@@ -272,7 +272,7 @@ The backpressure mechanism considers both L0 queue depth and L1 file count. High
 
 #### Memory Protection
 
-Each immutable memtable holds the full contents of a flushed memtable (64MB by default). With a stall threshold of 20, the system allows up to 1.28GB of immutable memtables plus the active memtable (64MB) before blocking writes. This bounds memory usage to roughly 1.34GB per column family under maximum write pressure, preventing out-of-memory conditions.
+Each immutable memtable holds the full contents of a flushed memtable (64MB by default). The hard cap of 16 immutable memtables per column family limits queued immutable memory to 1.024GB. Combined with the active memtable (64MB), this bounds memory usage to roughly 1.09GB per column family under maximum write pressure, preventing out-of-memory conditions. The stall threshold (default 20) is higher than the hard cap, meaning writes block at the hard cap before reaching the stall threshold under normal conditions.
 
 To prevent truly unbounded memory growth from immutable accumulation, the flush path enforces a hard cap of 16 immutable memtables per column family. When the queue reaches this limit, the flush path blocks until the flush worker drains the queue below the cap. This complements the L0 stall threshold (which slows writes) by providing an absolute ceiling on immutable memory.
 
@@ -568,7 +568,7 @@ Workers coordinate through thread-safe queues and atomic flags. The main thread 
 
 ## Error Handling
 
-Functions return integer error codes. Zero indicates success; negative values indicate specific errors: `TDB_ERR_MEMORY` (-1) for allocation failure, `TDB_ERR_INVALID_ARGS` (-2) for invalid parameters, `TDB_ERR_NOT_FOUND` (-3) for key not found, `TDB_ERR_IO` (-4) for I/O errors, `TDB_ERR_CORRUPTION` (-5) for data corruption detected, `TDB_ERR_EXISTS` (-6) for resource already exists, `TDB_ERR_CONFLICT` (-7) for transaction conflict, `TDB_ERR_TOO_LARGE` (-8) for key or value too large, `TDB_ERR_MEMORY_LIMIT` (-9) for memory limit exceeded, `TDB_ERR_INVALID_DB` (-10) for invalid database handle, `TDB_ERR_UNKNOWN` (-11) for unknown error, and `TDB_ERR_LOCKED` (-12) for database locked by another process.
+Functions return integer error codes. Zero indicates success; negative values indicate specific errors: `TDB_ERR_MEMORY` (-1) for allocation failure, `TDB_ERR_INVALID_ARGS` (-2) for invalid parameters, `TDB_ERR_NOT_FOUND` (-3) for key not found, `TDB_ERR_IO` (-4) for I/O errors, `TDB_ERR_CORRUPTION` (-5) for data corruption detected, `TDB_ERR_EXISTS` (-6) for resource already exists, `TDB_ERR_CONFLICT` (-7) for transaction conflict, `TDB_ERR_TOO_LARGE` (-8) for key or value too large, `TDB_ERR_MEMORY_LIMIT` (-9) for memory limit exceeded, `TDB_ERR_INVALID_DB` (-10) for invalid database handle, `TDB_ERR_UNKNOWN` (-11) for unknown error, and `TDB_ERR_LOCKED` (-12) for database locked by another process, and `TDB_ERR_READONLY` (-13) for write operations attempted on a read-only replica.
 
 More status codes can be seen in the [C reference](/reference/c) section.
 
@@ -738,7 +738,7 @@ Insert operations use optimistic concurrency: traverse to find position, create 
 
 The hot path `skip_list_put_with_seq()` uses stack-allocated update arrays for skip lists with max_level below 64, eliminating malloc/free overhead. This covers virtually all practical configurations since 64 levels can index 2^64 entries. The default configuration uses `skip_list_max_level = 12` and `skip_list_probability = 0.25`.
 
-Skip lists can optionally be backed by a lock-free bump arena (`skip_list_new_with_arena()`). The arena allocates nodes and versions from contiguous memory blocks using a single `atomic_fetch_add` per allocation (wait-free). All allocations are aligned to 8 bytes. When a block is exhausted, a new block is allocated and linked via atomic CAS on the `current_block` pointer. Individual frees are no-ops; all memory is reclaimed in bulk when the arena is destroyed. This improves spatial locality during iteration (nodes are packed sequentially rather than scattered across the heap) and eliminates per-node `free()` overhead during skip list destruction. It is ideal for memtable skip lists that are filled, flushed to an SSTable, then freed whole. If `arena_initial_capacity` is 0, the skip list falls back to standard `malloc`/`free`.
+Skip lists can optionally be backed by a lock-free bump arena (`skip_list_new_with_arena()`). The arena allocates nodes and versions from contiguous memory blocks using thread-local block slots for the fast path (non-atomic pointer bump, zero contention). When a thread's local block is exhausted, a new block is allocated and linked via atomic CAS on the `current_block` pointer. A shared fallback block using `atomic_fetch_add` serves threads beyond the thread-local slot limit. All allocations are aligned to 8 bytes. Individual frees are no-ops; all memory is reclaimed in bulk when the arena is destroyed. This improves spatial locality during iteration (nodes are packed sequentially rather than scattered across the heap) and eliminates per-node `free()` overhead during skip list destruction. It is ideal for memtable skip lists that are filled, flushed to an SSTable, then freed whole. If `arena_initial_capacity` is 0, the skip list falls back to standard `malloc`/`free`.
 
 Each key maintains a version chain. New writes prepend a version to the chain using atomic CAS on the version list head. Readers traverse the version chain to find the appropriate version for their snapshot sequence. Tombstones are represented as versions with the DELETED flag set.
 
@@ -780,7 +780,7 @@ The `compat.h` header isolates all platform-specific code, enabling TidesDB to r
 
 ## Object Store Mode
 
-TidesDB can optionally store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) instead of relying solely on local disk. This enables cloud-native deployments where compute and storage are separated, local disk serves as a cache, and the object store provides durable, replicated storage. Object store mode requires unified memtable mode and is enabled by setting a pluggable connector on `tidesdb_config_t.object_store`.
+TidesDB can optionally store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) instead of relying solely on local disk. This enables cloud-native deployments where compute and storage are separated, local disk serves as a cache, and the object store provides durable, replicated storage. Object store mode uses unified memtable mode (automatically enabled at open time if not already set) and is activated by setting a pluggable connector on `tidesdb_config_t.object_store`.
 
 ### Pluggable Connector Interface
 
