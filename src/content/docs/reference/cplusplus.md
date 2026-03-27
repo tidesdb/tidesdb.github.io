@@ -55,6 +55,14 @@ int main() {
     config.maxMemoryUsage = 0;                      // Global memory limit in bytes (default: 0 = auto, 50% of system RAM)
     config.logToFile = false;                       // Write logs to file instead of stderr (default: false)
     config.logTruncationAt = 24 * 1024 * 1024;     // Log file truncation size (default: 24MB), 0 = no truncation
+    config.unifiedMemtable = false;                 // Enable unified memtable mode (default: false = per-CF memtables)
+    config.unifiedMemtableWriteBufferSize = 0;      // Unified memtable write buffer size (0 = auto)
+    config.unifiedMemtableSkipListMaxLevel = 0;     // Skip list max level for unified memtable (0 = default 12)
+    config.unifiedMemtableSkipListProbability = 0;  // Skip list probability (0 = default 0.25)
+    config.unifiedMemtableSyncMode = tidesdb::SyncMode::None;  // Sync mode for unified WAL
+    config.unifiedMemtableSyncIntervalUs = 0;       // Sync interval for unified WAL in microseconds
+    config.objectStore = nullptr;                    // Pluggable object store connector (nullptr = local only)
+    config.objectStoreConfig = std::nullopt;         // Object store behavior config (nullopt = defaults)
 
     try {
         tidesdb::TidesDB db(config);
@@ -156,6 +164,10 @@ cfConfig.useBtree = false;  // Use block-based format (default), set true for B+
 db.createColumnFamily("my_cf", cfConfig);
 
 db.dropColumnFamily("my_cf");
+
+// Delete by handle (faster when you already hold a handle, avoids name lookup)
+auto cf2 = db.getColumnFamily("another_cf");
+db.deleteColumnFamily(cf2);
 ```
 
 ### CRUD Operations
@@ -358,6 +370,24 @@ while (iter.valid()) {
 
 This pattern works across both memtables and SSTables. When block indexes are enabled, the seek operation uses binary search to jump directly to the relevant block, making prefix scans efficient even on large datasets.
 
+#### Combined Key-Value Fetch
+
+`keyValue()` retrieves both key and value in a single call, which can be more efficient than separate `key()` and `value()` calls.
+
+```cpp
+auto iter = txn.newIterator(cf);
+iter.seekToFirst();
+
+while (iter.valid()) {
+    auto [key, value] = iter.keyValue();
+    std::string keyStr(key.begin(), key.end());
+    std::string valueStr(value.begin(), value.end());
+
+    std::cout << keyStr << " = " << valueStr << std::endl;
+    iter.next();
+}
+```
+
 ### Getting Column Family Statistics
 
 Retrieve detailed statistics about a column family.
@@ -437,6 +467,23 @@ std::cout << "Open SSTable handles: " << dbStats.numOpenSstables << std::endl;
 std::cout << "In-flight txn memory: " << dbStats.txnMemoryBytes << " bytes" << std::endl;
 std::cout << "Immutable memtables: " << dbStats.totalImmutableCount << std::endl;
 std::cout << "Memtable bytes: " << dbStats.totalMemtableBytes << std::endl;
+
+// Unified memtable fields
+std::cout << "Unified memtable enabled: " << dbStats.unifiedMemtableEnabled << std::endl;
+std::cout << "Unified memtable bytes: " << dbStats.unifiedMemtableBytes << std::endl;
+std::cout << "Unified immutable count: " << dbStats.unifiedImmutableCount << std::endl;
+std::cout << "Unified is flushing: " << dbStats.unifiedIsFlushing << std::endl;
+std::cout << "Unified WAL generation: " << dbStats.unifiedWalGeneration << std::endl;
+
+// Object store fields
+std::cout << "Object store enabled: " << dbStats.objectStoreEnabled << std::endl;
+if (dbStats.objectStoreEnabled) {
+    std::cout << "Object store connector: " << dbStats.objectStoreConnector << std::endl;
+    std::cout << "Local cache bytes used: " << dbStats.localCacheBytesUsed << std::endl;
+    std::cout << "Upload queue depth: " << dbStats.uploadQueueDepth << std::endl;
+    std::cout << "Total uploads: " << dbStats.totalUploads << std::endl;
+}
+std::cout << "Replica mode: " << dbStats.replicaMode << std::endl;
 ```
 
 **Database statistics fields**
@@ -455,6 +502,22 @@ std::cout << "Memtable bytes: " << dbStats.totalMemtableBytes << std::endl;
 - `txnMemoryBytes` · Bytes held by in-flight transactions
 - `compactionQueueSize` · Number of pending compaction tasks
 - `flushQueueSize` · Number of pending flush tasks in queue
+- `unifiedMemtableEnabled` · Whether unified memtable mode is active
+- `unifiedMemtableBytes` · Bytes in unified active memtable
+- `unifiedImmutableCount` · Number of unified immutable memtables
+- `unifiedIsFlushing` · Whether unified memtable is currently flushing/rotating
+- `unifiedNextCfIndex` · Next CF index to be assigned in unified mode
+- `unifiedWalGeneration` · Current unified WAL generation counter
+- `objectStoreEnabled` · Whether object store mode is active
+- `objectStoreConnector` · Connector name ("s3", "gcs", "fs", etc.)
+- `localCacheBytesUsed` · Current local file cache usage in bytes
+- `localCacheBytesMax` · Configured maximum local cache size in bytes
+- `localCacheNumFiles` · Number of files tracked in local cache
+- `lastUploadedGeneration` · Highest WAL generation confirmed uploaded
+- `uploadQueueDepth` · Number of pending upload jobs in the queue
+- `totalUploads` · Lifetime count of objects uploaded to object store
+- `totalUploadFailures` · Lifetime count of permanently failed uploads
+- `replicaMode` · Whether running in read-only replica mode
 
 Unlike `getStats()` (which heap-allocates internally), `getDbStats()` fills a stack-allocated struct. No free is needed.
 
@@ -589,6 +652,44 @@ db.purge();
 :::tip[Purge vs Manual Flush + Compact]
 `flushMemtable()` and `compact()` are non-blocking, they enqueue work and return immediately. `ColumnFamily::purge()` and `TidesDB::purge()` are synchronous, they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
+
+### Promote Replica to Primary
+
+Switch a read-only replica database to primary (read-write) mode.
+
+```cpp
+db.promoteToPrimary();
+```
+
+**Behavior**
+- Only valid when the database was opened in replica mode (via object store configuration)
+- Transitions the database from read-only to read-write mode
+- Throws `ErrorCode::InvalidArgs` if the database is not a replica
+
+### Unified Memtable Mode
+
+Enable a single shared memtable across all column families for reduced memory overhead and simplified WAL management.
+
+```cpp
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.unifiedMemtable = true;
+config.unifiedMemtableWriteBufferSize = 64 * 1024 * 1024;  // 64MB unified buffer
+config.unifiedMemtableSkipListMaxLevel = 12;
+config.unifiedMemtableSkipListProbability = 0.25f;
+config.unifiedMemtableSyncMode = tidesdb::SyncMode::Interval;
+config.unifiedMemtableSyncIntervalUs = 128000;
+
+tidesdb::TidesDB db(config);
+```
+
+**Configuration fields**
+- `unifiedMemtable` · Enable unified memtable mode (default: false = per-CF memtables)
+- `unifiedMemtableWriteBufferSize` · Write buffer size for unified memtable (0 = auto)
+- `unifiedMemtableSkipListMaxLevel` · Skip list max level (0 = default 12)
+- `unifiedMemtableSkipListProbability` · Skip list probability (0 = default 0.25)
+- `unifiedMemtableSyncMode` · Sync mode for unified WAL (default: `SyncMode::None`)
+- `unifiedMemtableSyncIntervalUs` · Sync interval for unified WAL in microseconds (default: 0)
 
 ### Updating Runtime Configuration
 
@@ -899,6 +1000,215 @@ cf.syncWal();
 - Thread-safe -- can be called concurrently from multiple threads
 - If the memtable rotates during the call, retries with the new active memtable
 
+## Object Store Mode
+
+Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
+
+### Enabling Object Store Mode (Filesystem Connector)
+
+```cpp
+#include <tidesdb/tidesdb.hpp>
+
+// create a filesystem connector (for testing and local replication)
+tidesdb_objstore_t* store = tidesdb_objstore_fs_create("/mnt/nfs/tidesdb-objects");
+
+auto osCfg = tidesdb::ObjectStoreConfig::defaultConfig();
+
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.objectStore = store;
+config.objectStoreConfig = osCfg;
+
+tidesdb::TidesDB db(config);
+
+// use the database normally -- SSTables are uploaded after flush
+```
+
+### Enabling Object Store Mode (S3/MinIO Connector)
+
+Build with `-DTIDESDB_WITH_S3=ON` to enable the S3 connector. This requires libcurl and OpenSSL.
+
+```cpp
+#include <tidesdb/tidesdb.hpp>
+
+tidesdb_objstore_t* s3 = tidesdb_objstore_s3_create(
+    "s3.amazonaws.com",      // endpoint
+    "my-tidesdb-bucket",     // bucket
+    "production/db1/",       // key prefix (or nullptr)
+    "AKIAIOSFODNN7EXAMPLE",  // access key
+    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", // secret key
+    "us-east-1",             // region
+    1,                       // use_ssl (HTTPS)
+    0                        // use_path_style (0 for AWS, 1 for MinIO)
+);
+
+auto osCfg = tidesdb::ObjectStoreConfig::defaultConfig();
+osCfg.localCacheMaxBytes = 512 * 1024 * 1024; // 512MB local cache
+osCfg.maxConcurrentUploads = 8;
+
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.objectStore = s3;
+config.objectStoreConfig = osCfg;
+
+tidesdb::TidesDB db(config);
+```
+
+### MinIO Example
+
+```cpp
+tidesdb_objstore_t* minio = tidesdb_objstore_s3_create(
+    "localhost:9000",   // MinIO endpoint
+    "tidesdb-bucket",   // bucket
+    nullptr,            // no key prefix
+    "minioadmin",       // access key
+    "minioadmin",       // secret key
+    nullptr,            // region (nullptr for MinIO)
+    0,                  // no SSL for local dev
+    1                   // path-style URLs (required for MinIO)
+);
+```
+
+### Object Store Configuration
+
+Use `ObjectStoreConfig::defaultConfig()` for sensible defaults, then override fields as needed.
+
+**Configuration fields**
+- `localCachePath` · Local directory for cached SSTable files (empty = use db_path)
+- `localCacheMaxBytes` · Maximum local cache size in bytes (0 = unlimited)
+- `cacheOnRead` · Cache downloaded files locally (default: true)
+- `cacheOnWrite` · Keep local copy after upload (default: true)
+- `maxConcurrentUploads` · Number of parallel upload threads (default: 4)
+- `maxConcurrentDownloads` · Number of parallel download threads (default: 8)
+- `multipartThreshold` · Use multipart upload above this size (default: 64MB)
+- `multipartPartSize` · Chunk size for multipart uploads (default: 8MB)
+- `syncManifestToObject` · Upload MANIFEST after each compaction (default: true)
+- `replicateWal` · Upload closed WAL segments for replication (default: true)
+- `walUploadSync` · false = background WAL upload, true = block flush until uploaded (default: false)
+- `walSyncThresholdBytes` · Sync active WAL to object store when it grows by this many bytes (default: 1MB, 0 = off)
+- `walSyncOnCommit` · Upload WAL after every txn commit for RPO=0 replication (default: false)
+- `replicaMode` · Enable read-only replica mode (default: false)
+- `replicaSyncIntervalUs` · MANIFEST poll interval for replica sync in microseconds (default: 5s)
+- `replicaReplayWal` · Replay WAL from object store for near-real-time reads on replicas (default: true)
+
+### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields.
+
+- `objectTargetFileSize` · Target SSTable size in object store mode (0 = auto)
+- `objectLazyCompaction` · 1 to compact less aggressively for remote storage (default: 0)
+- `objectPrefetchCompaction` · 1 to download all inputs before compaction merge (default: 1)
+
+### Object Store Statistics
+
+`getDbStats()` includes object store fields when a connector is active.
+
+```cpp
+auto dbStats = db.getDbStats();
+
+if (dbStats.objectStoreEnabled) {
+    std::cout << "Connector: " << dbStats.objectStoreConnector << std::endl;
+    std::cout << "Total uploads: " << dbStats.totalUploads << std::endl;
+    std::cout << "Upload failures: " << dbStats.totalUploadFailures << std::endl;
+    std::cout << "Upload queue depth: " << dbStats.uploadQueueDepth << std::endl;
+    std::cout << "Local cache: " << dbStats.localCacheBytesUsed
+              << " / " << dbStats.localCacheBytesMax << " bytes" << std::endl;
+}
+```
+
+### Cold Start Recovery
+
+When the local database directory is empty but a connector is configured, TidesDB automatically discovers column families from the object store during recovery. It downloads MANIFEST and config files in parallel (one thread per CF), reconstructs the SSTable inventory, and fetches SSTable data on demand as queries arrive.
+
+```cpp
+// delete all local state, then reopen with the same connector
+tidesdb::Config config;
+config.dbPath = "./mydb";
+config.objectStore = s3;
+config.objectStoreConfig = osCfg;
+
+tidesdb::TidesDB db(config);
+
+// all data is available -- SSTables are fetched from the object store on demand
+auto cf = db.getColumnFamily("my_cf");
+```
+
+### How It Works
+
+- Object store mode requires unified memtable mode. Setting `objectStore` on the config automatically enables `unifiedMemtable`
+- After each flush, SSTables are uploaded via an asynchronous upload pipeline with retry (3 attempts with exponential backoff) and post-upload verification
+- Point lookups on remote SSTables fetch just the single needed klog block (~64KB) via one HTTP range request, cached in the clock cache for subsequent reads
+- Iterators prefetch all needed SSTable files in parallel at creation time using bounded threads (`maxConcurrentDownloads`, default 8)
+- A hash-indexed LRU local file cache manages disk usage, evicting least-recently-used SSTable file pairs when `localCacheMaxBytes` is set
+- The MANIFEST is uploaded asynchronously after each flush and compaction for cold start recovery
+- The reaper thread periodically syncs the active WAL based on write volume (`walSyncThresholdBytes`, default 1MB)
+
+The S3 connector requires libcurl and OpenSSL. Enable it with `-DTIDESDB_WITH_S3=ON` during CMake configuration. The filesystem connector is always available.
+
+## Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store. The primary handles all writes while replicas poll for MANIFEST updates and replay WAL segments for near-real-time reads.
+
+### Enabling Replica Mode
+
+```cpp
+auto osCfg = tidesdb::ObjectStoreConfig::defaultConfig();
+osCfg.replicaMode = true;
+osCfg.replicaSyncIntervalUs = 1000000; // 1 second sync interval
+osCfg.replicaReplayWal = true;         // replay WAL for fresh reads
+
+tidesdb::Config config;
+config.dbPath = "./mydb_replica";
+config.objectStore = s3; // same bucket as the primary
+config.objectStoreConfig = osCfg;
+
+tidesdb::TidesDB db(config);
+
+// reads work normally
+auto txn = db.beginTransaction();
+auto cf = db.getColumnFamily("my_cf");
+auto value = txn.get(cf, "key");
+
+// writes are rejected with ErrorCode::Readonly
+```
+
+### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary so every committed write is uploaded to the object store immediately.
+
+```cpp
+auto osCfg = tidesdb::ObjectStoreConfig::defaultConfig();
+osCfg.walSyncOnCommit = true; // RPO = 0, every commit is durable in S3
+
+// replica sees committed data within one replicaSyncIntervalUs
+```
+
+### Promoting a Replica to Primary
+
+When the primary fails, promote a replica to accept writes.
+
+```cpp
+// external health check detects primary is down
+db.promoteToPrimary();
+
+// now writes are accepted
+auto txn = db.beginTransaction();
+auto cf = db.getColumnFamily("my_cf");
+txn.put(cf, "key", "value", -1);
+txn.commit();
+```
+
+`promoteToPrimary()` performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. Throws `ErrorCode::InvalidArgs` if the node is already a primary.
+
+### How Replica Sync Works
+
+- The reaper thread polls the remote MANIFEST for each CF every `replicaSyncIntervalUs`
+- New SSTables from the primary's flushes and compactions are added to the replica's levels
+- SSTables compacted away on the primary are removed from the replica's levels
+- When `replicaReplayWal` is enabled, the latest WAL is downloaded and replayed into the memtable for near-real-time reads
+- WAL replay is idempotent using sequence numbers so entries already present are skipped
+- SSTable data is not downloaded during sync -- it is fetched on demand via range_get for point lookups or prefetch for iterators
+
 ### Compression Algorithms
 
 TidesDB supports multiple compression algorithms:
@@ -992,6 +1302,7 @@ try {
 - `ErrorCode::InvalidDB` (-10) · Invalid database handle
 - `ErrorCode::Unknown` (-11) · Unknown error
 - `ErrorCode::Locked` (-12) · Database is locked
+- `ErrorCode::Readonly` (-13) · Database is read-only
 
 **Error categories**
 - `ErrorCode::Corruption` indicates data integrity issues requiring immediate attention

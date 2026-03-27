@@ -158,7 +158,7 @@ If `init()` is not called, TidesDB will auto-initialize with the system allocato
 ### Opening and Closing a Database
 
 ```rust
-use tidesdb::{TidesDB, Config, LogLevel};
+use tidesdb::{TidesDB, Config, LogLevel, SyncMode};
 
 fn main() -> tidesdb::Result<()> {
     let config = Config::new("./mydb")
@@ -169,7 +169,10 @@ fn main() -> tidesdb::Result<()> {
         .max_open_sstables(256)
         .max_memory_usage(0)                   // 0 = auto (50% of system RAM)
         .log_to_file(false)                    // Write logs to file instead of stderr
-        .log_truncation_at(24 * 1024 * 1024);  // Log file truncation threshold (24MB)
+        .log_truncation_at(24 * 1024 * 1024)   // Log file truncation threshold (24MB)
+        .unified_memtable(false)               // Enable unified memtable mode (default: false)
+        .unified_memtable_write_buffer_size(0) // 0 = auto
+        .unified_memtable_sync_mode(SyncMode::None);
 
     let db = TidesDB::open(config)?;
 
@@ -578,6 +581,24 @@ while iter.is_valid() {
 }
 ```
 
+#### Combined Key-Value Retrieval
+
+**`key_value()`** retrieves both key and value in a single FFI call, which is more efficient than calling `key()` and `value()` separately:
+
+```rust
+let txn = db.begin_transaction()?;
+let mut iter = txn.new_iterator(&cf)?;
+iter.seek_to_first()?;
+
+while iter.is_valid() {
+    let (key, value) = iter.key_value()?;
+    println!("Key: {:?}, Value: {:?}",
+        String::from_utf8_lossy(&key),
+        String::from_utf8_lossy(&value));
+    iter.next()?;
+}
+```
+
 ### Getting Column Family Statistics
 
 Retrieve detailed statistics about a column family.
@@ -719,6 +740,22 @@ fn main() -> tidesdb::Result<()> {
 | `txn_memory_bytes` | `i64` | Bytes held by in-flight transactions |
 | `compaction_queue_size` | `usize` | Number of pending compaction tasks |
 | `flush_queue_size` | `usize` | Number of pending flush tasks in queue |
+| `unified_memtable_enabled` | `bool` | Whether unified memtable mode is active |
+| `unified_memtable_bytes` | `i64` | Bytes in unified active memtable |
+| `unified_immutable_count` | `i32` | Number of unified immutable memtables |
+| `unified_is_flushing` | `bool` | Whether unified memtable is currently flushing/rotating |
+| `unified_next_cf_index` | `u32` | Next CF index to be assigned in unified mode |
+| `unified_wal_generation` | `u64` | Current unified WAL generation counter |
+| `object_store_enabled` | `bool` | Whether object store mode is active |
+| `object_store_connector` | `String` | Connector name ("s3", "gcs", "fs", etc.) |
+| `local_cache_bytes_used` | `usize` | Current local file cache usage in bytes |
+| `local_cache_bytes_max` | `usize` | Configured maximum local cache size in bytes |
+| `local_cache_num_files` | `i32` | Number of files tracked in local cache |
+| `last_uploaded_generation` | `u64` | Highest WAL generation confirmed uploaded |
+| `upload_queue_depth` | `usize` | Number of pending upload jobs in the queue |
+| `total_uploads` | `u64` | Lifetime count of objects uploaded to object store |
+| `total_upload_failures` | `u64` | Lifetime count of permanently failed uploads |
+| `replica_mode` | `bool` | Whether running in read-only replica mode |
 
 :::note[Stack Allocated]
 Unlike `ColumnFamily::get_stats` (which heap-allocates), `get_db_stats` fills a struct on the stack. No manual free is needed.
@@ -1084,6 +1121,27 @@ fn main() -> tidesdb::Result<()> {
 - Hard-linked files share storage with the live database. Deleting the original database does not affect the checkpoint (hard link semantics)
 - The checkpoint can be opened as a normal TidesDB database with `TidesDB::open`
 
+### Promote Replica to Primary
+
+`promote_to_primary` switches a read-only replica to primary mode. This is only valid when the database was opened in replica mode (via object store configuration with `replica_mode` enabled).
+
+```rust
+use tidesdb::{TidesDB, Config};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+
+    // Promote from replica to primary mode
+    db.promote_to_primary()?;
+
+    Ok(())
+}
+```
+
+**Return values**
+- `Ok(())` -- Promotion completed successfully
+- `ErrorCode::InvalidArgs` -- Database is not in replica mode
+
 ### Runtime Configuration Updates
 
 Update column family configuration at runtime:
@@ -1312,6 +1370,218 @@ fn main() -> tidesdb::Result<()> {
 `use_btree` **cannot be changed** after column family creation. Different column families can use different formats.
 :::
 
+### Unified Memtable Mode
+
+When enabled, all column families share a single memtable and WAL instead of having independent per-CF memtables. This can reduce memory overhead and write amplification when using many column families with small write volumes.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig, SyncMode, LogLevel};
+
+fn main() -> tidesdb::Result<()> {
+    let config = Config::new("./mydb")
+        .num_flush_threads(2)
+        .num_compaction_threads(2)
+        .log_level(LogLevel::Info)
+        .unified_memtable(true)
+        .unified_memtable_write_buffer_size(128 * 1024 * 1024)
+        .unified_memtable_skip_list_max_level(16)
+        .unified_memtable_skip_list_probability(0.25)
+        .unified_memtable_sync_mode(SyncMode::None)
+        .unified_memtable_sync_interval_us(0);
+
+    let db = TidesDB::open(config)?;
+
+    // Column families work the same way
+    db.create_column_family("cf_a", ColumnFamilyConfig::default())?;
+    db.create_column_family("cf_b", ColumnFamilyConfig::default())?;
+
+    let cf_a = db.get_column_family("cf_a")?;
+    let cf_b = db.get_column_family("cf_b")?;
+
+    let mut txn = db.begin_transaction()?;
+    txn.put(&cf_a, b"key1", b"value1", -1)?;
+    txn.put(&cf_b, b"key2", b"value2", -1)?;
+    txn.commit()?;
+
+    // Check unified memtable status via db stats
+    let stats = db.get_db_stats()?;
+    println!("Unified memtable enabled: {}", stats.unified_memtable_enabled);
+    println!("Unified memtable bytes: {}", stats.unified_memtable_bytes);
+
+    Ok(())
+}
+```
+
+**When to use**
+- Many column families with small individual write volumes
+- Reducing total memory overhead from per-CF memtable allocation
+- Simplifying WAL management across multiple column families
+
+**Configuration**
+- `unified_memtable_write_buffer_size` · Total write buffer threshold (0 = auto)
+- `unified_memtable_skip_list_max_level` · Skip list max level (0 = default 12)
+- `unified_memtable_skip_list_probability` · Skip list probability (0 = default 0.25)
+- `unified_memtable_sync_mode` · WAL sync mode (default: `SyncMode::None`)
+- `unified_memtable_sync_interval_us` · WAL sync interval in microseconds
+
+### Object Store Mode
+
+Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
+
+#### Enabling Object Store Mode (Filesystem Connector)
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig, ObjectStoreConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let config = Config::new("./mydb")
+        .object_store_fs("/mnt/nfs/tidesdb-objects");
+
+    let db = TidesDB::open(config)?;
+
+    // use the database normally -- SSTables are uploaded after flush
+
+    Ok(())
+}
+```
+
+#### Custom Object Store Configuration
+
+Use `ObjectStoreConfig::default()` for sensible defaults, then override fields as needed:
+
+```rust
+use tidesdb::{TidesDB, Config, ObjectStoreConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let os_config = ObjectStoreConfig::new()
+        .local_cache_max_bytes(512 * 1024 * 1024) // 512MB local cache
+        .max_concurrent_uploads(8)
+        .max_concurrent_downloads(16);
+
+    let config = Config::new("./mydb")
+        .object_store_fs("/mnt/nfs/tidesdb-objects")
+        .object_store_config(os_config);
+
+    let db = TidesDB::open(config)?;
+
+    Ok(())
+}
+```
+
+#### Object Store Configuration Reference
+
+| Method | Type | Default | Description |
+|--------|------|---------|-------------|
+| `local_cache_path(path)` | `&str` | None (uses db_path) | Local directory for cached SSTable files |
+| `local_cache_max_bytes(size)` | `usize` | 0 (unlimited) | Maximum local cache size in bytes |
+| `cache_on_read(enable)` | `bool` | true | Cache downloaded files locally |
+| `cache_on_write(enable)` | `bool` | true | Keep local copy after upload |
+| `max_concurrent_uploads(n)` | `i32` | 4 | Number of parallel upload threads |
+| `max_concurrent_downloads(n)` | `i32` | 8 | Number of parallel download threads |
+| `multipart_threshold(size)` | `usize` | 64MB | Use multipart upload above this size |
+| `multipart_part_size(size)` | `usize` | 8MB | Chunk size for multipart uploads |
+| `sync_manifest_to_object(enable)` | `bool` | true | Upload MANIFEST after each compaction |
+| `replicate_wal(enable)` | `bool` | true | Upload closed WAL segments for replication |
+| `wal_upload_sync(enable)` | `bool` | false | false for background WAL upload, true to block flush |
+| `wal_sync_threshold_bytes(size)` | `usize` | 1MB | Sync active WAL when it grows by this many bytes (0 = off) |
+| `wal_sync_on_commit(enable)` | `bool` | false | Upload WAL after every txn commit for RPO=0 replication |
+| `replica_mode(enable)` | `bool` | false | Enable read-only replica mode (writes return `ErrorCode::ReadOnly`) |
+| `replica_sync_interval_us(interval)` | `u64` | 5000000 (5s) | MANIFEST poll interval for replica sync in microseconds |
+| `replica_replay_wal(enable)` | `bool` | true | Replay WAL from object store for near-real-time reads on replicas |
+
+#### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields (see Column Family Configuration Reference):
+- `object_target_file_size` · Target SSTable size in object store mode (0 = auto)
+- `object_lazy_compaction` · Compact less aggressively for remote storage
+- `object_prefetch_compaction` · Download all inputs before compaction merge
+
+#### Object Store Statistics
+
+`get_db_stats` includes object store fields when a connector is active:
+
+```rust
+use tidesdb::{TidesDB, Config, ObjectStoreConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let config = Config::new("./mydb")
+        .object_store_fs("/mnt/nfs/tidesdb-objects");
+
+    let db = TidesDB::open(config)?;
+
+    let stats = db.get_db_stats()?;
+    if stats.object_store_enabled {
+        println!("connector: {}", stats.object_store_connector);
+        println!("total uploads: {}", stats.total_uploads);
+        println!("upload failures: {}", stats.total_upload_failures);
+        println!("upload queue depth: {}", stats.upload_queue_depth);
+        println!("local cache: {} / {} bytes",
+            stats.local_cache_bytes_used, stats.local_cache_bytes_max);
+    }
+
+    Ok(())
+}
+```
+
+#### Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store.
+
+```rust
+use tidesdb::{TidesDB, Config, ObjectStoreConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let os_config = ObjectStoreConfig::new()
+        .replica_mode(true)
+        .replica_sync_interval_us(1_000_000)  // 1 second sync interval
+        .replica_replay_wal(true);             // replay WAL for fresh reads
+
+    let config = Config::new("./mydb_replica")
+        .object_store_fs("/mnt/nfs/tidesdb-objects") // same store as the primary
+        .object_store_config(os_config);
+
+    let db = TidesDB::open(config)?;
+
+    // reads work normally, writes return ErrorCode::ReadOnly
+
+    // promote to primary when the original primary fails
+    db.promote_to_primary()?;
+
+    Ok(())
+}
+```
+
+#### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary so every committed write is uploaded to the object store immediately:
+
+```rust
+use tidesdb::{TidesDB, Config, ObjectStoreConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let os_config = ObjectStoreConfig::new()
+        .wal_sync_on_commit(true); // RPO = 0, every commit is durable in the store
+
+    let config = Config::new("./mydb")
+        .object_store_fs("/mnt/nfs/tidesdb-objects")
+        .object_store_config(os_config);
+
+    let db = TidesDB::open(config)?;
+
+    // replica sees committed data within one replica_sync_interval_us
+
+    Ok(())
+}
+```
+
+:::note[Object Store Requirements]
+- Object store mode automatically enables unified memtable mode
+- After each flush, SSTables are uploaded via an asynchronous upload pipeline with retry (3 attempts with exponential backoff)
+- Point lookups on remote SSTables fetch just the needed block (~64KB) via range request
+- Iterators prefetch all needed SSTable files in parallel at creation time
+- The MANIFEST is uploaded after each flush/compaction for cold start recovery
+:::
+
 ### Custom Comparators
 
 A comparator defines the sort order of keys throughout the entire system, memtables, SSTables, block indexes, and iterators. TidesDB ships with six built-in comparators and supports registering custom ones.
@@ -1394,6 +1664,14 @@ All available `Config` builder methods:
 | `max_memory_usage(size)` | `usize` | 0 | Global memory limit in bytes (0 = auto, 50% of system RAM) |
 | `log_to_file(enable)` | `bool` | false | Write logs to file instead of stderr |
 | `log_truncation_at(size)` | `usize` | 24MB | Log file truncation threshold in bytes (0 = no truncation) |
+| `unified_memtable(enable)` | `bool` | false | Enable unified memtable mode (all CFs share one memtable/WAL) |
+| `unified_memtable_write_buffer_size(size)` | `usize` | 0 | Unified memtable write buffer size (0 = auto) |
+| `unified_memtable_skip_list_max_level(level)` | `i32` | 0 | Skip list max level for unified memtable (0 = default 12) |
+| `unified_memtable_skip_list_probability(prob)` | `f32` | 0.0 | Skip list probability for unified memtable (0 = default 0.25) |
+| `unified_memtable_sync_mode(mode)` | `SyncMode` | None | Sync mode for unified WAL |
+| `unified_memtable_sync_interval_us(interval)` | `u64` | 0 | Sync interval for unified WAL in microseconds |
+| `object_store_fs(root_dir)` | `&str` | None | Enable object store with filesystem connector at `root_dir` |
+| `object_store_config(config)` | `ObjectStoreConfig` | None | Object store behavior configuration (see Object Store Configuration Reference) |
 
 ## Column Family Configuration Reference
 
@@ -1422,6 +1700,9 @@ All available `ColumnFamilyConfig` builder methods:
 | `l1_file_count_trigger(trigger)` | `i32` | 4 | L1 file count trigger for compaction |
 | `l0_queue_stall_threshold(threshold)` | `i32` | 20 | L0 queue stall threshold |
 | `use_btree(enable)` | `bool` | false | Use B+tree format for klog |
+| `object_target_file_size(size)` | `usize` | 0 | Target SSTable size in object store mode (0 = auto, default 256MB) |
+| `object_lazy_compaction(enable)` | `bool` | false | Compact less aggressively in object store mode |
+| `object_prefetch_compaction(enable)` | `bool` | true | Download all inputs before merge in object store mode |
 
 **Updatable at runtime** (via `update_runtime_config`):
 - `write_buffer_size`, `skip_list_max_level`, `skip_list_probability`
@@ -1485,6 +1766,7 @@ fn main() {
 - `ErrorCode::InvalidDb` (-10) · Invalid database handle
 - `ErrorCode::Unknown` (-11) · Unknown error
 - `ErrorCode::Locked` (-12) · Database is locked
+- `ErrorCode::ReadOnly` (-13) · Database is in read-only mode
 
 ## Complete Example
 

@@ -76,6 +76,12 @@ local db = tidesdb.TidesDB.open("./mydb", {
     max_memory_usage = 0,                  -- Global memory limit in bytes (0 = auto, 50% of system RAM)
     log_to_file = false,                   -- Write logs to file instead of stderr
     log_truncation_at = 24 * 1024 * 1024,  -- Log file truncation size (24MB), 0 = no truncation
+    unified_memtable = false,                       -- Enable unified memtable (shared across CFs)
+    unified_memtable_write_buffer_size = 64 * 1024 * 1024, -- Unified memtable buffer size
+    unified_memtable_skip_list_max_level = 12,      -- Skip list max level for unified memtable
+    unified_memtable_skip_list_probability = 0.25,  -- Skip list probability for unified memtable
+    unified_memtable_sync_mode = tidesdb.SyncMode.SYNC_INTERVAL, -- Unified memtable sync mode
+    unified_memtable_sync_interval_us = 128000,     -- Unified memtable sync interval (128ms)
 })
 
 print("Database opened successfully")
@@ -112,6 +118,9 @@ cf_config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
 cf_config.l1_file_count_trigger = 4          -- L1 file count trigger for compaction
 cf_config.l0_queue_stall_threshold = 20      -- L0 queue stall threshold
 cf_config.use_btree = false                  -- Use B+tree format for klog (default: false)
+cf_config.object_target_file_size = 0          -- Object store target file size (0 = default)
+cf_config.object_lazy_compaction = false       -- Enable lazy compaction for object store
+cf_config.object_prefetch_compaction = false   -- Enable prefetch during object store compaction
 
 db:create_column_family("my_cf", cf_config)
 
@@ -430,6 +439,31 @@ iter:free()
 txn:free()
 ```
 
+#### Combined Key-Value Access
+
+`iter:key_value()` retrieves both the key and value in a single call, which is more efficient than calling `iter:key()` and `iter:value()` separately.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local txn = db:begin_txn()
+
+local iter = txn:new_iterator(cf)
+
+iter:seek_to_first()
+
+while iter:valid() do
+    local key, value = iter:key_value()
+
+    print(string.format("Key: %s, Value: %s", key, value))
+
+    iter:next()
+end
+
+iter:free()
+txn:free()
+```
+
 ### Getting Column Family Statistics
 
 Retrieve detailed statistics about a column family.
@@ -506,6 +540,26 @@ print(string.format("Open SSTable handles: %d", db_stats.num_open_sstables))
 print(string.format("In-flight txn memory: %d bytes", db_stats.txn_memory_bytes))
 print(string.format("Immutable memtables: %d", db_stats.total_immutable_count))
 print(string.format("Memtable bytes: %d", db_stats.total_memtable_bytes))
+
+-- Unified memtable stats
+if db_stats.unified_memtable_enabled then
+    print(string.format("Unified memtable bytes: %d", db_stats.unified_memtable_bytes))
+    print(string.format("Unified immutable count: %d", db_stats.unified_immutable_count))
+    print(string.format("Unified is flushing: %s", tostring(db_stats.unified_is_flushing)))
+    print(string.format("Unified next CF index: %d", db_stats.unified_next_cf_index))
+    print(string.format("Unified WAL generation: %d", db_stats.unified_wal_generation))
+end
+
+-- Object store stats
+if db_stats.object_store_enabled then
+    print(string.format("Object store connector: %s", db_stats.object_store_connector or "N/A"))
+    print(string.format("Local cache used: %d bytes", db_stats.local_cache_bytes_used))
+    print(string.format("Local cache max: %d bytes", db_stats.local_cache_bytes_max))
+    print(string.format("Total uploads: %d", db_stats.total_uploads))
+    print(string.format("Upload failures: %d", db_stats.total_upload_failures))
+end
+
+print(string.format("Replica mode: %s", tostring(db_stats.replica_mode)))
 ```
 
 **Database statistics fields**
@@ -524,6 +578,22 @@ print(string.format("Memtable bytes: %d", db_stats.total_memtable_bytes))
 - `txn_memory_bytes` · Bytes held by in-flight transactions
 - `compaction_queue_size` · Number of pending compaction tasks
 - `flush_queue_size` · Number of pending flush tasks in queue
+- `unified_memtable_enabled` · Whether unified memtable is enabled
+- `unified_memtable_bytes` · Bytes in the unified memtable
+- `unified_immutable_count` · Number of unified immutable memtables
+- `unified_is_flushing` · Whether unified memtable is currently flushing
+- `unified_next_cf_index` · Next column family index for unified memtable round-robin
+- `unified_wal_generation` · Current WAL generation number for unified memtable
+- `object_store_enabled` · Whether object store is enabled
+- `object_store_connector` · Object store connector name (or nil)
+- `local_cache_bytes_used` · Bytes used in the local object cache
+- `local_cache_bytes_max` · Maximum bytes for the local object cache
+- `local_cache_num_files` · Number of files in the local cache
+- `last_uploaded_generation` · Last WAL generation uploaded to object store
+- `upload_queue_depth` · Number of pending uploads in the queue
+- `total_uploads` · Total number of successful uploads
+- `total_upload_failures` · Total number of failed uploads
+- `replica_mode` · Whether the database is in replica mode
 
 :::note[Stack Allocated]
 Unlike `cf:get_stats()` (which heap-allocates), `db:get_db_stats()` fills a caller-provided struct on the stack. No free is needed.
@@ -688,6 +758,147 @@ db:purge()
 :::tip[Purge vs Manual Flush + Compact]
 `cf:flush_memtable()` and `cf:compact()` are non-blocking - they enqueue work and return immediately. `cf:purge()` and `db:purge()` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
+
+### Promote Replica to Primary
+
+`db:promote_to_primary()` switches a replica database to primary mode, allowing it to accept writes.
+
+```lua
+db:promote_to_primary()
+```
+
+**Behavior**
+- Transitions a read-only replica database to a writable primary
+- Should only be called on databases opened in replica mode
+- Calling on a non-replica database may return an error
+
+**Use cases**
+- Failover · Promote a replica to primary when the original primary becomes unavailable
+- Maintenance · Temporarily promote a replica for maintenance operations
+
+## Object Store Mode
+
+Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store.
+
+### Object Store Configuration
+
+Use `tidesdb.default_objstore_config()` for sensible defaults, then override fields as needed.
+
+```lua
+local os_config = tidesdb.default_objstore_config()
+```
+
+**Configuration fields**
+- `local_cache_path` · Local directory for cached SSTable files (nil = use db_path)
+- `local_cache_max_bytes` · Maximum local cache size in bytes (0 = unlimited)
+- `cache_on_read` · Cache downloaded files locally (default: true)
+- `cache_on_write` · Keep local copy after upload (default: true)
+- `max_concurrent_uploads` · Number of parallel upload threads (default: 4)
+- `max_concurrent_downloads` · Number of parallel download threads (default: 8)
+- `multipart_threshold` · Use multipart upload above this size in bytes (default: 64MB)
+- `multipart_part_size` · Chunk size for multipart uploads in bytes (default: 8MB)
+- `sync_manifest_to_object` · Upload MANIFEST after each compaction (default: true)
+- `replicate_wal` · Upload closed WAL segments for replication (default: true)
+- `wal_upload_sync` · Block flush until WAL is uploaded (default: false)
+- `wal_sync_threshold_bytes` · Sync active WAL when it grows by this many bytes (default: 1MB, 0 = off)
+- `wal_sync_on_commit` · Upload WAL after every txn commit for RPO=0 replication (default: false)
+- `replica_mode` · Enable read-only replica mode (default: false)
+- `replica_sync_interval_us` · MANIFEST poll interval in microseconds (default: 5000000 / 5s)
+- `replica_replay_wal` · Replay WAL from object store for near-real-time reads on replicas (default: true)
+
+### Enabling Object Store Mode (Filesystem Connector)
+
+```lua
+local tidesdb = require("tidesdb")
+
+-- Create a filesystem connector (for testing and local replication)
+local store = tidesdb.objstore_fs_create("/mnt/nfs/tidesdb-objects")
+
+-- Configure object store behavior
+local os_config = tidesdb.default_objstore_config()
+os_config.local_cache_max_bytes = 512 * 1024 * 1024  -- 512MB local cache
+os_config.max_concurrent_uploads = 8
+
+local db = tidesdb.TidesDB.open("./mydb", {
+    object_store = store,
+    object_store_config = os_config,
+})
+
+-- Use the database normally -- SSTables are uploaded after flush
+
+db:close()
+```
+
+:::note[Unified Memtable]
+Object store mode requires unified memtable mode. Setting `object_store` on the config automatically enables `unified_memtable`.
+:::
+
+### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields:
+
+```lua
+local cf_config = tidesdb.default_column_family_config()
+cf_config.object_target_file_size = 256 * 1024 * 1024  -- Target SSTable size (0 = auto)
+cf_config.object_lazy_compaction = true                 -- Compact less aggressively for remote storage
+cf_config.object_prefetch_compaction = true              -- Download all inputs before compaction merge
+
+db:create_column_family("my_cf", cf_config)
+```
+
+### Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store. The primary handles all writes while replicas poll for MANIFEST updates and replay WAL segments for near-real-time reads.
+
+```lua
+-- Configure as a replica
+local os_config = tidesdb.default_objstore_config()
+os_config.replica_mode = true
+os_config.replica_sync_interval_us = 1000000  -- 1 second sync interval
+os_config.replica_replay_wal = true            -- Replay WAL for fresh reads
+
+local db = tidesdb.TidesDB.open("./mydb_replica", {
+    object_store = store,  -- Same store as the primary
+    object_store_config = os_config,
+})
+
+-- Reads work normally
+local cf = db:get_column_family("my_cf")
+local txn = db:begin_txn()
+local value = txn:get(cf, "key1")
+txn:free()
+
+-- Writes are rejected with TDB_ERR_READONLY
+```
+
+### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary so every committed write is uploaded to the object store immediately.
+
+```lua
+local os_config = tidesdb.default_objstore_config()
+os_config.wal_sync_on_commit = true  -- RPO = 0, every commit is durable in the object store
+
+-- Replica sees committed data within one replica_sync_interval_us
+```
+
+### Cold Start Recovery
+
+When the local database directory is empty but a connector is configured, TidesDB automatically discovers column families from the object store during recovery.
+
+```lua
+-- Delete all local state
+os.execute("rm -rf ./mydb")
+
+-- Reopen with the same connector -- cold start recovery
+local db = tidesdb.TidesDB.open("./mydb", {
+    object_store = store,
+    object_store_config = os_config,
+})
+
+-- All data is available -- SSTables are fetched from the object store on demand
+local cf = db:get_column_family("my_cf")
+```
 
 ### Manual WAL Sync
 
@@ -935,6 +1146,7 @@ txn:free()
 - `TDB_ERR_INVALID_DB` (-10) · Invalid database handle
 - `TDB_ERR_UNKNOWN` (-11) · Unknown error
 - `TDB_ERR_LOCKED` (-12) · Database is locked
+- `TDB_ERR_READONLY` (-13) · Database is read-only
 
 ## Complete Example
 
@@ -1166,6 +1378,7 @@ lua test_tidesdb.lua
 | `db:checkpoint(dir)` | Create lightweight database checkpoint using hard links |
 | `db:register_comparator(name, fn, ctx_str, ctx)` | Register custom comparator |
 | `db:get_comparator(name)` | Get registered comparator |
+| `db:promote_to_primary()` | Promote a replica database to primary mode |
 
 ### ColumnFamily Class
 
@@ -1212,6 +1425,7 @@ lua test_tidesdb.lua
 | `iter:prev()` | Move to previous entry |
 | `iter:key()` | Get current key |
 | `iter:value()` | Get current value |
+| `iter:key_value()` | Get current key and value in a single call |
 | `iter:free()` | Free iterator resources |
 
 ### Constants
@@ -1257,3 +1471,4 @@ lua test_tidesdb.lua
 - `TDB_ERR_INVALID_DB` (-10)
 - `TDB_ERR_UNKNOWN` (-11)
 - `TDB_ERR_LOCKED` (-12)
+- `TDB_ERR_READONLY` (-13)

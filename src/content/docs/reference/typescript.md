@@ -84,6 +84,14 @@ const db = TidesDB.open({
   maxMemoryUsage: 0,                  // Global memory limit in bytes (0 = auto, 50% of system RAM)
   logToFile: false,                   // Write logs to file instead of stderr
   logTruncationAt: 24 * 1024 * 1024,  // Log file truncation size (24MB), 0 = no truncation
+  unifiedMemtable: false,             // Enable unified memtable mode
+  unifiedMemtableWriteBufferSize: 0,  // Write buffer size (0 = auto)
+  unifiedMemtableSkipListMaxLevel: 0, // Skip list max level (0 = default 12)
+  unifiedMemtableSkipListProbability: 0, // Skip list probability (0 = default 0.25)
+  unifiedMemtableSyncMode: SyncMode.None, // Sync mode for unified WAL
+  unifiedMemtableSyncIntervalUs: 0,   // Sync interval for unified WAL (0 = default)
+  // objectStoreFsPath: '/path/to/store',  // Enable object store mode (FS connector)
+  // objectStoreConfig: { ... },           // Object store behavior config (optional)
 });
 
 console.log('Database opened successfully');
@@ -121,6 +129,10 @@ db.createColumnFamily('my_cf', {
 });
 
 db.dropColumnFamily('my_cf');
+
+// Delete by column family handle
+const cfToDelete = db.getColumnFamily('my_cf');
+db.deleteColumnFamily(cfToDelete);
 
 db.renameColumnFamily('old_name', 'new_name');
 
@@ -298,6 +310,30 @@ iter.seekForPrev(Buffer.from('user:2000'));
 while (iter.isValid()) {
   console.log(`Key: ${iter.key().toString()}`);
   iter.prev();
+}
+
+iter.free();
+txn.free();
+```
+
+#### Combined Key-Value Retrieval
+
+Retrieve both the key and value in a single FFI call for better performance when you need both.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const txn = db.beginTransaction();
+const iter = txn.newIterator(cf);
+
+iter.seekToFirst();
+
+while (iter.isValid()) {
+  const { key, value } = iter.keyValue();
+
+  console.log(`Key: ${key.toString()}, Value: ${value.toString()}`);
+
+  iter.next();
 }
 
 iter.free();
@@ -699,6 +735,22 @@ console.log(`Memtable bytes: ${dbStats.totalMemtableBytes}`);
 | `txnMemoryBytes` | `number` | Bytes held by in-flight transactions |
 | `compactionQueueSize` | `number` | Number of pending compaction tasks |
 | `flushQueueSize` | `number` | Number of pending flush tasks in queue |
+| `unifiedMemtableEnabled` | `boolean` | Whether unified memtable mode is active |
+| `unifiedMemtableBytes` | `number` | Bytes in unified active memtable |
+| `unifiedImmutableCount` | `number` | Number of unified immutable memtables |
+| `unifiedIsFlushing` | `boolean` | Whether unified memtable is currently flushing/rotating |
+| `unifiedNextCfIndex` | `number` | Next CF index to be assigned in unified mode |
+| `unifiedWalGeneration` | `number` | Current unified WAL generation counter |
+| `objectStoreEnabled` | `boolean` | Whether object store mode is active |
+| `objectStoreConnector` | `string` | Object store connector name ("s3", "gcs", "fs", etc.) |
+| `localCacheBytesUsed` | `number` | Current local file cache usage in bytes |
+| `localCacheBytesMax` | `number` | Configured maximum local cache size in bytes |
+| `localCacheNumFiles` | `number` | Number of files tracked in local cache |
+| `lastUploadedGeneration` | `number` | Highest WAL generation confirmed uploaded |
+| `uploadQueueDepth` | `number` | Number of pending upload jobs in the queue |
+| `totalUploads` | `number` | Lifetime count of objects uploaded to object store |
+| `totalUploadFailures` | `number` | Lifetime count of permanently failed uploads |
+| `replicaMode` | `boolean` | Whether running in read-only replica mode |
 
 :::note[Stack Allocated]
 Unlike `cf.getStats()` (which heap-allocates), `db.getDbStats()` fills a caller-provided struct. No free is needed.
@@ -798,6 +850,223 @@ if (stats.useBtree) {
 `useBtree` **cannot be changed** after column family creation. Different column families can use different formats.
 :::
 
+### Unified Memtable Mode
+
+In unified memtable mode, all column families share a single memtable and WAL, reducing write amplification and flush overhead for multi-CF workloads.
+
+```typescript
+import { TidesDB, SyncMode } from 'tidesdb';
+
+const db = TidesDB.open({
+  dbPath: './mydb',
+  numFlushThreads: 2,
+  numCompactionThreads: 2,
+  unifiedMemtable: true,
+  unifiedMemtableWriteBufferSize: 128 * 1024 * 1024,
+  unifiedMemtableSkipListMaxLevel: 12,
+  unifiedMemtableSkipListProbability: 0.25,
+  unifiedMemtableSyncMode: SyncMode.Interval,
+  unifiedMemtableSyncIntervalUs: 128000,
+});
+
+// Check unified memtable status via database stats
+const stats = db.getDbStats();
+console.log(`Unified memtable enabled: ${stats.unifiedMemtableEnabled}`);
+console.log(`Unified memtable bytes: ${stats.unifiedMemtableBytes}`);
+console.log(`Unified immutable count: ${stats.unifiedImmutableCount}`);
+console.log(`Unified is flushing: ${stats.unifiedIsFlushing}`);
+console.log(`Unified WAL generation: ${stats.unifiedWalGeneration}`);
+
+db.close();
+```
+
+**Configuration**
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `unifiedMemtable` | `boolean` | `false` | Enable unified memtable mode |
+| `unifiedMemtableWriteBufferSize` | `number` | `0` (auto) | Write buffer size for unified memtable |
+| `unifiedMemtableSkipListMaxLevel` | `number` | `0` (default 12) | Skip list max level |
+| `unifiedMemtableSkipListProbability` | `number` | `0` (default 0.25) | Skip list probability |
+| `unifiedMemtableSyncMode` | `SyncMode` | `SyncMode.None` | Sync mode for unified WAL |
+| `unifiedMemtableSyncIntervalUs` | `number` | `0` (default) | Sync interval in microseconds |
+
+### Object Store Mode
+
+Object store mode allows TidesDB to store SSTables in a remote object store (or local filesystem for testing) while using local disk as a cache. This separates compute from storage and enables cold start recovery. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
+
+#### Enabling Object Store Mode (Filesystem Connector)
+
+```typescript
+import { TidesDB, LogLevel } from 'tidesdb';
+
+const db = TidesDB.open({
+  dbPath: './mydb',
+  objectStoreFsPath: '/mnt/nfs/tidesdb-objects',
+});
+
+// Use the database normally -- SSTables are uploaded after flush
+
+db.close();
+```
+
+#### Object Store with Custom Configuration
+
+```typescript
+import { TidesDB } from 'tidesdb';
+
+const db = TidesDB.open({
+  dbPath: './mydb',
+  objectStoreFsPath: '/mnt/nfs/tidesdb-objects',
+  objectStoreConfig: {
+    localCacheMaxBytes: 512 * 1024 * 1024,  // 512MB local cache
+    maxConcurrentUploads: 8,
+    maxConcurrentDownloads: 16,
+    cacheOnRead: true,
+    cacheOnWrite: true,
+    syncManifestToObject: true,
+    replicateWal: true,
+    walSyncThresholdBytes: 1048576,  // 1MB
+  },
+});
+
+db.close();
+```
+
+#### Object Store Configuration Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `localCachePath` | `string \| null` | `null` (uses dbPath) | Local directory for cached SSTable files |
+| `localCacheMaxBytes` | `number` | `0` (unlimited) | Maximum local cache size in bytes |
+| `cacheOnRead` | `boolean` | `true` | Cache downloaded files locally |
+| `cacheOnWrite` | `boolean` | `true` | Keep local copy after upload |
+| `maxConcurrentUploads` | `number` | `4` | Number of parallel upload threads |
+| `maxConcurrentDownloads` | `number` | `8` | Number of parallel download threads |
+| `multipartThreshold` | `number` | `67108864` (64MB) | Use multipart upload above this size |
+| `multipartPartSize` | `number` | `8388608` (8MB) | Chunk size for multipart uploads |
+| `syncManifestToObject` | `boolean` | `true` | Upload MANIFEST after each compaction |
+| `replicateWal` | `boolean` | `true` | Upload closed WAL segments for replication |
+| `walUploadSync` | `boolean` | `false` | Block flush until WAL is uploaded |
+| `walSyncThresholdBytes` | `number` | `1048576` (1MB) | Sync active WAL to object store when it grows by this many bytes (0 = off) |
+| `walSyncOnCommit` | `boolean` | `false` | Upload WAL after every txn commit for RPO=0 replication |
+| `replicaMode` | `boolean` | `false` | Enable read-only replica mode (writes return `ErrorCode.ErrReadonly`) |
+| `replicaSyncIntervalUs` | `number` | `5000000` (5s) | MANIFEST poll interval for replica sync in microseconds |
+| `replicaReplayWal` | `boolean` | `true` | Replay WAL from object store for near-real-time reads on replicas |
+
+#### Per-CF Object Store Tuning
+
+Column family configurations include three object store tuning fields.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `objectTargetFileSize` | `number` | `0` (auto) | Target SSTable size in object store mode |
+| `objectLazyCompaction` | `boolean` | `false` | Compact less aggressively for remote storage |
+| `objectPrefetchCompaction` | `boolean` | `true` | Download all inputs before compaction merge |
+
+```typescript
+db.createColumnFamily('remote_cf', {
+  objectTargetFileSize: 256 * 1024 * 1024,  // 256MB
+  objectLazyCompaction: true,
+  objectPrefetchCompaction: true,
+});
+```
+
+#### Cold Start Recovery
+
+When the local database directory is empty but a connector is configured, TidesDB automatically discovers column families from the object store, downloads MANIFEST and config files in parallel, and fetches SSTable data on demand.
+
+```typescript
+// Reopen with the same connector -- cold start recovery
+const db = TidesDB.open({
+  dbPath: './mydb',
+  objectStoreFsPath: '/mnt/nfs/tidesdb-objects',
+});
+
+// All data is available -- SSTables are fetched on demand
+const cf = db.getColumnFamily('my_cf');
+```
+
+#### Replica Mode
+
+Replica mode enables read-only nodes that follow a primary through the object store.
+
+```typescript
+// Open as a replica
+const replica = TidesDB.open({
+  dbPath: './mydb_replica',
+  objectStoreFsPath: '/mnt/nfs/tidesdb-objects',  // Same store as primary
+  objectStoreConfig: {
+    replicaMode: true,
+    replicaSyncIntervalUs: 1000000,  // 1 second sync interval
+    replicaReplayWal: true,
+  },
+});
+
+// Reads work normally
+const cf = replica.getColumnFamily('my_cf');
+const txn = replica.beginTransaction();
+const value = txn.get(cf, Buffer.from('key'));
+txn.free();
+
+// Writes are rejected with ErrorCode.ErrReadonly
+```
+
+#### Sync-on-Commit WAL (Primary Side)
+
+For tighter replication lag, enable sync-on-commit on the primary so every committed write is uploaded immediately.
+
+```typescript
+const primary = TidesDB.open({
+  dbPath: './mydb',
+  objectStoreFsPath: '/mnt/nfs/tidesdb-objects',
+  objectStoreConfig: {
+    walSyncOnCommit: true,  // RPO = 0, every commit is durable
+  },
+});
+```
+
+#### Object Store Statistics
+
+Object store fields are included in database-level statistics when a connector is active.
+
+```typescript
+const stats = db.getDbStats();
+
+if (stats.objectStoreEnabled) {
+  console.log(`Connector: ${stats.objectStoreConnector}`);
+  console.log(`Total uploads: ${stats.totalUploads}`);
+  console.log(`Upload failures: ${stats.totalUploadFailures}`);
+  console.log(`Upload queue depth: ${stats.uploadQueueDepth}`);
+  console.log(`Local cache: ${stats.localCacheBytesUsed} / ${stats.localCacheBytesMax} bytes`);
+  console.log(`Replica mode: ${stats.replicaMode}`);
+}
+```
+
+:::note[S3/MinIO Connector]
+The filesystem connector is always available. For S3/MinIO support, TidesDB must be built with `-DTIDESDB_WITH_S3=ON`. The S3 connector is not exposed through the TypeScript binding -- use the C API directly for S3 configuration.
+:::
+
+### Promote Replica to Primary
+
+Switch a read-only replica database to primary mode.
+
+```typescript
+db.promoteToPrimary();
+```
+
+**Behavior**
+- Only valid when the database was opened in replica mode
+- Throws `TidesDBError` with `ErrorCode.ErrInvalidArgs` if the database is not a replica
+
+### Delete Column Family by Handle
+
+Delete a column family using its handle instead of its name.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+db.deleteColumnFamily(cf);
+```
+
 ## Error Handling
 
 ```typescript
@@ -840,6 +1109,7 @@ try {
 - `ErrorCode.ErrInvalidDB` (-10) · Invalid database handle
 - `ErrorCode.ErrUnknown` (-11) · Unknown error
 - `ErrorCode.ErrLocked` (-12) · Database is locked
+- `ErrorCode.ErrReadonly` (-13) · Database is read-only
 
 ## Complete Example
 
