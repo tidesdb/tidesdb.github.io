@@ -241,11 +241,77 @@ SELECT * FROM innodb_table;    -- InnoDB also snapshotted at the same time
 COMMIT;
 ```
 
-The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. All concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other.
+The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. By default, all concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other. When `tidesdb_pessimistic_locking` is enabled, the engine adds plugin-level row locks on top of MVCC for write-intent statements (see Pessimistic Row Locking below).
 
 Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB - which detects deadlocks during row-level locking and never fails at commit - there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. Conflicts are most likely under concurrent writes to the same rows at `REPEATABLE_READ` or higher isolation. Enabling `tidesdb_print_all_conflicts` logs every conflict event to the error log for diagnostics (see System Variables).
 
 This is a fundamental architectural difference between the two engines. InnoDB uses pessimistic row-level locks that serialize access to hot rows - when two transactions want to update the same row, the second one waits until the first commits or rolls back. TidesDB uses optimistic MVCC - both transactions proceed concurrently without blocking each other, and the second one to commit fails with a conflict error. In other words, InnoDB makes concurrent writers wait; TidesDB makes them fail and retry. Neither approach is inherently better. Pessimistic locking guarantees forward progress but introduces lock waits and potential deadlocks. Optimistic MVCC eliminates all lock waits and deadlocks but requires applications to handle retries. Workloads with low contention (most rows are touched by at most one writer at a time) see virtually no conflicts and benefit from the absence of lock overhead. Workloads with high contention on a small number of hot rows (e.g., a single counter row updated by every transaction) will see higher conflict rates and depend on efficient retry logic.
+
+### Pessimistic Row Locking
+
+For workloads that depend on InnoDB-style row-level serialization, TidesDB provides an optional pessimistic locking mode that can be enabled at runtime:
+
+```sql
+SET GLOBAL tidesdb_pessimistic_locking = ON;
+```
+
+When enabled, the engine acquires per-row locks on primary key values for all write-intent statements: `SELECT ... FOR UPDATE`, `UPDATE`, `DELETE`, and `INSERT`. Locks are held until the transaction commits or rolls back. A second transaction that attempts to access the same primary key value will block until the first transaction releases its lock, rather than proceeding optimistically and failing at commit time.
+
+The lock manager uses a partitioned hash table with 65,536 partitions, each protected by its own mutex. Primary key bytes are hashed (XXH3) to a partition, and each partition maintains a chain of lock entries keyed by the full comparable PK bytes. This gives per-row granularity without a global bottleneck. Lock entries are created on demand and persist in the hash table for the lifetime of the server, so repeated access to the same key reuses the existing entry without allocation.
+
+#### Which Statements Acquire Locks
+
+All write-intent statements acquire a row lock during the primary key lookup phase (`index_read_map()`), before reading or modifying the row:
+
+| Statement | Acquires Lock | When |
+|-----------|--------------|------|
+| `SELECT ... FOR UPDATE` | Yes | During the PK read |
+| `UPDATE` | Yes | During the PK read that precedes the row modification |
+| `DELETE` | Yes | During the PK read that precedes the row removal |
+| `INSERT` | Yes | Before the PK uniqueness check and data write |
+| `SELECT` (plain) | No | Read-only, no write intent |
+
+Both explicit transactions (`BEGIN ... COMMIT`) and autocommit single-statement DML participate in locking. Autocommit statements block on locks held by other transactions, which prevents an autocommit `UPDATE` from silently bypassing a lock held by a `SELECT ... FOR UPDATE` in another session.
+
+#### Locking Non-Existing Rows
+
+Locks are keyed by primary key bytes, not by the existence of a row. A `SELECT ... FOR UPDATE` on a primary key value that does not exist (e.g., `WHERE id = 15` when no such row exists) still acquires a lock on that key. This blocks other transactions from inserting, updating, or deleting that key until the lock is released. This behavior supports the common "check-then-insert" pattern:
+
+```sql
+BEGIN;
+SELECT * FROM t WHERE id = 42 FOR UPDATE;  -- empty set, but lock is held
+-- no other transaction can INSERT id=42 while this lock is held
+INSERT INTO t VALUES (42, 'reserved');
+COMMIT;
+```
+
+#### Deadlock Detection
+
+Before blocking on a held lock, the engine performs wait-for-graph cycle detection. It follows the chain of `waiting_on` pointers from the current lock's owner through any locks they are waiting on, up to a depth of 100 hops. If the chain leads back to the requesting transaction, a cycle exists and the engine returns `ER_LOCK_DEADLOCK` (ERROR 1213) immediately instead of blocking. The victim transaction can retry. This is the same error code and semantics that InnoDB uses for deadlocks.
+
+```sql
+-- Connection A:
+BEGIN;
+SELECT * FROM t WHERE id = 1 FOR UPDATE;  -- holds lock on id=1
+
+-- Connection B:
+BEGIN;
+SELECT * FROM t WHERE id = 2 FOR UPDATE;  -- holds lock on id=2
+
+-- Connection A:
+SELECT * FROM t WHERE id = 2 FOR UPDATE;  -- blocks, waiting for B
+
+-- Connection B:
+SELECT * FROM t WHERE id = 1 FOR UPDATE;  -- deadlock detected, ERROR 1213
+```
+
+#### Lock Release
+
+All locks held by a transaction are released atomically when the transaction commits or rolls back. There is no early lock release. Each lock entry's owner is cleared and any threads waiting on that lock are woken via a condition variable broadcast. If a connection is closed while holding locks, the engine releases them during connection cleanup.
+
+#### When to Enable It
+
+Pessimistic locking is off by default because most workloads perform better with optimistic MVCC. Enable it when the application depends on `SELECT ... FOR UPDATE` semantics for correctness, such as TPC-C style read-modify-write cycles where two transactions must not both read the same counter value before incrementing it. With pessimistic locking enabled, the second transaction blocks on the first rather than reading a stale value and failing at commit, which guarantees forward progress without application-level retry logic.
 
 The per-table isolation level is configurable at table creation time and defaults to `REPEATABLE_READ`:
 
@@ -738,7 +804,6 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_unified_memtable_write_buffer_size` | 128 MB | Write buffer size for the unified memtable (0 = library default). Only meaningful when `tidesdb_unified_memtable=ON` |
 | `tidesdb_unified_memtable_sync_mode` | FULL | Sync mode for the unified WAL (NONE, INTERVAL, FULL). Controls durability of all commits when unified memtable is enabled. Per-CF `SYNC_MODE` is ignored in unified mode since per-CF WALs do not exist |
 | `tidesdb_unified_memtable_sync_interval` | 128000 | Sync interval in microseconds for the unified WAL (only used when `unified_memtable_sync_mode=INTERVAL`) |
-| `tidesdb_row_lock_stripes` | 1024 | Legacy compatibility variable. The lock manager now uses a 256-partition hash table with per-row granularity and wait-for-graph deadlock detection |
 | `tidesdb_object_store_backend` | LOCAL | Object store backend (LOCAL disables, S3 enables S3-compatible storage) |
 | `tidesdb_s3_endpoint` | (empty) | S3 endpoint hostname (e.g. s3.amazonaws.com or minio.local:9000) |
 | `tidesdb_s3_bucket` | (empty) | S3 bucket name |
@@ -761,7 +826,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_backup_dir` | (empty) | Set to a path to trigger an online backup; clear with empty string |
 | `tidesdb_checkpoint_dir` | (empty) | Set to a path to trigger a hard-link checkpoint (near-instant, same filesystem only); clear with empty string |
 | `tidesdb_print_all_conflicts` | OFF | Log every `TDB_ERR_CONFLICT` event to the error log (similar to `innodb_print_all_deadlocks`). Last conflict info also shown in `SHOW ENGINE TIDESDB STATUS` |
-| `tidesdb_pessimistic_locking` | OFF | Enable plugin-level row locks for `SELECT ... FOR UPDATE` in multi-statement transactions. OFF (default) uses pure optimistic MVCC where concurrent writers on the same row are detected at COMMIT time. ON acquires per-row locks via a partitioned hash-table lock manager with deadlock detection (wait-for-graph traversal). Locks are only acquired during PK exact-match reads in `BEGIN ... COMMIT` blocks; autocommit statements skip locking entirely. Enable for TPC-C or workloads that depend on `SELECT ... FOR UPDATE` serialization semantics |
+| `tidesdb_pessimistic_locking` | OFF | Enable plugin-level row locks for `SELECT ... FOR UPDATE`, `UPDATE`, `DELETE`, and `INSERT` on user-defined primary keys. OFF (default) uses pure optimistic MVCC where concurrent writers on the same row are detected at COMMIT time. ON acquires per-row locks via a partitioned hash-table lock manager with wait-for-graph deadlock detection. All write-intent statements acquire locks, including autocommit statements. Locks can be acquired on non-existing PK values (e.g. `SELECT ... FOR UPDATE` on a missing row blocks `INSERT` of that key). Locks are held until `COMMIT` or `ROLLBACK`. Enable for TPC-C or workloads that depend on row-level serialization semantics |
 | `tidesdb_promote_primary` | OFF | Set to ON to promote a replica to primary mode. Performs a final MANIFEST sync and WAL replay, creates a local WAL, and starts accepting writes. Resets to OFF after promotion |
 
 ### Session Variables
@@ -1015,7 +1080,7 @@ Changing the primary key of a table requires a full copy rebuild. The engine doe
 
 The statistics cache refreshes every two seconds, so immediately after a bulk load, the optimizer may briefly see stale row counts. Running `ANALYZE TABLE` forces an immediate refresh.
 
-Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail at commit time with `ER_ERROR_DURING_COMMIT` (ERROR 1180) due to optimistic concurrency control conflicts. Applications using explicit `BEGIN ... COMMIT` blocks should implement retry logic for this error.
+Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail at commit time with `ER_ERROR_DURING_COMMIT` (ERROR 1180) due to optimistic concurrency control conflicts. Applications using explicit `BEGIN ... COMMIT` blocks should implement retry logic for this error. Enabling `tidesdb_pessimistic_locking` eliminates most write-write conflicts by serializing access to hot rows via row locks, at the cost of introducing lock waits and potential deadlocks (ERROR 1213).
 
 --
 
