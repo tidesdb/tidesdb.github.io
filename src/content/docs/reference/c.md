@@ -477,7 +477,7 @@ if (tidesdb_delete_column_family(db, cf) != 0)
 
 ### Renaming a Column Family
 
-Atomically rename a column family and its underlying directory. The operation waits for any in-progress flush or compaction to complete before renaming.
+Atomically rename a column family and its underlying directory. The operation drains all in-flight writes and waits for any in-progress flush or compaction to complete before renaming.
 
 ```c
 if (tidesdb_rename_column_family(db, "old_name", "new_name") != 0)
@@ -487,9 +487,12 @@ if (tidesdb_rename_column_family(db, "old_name", "new_name") != 0)
 ```
 
 **Behavior**
-- Waits for any in-progress flush or compaction to complete
+- Marks the column family to reject new writes during the rename
+- Force-flushes the active memtable to rotate the WAL and drain in-flight transactions
+- Waits unbounded for any in-progress flush or compaction to complete
 - Atomically renames the column family directory on disk
 - Updates all internal paths (SSTables, manifest, config)
+- Clears the write rejection mark on completion or error
 - Thread-safe with proper locking
 
 **Return values**
@@ -1924,12 +1927,13 @@ if (tidesdb_purge_cf(cf) != 0)
 ```
 
 **Behavior**
-1. Waits for any in-progress flush to complete
-2. Force-flushes the active memtable (even if below threshold)
-3. Waits for flush I/O to fully complete
-4. Waits for any in-progress compaction to complete
-5. Triggers synchronous compaction inline (bypasses the compaction queue)
-6. Waits for any queued compaction to drain
+1. If unified memtable mode is enabled, rotates the unified memtable and waits for the flush to complete so that entries belonging to this CF are moved to SSTables
+2. Waits for any in-progress flush to complete
+3. Force-flushes the active per-CF memtable (even if below threshold)
+4. Waits for flush I/O to fully complete
+5. Waits for any in-progress compaction to complete
+6. Triggers synchronous compaction inline (bypasses the compaction queue)
+7. Waits for any queued compaction to drain
 
 **When to use**
 - Before backup or checkpoint · Ensure all data is on disk and compacted
@@ -1954,9 +1958,10 @@ if (tidesdb_purge(db) != 0)
 ```
 
 **Behavior**
-1. Calls `tidesdb_purge_cf` on each column family
-2. Drains the global flush queue (waits for queue size and pending count to reach 0)
-3. Drains the global compaction queue (waits for queue size to reach 0)
+1. If unified memtable mode is enabled, rotates and flushes the unified memtable then waits for the flush to complete
+2. Calls `tidesdb_purge_cf` on each column family
+3. Drains the global flush queue (waits for queue size and pending count to reach 0)
+4. Drains the global compaction queue (waits for queue size to reach 0)
 
 **Return values**
 - `TDB_SUCCESS` if all column families purged successfully
@@ -2249,7 +2254,7 @@ tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
 ### How It Works
 
 - Object store mode requires unified memtable mode. Setting `object_store` on the config automatically enables `unified_memtable`
-- After each flush, SSTables are uploaded to the object store via an asynchronous upload pipeline with retry (3 attempts with exponential backoff) and post-upload verification (size check)
+- After each flush, SSTables are uploaded synchronously to the object store before being tracked in the local cache, ensuring the object store has a copy before cache eviction can delete the local file. Uploads use retry (3 attempts with exponential backoff) and post-upload verification (size check)
 - Point lookups on frozen SSTables (not present locally) fetch just the single needed klog block (~64KB) via one HTTP range request using `range_get`, bypassing the full file download. The block is cached in the clock cache so subsequent reads are pure memory hits. If the value is in the vlog, a second range request fetches just that vlog block
 - Iterators prefetch all needed SSTable files in parallel at creation time using bounded threads (`max_concurrent_downloads`, default 8), so sequential reads proceed at local disk speed. Prefetch runs at both initial iterator creation and after seek invalidation
 - A hash-indexed LRU local file cache manages disk usage, evicting least-recently-used SSTable file pairs (klog + vlog together) when `local_cache_max_bytes` is set
@@ -2324,14 +2329,15 @@ tidesdb_txn_put(txn, cf, key, key_size, val, val_size, 0); /* succeeds */
 tidesdb_txn_commit(txn);
 ```
 
-`tidesdb_promote_to_primary` performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. The function returns `TDB_ERR_INVALID_ARGS` if the node is already a primary.
+`tidesdb_promote_to_primary` waits for any in-progress reaper sync cycle to complete, performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. The wait prevents lock contention between the sync thread and the first post-promotion query. The function returns `TDB_ERR_INVALID_ARGS` if the node is already a primary.
 
 ### How Replica Sync Works
 
+- Before each MANIFEST sync cycle, the reaper discovers new column families in the object store that do not exist locally and creates them automatically by downloading their config and MANIFEST
 - The reaper thread polls the remote MANIFEST for each CF every `replica_sync_interval_us`
 - New SSTables from the primary's flushes and compactions are added to the replica's levels
 - SSTables compacted away on the primary are removed from the replica's levels
-- When `replica_replay_wal` is enabled, the latest WAL is downloaded and replayed into the memtable for near-real-time reads
+- When `replica_replay_wal` is enabled, all available WAL segments are discovered from the object store via listing and replayed in generation order into the memtable for near-real-time reads
 - WAL replay is idempotent using sequence numbers so entries already present are skipped
 - SSTable data is not downloaded during sync. It is fetched on demand via range_get for point lookups or prefetch for iterators
 
