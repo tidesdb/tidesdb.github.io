@@ -750,7 +750,7 @@ The benchmark suite configures both engines with equivalent settings to ensure a
 | LSM levels | 5 | 5 |
 | Bulk writes | Single transaction | WriteBatch |
 
-The one structural difference that cannot be eliminated is transaction overhead. TidesDB requires all operations to go through transactions (begin → op → commit), while RocksDB supports direct `db.put()`/`db.get()` calls. The plugin mitigates this with transaction reuse via `reset()`, but there is still a per-operation cost that is inherent to TidesDB's MVCC architecture. This cost is most visible on small-data read benchmarks; at larger dataset sizes, disk I/O dominates and the gap closes.
+The one structural difference that cannot be eliminated is transaction overhead. TidesDB requires all operations to go through transactions (begin -> op -> commit), while RocksDB supports direct `db.put()`/`db.get()` calls. The plugin mitigates this with transaction reuse via `reset()`, but there is still a per-operation cost that is inherent to TidesDB's MVCC architecture. This cost is most visible on small-data read benchmarks; at larger dataset sizes, disk I/O dominates and the gap closes.
 
 
 ## Architecture

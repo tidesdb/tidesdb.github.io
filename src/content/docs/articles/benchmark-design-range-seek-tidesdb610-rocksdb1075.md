@@ -96,7 +96,7 @@ The cache hit path is **pure memory operations**. No syscalls, no decompression,
 Even on cache misses, TidesDB's block indices are already in memory. The seek path
 
 1. Check bloom filter (memory) -> 99% of non-existent keys eliminated
-2. Binary search block index (memory) → exact block position
+2. Binary search block index (memory) -> exact block position
 3. Seek to block position (single disk I/O)
 4. Read and cache block
 

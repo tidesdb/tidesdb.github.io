@@ -1247,16 +1247,16 @@ When object store mode is active, the engine creates a reserved column family ca
 
 The schema CF is updated on every DDL operation:
 
-- **CREATE TABLE** stores the `.frm` binary from the in-memory image (MariaDB does not write `.frm` files to disk for engines with discovery callbacks)
-- **ALTER TABLE** updates the stored `.frm` after the inplace alter commits
-- **DROP TABLE** removes the entry
-- **RENAME TABLE** moves the entry to the new key
+- `CREATE TABLE` stores the `.frm` binary from the in-memory image (MariaDB does not write `.frm` files to disk for engines with discovery callbacks)
+- `ALTER TABLE` updates the stored `.frm` after the inplace alter commits
+- `DROP TABLE` removes the entry
+- `RENAME TABLE` moves the entry to the new key
 
 At startup, the plugin scans the schema CF for all unique database names and creates any missing database directories under the MariaDB data directory. This ensures `SHOW DATABASES` and `SHOW TABLES` work correctly on replicas without manual `CREATE DATABASE` commands.
 
 The engine registers MariaDB's `discover_table`, `discover_table_names`, and `discover_table_existence` handlerton callbacks. When MariaDB opens a table that has no local `.frm` file, these callbacks read the `.frm` from the schema CF and materialize it. The `.frm` is then cached on disk for subsequent opens.
 
-To prevent an infinite retry loop, `discover_table` verifies that the data column family exists locally before returning the `.frm`. If the table definition has been replicated but the data has not been synced yet, the engine returns "table not found" rather than entering a discover → open-fail → re-discover cycle.
+To prevent an infinite retry loop, `discover_table` verifies that the data column family exists locally before returning the `.frm`. If the table definition has been replicated but the data has not been synced yet, the engine returns "table not found" rather than entering a discover -> open-fail -> re-discover cycle.
 
 In local-only mode (no object store), none of this machinery is active. The schema CF is never created, discovery callbacks are not registered, and there is zero overhead.
 
