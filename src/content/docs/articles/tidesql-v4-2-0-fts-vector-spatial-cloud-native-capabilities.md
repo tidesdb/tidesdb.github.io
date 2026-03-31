@@ -24,7 +24,7 @@ head:
 
 Full-text search and spatial queries have been on the roadmap since TideSQL's earliest days. The ideas were there from the start, now in the latest minor release v4.2.0 the implementations are realized, and vector search came along for the ride. Each feature is accessed through standard SQL.
 
-In this write up I will walk through each feature with working examples run against a live <a href="https://mariadb.org">MariaDB</a> v11.8.6 instance running TideSQL 4.2.0 and TidesDB v9.0.1.  
+In this write up I will walk through each feature with working examples run against a live <a href="https://mariadb.org">MariaDB</a> v11.8.6 instance running the plugin with TidesDB v9.0.1.  
 
 ---
 
@@ -337,12 +337,12 @@ The ML-oriented query vector correctly identifies machine learning and neural ne
 
 ## Object Store Fixes
 
-S3-backed replication shipped in 4.1 but had gaps that prevented end-to-end operation. 4.2 adds automatic schema discovery via a reserved `__tidesql_schema` column family that replicates table definitions through S3 alongside row data. Replicas now discover databases and tables on their own -- no manual `CREATE DATABASE` or schema sync needed. Several correctness fixes were also made where `.frm` storage now uses the in-memory image directly (MariaDB skips writing `.frm` to disk for discovery-enabled engines), a discovery retry loop that could hang indefinitely when a data CF hadn't synced yet was resolved.
+S3-backed replication shipped in 4.1.0 but had gaps that prevented end-to-end operation. 4.2 adds automatic schema discovery via a reserved `__tidesql_schema` column family that replicates table definitions through S3 alongside row data. Replicas now discover databases and tables on their own. Several correctness fixes were also made where `.frm` storage now uses the in-memory image directly (MariaDB skips writing `.frm` to disk for discovery-enabled engines), a discovery retry loop that could hang indefinitely when a data CF hadn't synced yet was resolved.
 
 ---
 
 ## Summary
 
-With the latest minor release of TideSQL, version 4.2.0, the engine reaches feature parity with what you would expect from a general-purpose SQL storage engine combined with S3-backed replication and single-command failover, it scales from a single node to a cloud-native deployment where compute is ephemeral and storage is infinite.
+With the latest minor release of TideSQL, the engine reaches feature parity with what you would expect from a general-purpose SQL storage engine combined with S3-backed replication and single-command failover, it scales from a single node to a cloud-native deployment where compute is ephemeral and storage is infinite.
 
 TideSQL 4.2 is available now at [github.com/tidesdb/tidesql](https://github.com/tidesdb/tidesql). Full reference  is available  [here](/reference/tidesql/).
