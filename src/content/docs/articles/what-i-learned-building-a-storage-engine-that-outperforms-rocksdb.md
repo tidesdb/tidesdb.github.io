@@ -52,7 +52,7 @@ The sequential write benchmark shows 511% CPU utilization on 8 cores - that's 6.
 
 I implemented all three merge strategies from the Spooky paper (Dayan et al., 2022):
 - Full preemptive merge (compact adjacent levels entirely)
-- Dividing merge (merge levels 1→X into X+1)
+- Dividing merge (merge levels 1->X into X+1)
 - Partitioned merge (divide key space, merge ranges independently)
 
 Plus Dynamic Capacity Adaptation (DCA). After every compaction, DCA recalibrates level capacities based on actual data distribution:

@@ -447,7 +447,7 @@ fn main() -> tidesdb::Result<()> {
 - The transaction must be committed or aborted before reset; resetting an active transaction returns an error
 - Internal buffers are retained to avoid reallocation
 - A fresh transaction ID and snapshot sequence are assigned based on the new isolation level
-- The isolation level can be changed on each reset (e.g., `ReadCommitted` → `RepeatableRead`)
+- The isolation level can be changed on each reset (e.g., `ReadCommitted` -> `RepeatableRead`)
 
 **When to use**
 - Batch processing · Reuse a single transaction across many commit cycles in a loop

@@ -106,10 +106,10 @@ A background reaper thread runs every 100ms checking if we've exceeded `max_open
 
 This is the key design decision. Even after file handles close, the SSTable metadata remains allocated. When you need to read that SSTable again:
 
-1. Check min/max keys (already in memory) → might skip entirely
-2. Check bloom filter (already in memory) → might skip entirely  
+1. Check min/max keys (already in memory) -> might skip entirely
+2. Check bloom filter (already in memory) -> might skip entirely  
 3. If needed, reopen file handles (fast, no index/filter rebuild)
-4. Binary search block index (already in memory) → seek to exact block
+4. Binary search block index (already in memory) -> seek to exact block
 5. Read block, increment refcount
 6. When done, decrement refcount
 
@@ -153,11 +153,11 @@ Here's the scenario
 1. Thread A is reading from SSTable X (refcount = 1)
 2. Compaction decides to delete SSTable X (obsolete after merge)
 3. Compaction marks SSTable X for deletion but refcount > 0
-4. Thread A completes read, calls unref, refcount → 0
+4. Thread A completes read, calls unref, refcount -> 0
 5. **Now it's safe to free · SSTable X is deallocated**
 
 Without this reference counting, you'd have race conditions:
-- Thread A reading → compaction deletes SSTable → Thread A crashes (use-after-free)
+- Thread A reading -> compaction deletes SSTable -> Thread A crashes (use-after-free)
 - Solution · complicated locking or delayed deletion with uncertainty
 
 With reference counting, it's simple and safe · **The SSTable stays in memory until nothing is using it.**
@@ -169,7 +169,7 @@ This design choice produces the 1.76x read advantage and 3μs median latency:
 **Without metadata in memory** (RocksDB's approach):
 1. Open SSTable file
 2. Read and parse bloom filter from disk (I/O)
-3. Check bloom filter → false positive or continue
+3. Check bloom filter -> false positive or continue
 4. Read and parse block index from disk (I/O)
 5. Binary search index to find block
 6. Seek to block position

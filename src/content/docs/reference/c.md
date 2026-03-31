@@ -1278,7 +1278,7 @@ tidesdb_txn_free(txn);
 - Internal buffers (ops array, read set arrays, arena pointer array, column family array, savepoints array) are retained to avoid reallocation
 - Per-operation key/value data, arena buffers, hash tables, and savepoint children are freed
 - A fresh `txn_id` and `snapshot_seq` are assigned based on the new isolation level
-- The isolation level can be changed on each reset (e.g., `READ_COMMITTED` → `REPEATABLE_READ`)
+- The isolation level can be changed on each reset (e.g., `READ_COMMITTED` -> `REPEATABLE_READ`)
 - If switching to an isolation level that requires read tracking (`REPEATABLE_READ` or `SERIALIZABLE`), read set arrays are allocated automatically
 - SERIALIZABLE transactions are correctly unregistered from and re-registered to the active transaction list
 
