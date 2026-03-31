@@ -158,6 +158,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'TideSQL v4.2.0 Full-Text Search, Vector Similarity, Spatial Queries, and Cloud-Native Capabilities',
+							link: 'articles/tidesql-v4-2-0-fts-vector-spatial-cloud-native-capabilities'
+						},
+						{
 							label: 'Benchmark Analysis on TidesDB 9 (TideSQL 4.1), MyRocks, InnoDB in MariaDB 11.8.6 TPC-C HammerDB',
 							link: 'articles/benchmark-analysis-tidesdb-9-rocksdb-innodb-mariadb-11-8-tpc-c-hammerdb'
 						},
