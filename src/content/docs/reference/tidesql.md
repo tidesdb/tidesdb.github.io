@@ -17,7 +17,7 @@ TideSQL is a pluggable storage engine for <a href="https://mariadb.org/">MariaDB
 
 The engine supports ACID transactions through multi-version concurrency control (MVCC), letting readers proceed without blocking writers. It handles primary keys, secondary indexes, auto-increment columns, virtual and stored generated columns, savepoints, TTL-based expiration, data-at-rest encryption, online DDL, partitioning, and online backups. All of these features are accessible through standard SQL, so switching from InnoDB to TidesDB for a particular table requires nothing more than changing the `ENGINE` clause.
 
-The TidesDB data files live in a sibling directory next to the MariaDB data directory, named `tidesdb_data`. The engine manages its own file layout entirely, and MariaDB's schema discovery mechanism does not interfere with it. 
+The TidesDB data files live in a sibling directory next to the MariaDB data directory, named `tidesdb_data`. The engine manages its own file layout entirely. In object store mode, the engine uses MariaDB's schema discovery mechanism to replicate table definitions across nodes (see "Schema Discovery" under Object Store Mode).
 
 
 ## Getting Started
@@ -43,7 +43,7 @@ MariaDB [(none)]> SHOW ENGINES
 *************************** 1. row ***************************
       Engine: TIDESDB
      Support: YES
-     Comment: Supports ACID transactions, lock-free concurrency, indexing, and encryption for tables
+     Comment: LSM-tree engine with ACID transactions, MVCC concurrency, secondary/spatial/full-text/vector indexes, and encryption
 Transactions: YES
           XA: NO
   Savepoints: YES
@@ -243,7 +243,7 @@ COMMIT;
 
 The engine sets `lock_count()` to zero, which tells MariaDB to bypass its own table-level locking layer entirely. By default, all concurrency control is handled by TidesDB's MVCC, which allows readers and writers to proceed without blocking each other. When `tidesdb_pessimistic_locking` is enabled, the engine adds plugin-level row locks on top of MVCC for write-intent statements (see Pessimistic Row Locking below).
 
-Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, but because the error originates from the `hton->commit` callback, MariaDB wraps it as `ER_ERROR_DURING_COMMIT` (ERROR 1180). Unlike InnoDB - which detects deadlocks during row-level locking and never fails at commit - there is no automatic retry in the server for commit-time errors. Applications must catch ERROR 1180 and retry the transaction themselves. Conflicts are most likely under concurrent writes to the same rows at `REPEATABLE_READ` or higher isolation. Enabling `tidesdb_print_all_conflicts` logs every conflict event to the error log for diagnostics (see System Variables).
+Because TidesDB uses optimistic concurrency control, write-write conflicts are detected at commit time rather than during the DML operation. When `tidesdb_txn_commit()` encounters a conflict it returns `TDB_ERR_CONFLICT`. The engine maps this to `HA_ERR_LOCK_DEADLOCK`, which triggers MariaDB's built-in deadlock retry logic. For autocommit statements, MariaDB automatically retries the statement without application intervention. For multi-statement transactions (`BEGIN ... COMMIT`), the transaction is rolled back and the application receives ERROR 1213 (`ER_LOCK_DEADLOCK`), the same error InnoDB returns for deadlocks, and should retry the transaction. Conflicts are most likely under concurrent writes to the same rows at `REPEATABLE_READ` or higher isolation. Enabling `tidesdb_print_all_conflicts` logs every conflict event to the error log for diagnostics (see System Variables).
 
 This is a fundamental architectural difference between the two engines. InnoDB uses pessimistic row-level locks that serialize access to hot rows - when two transactions want to update the same row, the second one waits until the first commits or rolls back. TidesDB uses optimistic MVCC - both transactions proceed concurrently without blocking each other, and the second one to commit fails with a conflict error. In other words, InnoDB makes concurrent writers wait; TidesDB makes them fail and retry. Neither approach is inherently better. Pessimistic locking guarantees forward progress but introduces lock waits and potential deadlocks. Optimistic MVCC eliminates all lock waits and deadlocks but requires applications to handle retries. Workloads with low contention (most rows are touched by at most one writer at a time) see virtually no conflicts and benefit from the absence of lock overhead. Workloads with high contention on a small number of hot rows (e.g., a single counter row updated by every transaction) will see higher conflict rates and depend on efficient retry logic.
 
@@ -580,6 +580,213 @@ CREATE TABLE classified (
 Encryption works with all other features, including secondary indexes, BLOB columns, and TTL. The secondary index keys themselves are not encrypted (they need to remain comparable for seeking), but the row data pointed to by those keys is encrypted in the data column family.
 
 
+## Full-Text Search
+
+TidesDB supports FULLTEXT indexes for natural language and boolean mode full-text search, with BM25 relevance ranking. Each FULLTEXT index is stored as a dedicated column family containing an inverted index, where each key-value pair maps a (term, document) pair to its term frequency and document length.
+
+```sql
+CREATE TABLE articles (
+  id    INT NOT NULL PRIMARY KEY,
+  title VARCHAR(200),
+  body  TEXT,
+  FULLTEXT ft_content (title, body)
+) ENGINE=TIDESDB;
+
+INSERT INTO articles VALUES (1, 'MySQL Tutorial', 'DBMS stands for DataBase Management System');
+INSERT INTO articles VALUES (2, 'How To Use MySQL', 'After you went through a tutorial you can start');
+INSERT INTO articles VALUES (3, 'Optimizing MySQL', 'In this tutorial we show optimization techniques');
+```
+
+### Natural Language Mode
+
+The default search mode. The engine tokenizes the query, scans the inverted index for each term, computes BM25 relevance scores, and returns results sorted by score:
+
+```sql
+SELECT id, title, MATCH(title, body) AGAINST('tutorial') AS score
+FROM articles WHERE MATCH(title, body) AGAINST('tutorial')
+ORDER BY score DESC;
+```
+
+Multi-term queries accumulate BM25 scores across all query terms. Documents matching more terms and with higher term frequencies rank higher, normalized by document length.
+
+### Boolean Mode
+
+Boolean mode supports required (`+`), excluded (`-`), prefix wildcard (`*`), and exact phrase (`"..."`) operators:
+
+```sql
+-- Documents must contain 'mysql' AND 'tutorial'
+SELECT * FROM articles
+WHERE MATCH(title, body) AGAINST('+mysql +tutorial' IN BOOLEAN MODE);
+
+-- Documents must contain 'mysql' but NOT 'tutorial'
+SELECT * FROM articles
+WHERE MATCH(title, body) AGAINST('+mysql -tutorial' IN BOOLEAN MODE);
+
+-- Prefix wildcard: matches 'optimization', 'optimizing', etc.
+SELECT * FROM articles
+WHERE MATCH(title, body) AGAINST('optim*' IN BOOLEAN MODE);
+
+-- Exact phrase: words must appear consecutively in this order
+SELECT * FROM articles
+WHERE MATCH(title, body) AGAINST('"database management system"' IN BOOLEAN MODE);
+
+-- Phrase with operator: require phrase, exclude a word
+SELECT * FROM articles
+WHERE MATCH(title, body) AGAINST('+"management system" -tutorial' IN BOOLEAN MODE);
+```
+
+Phrase queries use the inverted index to find candidate documents containing all phrase words, then verify the exact word sequence by re-tokenizing the document text. This matches the approach used by InnoDB's FTS implementation.
+
+### BM25 Ranking
+
+Relevance scores are computed using the Okapi BM25 algorithm:
+
+```
+IDF(t) = ln(1 + (N - df + 0.5) / (df + 0.5))
+score  = IDF * (tf * (k1+1)) / (tf + k1 * (1 - b + b * |d| / avgdl))
+```
+
+where `N` is the total number of documents, `df` is the document frequency of the term, `tf` is the term frequency in the document, `|d|` is the document length in tokens, and `avgdl` is the average document length. The parameters `k1` and `b` are configurable via system variables (see below). The IDF formula includes the `+1` inside the logarithm to guarantee non-negative scores for all terms, matching the Lucene variant that is now the industry standard.
+
+### Tokenization
+
+The engine uses a charset-aware tokenizer that correctly handles multi-byte character sets including UTF-8, CJK characters, Cyrillic, Greek, and other Unicode scripts. Text is split on word boundaries using MariaDB's charset classification tables, then lowercased using the charset's case-folding rules. Words shorter than `tidesdb_fts_min_word_len` or longer than `tidesdb_fts_max_word_len` are excluded from the index and search queries.
+
+### Multi-Column Indexes
+
+A single FULLTEXT index can span multiple columns. The engine concatenates the text from all indexed columns into a single document for tokenization and scoring:
+
+```sql
+CREATE TABLE docs (
+  id      INT NOT NULL PRIMARY KEY,
+  title   VARCHAR(200),
+  summary TEXT,
+  body    TEXT,
+  FULLTEXT (title, summary, body)
+) ENGINE=TIDESDB;
+```
+
+### Index Maintenance
+
+FULLTEXT index entries are maintained transactionally within the same transaction as row data changes. When a row is inserted, the engine tokenizes the document, counts term frequencies, and writes one inverted index entry per unique term. When a row is deleted, the corresponding index entries are removed. When a row is updated and the indexed columns have changed, the old entries are removed and new entries are inserted. Global document count and average document length statistics are maintained atomically in the data column family for BM25 scoring.
+
+### FTS System Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `tidesdb_fts_min_word_len` | 3 | Minimum word length in characters for indexing |
+| `tidesdb_fts_max_word_len` | 84 | Maximum word length in characters for indexing |
+| `tidesdb_fts_bm25_k1` | 1.2 | BM25 k1 parameter (term-frequency saturation) |
+| `tidesdb_fts_bm25_b` | 0.75 | BM25 b parameter (document-length normalization, 0-1) |
+
+
+## Vector Search
+
+TidesDB supports approximate nearest neighbor (ANN) vector search through MariaDB's built-in MHNSW (Multi-layer Hierarchical Navigable Small World) vector index. The server handles all graph construction and search logic transparently; TidesDB provides the storage layer for both the main table data and the hidden MHNSW graph structure (hlindex).
+
+```sql
+CREATE TABLE embeddings (
+  id    INT NOT NULL PRIMARY KEY,
+  title VARCHAR(200),
+  v     VECTOR(384) NOT NULL,
+  VECTOR INDEX (v)
+) ENGINE=TIDESDB;
+
+INSERT INTO embeddings VALUES (1, 'cat picture', Vec_FromText('[0.1, 0.9, ...]'));
+INSERT INTO embeddings VALUES (2, 'dog picture', Vec_FromText('[0.2, 0.8, ...]'));
+```
+
+### ANN Search
+
+Vector search uses `ORDER BY VEC_DISTANCE_EUCLIDEAN()` or `VEC_DISTANCE_COSINE()` with a `LIMIT` clause. The MHNSW index provides approximate nearest neighbor results without scanning the entire table:
+
+```sql
+-- Find 5 nearest neighbors by Euclidean distance
+SELECT id, title,
+       VEC_DISTANCE_EUCLIDEAN(v, Vec_FromText('[0.15, 0.85, ...]')) AS dist
+FROM embeddings
+ORDER BY dist
+LIMIT 5;
+
+-- Cosine distance
+SELECT id, title,
+       VEC_DISTANCE_COSINE(v, Vec_FromText('[0.15, 0.85, ...]')) AS dist
+FROM embeddings
+ORDER BY dist
+LIMIT 5;
+```
+
+### Index Options
+
+The MHNSW index accepts two optional parameters:
+
+```sql
+CREATE TABLE docs (
+  id INT PRIMARY KEY,
+  v  VECTOR(128) NOT NULL,
+  VECTOR INDEX (v) M=12 DISTANCE='cosine'
+) ENGINE=TIDESDB;
+```
+
+`M` controls the number of neighbors per node in the MHNSW graph (default 6, range 3-200). Higher values improve recall at the cost of slower inserts and more memory. `DISTANCE` selects the distance metric: `euclidean` (default) or `cosine`.
+
+### DML Support
+
+All DML operations are fully supported on vector-indexed tables. INSERT adds the vector to the MHNSW graph, DELETE removes it, and UPDATE on the vector column invalidates the old graph node and inserts a new one with the updated vector. The engine correctly handles the interleaved `record[0]`/`record[1]` access pattern that the MHNSW graph maintenance requires for BLOB-backed vector data.
+
+### Limitations
+
+Partitioned tables do not support vector indexes. Only one vector index per table is currently supported by MariaDB's MHNSW implementation.
+
+
+## Spatial Indexes
+
+TidesDB supports SPATIAL indexes for geographic and geometric data using a Hilbert curve encoding on the LSM tree. Instead of a traditional R-tree (which requires in-place node updates that conflict with LSM append-only semantics), each geometry's MBR center is mapped to a 64-bit Hilbert curve value and stored as a sorted key in a dedicated column family.
+
+```sql
+CREATE TABLE places (
+  id       INT NOT NULL PRIMARY KEY,
+  name     VARCHAR(100),
+  location GEOMETRY NOT NULL,
+  SPATIAL INDEX (location)
+) ENGINE=TIDESDB;
+
+INSERT INTO places VALUES (1, 'NYC',     ST_GeomFromText('POINT(40.7128 -74.0060)'));
+INSERT INTO places VALUES (2, 'LA',      ST_GeomFromText('POINT(34.0522 -118.2437)'));
+INSERT INTO places VALUES (3, 'Chicago', ST_GeomFromText('POINT(41.8781 -87.6298)'));
+```
+
+### Spatial Queries
+
+All MBR-based spatial predicates are supported through the standard MariaDB spatial functions:
+
+```sql
+-- Find cities within a bounding box
+SELECT name FROM places
+WHERE MBRIntersects(location,
+  ST_GeomFromText('POLYGON((39 -76, 43 -76, 43 -72, 39 -72, 39 -76))'));
+
+-- Find cities contained within a region
+SELECT name FROM places
+WHERE MBRContains(
+  ST_GeomFromText('POLYGON((25 -125, 45 -125, 45 -70, 25 -70, 25 -125))'),
+  location);
+
+-- Find cities within a region (equivalent to MBRContains with swapped args)
+SELECT name FROM places
+WHERE MBRWithin(location,
+  ST_GeomFromText('POLYGON((25 -125, 45 -125, 45 -70, 25 -70, 25 -125))'));
+```
+
+The supported spatial predicates are `MBRIntersects`, `MBRContains`, `MBRWithin`, `MBREquals`, and `MBRDisjoint`. All geometry types are supported (POINT, LINESTRING, POLYGON, MULTIPOINT, MULTILINESTRING, MULTIPOLYGON, GEOMETRYCOLLECTION).
+
+### How It Works
+
+The spatial index stores each geometry as a single entry in a dedicated column family. The key is the 64-bit Hilbert curve value of the MBR center point (in big-endian for lexicographic ordering), followed by the primary key suffix. The value stores the full MBR (4 doubles = 32 bytes) for predicate evaluation during scans. The Hilbert curve provides excellent spatial locality - geographically nearby geometries tend to have numerically adjacent Hilbert values, which means they cluster together in the LSM tree and benefit from sequential I/O during range scans.
+
+Spatial queries use Hilbert range decomposition to avoid scanning the entire index. The query bounding box is mapped to a coarse grid on the Hilbert curve, and only the grid cells that overlap the box are included. These cells are sorted and merged into contiguous Hilbert ranges, and the engine seeks directly to each range - skipping over large portions of the curve that fall outside the query box. Each candidate entry within a range undergoes exact MBR predicate filtering to eliminate false positives from curve approximation. For a query box covering 1% of the coordinate space, this typically produces 10-50 targeted seeks instead of a full index scan. INSERT, UPDATE, and DELETE operations maintain the spatial index transactionally alongside the row data, following the same pattern as secondary indexes and full-text indexes.
+
+
 ## Generated Columns
 
 The engine supports both `VIRTUAL` and `STORED` (persistent) generated columns. Virtual columns are computed on read and never physically stored. Stored columns are computed on write and persisted as part of the row data, so they can be read back without recomputation.
@@ -725,6 +932,38 @@ SHOW ENGINE TIDESDB STATUS\G
 The output includes the data directory path, number of column families, global sequence number, memory usage (total system memory, resolved memory limit, memory pressure level, memtable bytes, transaction memory bytes), storage metrics (total SSTables, open SSTable handles, total data size, immutable memtable count), background queue sizes (flush pending, flush queue, compaction queue), and block cache statistics (enabled, entries, size, hits, misses, hit rate, partitions).
 
 When `tidesdb_print_all_conflicts` is enabled, the last conflict event is also displayed under a Conflicts section.
+
+### Status Variables
+
+The engine also exposes machine-readable status variables for monitoring tools (Prometheus mysqld_exporter, PMM, Datadog, etc.):
+
+```sql
+SHOW GLOBAL STATUS LIKE 'tidesdb%';
+```
+
+| Variable | Description |
+|----------|-------------|
+| `Tidesdb_column_families` | Number of active column families |
+| `Tidesdb_global_sequence` | Global MVCC sequence number |
+| `Tidesdb_memtable_bytes` | Total memtable memory usage in bytes |
+| `Tidesdb_txn_memory_bytes` | Transaction buffer memory in bytes |
+| `Tidesdb_memory_limit` | Resolved memory limit in bytes |
+| `Tidesdb_memory_pressure` | Memory pressure level (0 = normal) |
+| `Tidesdb_total_sstables` | Total SSTable count across all column families |
+| `Tidesdb_open_sstables` | Open SSTable file handles |
+| `Tidesdb_data_size_bytes` | Total data size on disk in bytes |
+| `Tidesdb_immutable_memtables` | Immutable memtables pending flush |
+| `Tidesdb_flush_pending` | Flush operations pending |
+| `Tidesdb_flush_queue` | Flush queue depth |
+| `Tidesdb_compaction_queue` | Compaction queue depth |
+| `Tidesdb_cache_entries` | Block cache entry count |
+| `Tidesdb_cache_bytes` | Block cache memory usage in bytes |
+| `Tidesdb_cache_hits` | Block cache hit count |
+| `Tidesdb_cache_misses` | Block cache miss count |
+| `Tidesdb_cache_hit_rate` | Block cache hit rate (percentage) |
+| `Tidesdb_cache_partitions` | Block cache partition count |
+
+Values are refreshed every two seconds, aligned with the optimizer statistics refresh cycle. This provides the same monitoring integration that InnoDB offers via `SHOW GLOBAL STATUS LIKE 'innodb%'`.
 
 
 ## Online Backup
@@ -928,7 +1167,7 @@ The cost model accounts for the fact that LSM-tree reads may need to consult mul
 
 ## OPTIMIZE TABLE
 
-Running `OPTIMIZE TABLE` triggers a synchronous flush and compaction on all column families associated with the table, both the main data CF and every secondary index CF. The engine calls `tidesdb_purge_cf()` for each column family, which flushes the active memtable to disk and then runs a full compaction inline, blocking until complete. This means the table is fully compacted when the statement returns. After compaction, the cached statistics are invalidated so the optimizer sees the post-compaction state sooner.
+Running `OPTIMIZE TABLE` triggers a synchronous flush and compaction on all column families associated with the table, both the main data CF and every secondary index CF. The engine calls `tidesdb_purge_cf()` for each column family, which rotates the unified memtable (when enabled), flushes the resulting immutable memtable to SSTables, and then runs a full compaction inline, blocking until complete. This means the table is fully compacted when the statement returns. In object store mode, the flushed SSTables are uploaded to S3, making `OPTIMIZE TABLE` the most direct way to push data to the object store. After compaction, the cached statistics are invalidated so the optimizer sees the post-compaction state sooner.
 
 ```sql
 OPTIMIZE TABLE products;
@@ -1000,7 +1239,26 @@ tidesdb_s3_access_key = minioadmin
 tidesdb_s3_secret_key = minioadmin
 ```
 
-Object store mode automatically enables unified memtable mode. No other configuration changes are needed. Existing SQL, table options, indexes, transactions, and all engine features work identically.
+Object store mode works with unified memtable mode (enabled by default). Unified memtable is strongly recommended for object store deployments because it reduces WAL I/O to a single file and ensures all column families are flushed together. No other configuration changes are needed. Existing SQL, table options, indexes, transactions, and all engine features work identically.
+
+### Schema Discovery
+
+When object store mode is active, the engine creates a reserved column family called `__tidesql_schema` that stores the binary `.frm` image for every TidesDB table. This column family replicates through S3 alongside data, so replicas automatically discover table definitions without any manual schema synchronization.
+
+The schema CF is updated on every DDL operation:
+
+- **CREATE TABLE** stores the `.frm` binary from the in-memory image (MariaDB does not write `.frm` files to disk for engines with discovery callbacks)
+- **ALTER TABLE** updates the stored `.frm` after the inplace alter commits
+- **DROP TABLE** removes the entry
+- **RENAME TABLE** moves the entry to the new key
+
+At startup, the plugin scans the schema CF for all unique database names and creates any missing database directories under the MariaDB data directory. This ensures `SHOW DATABASES` and `SHOW TABLES` work correctly on replicas without manual `CREATE DATABASE` commands.
+
+The engine registers MariaDB's `discover_table`, `discover_table_names`, and `discover_table_existence` handlerton callbacks. When MariaDB opens a table that has no local `.frm` file, these callbacks read the `.frm` from the schema CF and materialize it. The `.frm` is then cached on disk for subsequent opens.
+
+To prevent an infinite retry loop, `discover_table` verifies that the data column family exists locally before returning the `.frm`. If the table definition has been replicated but the data has not been synced yet, the engine returns "table not found" rather than entering a discover → open-fail → re-discover cycle.
+
+In local-only mode (no object store), none of this machinery is active. The schema CF is never created, discovery callbacks are not registered, and there is zero overhead.
 
 ### Read Replicas
 
@@ -1011,7 +1269,11 @@ tidesdb_replica_mode = ON
 tidesdb_replica_sync_interval = 1000000
 ```
 
-The replica periodically polls S3 for MANIFEST updates and replays WAL segments for near-real-time reads. Writes are rejected with a clean SQL error. Multiple replicas can run simultaneously, each with its own local cache.
+The replica periodically polls S3 for MANIFEST updates and discovers new column families that the primary has created. It also replays unified WAL segments for near-real-time reads. Writes are rejected with a clean SQL error. Multiple replicas can run simultaneously, each with its own local cache.
+
+Table definitions are discovered automatically from the `__tidesql_schema` column family. When a client queries a table that the replica has not opened before, the engine reads the `.frm` from the schema CF, writes it to local disk, and opens the table. Database directories are created at startup, so `SHOW DATABASES` and `SHOW TABLES` reflect the primary's schema immediately.
+
+`OPTIMIZE TABLE` on the primary triggers a unified memtable flush, which creates SSTables for all column families (including `__tidesql_schema`) and uploads them to S3. This ensures that both table data and schema definitions reach the object store promptly.
 
 ### Primary Promotion
 
@@ -1021,7 +1283,9 @@ When the primary fails, a replica can be promoted to accept writes:
 SET GLOBAL tidesdb_promote_primary = ON;
 ```
 
-This performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and starts accepting writes. The promotion is fast because the replica already has metadata in memory from the sync loop.
+This waits for any in-progress replica sync to complete, performs a final MANIFEST sync and WAL replay to catch the last writes from the old primary, creates a local WAL for crash recovery, and starts accepting writes. The promotion is fast because the replica already has metadata in memory from the sync loop.
+
+After promotion, tables that were previously opened (and have their `.frm` cached on disk) are accessible immediately. Tables that have not been opened yet will be discovered from the schema CF on first access, provided their data column family has been synced. If a table's schema has been replicated but its data has not arrived yet, the query returns "table not found" rather than blocking.
 
 ### WAL Sync Options
 
@@ -1057,7 +1321,18 @@ The `k8s/` directory contains example manifests for deploying TidesQL with objec
 - `replica.yaml` - Deployment for read replicas with replica mode
 - `failover-controller.yaml` - Automated failover controller that health-checks the primary and promotes a replica when unresponsive
 
-The failover controller runs as a separate pod, checks the primary every 5 seconds, and after 3 consecutive failures promotes a replica via `SET GLOBAL tidesdb_promote_primary = ON`.
+The failover controller runs as a separate pod, checks the primary every few seconds, and after consecutive failures promotes a replica via `SET GLOBAL tidesdb_promote_primary = ON`.
+
+Because MariaDB's default `root` user authenticates via unix socket (localhost only), the failover controller needs a dedicated user with TCP access to run the promotion command from a separate pod:
+
+```sql
+CREATE USER 'monitor'@'%' IDENTIFIED BY '<strong-password>';
+GRANT ALL PRIVILEGES ON *.* TO 'monitor'@'%' WITH GRANT OPTION;
+```
+
+This user must be created on both the primary and every replica. If MariaDB's `simple_password_check` plugin is active, the password must meet complexity requirements (mixed case, digits, special characters).
+
+Replica pods start with a fresh data directory. The plugin's schema discovery creates database directories at startup from the `__tidesql_schema` column family, and table definitions are materialized on first access. No manual `CREATE DATABASE` commands are needed on replicas.
 
 ### Build Requirement
 
@@ -1080,7 +1355,7 @@ Changing the primary key of a table requires a full copy rebuild. The engine doe
 
 The statistics cache refreshes every two seconds, so immediately after a bulk load, the optimizer may briefly see stale row counts. Running `ANALYZE TABLE` forces an immediate refresh.
 
-Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail at commit time with `ER_ERROR_DURING_COMMIT` (ERROR 1180) due to optimistic concurrency control conflicts. Applications using explicit `BEGIN ... COMMIT` blocks should implement retry logic for this error. Enabling `tidesdb_pessimistic_locking` eliminates most write-write conflicts by serializing access to hot rows via row locks, at the cost of introducing lock waits and potential deadlocks (ERROR 1213).
+Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail at commit time with `ER_LOCK_DEADLOCK` (ERROR 1213) due to optimistic concurrency control conflicts. Applications using explicit `BEGIN ... COMMIT` blocks should implement retry logic for this error. Autocommit statements are retried automatically by MariaDB. Enabling `tidesdb_pessimistic_locking` eliminates most write-write conflicts by serializing access to hot rows via row locks, at the cost of introducing lock waits and potential deadlocks (also ERROR 1213).
 
 --
 

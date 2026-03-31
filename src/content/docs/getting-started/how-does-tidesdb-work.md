@@ -17,8 +17,8 @@ description: A comprehensive design overview of TidesDB's architecture, core com
         '<span>' + version + '</span></a>';
     })
     .catch(function() {
-      badge.innerHTML = 
-        '<span>v9.0.0</span>';
+      badge.innerHTML =
+        '<span>v9.0.1</span>';
     });
 })();
 </script>
@@ -246,7 +246,7 @@ Even though the memtable is shared, backpressure is still applied per column fam
 
 #### WAL Lifetime
 
-Each unified WAL has a one-to-one relationship with the unified immutable memtable it belongs to. There is no generation refcounting. The WAL is created when the unified memtable is created and deleted after the flush worker successfully demuxes all entries into per-CF SSTables and commits their manifests.
+Each unified WAL has a one-to-one relationship with the unified immutable memtable it belongs to. There is no generation refcounting. The WAL is created when the unified memtable is created. After the flush worker successfully demuxes all entries into per-CF SSTables and commits their manifests, the closed WAL segment is uploaded to the object store if `replicate_wal` is enabled, then deleted locally. In non-object-store mode the WAL is deleted immediately after flush.
 
 #### Configuration
 
@@ -558,7 +558,7 @@ The database maintains two global work queues: one for flush operations and one 
 
 Workers call `queue_dequeue_wait()` to block until work arrives. Multiple workers can process different column families simultaneously: worker 1 might flush column family A while worker 2 flushes column family B. Each column family uses atomic flags (`is_flushing`, `is_compacting`) with compare-and-swap to prevent concurrent operations on the same structure. Only one flush can run per column family at a time, and only one compaction per column family at a time. The `is_flushing` flag is cleared in the flush worker after flush I/O completes, ensuring only one flush lifecycle (rotation, enqueue, I/O, and cleanup) runs per column family at a time. This prevents cascading flush storms under write pressure. The public `tidesdb_is_flushing()` and `tidesdb_is_compacting()` functions check both the atomic flag and the respective work queue size, returning true if either indicates pending work.
 
-The `tidesdb_purge_cf()` function provides a synchronous force-flush and aggressive compaction for a single column family. It waits for any in-progress flush to complete, force-flushes the active memtable, waits for flush I/O to finish, then triggers synchronous compaction inline (bypassing the compaction queue) and waits for any queued compaction to drain. The `tidesdb_purge()` function applies this to all column families and additionally drains both the global flush and compaction queues before returning. These are useful for manual maintenance, pre-backup preparation, or reclaiming space after bulk deletes.
+The `tidesdb_purge_cf()` function provides a synchronous force-flush and aggressive compaction for a single column family. If unified memtable mode is enabled, it first rotates the unified memtable and waits for the flush to complete so that entries belonging to this CF are moved to SSTables. It then waits for any in-progress flush to complete, force-flushes the active per-CF memtable, waits for flush I/O to finish, then triggers synchronous compaction inline (bypassing the compaction queue) and waits for any queued compaction to drain. The `tidesdb_purge()` function applies this to all column families, rotating the unified memtable once upfront, and additionally drains both the global flush and compaction queues before returning. These are useful for manual maintenance, pre-backup preparation, or reclaiming space after bulk deletes.
 
 The parallelism semantics are straightforward. Multiple flush and compaction workers can process different column families in parallel (cross-CF parallelism). A single column family can only have one flush and one compaction running at any time (within-CF serialization). Even if a CF has multiple immutable memtables queued, they are flushed sequentially.
 
@@ -682,7 +682,7 @@ The bloom filter implementation uses a packed bitset (uint64_t words) with multi
 
 The filter serializes using varint encoding for headers and sparse encoding for the bitset, storing only non-zero words with their indices. This achieves 70 to 90% space savings for low fill rates (below 50%). The serialization format is varint(m), varint(h), varint(non_zero_count), then pairs of varint(index) and uint64_t(word).
 
-The hash function uses a simple multiplicative hash with different seeds for each of the h hash functions. Each hash sets one bit in the bitset using `bitset[hash % m / 64] |= (1ULL << (hash % 64))`.
+The hash function uses Kirsch-Mitzenmacher double hashing. Two base hashes (h1 and h2) are computed using a multiplicative hash with seeds 0 and 1. The i-th hash function is derived as `h1 + i * h2`, producing h independent bit positions from only two hash computations. Each hash sets one bit in the bitset using Lemire's fast range reduction for uniform distribution across the bitset.
 
 TidesDB creates one bloom filter per SSTable during flush and merges, adding all keys. The filter is serialized and written to the klog file after data blocks. During reads, the system checks the bloom filter before consulting the block index. With 1% FPR, this eliminates 99% of disk reads for absent keys. The filter is loaded into memory when an SSTable is opened and remains resident.
 
@@ -801,7 +801,7 @@ When the memtable exceeds `unified_memtable_write_buffer_size`, it rotates to im
 
 The flush worker then demuxes the unified immutable into per-CF SSTables, writing klog and vlog files to local disk. This is identical to non-object-store mode. The SSTable is added to the CF's level 1.
 
-Immediately after flush, `tidesdb_level_add_sstable` enqueues the klog and vlog for async upload to the object store and registers both files in the local cache via `tdb_local_cache_track`. The MANIFEST is also uploaded asynchronously. At this point the SSTable exists in both tiers. The local copy serves reads with zero network latency.
+Immediately after flush, `tidesdb_level_add_sstable` uploads the klog and vlog synchronously to the object store and registers both files in the local cache via `tdb_local_cache_track`. The synchronous upload ensures the object store has a copy before local cache eviction can delete the file. The MANIFEST is uploaded asynchronously. At this point the SSTable exists in both tiers. The local copy serves reads with zero network latency.
 
 The SSTable files remain on local disk as cache entries. Every read access calls `tdb_local_cache_touch` to promote the file to the head of the LRU list. As long as the file stays warm (accessed within the LRU window), it stays local.
 
@@ -825,7 +825,7 @@ Data naturally flows downward through these tiers as it ages. Recent writes live
 
 ### Write Path
 
-The write path is unchanged at the memtable and WAL level. All writes go to the unified memtable and unified WAL as usual. When the memtable is flushed, the flush worker writes per-CF SSTables to local disk. After `tidesdb_level_add_sstable` writes the SSTable locally, it uploads the klog and vlog files to the object store. Uploads are queued to a pool of background upload threads (configurable via `max_concurrent_uploads`, default 4). Each upload is verified after completion by checking that the object exists in the store with the correct size. Failed uploads are retried up to 3 times with exponential backoff (100ms, 400ms, 1600ms) before being recorded as a permanent failure. The MANIFEST is uploaded asynchronously through the same pipeline after each flush and compaction when `sync_manifest_to_object` is enabled (default), ensuring the remote store has the latest SSTable inventory without blocking the flush worker.
+The write path is unchanged at the memtable and WAL level. All writes go to the unified memtable and unified WAL as usual. When the memtable is flushed, the flush worker writes per-CF SSTables to local disk. After `tidesdb_level_add_sstable` writes the SSTable locally, it uploads the klog and vlog files synchronously to the object store with retry (3 attempts with exponential backoff) and post-upload verification (size check). The synchronous upload ensures the object store has a copy before local cache eviction can delete the file. The MANIFEST is uploaded asynchronously after each flush and compaction when `sync_manifest_to_object` is enabled (default), ensuring the remote store has the latest SSTable inventory without blocking the flush worker. Closed unified WAL segments are uploaded to the object store before local deletion when `replicate_wal` is enabled, with upload timing controlled by `wal_upload_sync` (synchronous or background via the upload thread pool).
 
 ### Read Path
 
@@ -863,9 +863,9 @@ TidesDB supports read-only replicas that follow a primary node through the objec
 
 A replica is enabled by setting `replica_mode = 1` on `tidesdb_objstore_config_t`. In replica mode, `tidesdb_txn_put` and `tidesdb_txn_delete` return `TDB_ERR_READONLY` immediately. Read transactions work normally using the same MVCC isolation levels, iterators, bloom filters, and block caches as the primary.
 
-The reaper thread polls the remote MANIFEST for each column family every `replica_sync_interval_us` (default 5 seconds). `tdb_replica_sync_manifests` downloads each CF's MANIFEST to a temporary file, diffs it against the local MANIFEST, adds new SSTables (following the same pattern as cold start recovery), and removes SSTables that the primary compacted away. SSTable data is not downloaded during sync; it is fetched on demand via range_get for point lookups or prefetch for iterators.
+Before each MANIFEST sync cycle, the reaper discovers new column families in the object store that do not exist locally and creates them automatically by downloading their config and MANIFEST. This allows a replica to pick up CFs created by the primary after the replica started. The reaper then polls the remote MANIFEST for each column family every `replica_sync_interval_us` (default 5 seconds). `tdb_replica_sync_manifests` downloads each CF's MANIFEST to a temporary file, diffs it against the local MANIFEST, adds new SSTables (following the same pattern as cold start recovery), and removes SSTables that the primary compacted away. SSTable data is not downloaded during sync; it is fetched on demand via range_get for point lookups or prefetch for iterators.
 
-When `replica_replay_wal` is enabled (default), the reaper also downloads the latest unified WAL from the object store and replays new entries into the unified memtable. Replay is idempotent using sequence numbers. Entries with sequence numbers at or below the current `global_seq` are skipped. This gives the replica access to writes that the primary committed but has not yet flushed to SSTables. The replica's memtable is ephemeral and rebuilt from the primary's WAL on each sync cycle.
+When `replica_replay_wal` is enabled (default), the reaper discovers all available unified WAL segments from the object store via listing, sorts them by generation, and replays new entries from each into the unified memtable. Replay is idempotent using sequence numbers. Entries with sequence numbers at or below the current `global_seq` are skipped. This gives the replica access to writes that the primary committed but has not yet flushed to SSTables, even when the primary has rotated through multiple WAL generations between sync intervals. The replica's memtable is ephemeral and rebuilt from the primary's WAL segments on each sync cycle.
 
 For tighter replication lag, the primary can set `wal_sync_on_commit = 1`, which uploads the WAL synchronously after every `tidesdb_txn_commit`. This ensures the replica sees committed data within one sync interval rather than waiting for the periodic WAL threshold upload. The tradeoff is one additional HTTP round-trip per commit on the primary.
 
@@ -873,7 +873,7 @@ The replica's view of the data lags behind the primary by at most `replica_sync_
 
 ### Primary Promotion
 
-When the primary fails, a replica can be promoted to primary via `tidesdb_promote_to_primary`. The function performs a final MANIFEST sync and WAL replay to capture any last writes from the old primary, creates a local WAL for crash recovery of new writes, and atomically switches `replica_mode` to 0. After promotion, the node accepts writes immediately.
+When the primary fails, a replica can be promoted to primary via `tidesdb_promote_to_primary`. The function first waits for any in-progress reaper sync cycle to complete to avoid lock contention with the first post-promotion query, then performs a final MANIFEST sync and WAL replay to capture any last writes from the old primary, creates a local WAL for crash recovery of new writes, and atomically switches `replica_mode` to 0. After promotion, the node accepts writes immediately.
 
 Promotion is fast since the replica already has the MANIFEST and SSTable metadata in memory from the sync loop. The only work is one final WAL download plus replay and a WAL file creation. An external orchestration layer (health checks, DNS failover, Kubernetes operator, or a coordination service) handles the decision of when to promote.
 
@@ -881,7 +881,7 @@ Promotion is fast since the replica already has the MANIFEST and SSTable metadat
 
 The storage engine remains fully multi-writer within a single process. Multiple threads can write concurrently through transactions with full MVCC isolation, just as in non-object-store mode. The single-writer constraint applies only at the object store level, where one node at a time owns the bucket and uploads SSTables, MANIFESTs, and WAL segments.
 
-On clean shutdown, `tidesdb_close` flushes the active memtable to SSTables and uploads them through the async pipeline before stopping workers. The object store receives all committed data. On crash, the data loss window depends on configuration. With `wal_sync_on_commit = 1`, every committed write is in S3 (RPO = 0). With `wal_sync_threshold_bytes` set to 1MB (default), the worst case is 1MB of writes since the last WAL sync. Setting it to 0 disables periodic WAL sync, in which case the RPO equals one full flush cycle. On clean shutdown there is no data loss.
+On clean shutdown, `tidesdb_close` shuts down the upload pipeline first to drain any pending WAL uploads, then flushes the active unified memtable to SSTables before stopping workers. The object store receives all committed data. On crash, the data loss window depends on configuration. With `wal_sync_on_commit = 1`, every committed write is in S3 (RPO = 0). With `wal_sync_threshold_bytes` set to 1MB (default), the worst case is 1MB of writes since the last WAL sync. Setting it to 0 disables periodic WAL sync, in which case the RPO equals one full flush cycle. On clean shutdown there is no data loss.
 
 Recovery without replicas follows the cold start path. A new node starts with an empty local directory, discovers CFs from the object store via `tdb_objstore_cold_start_discover` (parallel MANIFEST download), and reconstructs the SSTable inventory. SSTable data is fetched on demand as queries arrive.
 
