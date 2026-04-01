@@ -215,7 +215,6 @@ cfConfig.MinDiskSpace = 100 * 1024 * 1024         // Minimum disk space required
 cfConfig.L1FileCountTrigger = 4                   // L1 file count trigger for compaction
 cfConfig.L0QueueStallThreshold = 20               // L0 queue stall threshold
 cfConfig.UseBtree = 0                             // Use B+tree format for klog (0 = block-based)
-cfConfig.ObjectTargetFileSize = 256 * 1024 * 1024  // Target SSTable size in object store mode (0 = auto)
 cfConfig.ObjectLazyCompaction = 0                  // Less aggressive compaction in object store mode
 cfConfig.ObjectPrefetchCompaction = 1              // Download all inputs before merge
 
@@ -1232,7 +1231,6 @@ Column family configurations include three object store tuning fields.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `ObjectTargetFileSize` | `uint64` | `0` (auto) | Target SSTable size in object store mode |
 | `ObjectLazyCompaction` | `int` | `0` | 1 to compact less aggressively for remote storage |
 | `ObjectPrefetchCompaction` | `int` | `1` | 1 to download all inputs before compaction merge |
 

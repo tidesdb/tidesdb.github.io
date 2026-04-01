@@ -754,7 +754,6 @@ Column family configurations include three object store tuning fields:
 ColumnFamilyConfig cfConfig = ColumnFamilyConfig.builder()
     .writeBufferSize(128 * 1024 * 1024)
     .compressionAlgorithm(CompressionAlgorithm.LZ4_COMPRESSION)
-    .objectTargetFileSize(256 * 1024 * 1024)  // 256MB target SSTable size
     .objectLazyCompaction(true)                // compact less aggressively
     .objectPrefetchCompaction(true)            // download all inputs before merge
     .build();
@@ -1062,7 +1061,6 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `l1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `l0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
 | `useBtree` | boolean | false | Use B+tree format for klog (faster point lookups) |
-| `objectTargetFileSize` | long | 0 | Target SSTable size in object store mode (0 = auto) |
 | `objectLazyCompaction` | boolean | false | Compact less aggressively for remote storage |
 | `objectPrefetchCompaction` | boolean | true | Download all inputs before compaction merge |
 

@@ -118,7 +118,6 @@ cf_config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
 cf_config.l1_file_count_trigger = 4          -- L1 file count trigger for compaction
 cf_config.l0_queue_stall_threshold = 20      -- L0 queue stall threshold
 cf_config.use_btree = false                  -- Use B+tree format for klog (default: false)
-cf_config.object_target_file_size = 0          -- Object store target file size (0 = default)
 cf_config.object_lazy_compaction = false       -- Enable lazy compaction for object store
 cf_config.object_prefetch_compaction = false   -- Enable prefetch during object store compaction
 
@@ -839,7 +838,6 @@ Column family configurations include three object store tuning fields:
 
 ```lua
 local cf_config = tidesdb.default_column_family_config()
-cf_config.object_target_file_size = 256 * 1024 * 1024  -- Target SSTable size (0 = auto)
 cf_config.object_lazy_compaction = true                 -- Compact less aggressively for remote storage
 cf_config.object_prefetch_compaction = true              -- Download all inputs before compaction merge
 

@@ -1492,7 +1492,6 @@ fn main() -> tidesdb::Result<()> {
 #### Per-CF Object Store Tuning
 
 Column family configurations include three object store tuning fields (see Column Family Configuration Reference):
-- `object_target_file_size` · Target SSTable size in object store mode (0 = auto)
 - `object_lazy_compaction` · Compact less aggressively for remote storage
 - `object_prefetch_compaction` · Download all inputs before compaction merge
 
@@ -1700,7 +1699,6 @@ All available `ColumnFamilyConfig` builder methods:
 | `l1_file_count_trigger(trigger)` | `i32` | 4 | L1 file count trigger for compaction |
 | `l0_queue_stall_threshold(threshold)` | `i32` | 20 | L0 queue stall threshold |
 | `use_btree(enable)` | `bool` | false | Use B+tree format for klog |
-| `object_target_file_size(size)` | `usize` | 0 | Target SSTable size in object store mode (0 = auto, default 256MB) |
 | `object_lazy_compaction(enable)` | `bool` | false | Compact less aggressively in object store mode |
 | `object_prefetch_compaction(enable)` | `bool` | true | Download all inputs before merge in object store mode |
 
