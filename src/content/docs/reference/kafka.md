@@ -171,7 +171,6 @@ Each state store maps to a single TidesDB column family. These settings control 
 | `dividingLevelOffset` | int | 2 | Compaction dividing level offset |
 | `minDiskSpace` | long | 100 MB | Minimum free disk space required before writes are rejected |
 | `comparatorName` | String | "" (memcmp) | Custom comparator name; empty uses default binary comparison |
-| `objectTargetFileSize` | long | 0 (auto, 256 MB) | Target SSTable size in object store mode |
 | `objectLazyCompaction` | boolean | false | Compact less aggressively in object store mode |
 | `objectPrefetchCompaction` | boolean | true | Download all inputs before merge in object store mode |
 
@@ -516,7 +515,6 @@ Per-column-family options control SSTable sizing and compaction behavior in obje
 ```java
 TidesDBStoreConfig config = TidesDBStoreConfig.builder()
     .objectStoreFsPath("/mnt/shared/tidesdb-objects")
-    .objectTargetFileSize(512 * 1024 * 1024)  // 512 MB SSTables
     .objectLazyCompaction(true)                // compact less aggressively
     .objectPrefetchCompaction(true)            // download all inputs before merge
     .build();

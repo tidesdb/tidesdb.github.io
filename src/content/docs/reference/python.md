@@ -804,7 +804,6 @@ config.l0_queue_stall_threshold = 20          # L0 queue stall threshold (defaul
 config.use_btree = False                      # Use B+tree klog format (default: False)
 
 # Object store settings (for object store mode)
-config.object_target_file_size = 0            # Target file size for object store (0 = auto)
 config.object_lazy_compaction = False         # Enable lazy compaction for object store
 config.object_prefetch_compaction = True      # Prefetch data during compaction (default: True)
 ```
@@ -985,7 +984,6 @@ Column family configurations include three object store tuning fields.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `object_target_file_size` | `int` | `0` (auto) | Target SSTable size in object store mode |
 | `object_lazy_compaction` | `bool` | `False` | Compact less aggressively for remote storage |
 | `object_prefetch_compaction` | `bool` | `True` | Download all inputs before compaction merge |
 

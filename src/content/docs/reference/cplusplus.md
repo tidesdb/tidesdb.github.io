@@ -1095,7 +1095,6 @@ Use `ObjectStoreConfig::defaultConfig()` for sensible defaults, then override fi
 
 Column family configurations include three object store tuning fields.
 
-- `objectTargetFileSize` · Target SSTable size in object store mode (0 = auto)
 - `objectLazyCompaction` · 1 to compact less aggressively for remote storage (default: 0)
 - `objectPrefetchCompaction` · 1 to download all inputs before compaction merge (default: 1)
 

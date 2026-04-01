@@ -2203,13 +2203,13 @@ Use `tidesdb_objstore_default_config()` for sensible defaults, then override fie
 
 ### Per-CF Object Store Tuning
 
-Column family configurations include three object store tuning fields.
+Column family configurations include object store tuning fields. These are persisted to config.ini and survive restarts.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `object_target_file_size` | `size_t` | `0` (auto) | Target SSTable size in object store mode |
-| `object_lazy_compaction` | `int` | `0` | 1 to compact less aggressively for remote storage |
-| `object_prefetch_compaction` | `int` | `1` | 1 to download all inputs before compaction merge |
+| `object_target_file_size` | `size_t` | `0` | Reserved for API compatibility. Not used; output SSTable sizing during partitioned merge is derived automatically from level geometry (`file_max = C_X`) per the Spooky algorithm |
+| `object_lazy_compaction` | `int` | `0` | 1 to double the L1 file count compaction trigger, reducing compaction frequency and remote I/O at the cost of higher read amplification |
+| `object_prefetch_compaction` | `int` | `1` | 1 to download all input SSTables in parallel before the compaction merge begins (uses `max_concurrent_downloads` threads). 0 to download on demand during merge source creation |
 
 ### Object Store Statistics
 
@@ -2258,8 +2258,9 @@ tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
 - Point lookups on frozen SSTables (not present locally) fetch just the single needed klog block (~64KB) via one HTTP range request using `range_get`, bypassing the full file download. The block is cached in the clock cache so subsequent reads are pure memory hits. If the value is in the vlog, a second range request fetches just that vlog block
 - Iterators prefetch all needed SSTable files in parallel at creation time using bounded threads (`max_concurrent_downloads`, default 8), so sequential reads proceed at local disk speed. Prefetch runs at both initial iterator creation and after seek invalidation
 - A hash-indexed LRU local file cache manages disk usage, evicting least-recently-used SSTable file pairs (klog + vlog together) when `local_cache_max_bytes` is set
-- The MANIFEST is uploaded asynchronously after each flush and compaction so cold start recovery can reconstruct the SSTable inventory without blocking the flush worker
-- Compaction runs on local files. Input SSTables are downloaded if evicted, output SSTables are uploaded after the merge
+- The MANIFEST is uploaded asynchronously after each flush so cold start recovery can reconstruct the SSTable inventory without blocking the flush worker
+- During compaction, the MANIFEST is uploaded after the new merged SSTable is committed, before old input SSTables are cleaned up. This ensures replicas and cold-start nodes see the new SSTable before old inputs are removed
+- Compaction prefetches input SSTables in parallel when `object_prefetch_compaction` is enabled (default). Output SSTables are uploaded synchronously after the merge. Old input SSTables are deleted from the object store with retry and exponential backoff when their reference count reaches zero
 - The reaper thread periodically syncs the active WAL to the object store based on write volume (`wal_sync_threshold_bytes`, default 1MB). This reads the WAL's atomic file size lock-free and uploads when the delta since last sync exceeds the threshold, bounding the data loss window to write volume rather than wall clock time
 - Upload failures are tracked in `total_upload_failures` on `tidesdb_db_stats_t` for operator monitoring
 

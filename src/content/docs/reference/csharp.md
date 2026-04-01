@@ -1294,7 +1294,6 @@ using TidesDB;
 | `L1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `L0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
 | `UseBtree` | bool | false | Use B+tree format for klog |
-| `ObjectTargetFileSize` | ulong | 0 | Target SSTable size in object store mode (0 = auto/256MB) |
 | `ObjectLazyCompaction` | bool | false | Compact less aggressively in object store mode |
 | `ObjectPrefetchCompaction` | bool | true | Download all inputs before merge in object store mode |
 

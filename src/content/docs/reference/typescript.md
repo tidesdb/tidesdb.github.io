@@ -959,13 +959,11 @@ Column family configurations include three object store tuning fields.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `objectTargetFileSize` | `number` | `0` (auto) | Target SSTable size in object store mode |
 | `objectLazyCompaction` | `boolean` | `false` | Compact less aggressively for remote storage |
 | `objectPrefetchCompaction` | `boolean` | `true` | Download all inputs before compaction merge |
 
 ```typescript
 db.createColumnFamily('remote_cf', {
-  objectTargetFileSize: 256 * 1024 * 1024,  // 256MB
   objectLazyCompaction: true,
   objectPrefetchCompaction: true,
 });
