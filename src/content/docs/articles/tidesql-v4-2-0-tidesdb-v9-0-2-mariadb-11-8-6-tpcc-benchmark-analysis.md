@@ -22,7 +22,7 @@ head:
 
 *published on April 2nd, 2026*
 
-The latest patch of TidesDB brings lots of performance improvements and bug fixes thus a new benchmark analysis article was warranted.
+The latest patch of TidesDB brings a few performance improvements thus I thought a new benchmark analysis article was warranted.
 
 The specs for the environment are
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
@@ -75,7 +75,7 @@ Across two runs TidesDB v9.0.2 posted 81,959 and 85,888 NOPM. The peak run is sh
 
 TidesDB's DELIVERY avg is 6.7ms vs InnoDB's 182ms, a 27x difference. SLEV is 205x faster at the average. Even NEWORD, a write-heavy transaction, is 6.7x faster.
 
-No deadlocks were observed in the peak run. The first run saw one (`Got error 149 Lock deadlock; Retry transaction`) with no effect on final numbers. The engine was set up to not use pessimistic locking.
+No deadlocks were observed in the peak run. The first run saw one (`Got error 149 Lock deadlock; Retry transaction`) with no effect on final numbers. TideSQL was not configured for pessimistic locking.
 
 ![TPM over time during timed test](/tidesdb-v9-0-2-tidesql-v4-2-0-mariadb-v11-8-6/chart_tpcc_tpm.png)
 
@@ -83,7 +83,7 @@ In the [previous article](https://tidesdb.com/articles/benchmark-analysis-tidesd
 
 InnoDB's numbers are rather consistent at 6,013 NOPM at 16 VUs previously, 6,308 at 8 VUs here. InnoDB was already bottlenecked on I/O at this cache size regardless of concurrency.
 
-The v9.0.2 patch targeted the read path primarily focusing on block deserialization, cache bypass, comparator overhead, and iterator mechanics. Under a 64MB cache with a ~4GB working set, these are exactly the functions that dominate. The profile confirms the hot path is now flat and distributed rather than concentrated in allocation and hashing. At 13.6x InnoDB's throughput with half the threads, the patch landed where it mattered. The engine is known to linearly scale, thus more concurrency should yield even better results. 
+The v9.0.2 patch targeted the read path primarily focusing on block deserialization, cache bypass, comparator overhead, and iterator mechanics. Under a 64MB cache with a few gigabytes working set, these are exactly the functions that dominate. The profile confirms the hot path is now flat and distributed rather than concentrated in allocation and hashing. At 13.6x InnoDB's throughput with half the threads, the patch landed where it mattered.
 
 
 That's all for now, thank you for reading!
