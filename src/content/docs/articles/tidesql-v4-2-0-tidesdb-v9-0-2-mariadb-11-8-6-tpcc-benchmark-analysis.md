@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![TPC-CBenchmark Analysis on TidesDB v9.0.2 in TideSQL v4.2.0 in MariaDB v11.8.6](/pexels-dajana-reci-289671698-29090853.jpg)
+![TPC-C Benchmark Analysis on TidesDB v9.0.2 in TideSQL v4.2.0 in MariaDB v11.8.6](/pexels-dajana-reci-289671698-29090853.jpg)
 
 </div>
 
@@ -33,10 +33,19 @@ The specs for the environment are
 
 Though you can build TidesDB with jemalloc, tcmalloc, etc.  I use the default allocator for this benchmark.  
 
+I will say, when running TidesDB in MariaDB it's a good idea to use a better allocator.  mimalloc and tcmalloc have shown to really optimize the library for concurrent workloads and reduce memory fragmentation which can in turn lead to better performance.
+
 Same hardware and OS as the [previous benchmark](https://tidesdb.com/articles/benchmark-analysis-tidesdb-9-rocksdb-innodb-mariadb-11-8-tpc-c-hammerdb/). Same `my.cnf`. This is the small-cache configuration from that article, 64MB buffer/cache for both InnoDB and TidesDB.
 
 The difference is the engine library version, TidesDB v9.0.2 via [PR #583](https://github.com/tidesdb/tidesdb/pull/583/commits), a patch release containing library-level optimizations over v9.0.0.
 
+I am running <a href="https://github.com/MariaDB/server/releases/tag/mariadb-11.8.6">MariaDB v11.8.6</a> and <a href="https://github.com/TPC-Council/HammerDB/releases/tag/v5.0">HammerDB 5.0</a> TPROC-C.
+
+I use a specific shell script to run the benchmark, which you can find [here](https://github.com/tidesdb/tidesdb/blob/main/scripts/run_tpcc_mariadb.sh) (7c5df694eddf6759c1818a47fbd0ad9f3f2697ec3d8c689c1ca054be3dbcdea4).
+```
+./run_tpcc_mariadb.sh -b tpcc --warehouses 40 --tpcc-vu 8 --tpcc-build-vu 8 --rampup 1 --duration 2 --settle 5 -H ~/HammerDB-5.0 -e tidesdb -u hammerdb --pass hammerdb123 -S /tmp/mariadb.sock
+```
+*tidesdb is replaced for any engine, innodb, rocksdb, etc.*
 
 
 **What changed in v9.0.2**
