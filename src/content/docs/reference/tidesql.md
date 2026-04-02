@@ -1012,6 +1012,8 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 
 | Variable | Description |
 |----------|-------------|
+| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.2.1`) |
+| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `262657` = `0x40201`) |
 | `Tidesdb_column_families` | Number of active column families |
 | `Tidesdb_global_sequence` | Global MVCC sequence number |
 | `Tidesdb_memtable_bytes` | Total memtable memory usage in bytes |
@@ -1246,6 +1248,29 @@ OPTIMIZE TABLE products;
 
 This is useful after bulk deletes or updates that leave behind a large number of tombstones, or when `ANALYZE TABLE` reports high read amplification.
 
+## CHECK TABLE / REPAIR TABLE
+
+`CHECK TABLE` verifies that all column families associated with the table are readable by fetching metadata from all SSTables. This validates manifests, block indexes, bloom filters, and metadata blocks are intact. If any SSTable is unreadable, the command returns an error indicating the table is corrupt.
+
+```sql
+CHECK TABLE orders;
+```
+
+`REPAIR TABLE` triggers a full purge (flush + compaction) of all column families, identical to `OPTIMIZE TABLE`. The compaction pass reads and re-checksums every block, dropping corrupt entries, expired TTL data, and tombstones. In unified memtable mode, the first purge call rotates the shared memtable once, and subsequent index CF purges just run compaction.
+
+```sql
+REPAIR TABLE orders;
+```
+
+## FLUSH TABLES FOR EXPORT
+
+TidesDB supports `FLUSH TABLES ... FOR EXPORT` for online physical table copies. The statement flushes all pending memtable data to SSTables and holds a table lock while the data directory files are consistent and copyable. After copying, release the lock with `UNLOCK TABLES`.
+
+```sql
+FLUSH TABLES orders FOR EXPORT;
+-- copy the column family directories from tidesdb_data/
+UNLOCK TABLES;
+```
 
 ## Rename and Drop
 
