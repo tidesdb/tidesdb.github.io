@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![TPC-CBenchmark Analysis on TidesDB v9.0.2 in TideSQL v4.2.0 in MariaDB v11.8.6](/pexels-dajana-reci-289671698-29090853.jpg)
+![TPC-C Benchmark Analysis on TidesDB v9.0.2 in TideSQL v4.2.0 in MariaDB v11.8.6](/pexels-dajana-reci-289671698-29090853.jpg)
 
 </div>
 
@@ -22,7 +22,7 @@ head:
 
 *published on April 2nd, 2026*
 
-The latest patch of TidesDB brings lots of performance improvements and bug fixes thus a new benchmark analysis article was warranted.
+The latest patch of TidesDB brings a few performance improvements thus I thought a new benchmark analysis article was warranted.
 
 The specs for the environment are
 - Intel Core i7-11700K (8 cores, 16 threads) @ 4.9GHz
@@ -33,10 +33,19 @@ The specs for the environment are
 
 Though you can build TidesDB with jemalloc, tcmalloc, etc.  I use the default allocator for this benchmark.  
 
+I will say, when running TidesDB in MariaDB it's a good idea to use a better allocator.  mimalloc and tcmalloc have shown to really optimize the library for concurrent workloads and reduce memory fragmentation which can in turn lead to better performance.
+
 Same hardware and OS as the [previous benchmark](https://tidesdb.com/articles/benchmark-analysis-tidesdb-9-rocksdb-innodb-mariadb-11-8-tpc-c-hammerdb/). Same `my.cnf`. This is the small-cache configuration from that article, 64MB buffer/cache for both InnoDB and TidesDB.
 
 The difference is the engine library version, TidesDB v9.0.2 via [PR #583](https://github.com/tidesdb/tidesdb/pull/583/commits), a patch release containing library-level optimizations over v9.0.0.
 
+I am running <a href="https://github.com/MariaDB/server/releases/tag/mariadb-11.8.6">MariaDB v11.8.6</a> and <a href="https://github.com/TPC-Council/HammerDB/releases/tag/v5.0">HammerDB 5.0</a> TPROC-C.
+
+I use a specific shell script to run the benchmark, which you can find [here](https://github.com/tidesdb/tidesdb/blob/main/scripts/run_tpcc_mariadb.sh) (7c5df694eddf6759c1818a47fbd0ad9f3f2697ec3d8c689c1ca054be3dbcdea4).
+```
+./run_tpcc_mariadb.sh -b tpcc --warehouses 40 --tpcc-vu 8 --tpcc-build-vu 8 --rampup 1 --duration 2 --settle 5 -H ~/HammerDB-5.0 -e tidesdb -u hammerdb --pass hammerdb123 -S /tmp/mariadb.sock
+```
+*tidesdb is replaced for any engine, innodb, rocksdb, etc.*
 
 
 **What changed in v9.0.2**
@@ -66,7 +75,7 @@ Across two runs TidesDB v9.0.2 posted 81,959 and 85,888 NOPM. The peak run is sh
 
 TidesDB's DELIVERY avg is 6.7ms vs InnoDB's 182ms, a 27x difference. SLEV is 205x faster at the average. Even NEWORD, a write-heavy transaction, is 6.7x faster.
 
-No deadlocks were observed in the peak run. The first run saw one (`Got error 149 Lock deadlock; Retry transaction`) with no effect on final numbers. The engine was set up to not use pessimistic locking.
+No deadlocks were observed in the peak run. The first run saw one (`Got error 149 Lock deadlock; Retry transaction`) with no effect on final numbers. TideSQL was not configured for pessimistic locking.
 
 ![TPM over time during timed test](/tidesdb-v9-0-2-tidesql-v4-2-0-mariadb-v11-8-6/chart_tpcc_tpm.png)
 
@@ -74,7 +83,7 @@ In the [previous article](https://tidesdb.com/articles/benchmark-analysis-tidesd
 
 InnoDB's numbers are rather consistent at 6,013 NOPM at 16 VUs previously, 6,308 at 8 VUs here. InnoDB was already bottlenecked on I/O at this cache size regardless of concurrency.
 
-The v9.0.2 patch targeted the read path primarily focusing on block deserialization, cache bypass, comparator overhead, and iterator mechanics. Under a 64MB cache with a ~4GB working set, these are exactly the functions that dominate. The profile confirms the hot path is now flat and distributed rather than concentrated in allocation and hashing. At 13.6x InnoDB's throughput with half the threads, the patch landed where it mattered. The engine is known to linearly scale, thus more concurrency should yield even better results. 
+The v9.0.2 patch targeted the read path primarily focusing on block deserialization, cache bypass, comparator overhead, and iterator mechanics. Under a 64MB cache with a few gigabytes working set, these are exactly the functions that dominate. The profile confirms the hot path is now flat and distributed rather than concentrated in allocation and hashing. At 13.6x InnoDB's throughput with half the threads, the patch landed where it mattered.
 
 
 That's all for now, thank you for reading!
