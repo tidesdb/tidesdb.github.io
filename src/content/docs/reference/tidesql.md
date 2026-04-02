@@ -480,6 +480,20 @@ CREATE TABLE tuned (
 
 `LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 5). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 2). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 20). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × min(L0_QUEUE_STALL_THRESHOLD, 16))`, with a hard cap of 16 immutable memtables regardless of the stall threshold.
 
+### Object Store Compaction Tuning
+
+When using S3 object store mode, two per-table options control compaction behavior for remote storage:
+
+```sql
+-- Reduce compaction frequency for write-heavy tables in object store mode
+CREATE TABLE remote_logs (
+  id  BIGINT PRIMARY KEY,
+  msg TEXT
+) ENGINE=TIDESDB OBJECT_LAZY_COMPACTION=1 OBJECT_PREFETCH_COMPACTION=1;
+```
+
+`OBJECT_LAZY_COMPACTION` (default 0) doubles the L1 file count compaction trigger when enabled, reducing the frequency of compaction and thus remote I/O at the cost of higher read amplification. `OBJECT_PREFETCH_COMPACTION` (default 1) downloads all input SSTables in parallel before the compaction merge begins, using bounded threads. When disabled, input SSTables are downloaded on demand during merge source creation one at a time. These options are persisted to the column family config and have corresponding session-level defaults `tidesdb_default_object_lazy_compaction` and `tidesdb_default_object_prefetch_compaction`. In non-object-store deployments, these options have no effect.
+
 ### Combining Multiple Options
 
 Options can be freely combined:
@@ -652,6 +666,59 @@ where `N` is the total number of documents, `df` is the document frequency of th
 
 The engine uses a charset-aware tokenizer that correctly handles multi-byte character sets including UTF-8, CJK characters, Cyrillic, Greek, and other Unicode scripts. Text is split on word boundaries using MariaDB's charset classification tables, then lowercased using the charset's case-folding rules. Words shorter than `tidesdb_fts_min_word_len` or longer than `tidesdb_fts_max_word_len` are excluded from the index and search queries.
 
+### Stop Words
+
+Common words like "the", "is", "a", "of" are excluded from the full-text index to reduce index bloat and improve search quality. By default, TidesDB uses the same 36 stop words as InnoDB (the list from `information_schema.INNODB_FT_DEFAULT_STOPWORD`). Stop words are filtered during tokenization, so they are never stored in the inverted index and never match in search queries.
+
+The stop word list can be customized via the `tidesdb_ft_stopword_table` system variable. When set to a `db_name/table_name` string, the engine loads stop words from the specified TidesDB table (which must have a `value` VARCHAR column containing one word per row). When set to NULL or empty string, the default stop words are restored:
+
+```sql
+-- Use a custom stop word table
+CREATE TABLE mydb.my_stopwords (value VARCHAR(50)) ENGINE=TidesDB;
+INSERT INTO mydb.my_stopwords (value) VALUES ('custom'), ('words'), ('here');
+SET GLOBAL tidesdb_ft_stopword_table = 'mydb/my_stopwords';
+
+-- Restore defaults
+SET GLOBAL tidesdb_ft_stopword_table = NULL;
+```
+
+After changing the stop word table, existing FULLTEXT indexes should be rebuilt with `ALTER TABLE ... DROP INDEX ..., ADD FULLTEXT INDEX ...` to reflect the new stop word list.
+
+### Blend Characters
+
+Blend characters are treated as both word separators and valid word characters during tokenization. When a blend character appears inside a token, the tokenizer emits both the full blended form and the individual sub-parts. This enables Romance language elision (Italian, French, Catalan) and names with apostrophes to be searchable by any component or the full form.
+
+For example, with `tidesdb_fts_blend_chars = "'"`:
+
+| Input | Indexed Tokens |
+|-------|---------------|
+| `L'aria` | `l'aria`, `aria` |
+| `Dell'aria` | `dell'aria`, `dell`, `aria` |
+| `O'Malley` | `o'malley`, `malley` |
+
+Searching for any of the indexed forms will match the document. The full blended form scores higher than a sub-part match because both the blended token and the sub-part contribute to the BM25 score.
+
+```sql
+-- Enable apostrophe blending for Italian/French
+SET GLOBAL tidesdb_fts_blend_chars = "'";
+
+CREATE TABLE articoli (
+  id    INT PRIMARY KEY,
+  testo TEXT,
+  FULLTEXT (testo)
+) ENGINE=TIDESDB;
+
+INSERT INTO articoli VALUES (1, "L'aria fresca della montagna");
+INSERT INTO articoli VALUES (2, "Dell'aria pura si respira bene");
+
+-- All three queries match:
+SELECT * FROM articoli WHERE MATCH(testo) AGAINST('aria');          -- sub-part
+SELECT * FROM articoli WHERE MATCH(testo) AGAINST("l'aria");        -- blended
+SELECT * FROM articoli WHERE MATCH(testo) AGAINST("dell'aria");     -- blended
+```
+
+The default is empty (no blend characters). The setting is global and takes effect for all subsequent FULLTEXT indexing and query operations. After changing blend characters, existing indexes should be rebuilt.
+
 ### Multi-Column Indexes
 
 A single FULLTEXT index can span multiple columns. The engine concatenates the text from all indexed columns into a single document for tokenization and scoring:
@@ -678,6 +745,8 @@ FULLTEXT index entries are maintained transactionally within the same transactio
 | `tidesdb_fts_max_word_len` | 84 | Maximum word length in characters for indexing |
 | `tidesdb_fts_bm25_k1` | 1.2 | BM25 k1 parameter (term-frequency saturation) |
 | `tidesdb_fts_bm25_b` | 0.75 | BM25 b parameter (document-length normalization, 0-1) |
+| `tidesdb_ft_stopword_table` | NULL | Custom stop word table (`db_name/table_name`). NULL uses InnoDB defaults. |
+| `tidesdb_fts_blend_chars` | empty | Characters treated as both separators and word chars. Set to `'` for Italian/French. |
 
 
 ## Vector Search
@@ -1094,6 +1163,8 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_default_block_index_prefix_len` | 16 | Default block index prefix length |
 | `tidesdb_default_min_disk_space` | 100 MB | Default minimum disk space in bytes |
 | `tidesdb_default_isolation_level` | REPEATABLE_READ | Default isolation level |
+| `tidesdb_default_object_lazy_compaction` | OFF | Double L1 compaction trigger in object store mode |
+| `tidesdb_default_object_prefetch_compaction` | ON | Prefetch input SSTables before compaction merge |
 
 Every table option has a corresponding `tidesdb_default_*` session variable. When `CREATE TABLE` does not explicitly set an option, the session (or global) default is used. Table-level options in `CREATE TABLE` override the default. This design mirrors InnoDB's approach of having global defaults that individual tables can override, and makes it straightforward to configure all tables uniformly for benchmarking or deployment without repeating options in every DDL statement:
 
