@@ -158,6 +158,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Deploying TideSQL (TidesDB+MariaDB) on AWS EC2',
+							link: 'articles/deploying-tidesb-and-mariadb-on-ubuntu-ec2'
+						},
+						{
 							label: 'TPC-C Benchmark Analysis on TidesDB v9.0.2 in TideSQL v4.2.0 in MariaDB v11.8.6',
 							link: 'articles/tidesql-v4-2-0-tidesdb-v9-0-2-mariadb-11-8-6-tpcc-benchmark-analysis'
 						},
