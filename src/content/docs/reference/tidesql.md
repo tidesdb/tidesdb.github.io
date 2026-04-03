@@ -11,8 +11,6 @@ If you want to download the source of this document, you can find it [here](http
 
 </div>
 
-## Overview
-
 TideSQL is a pluggable storage engine for <a href="https://mariadb.org/">MariaDB</a>, built on top of TidesDB.
 
 The engine supports ACID transactions through multi-version concurrency control (MVCC), letting readers proceed without blocking writers. It handles primary keys, secondary indexes, auto-increment columns, virtual and stored generated columns, savepoints, TTL-based expiration, data-at-rest encryption, online DDL, partitioning, and online backups. All of these features are accessible through standard SQL, so switching from InnoDB to TidesDB for a particular table requires nothing more than changing the `ENGINE` clause.
