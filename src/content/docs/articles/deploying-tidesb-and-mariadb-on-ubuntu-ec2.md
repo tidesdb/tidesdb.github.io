@@ -64,6 +64,8 @@ sudo ./install.sh \
   --skip-engines mroonga,rocksdb,connect,spider,oqgraph,columnstore,sphinx
 ```
 
+![](/tidesql-intall1.png)
+
 The `--skip-engines` flag excludes storage engines you don't need, cutting build time significantly.  RocksDB tends to be the biggest time sink.
 
 **Useful options**
@@ -77,6 +79,8 @@ The `--skip-engines` flag excludes storage engines you don't need, cutting build
 | `--jobs 4` | Limit parallel build jobs (useful on small instances) |
 
 The build takes 10-45 minutes depending on instance size. When complete, the installer prints a summary box with paths and connection commands.
+
+![](/tidesql-intall2.png)
 
 ## 4. Start MariaDB
 
