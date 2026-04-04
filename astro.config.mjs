@@ -158,6 +158,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Deploying TideSQL on AWS Kubernetes with S3 Object Store (Cloud-Native MariaDB)',
+							link: 'articles/deploying-tidesql-on-kubernetes-with-s3-object-store-cloud-native-mariadb-aws'
+						},
+						{
 							label: 'Deploying TideSQL (TidesDB+MariaDB) on AWS EC2',
 							link: 'articles/deploying-tidesb-and-mariadb-on-ubuntu-ec2'
 						},
