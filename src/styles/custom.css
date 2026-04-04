@@ -16,6 +16,7 @@ a, a:visited {
 	transition: all 0.2s ease;
 }
 
+
 .architecture-diagram {
 	max-width: 348px;
 	width: 100%;
@@ -722,6 +723,7 @@ input[type="select"]:focus, select:focus {
 	box-shadow: rgba(0, 0, 0, 0.1) 0px 10px 50px;
 }
 
+
 .article-image::before {
 	content: '';
 	position: absolute;
@@ -759,10 +761,11 @@ canvas {
 	height: 100%;
 	object-fit: cover;
 	object-position: center;
-	transform: scale(1.1);
 	transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 	will-change: transform;
 }
+
+
 
 .ob-bottom {
 	object-fit: cover;
@@ -770,7 +773,7 @@ canvas {
 }
 
 .article-image:hover img {
-	transform: scale(1.15);
+	transform: scale(1.05);
 }
 
 .article-image p {
