@@ -689,7 +689,7 @@ volumes:
 
 3. Set `tidesdb_objstore_local_cache_max` to ~80% of the NVMe capacity. With i4i.xlarge (940 GB NVMe), that's ~800G of hot data served at local NVMe speed, with the full dataset in S3.
 
-NVMe instance storage is ephemeral — data is lost if the instance is terminated. This is fine for TideSQL in object store mode since all durable data lives in S3 and the local disk is purely a cache.
+NVMe instance storage is ephemeral - data is lost if the instance is terminated. This is fine for TideSQL in object store mode since all durable data lives in S3 and the local disk is purely a cache.
 
 ### Scale replicas
 
