@@ -15,67 +15,96 @@ If you want to download the source of this document, you can find it [here](http
 
 ### Prerequisites
 
-You **must** have the TidesDB shared C library installed on your system. You can find the installation instructions [here](/reference/building/#_top).
+You need a C compiler and CMake installed, along with compression libraries. The crate will automatically download and build TidesDB from source if the C library is not already installed.
+
+**Debian/Ubuntu**
+```bash
+sudo apt install build-essential cmake libzstd-dev liblz4-dev libsnappy-dev
+```
+
+**macOS**
+```bash
+brew install cmake zstd lz4 snappy
+```
+
+**Windows**
+```bash
+vcpkg install zstd:x64-windows lz4:x64-windows snappy:x64-windows
+```
+
+For S3 object store support, you also need `libcurl` and `openssl` (see [Object Store Support](#object-store-support) below).
+
+### Installing from crates.io
+
+The easiest way to add TidesDB to your project is via [crates.io](https://crates.io/crates/tidesdb):
+
+```toml
+[dependencies]
+tidesdb = "0.6"
+```
+
+Or using `cargo add`:
+
+```bash
+cargo add tidesdb
+```
+
+### How the Build System Works
+
+The build script (`build.rs`) handles linking automatically:
+
+1. pkg-config check · It first tries to find TidesDB already installed on your system via `pkg-config` with an exact version match. If found, it links against the system library and no further steps are needed.
+
+2. Auto-build from source · If the system library is not found, the build script automatically downloads the matching TidesDB C library source from GitHub, builds it with CMake as a static library, and links it into your project.
+
+3. Compression libraries · TidesDB depends on zstd, lz4, and snappy. The build script tries to find these via `pkg-config` and falls back to linking by name if not found.
+
+### Version Selection
+
+Each crate release defaults to a specific TidesDB C library version. You can select a different version using Cargo features:
+
+```toml
+[dependencies]
+# Uses the default version (currently v9.0.6)
+tidesdb = "0.6"
+
+# Pin to a specific TidesDB version
+tidesdb = { version = "0.6", default-features = false, features = ["v9_0_5"] }
+```
+
+Only one version feature can be enabled at a time. The version feature (e.g., `v9_0_6`) maps directly to the TidesDB C library release tag (e.g., `v9.0.6`).
+
+### Object Store Support
+
+To enable S3 object store support, enable the `objectstore` feature:
+
+```toml
+[dependencies]
+tidesdb = { version = "0.6", features = ["objectstore"] }
+```
+
+This requires additional dependencies:
+
+- Debian/Ubuntu · `sudo apt install libcurl4-openssl-dev libssl-dev`
+- macOS · `brew install curl openssl`
+- Windows · `vcpkg install curl:x64-windows openssl:x64-windows` (requires tidesdb >= v9.0.6)
 
 ### Building from GitHub
 
-To build the library directly from the GitHub repository:
+To build the Rust bindings directly from the GitHub repository:
 
 ```bash
-# Clone the repository
-git clone https://github.com/tidesdb/tidesdb-rust.git
-cd tidesdb-rust
-
-# Build the library
+git clone https://github.com/tidesdb/tidesdb-rs.git
+cd tidesdb-rs
 cargo build --release
-
-# Run tests
 cargo test -- --test-threads=1
-
-# Install locally (optional)
-cargo install --path .
 ```
 
-**Using as a local dependency**
-
-You can reference the local build in your project's `Cargo.toml`:
+**Using directly from GitHub in your Cargo.toml**
 
 ```toml
 [dependencies]
-tidesdb = { path = "/path/to/tidesdb-rust" }
-```
-
-**Using directly from GitHub**
-
-You can also add the dependency directly from GitHub:
-
-```toml
-[dependencies]
-tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git" }
-
-# Or pin to a specific branch
-tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git", branch = "main" }
-
-# Or pin to a specific tag/version
-tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git", tag = "v0.2.0" }
-
-# Or pin to a specific commit
-tidesdb = { git = "https://github.com/tidesdb/tidesdb-rust.git", rev = "abc123" }
-```
-
-### Custom Installation Paths
-
-If you installed TidesDB to a non-standard location, you can specify custom paths using environment variables:
-
-```bash
-# Set custom library path
-export LIBRARY_PATH="/custom/path/lib:$LIBRARY_PATH"
-export LD_LIBRARY_PATH="/custom/path/lib:$LD_LIBRARY_PATH"  # Linux
-# or
-export DYLD_LIBRARY_PATH="/custom/path/lib:$DYLD_LIBRARY_PATH"  # macOS
-
-# Then build
-cargo build
+tidesdb = { git = "https://github.com/tidesdb/tidesdb-rs.git" }
 ```
 
 **Using pkg-config**
@@ -1585,7 +1614,7 @@ fn main() -> tidesdb::Result<()> {
 
 A comparator defines the sort order of keys throughout the entire system, memtables, SSTables, block indexes, and iterators. TidesDB ships with six built-in comparators and supports registering custom ones.
 
-**Built-in comparators:** `memcmp` (default), `lexicographic`, `uint64`, `int64`, `reverse`, `case_insensitive`
+**Built-in comparators** `memcmp` (default), `lexicographic`, `uint64`, `int64`, `reverse`, `case_insensitive`
 
 #### Registering a Custom Comparator
 
