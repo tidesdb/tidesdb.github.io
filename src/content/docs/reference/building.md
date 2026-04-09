@@ -462,6 +462,7 @@ TidesDB provides several CMake options to customize the build:
 | `TIDESDB_WITH_S3` | Build S3-compatible object store connector (requires libcurl + OpenSSL) | `OFF` |
 | `TIDESDB_WITH_MIMALLOC` | Use mimalloc as the memory allocator | `OFF` |
 | `TIDESDB_WITH_TCMALLOC` | Use tcmalloc as the memory allocator | `OFF` |
+| `TIDESDB_WITH_JEMALLOC` | Use jemalloc as the memory allocator | `OFF` |
 | `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | (unset) |
 
 ### Mimalloc Memory Allocator
@@ -530,9 +531,48 @@ vcpkg install gperftools:x64-windows
 - Excellent thread-local caching reduces lock contention
 - Minimal overhead when disabled (default)
 
+## Jemalloc Memory Allocator
+
+TidesDB optionally supports [jemalloc](https://github.com/jemalloc/jemalloc), Facebook's high-performance memory allocator. Like mimalloc and tcmalloc, jemalloc replaces the standard malloc/free at link time, providing improved allocation performance especially for multi-threaded workloads.
+
+**Enabling jemalloc**
+
+```bash
+# Linux/macOS
+cmake -S . -B build -DTIDESDB_WITH_JEMALLOC=ON
+
+# Windows with vcpkg
+cmake -S . -B build -DTIDESDB_WITH_JEMALLOC=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+```
+
+**Installing jemalloc**
+
+```bash
+# Linux (Debian/Ubuntu)
+sudo apt install libjemalloc-dev
+
+# macOS (Homebrew)
+brew install jemalloc
+
+# Windows (vcpkg)
+vcpkg install jemalloc:x64-windows
+```
+
+**When to use jemalloc**
+- High-throughput multi-threaded workloads
+- Applications with many small allocations
+- When you need detailed heap profiling (jemalloc includes profiling tools)
+
+**Performance impact**
+- Typical improvement - 5-25% reduction in allocation overhead for multi-threaded code
+- Excellent thread-local caching reduces lock contention
+- Minimal overhead when disabled (default)
+
 :::note
-You cannot enable both mimalloc and tcmalloc simultaneously. Choose one based on your workload characteristics.
+You cannot enable both mimalloc, tcmalloc, and jemalloc simultaneously. Choose one based on your workload characteristics.
 :::
+
+
 
 ### S3 Object Store Connector
 
