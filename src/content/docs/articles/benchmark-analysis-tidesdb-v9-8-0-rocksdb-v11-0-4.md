@@ -1,6 +1,6 @@
 ---
 title: "Benchmark Analysis on TidesDB v9.8.0 and RocksDB v11.0.4"
-description: "Extensive benchmark analysis on TidesDB v9.8.0 and RocksDB v11.0.4 across multiple workloads, durable and not."
+description: "Extensive benchmark analysis on TidesDB v9.8.0 and RocksDB v11.0.4 across multiple workloads."
 head:
   - tag: meta
     attrs:
