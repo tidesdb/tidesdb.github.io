@@ -158,6 +158,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Benchmark Analysis on TidesDB v9.8.0 and RocksDB v11.0.4',
+							link: 'articles/benchmark-analysis-tidesdb-v9-8-0-rocksdb-v11-0-4'
+						},
+						{
 							label: 'Deploying TideSQL on AWS Kubernetes with S3 Object Store (Cloud-Native MariaDB)',
 							link: 'articles/deploying-tidesql-on-kubernetes-with-s3-object-store-cloud-native-mariadb-aws'
 						},
