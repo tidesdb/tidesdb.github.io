@@ -33,7 +33,7 @@ System specs
 
 First run, small buffers/caches at 64mb to see how the engines perform utilizing memory and disk i/o.
 
-For each run I used `hammerdb_runner.sh` examples
+For each run I used `hammerdb_runner.sh` i.e:
 ```
 ./hammerdb_runner.sh -b tpcc --warehouses 40 --tpcc-vu 8 --tpcc-build-vu 8 --rampup 1 --duration 2 --settle 5 -H ~/HammerDB-5.0 -e innodb -u hammerdb --pass hammerdb123 -S /tmp/mariadb.sock
 
@@ -176,9 +176,9 @@ Both engines are aligned in configuration. Results below.
 ![](/mariadb-11-8-6-innodb-and-tidesql-v4-2-4-tpc-c/hammerdb_results_20260416_182002/chart_tpcc_tpm.png)
 
 
-At 64MB TidesDB hit 69,320 NOPM / 160,779 TPM versus InnoDB's 16,816 NOPM / 39,251 TPM, a 4.12x gap. NEWORD average fell from 8.18 ms to 3.723 ms, p99 from 16.442 ms to 5.89 ms. PAYMENT went 7.52 ms / 21.392 ms p99 down to 1.437 ms / 3.23 ms p99. DELIVERY, the heaviest transaction, dropped from 65.521 ms / 87.456 ms p99 to 10.28 ms / 16.878 ms p99, and SLEV collapsed from 55.293 ms average to 2.147 ms. InnoDB is thrashing a buffer pool that cannot fit the working set, paging B-tree and undo constantly. TidesDB writes land in the memtable and flush out sequentially, so the 64MB block cache plus bloom filters are enough to keep reads cheap.
+At 64MB TidesDB hit 69,320 NOPM / 160,779 TPM versus InnoDB's 16,816 NOPM / 39,251 TPM, a 4.12x gap. NEWORD average fell from 8.18 ms to 3.723 ms, p99 from 16.442 ms to 5.89 ms. PAYMENT went 7.52 ms / 21.392 ms p99 down to 1.437 ms / 3.23 ms p99. DELIVERY, the heaviest transaction, dropped from 65.521 ms / 87.456 ms p99 to 10.28 ms / 16.878 ms p99, and SLEV collapsed from 55.293 ms average to 2.147 ms. 
 
-Second run, larger buffers/caches mainly. For TidesDB we have 16GB block cache and 512MB unified memtable size. For InnoDB we have 16GB buffer pool and some other settings to align with TidesDB. This is testing mainly memory utilization, contention, etc.
+Now for the second run, larger buffers/caches mainly. For TidesDB we have 16GB block cache and 512MB unified memtable size. For InnoDB we have 16GB buffer pool and some other settings to align with TidesDB. This is testing mainly memory utilization, contention, etc.
 
 <details>
   <summary>Click to see MariaDB config</summary>
@@ -310,7 +310,7 @@ max_allowed_packet = 64M
 ![](/mariadb-11-8-6-innodb-and-tidesql-v4-2-4-tpc-c/hammerdb_results_20260416_184738/chart_tpcc_latency.png)
 ![](/mariadb-11-8-6-innodb-and-tidesql-v4-2-4-tpc-c/hammerdb_results_20260416_184738/chart_tpcc_tpm.png)
 
-With 16GB buffers on both sides TidesDB reached 128,400 NOPM / 297,433 TPM, InnoDB 37,423 NOPM / 87,167 TPM, a 3.43x gap. Throughput scaled for both (InnoDB 2.23x, TidesDB 1.85x over their small-buffer runs), but the tail is where it gets ugly. NEWORD p99 is 3.023 ms on TidesDB, 153.846 ms on InnoDB. DELIVERY p99 is 7.84 ms vs 278.751 ms. PAYMENT p99 is 1.956 ms vs 61.443 ms. The standard deviations show why, InnoDB NEWORD sd 27,072 and DELIVERY sd 53,663 versus 529 and 3,897 on TidesDB. Those are flush and checkpoint stalls, most transactions are fast once the working set fits, but evictions block everything behind them. LSM writes are append-only to the memtable, no in-place updates, no doublewrite, no purge thread, and compaction runs off the critical path, so commit latency stays tight under load. Even with 256x the buffer pool of the small run, InnoDB cannot match the LSM on a write-heavy OLTP mix at this concurrency.
+With 16GB buffers on both sides TidesDB reached 128,400 NOPM / 297,433 TPM, InnoDB 37,423 NOPM / 87,167 TPM, a 3.43x gap. Throughput scaled for both (InnoDB 2.23x, TidesDB 1.85x over their small-buffer runs), but the tail is where it gets ugly. NEWORD p99 is 3.023 ms on TidesDB, 153.846 ms on InnoDB. DELIVERY p99 is 7.84 ms vs 278.751 ms. PAYMENT p99 is 1.956 ms vs 61.443 ms. The standard deviations show why, InnoDB NEWORD sd 27,072 and DELIVERY sd 53,663 versus 529 and 3,897 on TidesDB.
 
 
 TidesDB wins both runs and the reason is primarily architectural, not tuning.
