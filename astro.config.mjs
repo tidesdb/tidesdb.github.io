@@ -150,7 +150,6 @@ export default defineConfig({
 						{ label: 'TypeScript API Reference', slug: 'reference/typescript' },
 						{ label: 'Lua API Reference', slug: 'reference/lua' },
 						{ label: 'TideSQL Reference', slug: 'reference/tidesql' },
-						{ label: 'TidesPG Reference', slug: 'reference/tidespg' },
 						{ label: 'Kafka Reference', slug: 'reference/kafka' },
 						{ label: 'Admintool Reference', slug: 'reference/admintool' },
 					],
