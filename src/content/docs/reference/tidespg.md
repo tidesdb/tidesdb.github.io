@@ -1,6 +1,6 @@
 ---
 title: TidesDB Table Access Method Reference
-description: Official TidesDB table access method for PostgreSQL reference.
+description: Official reference for TidesDB's table access method for PostgreSQL.
 ---
 
 <div class="no-print">
