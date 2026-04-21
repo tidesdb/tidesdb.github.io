@@ -47,22 +47,22 @@ cmake --build build
 int main() {
     tidesdb::Config config;
     config.dbPath = "./mydb";
-    config.numFlushThreads = 2;                    // Flush thread pool size (default: 2)
-    config.numCompactionThreads = 2;               // Compaction thread pool size (default: 2)
-    config.logLevel = tidesdb::LogLevel::Info;      // Log level (default: Info)
-    config.blockCacheSize = 64 * 1024 * 1024;      // 64MB global block cache (default: 64MB)
-    config.maxOpenSSTables = 256;                   // Max cached SSTable structures (default: 256)
-    config.maxMemoryUsage = 0;                      // Global memory limit in bytes (default: 0 = auto, 50% of system RAM)
-    config.logToFile = false;                       // Write logs to file instead of stderr (default: false)
-    config.logTruncationAt = 24 * 1024 * 1024;     // Log file truncation size (default: 24MB), 0 = no truncation
-    config.unifiedMemtable = false;                 // Enable unified memtable mode (default: false = per-CF memtables)
-    config.unifiedMemtableWriteBufferSize = 0;      // Unified memtable write buffer size (0 = auto)
-    config.unifiedMemtableSkipListMaxLevel = 0;     // Skip list max level for unified memtable (0 = default 12)
-    config.unifiedMemtableSkipListProbability = 0;  // Skip list probability (0 = default 0.25)
-    config.unifiedMemtableSyncMode = tidesdb::SyncMode::None;  // Sync mode for unified WAL
-    config.unifiedMemtableSyncIntervalUs = 0;       // Sync interval for unified WAL in microseconds
-    config.objectStore = nullptr;                    // Pluggable object store connector (nullptr = local only)
-    config.objectStoreConfig = std::nullopt;         // Object store behavior config (nullopt = defaults)
+    config.numFlushThreads = 2;                               // Flush thread pool size (default: 2)
+    config.numCompactionThreads = 2;                          // Compaction thread pool size (default: 2)
+    config.logLevel = tidesdb::LogLevel::Info;                // Log level (default: Info)
+    config.blockCacheSize = 64 * 1024 * 1024;                 // 64MB global block cache (default: 64MB)
+    config.maxOpenSSTables = 256;                             // Max cached SSTable structures (default: 256)
+    config.maxMemoryUsage = 0;                                // Global memory limit in bytes (default: 0 = auto, 50% of system RAM)
+    config.logToFile = false;                                 // Write logs to file instead of stderr (default: false)
+    config.logTruncationAt = 24 * 1024 * 1024;                // Log file truncation size (default: 24MB), 0 = no truncation
+    config.unifiedMemtable = false;                           // Enable unified memtable mode (default: false = per-CF memtables)
+    config.unifiedMemtableWriteBufferSize = 0;                // Unified memtable write buffer size (0 = auto)
+    config.unifiedMemtableSkipListMaxLevel = 0;               // Skip list max level for unified memtable (0 = default 12)
+    config.unifiedMemtableSkipListProbability = 0;            // Skip list probability (0 = default 0.25)
+    config.unifiedMemtableSyncMode = tidesdb::SyncMode::None; // Sync mode for unified WAL
+    config.unifiedMemtableSyncIntervalUs = 0;                 // Sync interval for unified WAL in microseconds
+    config.objectStore = nullptr;                             // Pluggable object store connector (nullptr = local only)
+    config.objectStoreConfig = std::nullopt;                  // Object store behavior config (nullopt = defaults)
 
     try {
         tidesdb::TidesDB db(config);
@@ -1032,14 +1032,14 @@ Build with `-DTIDESDB_WITH_S3=ON` to enable the S3 connector. This requires libc
 #include <tidesdb/tidesdb.hpp>
 
 tidesdb_objstore_t* s3 = tidesdb_objstore_s3_create(
-    "s3.amazonaws.com",      // endpoint
-    "my-tidesdb-bucket",     // bucket
-    "production/db1/",       // key prefix (or nullptr)
-    "AKIAIOSFODNN7EXAMPLE",  // access key
+    "s3.amazonaws.com",                         // endpoint
+    "my-tidesdb-bucket",                        // bucket
+    "production/db1/",                          // key prefix (or nullptr)
+    "AKIAIOSFODNN7EXAMPLE",                     // access key
     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", // secret key
-    "us-east-1",             // region
-    1,                       // use_ssl (HTTPS)
-    0                        // use_path_style (0 for AWS, 1 for MinIO)
+    "us-east-1",                                // region
+    1,                                          // use_ssl (HTTPS)
+    0                                           // use_path_style (0 for AWS, 1 for MinIO)
 );
 
 auto osCfg = tidesdb::ObjectStoreConfig::defaultConfig();
@@ -1597,9 +1597,9 @@ TidesDB uses separate thread pools for flush and compaction operations. Understa
 ```cpp
 tidesdb::Config config;
 config.dbPath = "./mydb";
-config.numFlushThreads = 2;                    // Flush thread pool size (default: 2)
-config.numCompactionThreads = 2;               // Compaction thread pool size (default: 2)
-config.blockCacheSize = 64 * 1024 * 1024;      // 64MB global block cache (default: 64MB)
+config.numFlushThreads = 2;                     // Flush thread pool size (default: 2)
+config.numCompactionThreads = 2;                // Compaction thread pool size (default: 2)
+config.blockCacheSize = 64 * 1024 * 1024;       // 64MB global block cache (default: 64MB)
 config.maxOpenSSTables = 256;                   // LRU cache for SSTable objects (default: 256, each has 2 FDs)
 
 tidesdb::TidesDB db(config);

@@ -97,9 +97,9 @@ func main() {
         LogLevel:             tidesdb.LogInfo,
         BlockCacheSize:       64 * 1024 * 1024,
         MaxOpenSSTables:      256,
-        MaxMemoryUsage:       0,                   // Global memory limit in bytes (0 = auto, 80% of system RAM)
-        LogToFile:            false,               // Write logs to file instead of stderr
-        LogTruncationAt:      24 * 1024 * 1024,    // Log file truncation size (24MB default)
+        MaxMemoryUsage:       0,                    // Global memory limit in bytes (0 = auto, 80% of system RAM)
+        LogToFile:            false,                // Write logs to file instead of stderr
+        LogTruncationAt:      24 * 1024 * 1024,     // Log file truncation size (24MB default)
         ObjectStore:          nil,                  // Object store connector (nil = local only)
         ObjectStoreConfig:    nil,                  // Object store behavior config (nil = defaults)
     }
@@ -208,13 +208,13 @@ cfConfig.EnableBlockIndexes = true
 cfConfig.SyncMode = tidesdb.SyncInterval
 cfConfig.SyncIntervalUs = 128000                  
 cfConfig.DefaultIsolationLevel = tidesdb.IsolationReadCommitted
-cfConfig.DividingLevelOffset = 2                  // Compaction dividing level offset
-cfConfig.KlogValueThreshold = 512                 // Values > 512 bytes go to vlog
-cfConfig.BlockIndexPrefixLen = 16                 // Block index prefix length
-cfConfig.MinDiskSpace = 100 * 1024 * 1024         // Minimum disk space required (100MB)
-cfConfig.L1FileCountTrigger = 4                   // L1 file count trigger for compaction
-cfConfig.L0QueueStallThreshold = 20               // L0 queue stall threshold
-cfConfig.UseBtree = 0                             // Use B+tree format for klog (0 = block-based)
+cfConfig.DividingLevelOffset = 2                   // Compaction dividing level offset
+cfConfig.KlogValueThreshold = 512                  // Values > 512 bytes go to vlog
+cfConfig.BlockIndexPrefixLen = 16                  // Block index prefix length
+cfConfig.MinDiskSpace = 100 * 1024 * 1024          // Minimum disk space required (100MB)
+cfConfig.L1FileCountTrigger = 4                    // L1 file count trigger for compaction
+cfConfig.L0QueueStallThreshold = 20                // L0 queue stall threshold
+cfConfig.UseBtree = 0                              // Use B+tree format for klog (0 = block-based)
 cfConfig.ObjectLazyCompaction = 0                  // Less aggressive compaction in object store mode
 cfConfig.ObjectPrefetchCompaction = 1              // Download all inputs before merge
 

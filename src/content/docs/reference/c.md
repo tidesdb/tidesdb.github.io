@@ -194,16 +194,16 @@ tidesdb_finalize();
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 2,                /* Flush thread pool size (default: 2) */
-    .num_compaction_threads = 2,           /* Compaction thread pool size (default: 2) */
-    .log_level = TDB_LOG_INFO,             /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
-    .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
-    .max_open_sstables = 256,              /* Max cached SSTable structures (default: 256) */
-    .max_memory_usage = 0,                 /* Global memory limit in bytes (default: 0 = auto, 50% of system RAM; minimum: 5% of system RAM) */
-    .log_to_file = 0,                      /* Write logs to file instead of stderr (default: 0) */
-    .log_truncation_at = 24 * (1024*1024), /* Log file truncation size (default: 24MB), 0 = no truncation */
-    .unified_memtable = 0,                 /* Enable unified memtable mode (default: 0 = per-CF memtables) */
-    .unified_memtable_write_buffer_size = 0,    /* Unified memtable write buffer size (default: 0 = use TDB_DEFAULT_WRITE_BUFFER_SIZE, 64MB) */
+    .num_flush_threads = 2,                       /* Flush thread pool size (default: 2) */
+    .num_compaction_threads = 2,                  /* Compaction thread pool size (default: 2) */
+    .log_level = TDB_LOG_INFO,                    /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
+    .block_cache_size = 64 * 1024 * 1024,         /* 64MB global block cache (default: 64MB) */
+    .max_open_sstables = 256,                     /* Max cached SSTable structures (default: 256) */
+    .max_memory_usage = 0,                        /* Global memory limit in bytes (default: 0 = auto, 50% of system RAM; minimum: 5% of system RAM) */
+    .log_to_file = 0,                             /* Write logs to file instead of stderr (default: 0) */
+    .log_truncation_at = 24 * (1024*1024),        /* Log file truncation size (default: 24MB), 0 = no truncation */
+    .unified_memtable = 0,                        /* Enable unified memtable mode (default: 0 = per-CF memtables) */
+    .unified_memtable_write_buffer_size = 0,      /* Unified memtable write buffer size (default: 0 = use TDB_DEFAULT_WRITE_BUFFER_SIZE, 64MB) */
     .unified_memtable_skip_list_max_level = 0,    /* Skip list max level for unified memtable (default: 0 = 12) */
     .unified_memtable_skip_list_probability = 0,  /* Skip list probability for unified memtable (default: 0 = 0.25) */
     .unified_memtable_sync_mode = 0,              /* Sync mode for unified WAL (default: 0 = TDB_SYNC_NONE) */
@@ -403,27 +403,27 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 **Custom configuration example**
 ```c
 tidesdb_column_family_config_t cf_config = {
-    .write_buffer_size = 128 * 1024 * 1024,     /* 128MB memtable flush threshold */
-    .level_size_ratio = 10,                     /* Level size multiplier (default: 10) */
-    .min_levels = 5,                            /* Minimum LSM levels (default: 5) */
-    .dividing_level_offset = 2,                 /* Compaction dividing level offset (default: 2) */
-    .skip_list_max_level = 12,                  /* Skip list max level */
-    .skip_list_probability = 0.25f,             /* Skip list probability */
-    .compression_algorithm = TDB_COMPRESS_LZ4,  /* TDB_COMPRESS_LZ4, TDB_COMPRESS_LZ4_FAST, TDB_COMPRESS_ZSTD, TDB_COMPRESS_SNAPPY, or TDB_COMPRESS_NONE */
-    .enable_bloom_filter = 1,                   /* Enable bloom filters */
-    .bloom_fpr = 0.01,                          /* 1% false positive rate */
-    .enable_block_indexes = 1,                  /* Enable compact block indexes */
-    .index_sample_ratio = 1,                    /* Sample every block for index (default: 1) */
-    .block_index_prefix_len = 16,               /* Block index prefix length (default: 16) */
-    .sync_mode = TDB_SYNC_FULL,                 /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
-    .sync_interval_us = 1000000,                /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
-    .comparator_name = {0},                     /* Empty = use default "memcmp" */
-    .klog_value_threshold = 512,                /* Values >= 512 bytes go to vlog (default: 512) */
-    .min_disk_space = 100 * 1024 * 1024,        /* Minimum disk space required (default: 100MB) */
+    .write_buffer_size = 128 * 1024 * 1024,                   /* 128MB memtable flush threshold */
+    .level_size_ratio = 10,                                   /* Level size multiplier (default: 10) */
+    .min_levels = 5,                                          /* Minimum LSM levels (default: 5) */
+    .dividing_level_offset = 2,                               /* Compaction dividing level offset (default: 2) */
+    .skip_list_max_level = 12,                                /* Skip list max level */
+    .skip_list_probability = 0.25f,                           /* Skip list probability */
+    .compression_algorithm = TDB_COMPRESS_LZ4,                /* TDB_COMPRESS_LZ4, TDB_COMPRESS_LZ4_FAST, TDB_COMPRESS_ZSTD, TDB_COMPRESS_SNAPPY, or TDB_COMPRESS_NONE */
+    .enable_bloom_filter = 1,                                 /* Enable bloom filters */
+    .bloom_fpr = 0.01,                                        /* 1% false positive rate */
+    .enable_block_indexes = 1,                                /* Enable compact block indexes */
+    .index_sample_ratio = 1,                                  /* Sample every block for index (default: 1) */
+    .block_index_prefix_len = 16,                             /* Block index prefix length (default: 16) */
+    .sync_mode = TDB_SYNC_FULL,                               /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
+    .sync_interval_us = 1000000,                              /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
+    .comparator_name = {0},                                   /* Empty = use default "memcmp" */
+    .klog_value_threshold = 512,                              /* Values >= 512 bytes go to vlog (default: 512) */
+    .min_disk_space = 100 * 1024 * 1024,                      /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
-    .l1_file_count_trigger = 4,                 /* L1 file count trigger for compaction (default: 4) */
-    .l0_queue_stall_threshold = 20,             /* L0 queue stall threshold (default: 20) */
-    .use_btree = 0                              /* Use B+tree format for klog (default: 0 = block-based) */
+    .l1_file_count_trigger = 4,                               /* L1 file count trigger for compaction (default: 4) */
+    .l0_queue_stall_threshold = 20,                           /* L0 queue stall threshold (default: 20) */
+    .use_btree = 0                                            /* Use B+tree format for klog (default: 0 = block-based) */
 };
 
 if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
@@ -2031,9 +2031,9 @@ tidesdb_config_t config = tidesdb_default_config();
 config.db_path = "./mydb";
 config.unified_memtable = 1;
 config.unified_memtable_write_buffer_size = 128 * 1024 * 1024;  /* 128MB unified write buffer */
-config.unified_memtable_skip_list_max_level = 16;           /* Higher max level for larger datasets */
-config.unified_memtable_skip_list_probability = 0.25f;      /* Default probability */
-config.unified_memtable_sync_mode = TDB_SYNC_FULL;          /* Fsync on every WAL write */
+config.unified_memtable_skip_list_max_level = 16;               /* Higher max level for larger datasets */
+config.unified_memtable_skip_list_probability = 0.25f;          /* Default probability */
+config.unified_memtable_sync_mode = TDB_SYNC_FULL;              /* Fsync on every WAL write */
 
 tidesdb_t *db = NULL;
 if (tidesdb_open(&config, &db) != 0)
@@ -2140,14 +2140,14 @@ Build with `-DTIDESDB_WITH_S3=ON` to enable the S3 connector. This requires libc
 #include <tidesdb/tidesdb.h>
 
 tidesdb_objstore_t *s3 = tidesdb_objstore_s3_create(
-    "s3.amazonaws.com",      /* endpoint */
-    "my-tidesdb-bucket",     /* bucket */
-    "production/db1/",       /* key prefix (or NULL) */
-    "AKIAIOSFODNN7EXAMPLE",  /* access key */
+    "s3.amazonaws.com",                         /* endpoint */
+    "my-tidesdb-bucket",                        /* bucket */
+    "production/db1/",                          /* key prefix (or NULL) */
+    "AKIAIOSFODNN7EXAMPLE",                     /* access key */
     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", /* secret key */
-    "us-east-1",             /* region */
-    1,                       /* use_ssl (HTTPS) */
-    0                        /* use_path_style (0 for AWS, 1 for MinIO) */
+    "us-east-1",                                /* region */
+    1,                                          /* use_ssl (HTTPS) */
+    0                                           /* use_path_style (0 for AWS, 1 for MinIO) */
 );
 
 tidesdb_objstore_config_t os_cfg = tidesdb_objstore_default_config();
