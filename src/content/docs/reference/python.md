@@ -74,19 +74,19 @@ config = tidesdb.Config(
     num_flush_threads=2,
     num_compaction_threads=2,
     log_level=tidesdb.LogLevel.LOG_INFO,
-    block_cache_size=64 * 1024 * 1024,   # 64MB
+    block_cache_size=64 * 1024 * 1024,                      # 64MB
     max_open_sstables=256,
-    max_memory_usage=0,                  # Global memory limit in bytes (0 = auto, 50% of system RAM)
-    log_to_file=False,                   # Write logs to file instead of stderr
-    log_truncation_at=24 * 1024 * 1024,  # Log file truncation size (24MB)
-    unified_memtable=False,              # Enable unified memtable mode
-    unified_memtable_write_buffer_size=0,            # Unified memtable buffer size (0 = default)
-    unified_memtable_skip_list_max_level=0,          # Unified memtable skip list max level
-    unified_memtable_skip_list_probability=0.0,      # Unified memtable skip list probability
+    max_memory_usage=0,                                     # Global memory limit in bytes (0 = auto, 50% of system RAM)
+    log_to_file=False,                                      # Write logs to file instead of stderr
+    log_truncation_at=24 * 1024 * 1024,                     # Log file truncation size (24MB)
+    unified_memtable=False,                                 # Enable unified memtable mode
+    unified_memtable_write_buffer_size=0,                   # Unified memtable buffer size (0 = default)
+    unified_memtable_skip_list_max_level=0,                 # Unified memtable skip list max level
+    unified_memtable_skip_list_probability=0.0,             # Unified memtable skip list probability
     unified_memtable_sync_mode=tidesdb.SyncMode.SYNC_NONE,  # Unified memtable WAL sync mode
-    unified_memtable_sync_interval_us=0,             # Unified memtable sync interval in microseconds
-    object_store=None,                               # Object store connector (from objstore_fs_create())
-    object_store_config=None,                        # Object store behavior config (ObjStoreConfig)
+    unified_memtable_sync_interval_us=0,                    # Unified memtable sync interval in microseconds
+    object_store=None,                                      # Object store connector (from objstore_fs_create())
+    object_store_config=None,                               # Object store behavior config (ObjStoreConfig)
 )
 db = tidesdb.TidesDB(config)
 
@@ -108,12 +108,12 @@ config.compression_algorithm = tidesdb.CompressionAlgorithm.ZSTD_COMPRESSION
 config.enable_bloom_filter = True
 config.bloom_fpr = 0.01
 config.sync_mode = tidesdb.SyncMode.SYNC_INTERVAL
-config.sync_interval_us = 128000  # 128ms
-config.klog_value_threshold = 512  # Values > 512 bytes go to vlog
-config.min_disk_space = 100 * 1024 * 1024  # 100MB minimum disk space
+config.sync_interval_us = 128000              # 128ms
+config.klog_value_threshold = 512             # Values > 512 bytes go to vlog
+config.min_disk_space = 100 * 1024 * 1024     # 100MB minimum disk space
 config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
-config.l1_file_count_trigger = 4  # L1 compaction trigger
-config.l0_queue_stall_threshold = 20  # L0 backpressure threshold
+config.l1_file_count_trigger = 4              # L1 compaction trigger
+config.l0_queue_stall_threshold = 20          # L0 backpressure threshold
 db.create_column_family("my_cf", config)
 
 cf = db.get_column_family("my_cf")
@@ -740,14 +740,14 @@ import tidesdb
 # Available log levels
 config = tidesdb.Config(
     db_path="./mydb",
-    log_level=tidesdb.LogLevel.LOG_DEBUG,    # Detailed diagnostic info
-    # log_level=tidesdb.LogLevel.LOG_INFO,   # General info (default)
-    # log_level=tidesdb.LogLevel.LOG_WARN,   # Warnings only
-    # log_level=tidesdb.LogLevel.LOG_ERROR,  # Errors only
-    # log_level=tidesdb.LogLevel.LOG_FATAL,  # Critical errors only
-    # log_level=tidesdb.LogLevel.LOG_NONE,   # Disable logging
-    log_to_file=True,                        # Write to ./mydb/LOG instead of stderr
-    log_truncation_at=24 * 1024 * 1024,      # Truncate log file at 24MB (0 = no truncation)
+    log_level=tidesdb.LogLevel.LOG_DEBUG,   # Detailed diagnostic info
+    # log_level=tidesdb.LogLevel.LOG_INFO,    General info (default)
+    # log_level=tidesdb.LogLevel.LOG_WARN,    Warnings only
+    # log_level=tidesdb.LogLevel.LOG_ERROR,   Errors only
+    # log_level=tidesdb.LogLevel.LOG_FATAL,   Critical errors only
+    # log_level=tidesdb.LogLevel.LOG_NONE,    Disable logging
+    log_to_file=True,                       # Write to ./mydb/LOG instead of stderr
+    log_truncation_at=24 * 1024 * 1024,     # Truncate log file at 24MB (0 = no truncation)
 )
 ```
 
@@ -877,7 +877,7 @@ db = tidesdb.TidesDB.open(
     unified_memtable_skip_list_max_level=12,
     unified_memtable_skip_list_probability=0.25,
     unified_memtable_sync_mode=tidesdb.SyncMode.SYNC_INTERVAL,
-    unified_memtable_sync_interval_us=128000,  # 128ms
+    unified_memtable_sync_interval_us=128000,             # 128ms
 )
 
 # Or via Config object

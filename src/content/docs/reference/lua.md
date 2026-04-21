@@ -73,15 +73,15 @@ local db = tidesdb.TidesDB.open("./mydb", {
     log_level = tidesdb.LogLevel.LOG_INFO,
     block_cache_size = 64 * 1024 * 1024,
     max_open_sstables = 256,
-    max_memory_usage = 0,                  -- Global memory limit in bytes (0 = auto, 50% of system RAM)
-    log_to_file = false,                   -- Write logs to file instead of stderr
-    log_truncation_at = 24 * 1024 * 1024,  -- Log file truncation size (24MB), 0 = no truncation
-    unified_memtable = false,                       -- Enable unified memtable (shared across CFs)
-    unified_memtable_write_buffer_size = 64 * 1024 * 1024, -- Unified memtable buffer size
-    unified_memtable_skip_list_max_level = 12,      -- Skip list max level for unified memtable
-    unified_memtable_skip_list_probability = 0.25,  -- Skip list probability for unified memtable
+    max_memory_usage = 0,                                        -- Global memory limit in bytes (0 = auto, 50% of system RAM)
+    log_to_file = false,                                         -- Write logs to file instead of stderr
+    log_truncation_at = 24 * 1024 * 1024,                        -- Log file truncation size (24MB), 0 = no truncation
+    unified_memtable = false,                                    -- Enable unified memtable (shared across CFs)
+    unified_memtable_write_buffer_size = 64 * 1024 * 1024,       -- Unified memtable buffer size
+    unified_memtable_skip_list_max_level = 12,                   -- Skip list max level for unified memtable
+    unified_memtable_skip_list_probability = 0.25,               -- Skip list probability for unified memtable
     unified_memtable_sync_mode = tidesdb.SyncMode.SYNC_INTERVAL, -- Unified memtable sync mode
-    unified_memtable_sync_interval_us = 128000,     -- Unified memtable sync interval (128ms)
+    unified_memtable_sync_interval_us = 128000,                  -- Unified memtable sync interval (128ms)
 })
 
 print("Database opened successfully")
@@ -112,12 +112,12 @@ cf_config.index_sample_ratio = 1
 cf_config.block_index_prefix_len = 16
 cf_config.sync_mode = tidesdb.SyncMode.SYNC_INTERVAL
 cf_config.sync_interval_us = 128000
-cf_config.klog_value_threshold = 512         -- Values >= 512 bytes go to vlog
-cf_config.min_disk_space = 100 * 1024 * 1024 -- Minimum disk space required (100MB)
+cf_config.klog_value_threshold = 512           -- Values >= 512 bytes go to vlog
+cf_config.min_disk_space = 100 * 1024 * 1024   -- Minimum disk space required (100MB)
 cf_config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
-cf_config.l1_file_count_trigger = 4          -- L1 file count trigger for compaction
-cf_config.l0_queue_stall_threshold = 20      -- L0 queue stall threshold
-cf_config.use_btree = false                  -- Use B+tree format for klog (default: false)
+cf_config.l1_file_count_trigger = 4            -- L1 file count trigger for compaction
+cf_config.l0_queue_stall_threshold = 20        -- L0 queue stall threshold
+cf_config.use_btree = false                    -- Use B+tree format for klog (default: false)
 cf_config.object_lazy_compaction = false       -- Enable lazy compaction for object store
 cf_config.object_prefetch_compaction = false   -- Enable prefetch during object store compaction
 
@@ -838,7 +838,7 @@ Column family configurations include three object store tuning fields:
 
 ```lua
 local cf_config = tidesdb.default_column_family_config()
-cf_config.object_lazy_compaction = true                 -- Compact less aggressively for remote storage
+cf_config.object_lazy_compaction = true                  -- Compact less aggressively for remote storage
 cf_config.object_prefetch_compaction = true              -- Download all inputs before compaction merge
 
 db:create_column_family("my_cf", cf_config)
@@ -852,7 +852,7 @@ Replica mode enables read-only nodes that follow a primary through the object st
 -- Configure as a replica
 local os_config = tidesdb.default_objstore_config()
 os_config.replica_mode = true
-os_config.replica_sync_interval_us = 1000000  -- 1 second sync interval
+os_config.replica_sync_interval_us = 1000000   -- 1 second sync interval
 os_config.replica_replay_wal = true            -- Replay WAL for fresh reads
 
 local db = tidesdb.TidesDB.open("./mydb_replica", {
@@ -1018,7 +1018,7 @@ local cf = db:get_column_family("my_cf")
 
 local new_config = tidesdb.default_column_family_config()
 new_config.write_buffer_size = 256 * 1024 * 1024  -- 256MB
-new_config.bloom_fpr = 0.001  -- 0.1% false positive rate
+new_config.bloom_fpr = 0.001                      -- 0.1% false positive rate
 
 cf:update_runtime_config(new_config, true)
 ```

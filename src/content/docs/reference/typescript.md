@@ -81,17 +81,17 @@ const db = TidesDB.open({
   logLevel: LogLevel.Info,
   blockCacheSize: 64 * 1024 * 1024,
   maxOpenSSTables: 256,
-  maxMemoryUsage: 0,                  // Global memory limit in bytes (0 = auto, 50% of system RAM)
-  logToFile: false,                   // Write logs to file instead of stderr
-  logTruncationAt: 24 * 1024 * 1024,  // Log file truncation size (24MB), 0 = no truncation
-  unifiedMemtable: false,             // Enable unified memtable mode
-  unifiedMemtableWriteBufferSize: 0,  // Write buffer size (0 = auto)
-  unifiedMemtableSkipListMaxLevel: 0, // Skip list max level (0 = default 12)
-  unifiedMemtableSkipListProbability: 0, // Skip list probability (0 = default 0.25)
+  maxMemoryUsage: 0,                      // Global memory limit in bytes (0 = auto, 50% of system RAM)
+  logToFile: false,                       // Write logs to file instead of stderr
+  logTruncationAt: 24 * 1024 * 1024,      // Log file truncation size (24MB), 0 = no truncation
+  unifiedMemtable: false,                 // Enable unified memtable mode
+  unifiedMemtableWriteBufferSize: 0,      // Write buffer size (0 = auto)
+  unifiedMemtableSkipListMaxLevel: 0,     // Skip list max level (0 = default 12)
+  unifiedMemtableSkipListProbability: 0,  // Skip list probability (0 = default 0.25)
   unifiedMemtableSyncMode: SyncMode.None, // Sync mode for unified WAL
-  unifiedMemtableSyncIntervalUs: 0,   // Sync interval for unified WAL (0 = default)
-  // objectStoreFsPath: '/path/to/store',  // Enable object store mode (FS connector)
-  // objectStoreConfig: { ... },           // Object store behavior config (optional)
+  unifiedMemtableSyncIntervalUs: 0,       // Sync interval for unified WAL (0 = default)
+  objectStoreFsPath: '/path/to/store',    // Enable object store mode (FS connector)
+  objectStoreConfig: { ... },             // Object store behavior config (optional)
 });
 
 console.log('Database opened successfully');
@@ -925,7 +925,7 @@ const db = TidesDB.open({
     cacheOnWrite: true,
     syncManifestToObject: true,
     replicateWal: true,
-    walSyncThresholdBytes: 1048576,  // 1MB
+    walSyncThresholdBytes: 1048576,         // 1MB
   },
 });
 

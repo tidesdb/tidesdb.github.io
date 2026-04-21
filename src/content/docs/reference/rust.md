@@ -1561,8 +1561,8 @@ use tidesdb::{TidesDB, Config, ObjectStoreConfig};
 fn main() -> tidesdb::Result<()> {
     let os_config = ObjectStoreConfig::new()
         .replica_mode(true)
-        .replica_sync_interval_us(1_000_000)  // 1 second sync interval
-        .replica_replay_wal(true);             // replay WAL for fresh reads
+        .replica_sync_interval_us(1_000_000)         // 1 second sync interval
+        .replica_replay_wal(true);                   // replay WAL for fresh reads
 
     let config = Config::new("./mydb_replica")
         .object_store_fs("/mnt/nfs/tidesdb-objects") // same store as the primary
