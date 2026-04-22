@@ -1,6 +1,6 @@
 ---
-title: "TPC-C Analysis with jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6"
-description: "TPC-C analysis with jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6"
+title: "TPC-C Analysis with glibc, jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6"
+description: "TPC-C analysis with glibc, jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6"
 head:
   - tag: meta
     attrs:
@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![TPC-C Analysis with jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6](/pexels-mary-vinitha-1373669599-37195530.jpg)
+![TPC-C Analysis with glibc, jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6](/pexels-mary-vinitha-1373669599-37195530.jpg)
 
 </div>
 
