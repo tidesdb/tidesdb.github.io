@@ -1,0 +1,2 @@
+benchmark,engine,nopm,tpm,warehouses,virtual_users,rampup_min,duration_min,scale_factor,querysets,build_sec,settle_sec,neword_avg_ms,neword_p95_ms,payment_avg_ms,payment_p95_ms,delivery_avg_ms,delivery_p95_ms,tpch_geomean_sec,tpch_total_sec
+TPC-C,TidesDB,75750,175775,40,8,1,2,,,158,5,3.464,4.999,1.301,2.395,9.349,14.457,,,

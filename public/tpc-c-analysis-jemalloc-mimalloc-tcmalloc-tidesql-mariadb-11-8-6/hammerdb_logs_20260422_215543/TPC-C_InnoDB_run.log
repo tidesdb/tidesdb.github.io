@@ -1,0 +1,122 @@
+HammerDB CLI v5.0
+Copyright © HammerDB Ltd hosted by tpc.org 2019-2025
+Type "help" for a list of commands
+Initialized Jobs on-disk database /root/hammerdb_logs_20260422_215543/hammerdb_tmp/hammer.DB using existing tables (352,256 bytes)
+SETTING CONFIGURATION
+Database set to MariaDB
+Benchmark set to TPC-C for MariaDB
+Value localhost for connection:maria_host is the same as existing value localhost, no change made
+Value 3306 for connection:maria_port is the same as existing value 3306, no change made
+Value /tmp/mariadb.sock for connection:maria_socket is the same as existing value /tmp/mariadb.sock, no change made
+Value hammerdb for tpcc:maria_user is the same as existing value hammerdb, no change made
+Value hammerdb123 for tpcc:maria_pass is the same as existing value hammerdb123, no change made
+Value tpcc for tpcc:maria_dbase is the same as existing value tpcc, no change made
+Value timed for tpcc:maria_driver is the same as existing value timed, no change made
+Changed tpcc:maria_rampup from 2 to 1 for MariaDB
+Changed tpcc:maria_duration from 5 to 2 for MariaDB
+Changed tpcc:maria_allwarehouse from false to true for MariaDB
+Changed tpcc:maria_timeprofile from false to true for MariaDB
+Script loaded, Type "print script" to view
+TEST STARTED
+Vuser 1 created MONITOR - WAIT IDLE
+Vuser 2 created - WAIT IDLE
+Vuser 3 created - WAIT IDLE
+Vuser 4 created - WAIT IDLE
+Vuser 5 created - WAIT IDLE
+Vuser 6 created - WAIT IDLE
+Vuser 7 created - WAIT IDLE
+Vuser 8 created - WAIT IDLE
+Vuser 9 created - WAIT IDLE
+9 Virtual Users Created with Monitor VU
+Transaction Counter Started
+Transaction Counter thread running with threadid:tid0x7f518e7fc640
+Vuser 1:RUNNING
+Vuser 1:Initializing xtprof time profiler
+0 MariaDB tpm
+Vuser 1:Ssl_cipher 
+Vuser 1:DBVersion:12.2.2
+Vuser 1:Beginning rampup time of 1 minutes
+Vuser 2:RUNNING
+Vuser 2:Initializing xtprof time profiler
+Vuser 2:Ssl_cipher 
+Vuser 2:Assigned 5 WIDs = 1 9 17 25 33 based on VU count 8, Warehouses = 5 out of 40
+Vuser 2:Processing 10000000 transactions with output suppressed...
+Vuser 3:RUNNING
+Vuser 3:Initializing xtprof time profiler
+Vuser 3:Ssl_cipher 
+Vuser 3:Assigned 5 WIDs = 2 10 18 26 34 based on VU count 8, Warehouses = 5 out of 40
+Vuser 3:Processing 10000000 transactions with output suppressed...
+Vuser 4:RUNNING
+Vuser 4:Initializing xtprof time profiler
+Vuser 4:Ssl_cipher 
+Vuser 4:Assigned 5 WIDs = 3 11 19 27 35 based on VU count 8, Warehouses = 5 out of 40
+Vuser 4:Processing 10000000 transactions with output suppressed...
+Vuser 5:RUNNING
+Vuser 5:Initializing xtprof time profiler
+Vuser 5:Ssl_cipher 
+Vuser 5:Assigned 5 WIDs = 4 12 20 28 36 based on VU count 8, Warehouses = 5 out of 40
+Vuser 5:Processing 10000000 transactions with output suppressed...
+Vuser 6:RUNNING
+Vuser 6:Initializing xtprof time profiler
+Vuser 6:Ssl_cipher 
+Vuser 6:Assigned 5 WIDs = 5 13 21 29 37 based on VU count 8, Warehouses = 5 out of 40
+Vuser 6:Processing 10000000 transactions with output suppressed...
+Vuser 7:RUNNING
+Vuser 7:Initializing xtprof time profiler
+Vuser 7:Ssl_cipher 
+Vuser 7:Assigned 5 WIDs = 6 14 22 30 38 based on VU count 8, Warehouses = 5 out of 40
+Vuser 7:Processing 10000000 transactions with output suppressed...
+Vuser 8:RUNNING
+Vuser 8:Initializing xtprof time profiler
+Vuser 8:Ssl_cipher 
+Vuser 8:Assigned 5 WIDs = 7 15 23 31 39 based on VU count 8, Warehouses = 5 out of 40
+Vuser 8:Processing 10000000 transactions with output suppressed...
+Vuser 9:RUNNING
+Vuser 9:Initializing xtprof time profiler
+Vuser 9:Ssl_cipher 
+Vuser 9:Assigned 5 WIDs = 8 16 24 32 40 based on VU count 8, Warehouses = 5 out of 40
+Vuser 9:Processing 10000000 transactions with output suppressed...
+25446 MariaDB tpm
+34032 MariaDB tpm
+36336 MariaDB tpm
+36954 MariaDB tpm
+37212 MariaDB tpm
+Vuser 1:Rampup 1 minutes complete ...
+Vuser 1:Rampup complete, Taking start Transaction Count.
+36360 MariaDB tpm
+Vuser 1:Timing test period of 2 in minutes
+37644 MariaDB tpm
+37590 MariaDB tpm
+Vuser 3:mariaexec/db server: Record has changed since last read in table 'customer'
+39108 MariaDB tpm
+37530 MariaDB tpm
+38616 MariaDB tpm
+Vuser 1:1 ...,
+40248 MariaDB tpm
+38598 MariaDB tpm
+38736 MariaDB tpm
+38682 MariaDB tpm
+39516 MariaDB tpm
+37704 MariaDB tpm
+Vuser 1:2 ...,
+Vuser 1:Test complete, Taking end Transaction Count.
+Vuser 1:8 Active Virtual Users configured
+Vuser 1:TEST RESULT : System achieved 16635 NOPM from 38499 MariaDB TPM
+Vuser 1:Gathering timing data from Active Virtual Users...
+38172 MariaDB tpm
+Vuser 6:FINISHED SUCCESS
+Vuser 3:FINISHED SUCCESS
+Vuser 2:FINISHED SUCCESS
+Vuser 5:FINISHED SUCCESS
+Vuser 9:FINISHED SUCCESS
+Vuser 4:FINISHED SUCCESS
+Vuser 8:FINISHED SUCCESS
+Vuser 7:FINISHED SUCCESS
+Vuser 1:Calculating timings...
+Vuser 1:Writing timing data to /root/hammerdb_logs_20260422_215543/hammerdb_tmp/hdbxtprofile.log
+Vuser 1:FINISHED SUCCESS
+ALL VIRTUAL USERS COMPLETE
+vudestroy success
+Transaction Counter thread running with threadid:tid0x7f518e7fc640
+Stopping Transaction Counter
+TEST COMPLETE
