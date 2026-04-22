@@ -158,7 +158,7 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
-							label: 'TPC-C Analysis with jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6',
+							label: 'TPC-C Analysis with glibc, jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6',
 							link: 'articles/tpcc-analysis-jemalloc-mimalloc-tcmalloc-tidesql-and-innodb-in-mariadb-v11-8-6'
 						},
 						{
