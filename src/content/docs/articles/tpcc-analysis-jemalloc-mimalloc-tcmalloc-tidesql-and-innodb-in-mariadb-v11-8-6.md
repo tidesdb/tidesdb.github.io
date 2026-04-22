@@ -22,7 +22,7 @@ head:
 
 *published on April 22nd, 2026*
 
-Well I had a thought recently and it was to run analysis with different allocators running in TidesDB in which is the lower level component for the MariaDB plugin <a href="/reference/tidesql">TideSQL</a>.  In TidesDB you can configure jemalloc, mimalloc, or tcmalloc as the allocator when building.  I've run this analysis using <a href="https://hammerdb.com">HammerDB</a> TPROC-C and a custom <a href="/mariadb-11-8-6-innodb-and-tidesql-v4-2-4-tpc-c/hammerdb_runner.sh">script</a> to automate the processes.
+It's been on my mind for a while to run analysis with different allocators running in TidesDB in which is the lower level component for the MariaDB plugin <a href="/reference/tidesql">TideSQL</a>.  In TidesDB you can configure jemalloc, mimalloc, or tcmalloc as the allocator when building.  I've run this analysis using <a href="https://hammerdb.com">HammerDB</a> TPROC-C and a custom <a href="/mariadb-11-8-6-innodb-and-tidesql-v4-2-4-tpc-c/hammerdb_runner.sh">script</a> to automate the processes.
 
 
 When installing TideSQL you can specify the allocator to build with TidesDB, the installer does all the mapping for you
