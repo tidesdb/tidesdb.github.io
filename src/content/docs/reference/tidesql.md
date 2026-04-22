@@ -88,11 +88,31 @@ The script accepts several options:
 | `--list-engines` | List available storage engines and exit |
 | `--pgo` | Enable profile-guided optimization (longer build, faster binaries) |
 | `--s3` | Build with S3 object store connector (requires libcurl + OpenSSL) |
+| `--allocator <name>` | Link libtidesdb against `system` (default), `jemalloc`, `mimalloc`, or `tcmalloc` |
 
 For object store mode with S3:
 
 ```bash
 ./install.sh --mariadb-prefix ~/mariadb-tidesdb --s3
+```
+
+For a non-default allocator:
+
+```bash
+./install.sh --allocator jemalloc
+```
+
+The `--allocator` flag only affects `libtidesdb.so`'s internal allocations (memtable, klog/vlog buffers, compaction scratch, txn ops). `mariadbd`'s allocator is unchanged. For a process-wide swap, also `LD_PRELOAD` the allocator at server startup:
+
+```bash
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 \
+  ~/mariadb-tidesdb/bin/mariadbd-safe --defaults-file=~/mariadb-tidesdb/my.cnf &
+```
+
+Note that `--rebuild-plugin` does not rebuild `libtidesdb.so`, so changing `--allocator` requires a full install run (omit `--rebuild-plugin`) to take effect. Verify the linkage with:
+
+```bash
+ldd /usr/local/lib/libtidesdb.so | grep -E 'jemalloc|mimalloc|tcmalloc'
 ```
 
 After installation, start the server:
@@ -186,10 +206,22 @@ The optimizer is aware of these indexes. The engine reports cost estimates based
 
 The engine supports Index Condition Pushdown for secondary index scans. When the optimizer pushes a WHERE condition down to the storage engine, the engine evaluates it on the index key columns before performing the expensive primary key point-lookup into the data column family. Index entries that fail the condition are skipped without touching the data CF at all. This is the same pattern used by InnoDB - the engine decodes the index key columns into the record buffer and calls MariaDB's `handler_index_cond_check()` evaluator. ICP is supported for indexes on integer types (`TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT`), temporal types (`DATE`, `DATETIME`, `TIMESTAMP`, `YEAR`), and fixed-length `CHAR`/`BINARY` columns with binary or latin1 charset. For indexes on multi-byte charset string columns (e.g., `utf8mb4`), the engine falls through to the standard PK-lookup path.
 
+### Multi-Range Read (MRR)
+
+The engine implements a custom MRR path for point-lookup batches such as `WHERE col IN (v1, v2, ..., vN)` on a primary or full-key unique index. When every range the optimizer hands the engine is a full-key point equality (`UNIQUE_RANGE | EQ_RANGE`) and there are at least two ranges, the engine buffers them, converts each key into comparable bytes, and sorts by those bytes so the LSM sees a monotone stream of seeks — much friendlier to the block cache and the merge-heap than N scattered seeks in user-supplied order. Primary-key lookups bypass the iterator entirely via `fetch_row_by_pk`; secondary-index lookups reuse a single cached iterator and do one seek per entry. Ranges whose rows have been deleted concurrently are silently skipped.
+
+The engine deliberately declines MRR in three cases, falling back to the base handler's default implementation:
+
+- Single-range scans (`count < 2`) — MRR has no sorting win for one key, and the eq_ref path is where pessimistic row locking engages.
+- Non-point ranges — true `BETWEEN`/`<`/`>` scans stay on `read_range_first`.
+- Partitioned tables — `ha_partition` already dispatches MRR across children using its own DS-MRR logic.
+
 
 ## Auto-Increment
 
 Auto-increment works in a similar way to InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`. Rather than calling `index_last()` on every INSERT (which would create and destroy a TidesDB merge-heap iterator each time), the engine maintains an in-memory atomic counter on the shared table descriptor. The counter is seeded once at table open time by seeking to the last key in the primary key column family, and is atomically incremented via a CAS loop on each INSERT - making auto-increment assignment O(1). When a user inserts an explicit value larger than the current counter, `write_row()` bumps the counter to match.
+
+`TRUNCATE TABLE` and `ALTER TABLE ... AUTO_INCREMENT=N` both reset the counter via the engine's `reset_auto_increment` handler hook — the next generated ID equals `N` (or `1` after a bare `TRUNCATE`). This applies to both user-defined AUTO_INCREMENT columns and hidden-PK tables.
 
 ```sql
 CREATE TABLE tickets (
@@ -253,7 +285,7 @@ For workloads that depend on InnoDB-style row-level serialization, TidesDB provi
 SET GLOBAL tidesdb_pessimistic_locking = ON;
 ```
 
-When enabled, the engine acquires per-row locks on primary key values for all write-intent statements: `SELECT ... FOR UPDATE`, `UPDATE`, `DELETE`, and `INSERT`. Locks are held until the transaction commits or rolls back. A second transaction that attempts to access the same primary key value will block until the first transaction releases its lock, rather than proceeding optimistically and failing at commit time.
+When enabled, the engine acquires row level locks on primary key values for every write intent statement such as `SELECT ... FOR UPDATE`, `UPDATE`, `DELETE`, and `INSERT`. Locks are held until the transaction commits or rolls back. A second transaction that attempts to access the same primary key value will block until the first transaction releases its lock, rather than proceeding optimistically and failing at commit time.
 
 The lock manager uses a partitioned hash table with 65,536 partitions, each protected by its own mutex. Primary key bytes are hashed (XXH3) to a partition, and each partition maintains a chain of lock entries keyed by the full comparable PK bytes. This gives per-row granularity without a global bottleneck. Lock entries are created on demand and persist in the hash table for the lifetime of the server, so repeated access to the same key reuses the existing entry without allocation.
 
@@ -286,6 +318,10 @@ COMMIT;
 #### Deadlock Detection
 
 Before blocking on a held lock, the engine performs wait-for-graph cycle detection. It follows the chain of `waiting_on` pointers from the current lock's owner through any locks they are waiting on, up to a depth of 100 hops. If the chain leads back to the requesting transaction, a cycle exists and the engine returns `ER_LOCK_DEADLOCK` (ERROR 1213) immediately instead of blocking. The victim transaction can retry. This is the same error code and semantics that InnoDB uses for deadlocks.
+
+The graph walk is performed without holding the current partition's mutex. The engine publishes its wait intent under the mutex, drops the mutex, walks the graph using atomic loads on the `owner_trx` and `waiting_on` fields (which are `std::atomic` precisely for this reason), then reacquires the mutex and rechecks state. This avoids serializing every locker on a partition behind a walk of up to 100 hops and lets other threads proceed while detection runs. Lock entries and transaction objects are never freed during normal operation, so pointer stability across the walk is guaranteed.
+
+A waiter that receives `KILL QUERY` during its wait is woken promptly. The `kill_query` handlerton callback broadcasts on the owning lock's condition variable, the wait loop observes `thd_killed()` on its next iteration, and the statement returns `HA_ERR_LOCK_WAIT_TIMEOUT` instead of hanging until the holder commits.
 
 ```sql
 -- Connection A:
@@ -321,6 +357,12 @@ CREATE TABLE ledger (
 ```
 
 The available isolation levels are `READ_UNCOMMITTED`, `READ_COMMITTED`, `REPEATABLE_READ`, `SNAPSHOT`, and `SERIALIZABLE`.
+
+### Bulk DML Batching
+
+Statements that touch many rows such as `LOAD DATA INFILE`, multi row `INSERT`, `INSERT ... SELECT`, and `UPDATE` or `DELETE` over a range keep the TidesDB transaction from growing unbounded by committing mid statement in fixed size batches. The engine hooks MariaDB's `start_bulk_insert`, `start_bulk_update`, and `start_bulk_delete` callbacks, counts the row operations (data write plus secondary index maintenance) against `TIDESDB_BULK_INSERT_BATCH_OPS` (50,000 ops), and at each threshold commits the current transaction and resets it with `READ_COMMITTED` for the next batch. This keeps statement memory bounded and keeps the transaction under `TDB_MAX_TXN_OPS` regardless of statement size. Autocommit semantics are preserved so a failure rolls back only the current batch, and the statement as a whole reports the first error encountered.
+
+The mid commit logic is shared between INSERT, UPDATE, and DELETE via a single `maybe_bulk_commit` helper, so the batching threshold and the iterator plus dup cache invalidation policy are identical across the three paths.
 
 
 ## Table Options
@@ -795,7 +837,7 @@ CREATE TABLE docs (
 ) ENGINE=TIDESDB;
 ```
 
-`M` controls the number of neighbors per node in the MHNSW graph (default 6, range 3-200). Higher values improve recall at the cost of slower inserts and more memory. `DISTANCE` selects the distance metric: `euclidean` (default) or `cosine`.
+`M` controls the number of neighbors per node in the MHNSW graph (default 6, range 3 to 200). Higher values improve recall at the cost of slower inserts and more memory. `DISTANCE` selects the distance metric, either `euclidean` (default) or `cosine`.
 
 ### DML Support
 
@@ -1276,11 +1318,25 @@ Renaming a table renames all associated column families, including secondary ind
 
 Dropping a table drops the main data CF and then enumerates and drops all index CFs that share the table's naming prefix. The operation is idempotent, if a CF does not exist, the engine simply continues.
 
+`DROP DATABASE` is wired through the engine's handlerton `drop_database` callback. MariaDB invokes it after removing the `.frm` files for the database; the engine then enumerates every column family whose name starts with `<db_name>__` and drops each one (data CFs plus their `__idx_*` secondary-index CFs), force-removes the on-disk directories, and purges schema-CF entries for the database (object-store mode only). This prevents orphaned column families accumulating on disk when a database is dropped.
+
 ```sql
 RENAME TABLE events TO event_log;
 TRUNCATE TABLE event_log;
 DROP TABLE event_log;
+DROP DATABASE mydb;   -- drops every TidesDB CF under mydb__*
 ```
+
+## Server Lifecycle Hooks
+
+The engine wires several handlerton callbacks so that TidesDB cooperates with MariaDB's lifecycle and durability guarantees:
+
+| Callback | Purpose |
+|---------|---------|
+| `flush_logs` | `FLUSH LOGS` (and `mariadb-backup`'s pre-copy step) syncs the TidesDB WAL so on-disk copies are a consistent snapshot. |
+| `panic` | On signal-driven shutdown paths MariaDB may call `panic(HA_PANIC_CLOSE)` instead of the normal deinit; the engine performs an orderly `tidesdb_close()` there so pending commits are flushed. |
+| `pre_shutdown` | Lets background threads quiesce before the deinit path begins; syncs the unified WAL so compactions in flight don't get killed mid-write. |
+| `kill_query` | `KILL QUERY <id>` wakes any waiter blocked in `row_lock_acquire` and, in combination with `thd_killed()` checks scattered through the scan loops (`rnd_next`, `index_next`, `index_prev`, `index_next_same`, `spatial_scan_next`, `ft_read`), promptly terminates long-running statements with `HA_ERR_ABORTED_BY_USER`. |
 
 
 ## Object Store Mode
