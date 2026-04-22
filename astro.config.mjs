@@ -155,6 +155,15 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Unified Manuals',
+					items: [
+						{
+							label: 'TidesDB 9 Unified Manual',
+							link: 'unified-manuals/TidesDB_9_Unified_Manual.pdf'
+						},
+					],
+				},
+				{
 					label: 'Articles',
 					items: [
 						{
