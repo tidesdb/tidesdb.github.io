@@ -37,7 +37,7 @@ like in my command below:
 
 -- Now I went ahead with glibc allocator
 
--- Then before each allocator analysis I rebuilt TidesDB, rebuilt plugin and restarted MariaDB server.
+-- Then before each other besides glibc allocator analysis I rebuilt TidesDB, rebuilt plugin and restarted MariaDB server.
 
 cd /data/tidesql-build/tidesdb-lib
 
@@ -205,7 +205,7 @@ max_allowed_packet = 64M
 
 
 
-I ran the script twice per engine per allocator (jemalloc, mimalloc, and tcmalloc).
+I ran the script twice per engine per allocator (glibc, jemalloc, mimalloc, and tcmalloc).
 
 ```
 ./hammerdb_runner.sh -b tpcc --warehouses 40 --tpcc-vu 8 --tpcc-build-vu 8 --rampup 1 --duration 2 --settle 5 -H ~/HammerDB-5.0 -e <innodb|tidesdb> -u hammerdb --pass hammerdb123 -S /tmp/mariadb.sock
@@ -217,7 +217,7 @@ I ran the script twice per engine per allocator (jemalloc, mimalloc, and tcmallo
 
 From the analysis what we see is in MariaDB 11.8.6 the two engines respond very differently to allocator choice. InnoDB is effectively flat across all four allocators, the spread between the best (glibc, ~16.9k NOPM) and the worst (mimalloc, ~16.6k NOPM) is under 2.1%, and average new-order latency stays inside an 8.10–8.18 ms band regardless of which allocator the server is preloaded with. TidesDB on the other hand is strongly allocator-sensitive in that jemalloc (~75.1k NOPM) and tcmalloc (~74.5k NOPM) are the clear winners, glibc (~68.8k) is roughly 8–9% behind them, and mimalloc is the outlier going the other way at ~42.7k NOPM, a ~43% drop versus jemalloc, with average new-order latency rising from ~3.46 ms to ~4.91 ms and p95 from ~5.0 ms to ~7.4 ms. 
 
-The article's takeaway is rather split, for InnoDB the allocator basically does not matter at this scale, while for TidesDB jemalloc and tcmalloc are interchangeable best picks, glibc is acceptable, and mimalloc should be avoided in this configuration. Even at its worst case TidesDB still does ~2.5x the throughput of InnoDB, and at its best ~4.5x, so the engine difference dominates the allocator difference in every cell of the matrix!
+The article's takeaway is rather split, for InnoDB the allocator basically does not matter at this scale, while for TidesDB jemalloc and tcmalloc are interchangeable best picks, glibc is acceptable, and mimalloc should be avoided in this configuration. Even at its worst case TidesDB still does ~2.5x the throughput of InnoDB, and at its best ~4.5x, so the engine difference dominates the allocator difference in every cell of the matrix.
 
 That's all for this article.
 
@@ -239,7 +239,7 @@ Learn more about TideSQL:
 - [TideSQL Design Doc](/reference/tidesql)
 - [TideSQL GitHub](https://github.com/tidesdb/tidesql)
 
-*Files*
+You can find all the data from the analysis below:
 
 | Engine | Allocator | Run | File | SHA-256 |
 |---|---|---|---|---|
