@@ -1509,9 +1509,7 @@ Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail a
 
 --
 
-TideSQL repository: <https://github.com/tidesdb/tidesql>
-
-Currently supported MariaDB versions: 11.x.x, 12.x.x
+## MariaDB Compatibility
 
 | MariaDB Version | Supported |
 |-----------------|--------|
@@ -1519,3 +1517,7 @@ Currently supported MariaDB versions: 11.x.x, 12.x.x
 | 11.8.6          | ✅     |
 | 12.2.2          | ✅     |
 *As versions are tested and confirmed working we update this table.*
+
+--
+
+TideSQL repository: <https://github.com/tidesdb/tidesql>
