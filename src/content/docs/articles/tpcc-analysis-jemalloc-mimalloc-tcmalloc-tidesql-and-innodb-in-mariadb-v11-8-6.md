@@ -29,7 +29,6 @@ When installing TideSQL you can specify the allocator to build with TidesDB, the
 
 Because TidesDB and TideSQL don't come packaged in MariaDB and are external in this analysis I had to rebuild TidesDB with each allocator and restart my MariaDB server also to load the new allocator on MariaDB so both library and engine use the same allocator.
 
-like in my command below:
 ```
 -- First i installed MariaDB with TidesDB and TideSQL 
 ./install.sh --mariadb-prefix /data/mariadb --tidesdb-prefix /data/tidesdb --build-dir /data/tidesql-build --mariadb-version    
