@@ -1513,10 +1513,10 @@ Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail a
 
 | MariaDB Version |  TideSQL Version | Full Support |
 |-----------------|--------|--------|
-| 11.4.10         | >= 3.4.0     | ✅     |
-| 11.8.6          | >= 4.0.0    | ✅     |
-| 12.2.2          | >= 1.0.0     | ✅     |
-| 12.3.1          | >= 4.2.6     | ✅     |
+| 11.4.10         | >= 3.4.0     | ✔     |
+| 11.8.6          | >= 4.0.0    | ✔    |
+| 12.2.2          | >= 1.0.0     | ✔     |
+| 12.3.1          | >= 4.2.6     | ✔     |
 
 *As versions are tested and confirmed working we update this table. Full Support means the system is tested against all known functionality.*
 
