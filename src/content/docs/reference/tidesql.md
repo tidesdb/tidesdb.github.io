@@ -1515,6 +1515,7 @@ Currently supported MariaDB versions: 11.x.x, 12.x.x
 
 | MariaDB Version | Supported |
 |-----------------|--------|
-| 11.8.6            | ✅     |
-| 12.2.2            | ✅     |
+| 11.4.10         | ✅     |
+| 11.8.6          | ✅     |
+| 12.2.2          | ✅     |
 *As versions are tested and confirmed working we update this table.*
