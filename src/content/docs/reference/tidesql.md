@@ -1511,12 +1511,13 @@ Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail a
 
 ## MariaDB Compatibility
 
-| MariaDB Version | Supported |
-|-----------------|--------|
-| 11.4.10         | ✅     |
-| 11.8.6          | ✅     |
-| 12.2.2          | ✅     |
-*As versions are tested and confirmed working we update this table.*
+| MariaDB Version |  TideSQL Major Support | Full Support |
+|-----------------|--------|--------|
+| 11.4.10         | > 1     | ✅     |
+| 11.8.6          | > 1    | ✅     |
+| 12.2.2          | > 1     | ✅     |
+
+*As versions are tested and confirmed working we update this table. Full Support means the system is tested against all known functionality.*
 
 --
 
