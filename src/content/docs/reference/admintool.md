@@ -19,6 +19,8 @@ Admintool is a command-line utility for managing and inspecting TidesDB database
 
 Build from source:
 ```bash
+git clone https://github.com/tidesdb/admintool.git
+cd admintool
 mkdir build && cd build
 cmake ..
 make
