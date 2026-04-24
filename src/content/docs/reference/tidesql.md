@@ -365,6 +365,46 @@ Statements that touch many rows such as `LOAD DATA INFILE`, multi row `INSERT`, 
 The mid commit logic is shared between INSERT, UPDATE, and DELETE via a single `maybe_bulk_commit` helper, so the batching threshold and the iterator plus dup cache invalidation policy are identical across the three paths.
 
 
+## Single-Delete Optimization
+
+DELETE on a TidesDB table writes a tombstone into every column family the row touches: the primary row CF plus one CF per secondary, full-text, or spatial index. Regular tombstones have to be carried forward through every compaction until they reach the largest active level, because any level below could still contain an older put of the same key that the tombstone is masking. Insert-then-delete workloads (event streams, log tables, TTL-style purges, the classic iibench benchmark) pile these tombstones at the low end of the key space where DELETE range scans start, and the scan CPU climbs linearly with the backlog until compaction catches up.
+
+The TidesDB library's single-delete primitive (`tidesdb_txn_single_delete`) lets compaction drop a put and its matching tombstone together the first time both appear in the same merge input, regardless of level. The caller's contract is "at most one put between single-deletes on the same key (or between the start of the key's history and its first single-delete)". For reads, a single-delete behaves exactly like a regular tombstone.
+
+The plugin splits this across two behaviours:
+
+### Secondary-index single-delete (automatic)
+
+Every secondary index entry -- `(col_values, pk)` for a regular index, `(term, pk)` for a FULLTEXT index, `(hilbert_value, pk)` for a SPATIAL index -- is written exactly once per row lifetime and deleted exactly once, across every path the plugin takes: `INSERT`, `UPDATE` (which delete-plus-put when the indexed columns change), `DELETE`, `REPLACE INTO`, `INSERT ... ON DUPLICATE KEY UPDATE`. The same `(composite, pk)` bytes never see a second put without an intervening delete, so the single-delete contract holds by construction of the index key layout.
+
+The plugin therefore uses `tidesdb_txn_single_delete` for every secondary-index delete automatically. No configuration, no user flag, no workload assumption. This alone covers three of the four tombstones per deleted row on a table with three secondary indexes.
+
+### Primary-CF single-delete (opt-in per session)
+
+The primary row CF is different. `UPDATE t SET non_pk_col = ...` writes a fresh row at the same `data_key(pk)`, producing a put-over-put. `REPLACE INTO` on a table without secondary indexes takes a short-circuit path that overwrites the primary row silently for the same reason. Under either pattern, dropping a primary-CF put and its later single-delete together at compaction can re-expose an older put -- a silent correctness problem the engine cannot detect from the outside.
+
+Primary-CF single-delete is therefore behind the session variable `tidesdb_single_delete_primary`, default OFF. Enabling it is the caller's explicit promise that:
+
+- The session performs no `UPDATE` on non-PK columns of TidesDB tables.
+- The session performs no `REPLACE INTO` or `INSERT ... ON DUPLICATE KEY UPDATE` that hits the line-5143 silent-overwrite path on a table without secondary indexes.
+- New rows with a given PK are always preceded by a `DELETE` of that PK (append-only or insert-then-delete).
+
+Enable it only when the workload is known to fit this shape. Typical safe cases:
+
+```sql
+-- classic insert-then-delete (event stream, TTL purge, iibench-shape)
+SET SESSION tidesdb_single_delete_primary = 1;
+INSERT INTO events (...) VALUES ...;   -- monotonic PK
+DELETE FROM events WHERE ts < NOW() - INTERVAL 1 HOUR;
+```
+
+Leave it OFF for any session that may issue `UPDATE` on a non-PK column, `REPLACE INTO` on a no-secondary table, or `INSERT ... ON DUPLICATE KEY UPDATE` on a no-secondary table. Setting the variable ON in those scenarios can leak older row versions through reads after a compaction.
+
+### When to expect a benefit
+
+The larger the tombstone backlog at the scan head of your DELETE statements, the more the single-delete pair-cancellation helps. On iibench-shaped insert-then-delete workloads, with three secondary indexes, turning both automatic secondary-index SD and the primary-CF session variable together typically cuts the `max_d` sawtooth peak by 60 to 95 percent, depending on how long deletes have been running against the same key range without compaction catching up. On workloads with no DELETE, no benefit -- and no risk either, since the secondary-index path only changes behaviour on DELETE and UPDATE.
+
+
 ## Table Options
 
 TidesDB exposes a rich set of per-table options that control the underlying column family's behavior. These are specified as table-level options in `CREATE TABLE` and are baked into the column family at creation time. They appear in `SHOW CREATE TABLE` output.
@@ -1185,6 +1225,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 |----------|---------|-------------|
 | `tidesdb_ttl` | 0 | Per-session TTL in seconds applied to INSERT/UPDATE; 0 means use the table-level default. Can be set with `SET SESSION` or `SET STATEMENT` |
 | `tidesdb_skip_unique_check` | OFF | Skip uniqueness checks on primary key and unique secondary indexes during INSERT. Only safe when the application guarantees no duplicates (e.g., bulk loads with monotonic PKs) |
+| `tidesdb_single_delete_primary` | OFF | Use single-delete semantics on the primary row CF for this session's DELETEs. See [Single-Delete Optimization](#single-delete-optimization) |
 | `tidesdb_default_compression` | LZ4 | Default compression algorithm (NONE, SNAPPY, LZ4, ZSTD, LZ4_FAST) |
 | `tidesdb_default_write_buffer_size` | 128 MB | Default write buffer size in bytes |
 | `tidesdb_default_bloom_filter` | ON | Default bloom filter setting |
