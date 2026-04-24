@@ -1,0 +1,30 @@
+[bench] A_bulk50000,50000,50000,bulk,5.668,1086956
+[bench] A_bulk250000,250000,50000,bulk,6.769,1085700
+[bench] A_bulk1000000,1000000,50000,bulk,8.668,1255248
+[bench] A_bulk5000000,5000000,50000,bulk,10.824,1782960
+[bench] B_idx50000,50000,50000,idx,1.696,704792
+[bench] B_idx250000,50000,250000,idx,3.146,907168
+[bench] B_idx500000,50000,500000,idx,2.915,1087436
+[bench] B_idx2000000,50000,2000000,idx,6.542,1637352
+[bench] restored header to baseline, mariadbd restarted
+[bench] Asm_bulk5000,5000,50000,bulk,4.210,1084512
+[bench] Asm_bulk10000,10000,50000,bulk,4.551,1045728
+[bench] Asm_bulk25000,25000,50000,bulk,4.982,1040220
+[bench] Bsm_idx5000,50000,5000,idx,1.133,669160
+[bench] Bsm_idx10000,50000,10000,idx,1.410,682308
+[bench] Bsm_idx25000,50000,25000,idx,1.502,679752
+[bench] restored header to baseline, mariadbd restarted
+[bench] At_bulk500,500,50000,bulk,2.845,1073728
+[bench] At_bulk1000,1000,50000,bulk,2.884,1074544
+[bench] At_bulk2000,2000,50000,bulk,3.411,1059840
+[bench] At_bulk5000,5000,50000,bulk,4.087,1063408
+[bench] Bt_idx500,50000,500,idx,0.726,658904
+[bench] Bt_idx1000,50000,1000,idx,0.848,674048
+[bench] Bt_idx2000,50000,2000,idx,1.002,683264
+[bench] Bt_idx5000,50000,5000,idx,1.168,660548
+[bench] restored header to baseline, mariadbd restarted
+[bench] Au_bulk100,100,50000,bulk,3.003,1054948
+[bench] Au_bulk250,250,50000,bulk,2.841,1073908
+[bench] Bu_idx100,50000,100,idx,0.626,675376
+[bench] Bu_idx250,50000,250,idx,0.637,668456
+[bench] restored header to baseline, mariadbd restarted

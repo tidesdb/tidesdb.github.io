@@ -1,0 +1,61 @@
+[0;36m[INFO][0m  Fetching latest TidesDB version from GitHub...
+[0;36m[INFO][0m  Fetching latest MariaDB version from GitHub...
+
+[0;36m╔═════════════════════════════════════════════════════════════════════════════════════════════════════════╗[0m
+[0;36m║[0m [0;36mTIDESQL Installer[0m                                                                                       [0;36m║[0m
+[0;36m╠═════════════════════════════════════════════════════════════════════════════════════════════════════════╣[0m
+[0;36m║[0m TidesDB version  : [0;32mv9.1.0[0m                                                                               [0;36m║[0m
+[0;36m║[0m MariaDB version  : [0;32mmariadb-12.2.2[0m                                                                       [0;36m║[0m
+[0;36m║[0m TidesDB prefix   : [0;32m/usr/local[0m                                                                           [0;36m║[0m
+[0;36m║[0m MariaDB prefix   : [0;32m/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb[0m       [0;36m║[0m
+[0;36m║[0m Build directory  : [0;32m/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/tidesql-build[0m [0;36m║[0m
+[0;36m║[0m Parallel jobs    : [0;32m16[0m                                                                                   [0;36m║[0m
+[0;36m║[0m Detected OS      : [0;32mdebian[0m                                                                               [0;36m║[0m
+[0;36m║[0m PGO build        : [0;32mfalse[0m                                                                                [0;36m║[0m
+[0;36m║[0m Allocator        : [0;32msystem[0m                                                                               [0;36m║[0m
+[0;36m║[0m TideSQL repo     : [0;32m/home/agpmastersystem/tidesql[0m                                                        [0;36m║[0m
+[0;36m╚═════════════════════════════════════════════════════════════════════════════════════════════════════════╝[0m
+
+[0;36m[INFO][0m  Copying TidesDB plugin source into MariaDB source tree...
+-- Running cmake version 3.25.1
+-- MariaDB 11.8.6
+-- Updating submodules
+-- Wsrep-lib version: 1.0.0
+== Configuring MariaDB Connector/C
+-- SYSTEM_LIBS: /usr/lib/x86_64-linux-gnu/libz.so;dl;m;dl;m;/usr/lib/x86_64-linux-gnu/libssl.so;/usr/lib/x86_64-linux-gnu/libcrypto.so;/usr/lib/x86_64-linux-gnu/libzstd.so;/usr/lib/x86_64-linux-gnu/libz.so
+-- Could NOT find LZO (missing: LZO_LIBRARIES LZO_INCLUDE_DIRS) 
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/tidesql-build/mariadb-server/build
+[0;36m[INFO][0m  Building tidesdb plugin target (16 jobs)...
+[  0%] Built target uca-dump
+[ 10%] Built target mysqlservices
+[ 10%] Built target GenUnicodeDataSource
+[ 70%] Built target mysys
+[100%] Built target strings
+[100%] Built target dbug
+[100%] Built target comp_err
+[100%] Built target GenError
+[100%] Building CXX object storage/tidesdb/CMakeFiles/tidesdb.dir/ha_tidesdb.cc.o
+[100%] Linking CXX shared module ha_tidesdb.so
+[100%] Built target tidesdb
+[0;36m[INFO][0m  Installing ha_tidesdb.so -> /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/lib/plugin/
+[0;32m[OK][0m    Plugin rebuilt and installed
+
+[0;32m╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗[0m
+[0;32m║[0m [0;32mPlugin Rebuild Complete[0m                                                                                                   [0;32m║[0m
+[0;32m╠═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣[0m
+[0;32m║[0m                                                                                                                           [0;32m║[0m
+[0;32m║[0m Plugin rebuilt : [0;36m/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/lib/plugin/ha_tidesdb.so[0m  [0;32m║[0m
+[0;32m║[0m                                                                                                                           [0;32m║[0m
+[0;32m║[0m Restart MariaDB to pick up the new plugin:                                                                                [0;32m║[0m
+[0;32m║[0m   /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/bin/mariadb-admin shutdown               [0;32m║[0m
+[0;32m║[0m   /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/bin/mariadbd-safe \                      [0;32m║[0m
+[0;32m║[0m     --defaults-file=/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/my.cnf &               [0;32m║[0m
+[0;32m║[0m                                                                                                                           [0;32m║[0m
+[0;32m║[0m Run TidesDB test suite:                                                                                                   [0;32m║[0m
+[0;32m║[0m   cd /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/tidesql-build/mariadb-server/build/mysql-test [0;32m║[0m
+[0;32m║[0m   perl mtr --suite=tidesdb --parallel=4                                                                                   [0;32m║[0m
+[0;32m║[0m                                                                                                                           [0;32m║[0m
+[0;32m╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝[0m
+
