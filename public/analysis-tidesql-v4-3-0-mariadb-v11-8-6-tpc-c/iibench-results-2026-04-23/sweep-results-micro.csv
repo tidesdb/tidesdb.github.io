@@ -1,0 +1,5 @@
+label,bulk_ops,idx_batch,phase,seconds,peak_rss_kb
+Au_bulk100,100,50000,bulk,3.003,1054948
+Au_bulk250,250,50000,bulk,2.841,1073908
+Bu_idx100,50000,100,idx,0.626,675376
+Bu_idx250,50000,250,idx,0.637,668456

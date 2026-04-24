@@ -1,0 +1,26 @@
+HammerDB CLI v5.0
+Copyright © HammerDB Ltd hosted by tpc.org 2019-2025
+Type "help" for a list of commands
+Initialized Jobs on-disk database /root/hammerdb_logs_20260423_181701/hammerdb_tmp/hammer.DB using existing tables (364,544 bytes)
+SETTING CONFIGURATION
+Database set to MariaDB
+Benchmark set to TPC-C for MariaDB
+Value localhost for connection:maria_host is the same as existing value localhost, no change made
+Value 3306 for connection:maria_port is the same as existing value 3306, no change made
+Value /tmp/mariadb.sock for connection:maria_socket is the same as existing value /tmp/mariadb.sock, no change made
+Value hammerdb for tpcc:maria_user is the same as existing value hammerdb, no change made
+Value hammerdb123 for tpcc:maria_pass is the same as existing value hammerdb123, no change made
+Value tpcc for tpcc:maria_dbase is the same as existing value tpcc, no change made
+DROP SCHEMA STARTED
+Script cleared
+Deleting schema with 1 Virtual User
+Do you want to delete the TPCC TPROC-C schema
+ in host LOCALHOST:/TMP/MARIADB.SOCK under user HAMMERDB?
+Enter yes or no: replied yes
+Vuser 1 created - WAIT IDLE
+Vuser 1:RUNNING
+Vuser 1:Ssl_cipher 
+Vuser 1:tpcc TPROC-C Schema has been deleted successfully.
+Vuser 1:FINISHED SUCCESS
+ALL VIRTUAL USERS COMPLETE
+DROP SCHEMA COMPLETED

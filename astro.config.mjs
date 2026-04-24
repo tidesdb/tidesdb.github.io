@@ -167,6 +167,14 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Benchmark Analysis on TideSQL v4.3.0 in MariaDB v11.8.6 TPC-C with jemalloc and PGO',
+							link: 'articles/benchmark-analysis-tidesql-v4-3-0-mariadb-v11-8-6-tpc-c-pgo-jemalloc'
+						},
+						{
+							label: 'Benchmark Analysis on TideSQL v4.3.0 in MariaDB v11.8.6 TPC-C',
+							link: 'articles/benchmark-analysis-tidesql-v4-3-0-mariadb-v11-8-6-tpc-c'
+						},
+						{
 							label: 'Profile-Guided Optimization (PGO) Build TPC-C Analysis for TideSQL in MariaDB v11.8.6',
 							link: 'articles/pgo-build-tpc-c-analysis-mariadb-v11-8-6-tidesql'
 						},
