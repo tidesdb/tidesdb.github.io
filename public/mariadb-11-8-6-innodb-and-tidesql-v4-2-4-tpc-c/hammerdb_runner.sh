@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ============================================================
-#  TidesDB vs RocksDB vs PostgreSQL — HammerDB TPC-C / TPC-H benchmark
-#  Requires: HammerDB 5.0
-#    MariaDB with TidesDB+RocksDB engines (for MariaDB engines)
-#    PostgreSQL (for postgres engine)
-# ============================================================
-
-# ---------- defaults ----------
+# defaults
 HAMMERDB_DIR=${HAMMERDB_DIR:-/opt/HammerDB-5.0}
 ENGINE_SELECT=${ENGINE_SELECT:-both}
 BENCH_SELECT=${BENCH_SELECT:-both}
@@ -68,8 +61,6 @@ mkdir -p "$LOG_DIR"
 usage() {
     cat <<EOF
 Usage: $0 [OPTIONS]
-
-HammerDB TPC-C / TPC-H benchmark: TidesDB vs RocksDB vs PostgreSQL
 
 Options:
   -e, --engine       STR   Engine: tidesdb|rocksdb|innodb|postgres|both|all
@@ -187,7 +178,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ---------- plot-only mode ----------
+# plot-only mode
 if [[ -n "$PLOT_ONLY" ]]; then
     if [[ ! -f "$PLOT_ONLY" ]]; then
         echo "ERROR: CSV file not found: $PLOT_ONLY"
@@ -211,7 +202,7 @@ fi
 
 if [[ "${SKIP_BENCH:-0}" -ne 1 ]]; then
 
-# ---------- validate ----------
+# validate
 if [[ ! -x "$HAMMERDBCLI" ]]; then
     echo "ERROR: hammerdbcli not found at $HAMMERDBCLI"
     echo "Set HAMMERDB_DIR or use --hammerdb-dir"
@@ -228,7 +219,7 @@ case "${ENGINE_SELECT,,}" in
     *)         echo "ERROR: --engine must be tidesdb, rocksdb, innodb, postgres, both, or all"; exit 1 ;;
 esac
 
-# ---------- perf preflight ----------
+# perf preflight
 if [[ "$PERF_RECORD" -eq 1 ]]; then
     if ! command -v perf &>/dev/null; then
         echo "ERROR: perf not found. Install with: sudo apt install linux-tools-\$(uname -r)"
@@ -296,8 +287,8 @@ fi
 export TMP="${LOG_DIR}/hammerdb_tmp"
 mkdir -p "$TMP"
 
-# ---------- conditional password lines for Tcl scripts ----------
-# HammerDB's diset requires a value — omit the line entirely if empty
+# conditional password lines for Tcl scripts
+# HammerDB's diset requires a value - omit the line entirely if empty
 if [[ -n "$MYSQL_PASS" ]]; then
     DISET_TPCC_PASS="diset tpcc maria_pass $MYSQL_PASS"
     DISET_TPCH_PASS="diset tpch maria_tpch_pass $MYSQL_PASS"
@@ -322,7 +313,7 @@ else
     DISET_PG_TPCH_PASS="# pg tpch password not set"
 fi
 
-# ---------- CSV header ----------
+# CSV header
 cat > "$CSV_FILE" <<EOF
 benchmark,engine,nopm,tpm,warehouses,virtual_users,rampup_min,duration_min,scale_factor,querysets,build_sec,settle_sec,neword_avg_ms,neword_p95_ms,payment_avg_ms,payment_p95_ms,delivery_avg_ms,delivery_p95_ms,tpch_geomean_sec,tpch_total_sec
 EOF
@@ -357,7 +348,7 @@ echo "  Logs:         $LOG_DIR/"
 echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
 echo ""
 
-# ---------- helper: generate tcl scripts ----------
+# helper: generate tcl scripts
 
 gen_tpcc_build() {
     local engine="$1" outfile="$2"
@@ -511,7 +502,7 @@ puts "DROP SCHEMA COMPLETED"
 TCLEOF
 }
 
-# ---------- PostgreSQL Tcl script generators ----------
+# PostgreSQL Tcl script generators
 
 gen_pg_tpcc_build() {
     local outfile="$1"
@@ -673,7 +664,7 @@ puts "DROP SCHEMA COMPLETED"
 TCLEOF
 }
 
-# ---------- helper: parse TPC-C results ----------
+# helper: parse TPC-C results
 parse_tpcc() {
     local logfile="$1"
     local nopm tpm
@@ -722,7 +713,7 @@ parse_tpch() {
     echo "${geomean},${total}"
 }
 
-# ---------- settle helper ----------
+# settle helper
 do_settle() {
     if [[ "$SETTLE" -gt 0 ]]; then
         echo "[$(date +%H:%M:%S)] Settling ${SETTLE}s..."
@@ -738,11 +729,11 @@ do_settle() {
     fi
 }
 
-# ---------- set default storage engine ----------
+# set default storage engine
 set_default_engine() {
     local engine="$1"
     if is_pg_engine "$engine"; then
-        echo "[$(date +%H:%M:%S)] PostgreSQL engine — no default_storage_engine to set"
+        echo "[$(date +%H:%M:%S)] PostgreSQL engine - no default_storage_engine to set"
         return 0
     fi
     local engine_lower
@@ -753,13 +744,13 @@ set_default_engine() {
 }
 
 # ============================================================
-#  DEBUG RUN (optional) — short test with raiseerror=true
+#  DEBUG RUN (optional) - short test with raiseerror=true
 # ============================================================
 if [[ "$DEBUG_RUN" -eq 1 ]]; then
     DEBUG_VU=2
 
     echo "######################################################"
-    echo "  DEBUG RUN — checking for lock conflicts"
+    echo "  DEBUG RUN - checking for lock conflicts"
     echo "  VUs: $DEBUG_VU  |  Duration: 1 min (0 ramp)"
     echo "  raiseerror: TRUE  |  driver: timed"
     echo "######################################################"
@@ -866,18 +857,18 @@ TCLEOF
             echo ""
             echo "  Issues detected for $ENGINE."
             if [[ "$DEADLOCKS" -gt 0 || "$PROC_ERRORS" -gt 0 ]]; then
-                echo "  Lock conflicts found — the timed benchmark uses"
+                echo "  Lock conflicts found - the timed benchmark uses"
                 echo "  raiseerror=false (default) so these will be silently"
                 echo "  caught and skipped. High rates may deflate TPM."
             fi
             if [[ "$ABORTS" -gt 0 ]]; then
-                echo "  Some VUs FINISHED FAILED — check log for details."
+                echo "  Some VUs FINISHED FAILED - check log for details."
             fi
             echo ""
             echo "  Relevant lines:"
             grep -iE "deadlock|lock wait|Error 1213|Error 1180|Procedure Error|FINISHED FAILED" "${DBG_PREFIX}_run.log" | head -10 || true
         else
-            echo "  No lock conflicts detected — clean run."
+            echo "  No lock conflicts detected - clean run."
         fi
         echo "  ========================================="
         echo ""
@@ -896,7 +887,7 @@ TCLEOF
     done
 
     echo "######################################################"
-    echo "  DEBUG RUN COMPLETE — proceeding to benchmark"
+    echo "  DEBUG RUN COMPLETE - proceeding to benchmark"
     echo "######################################################"
     echo ""
 fi
@@ -918,7 +909,7 @@ for BENCH in "${BENCHMARKS[@]}"; do
         set_default_engine "$ENGINE"
 
         if [[ "$BENCH" == "TPC-C" ]]; then
-            # ---- TPC-C BUILD ----
+            # TPC-C BUILD
             if is_pg_engine "$ENGINE"; then
                 gen_pg_tpcc_build "${LOG_PREFIX}_build.tcl"
             else
@@ -934,7 +925,7 @@ for BENCH in "${BENCHMARKS[@]}"; do
 
             do_settle
 
-            # ---- PERF START ----
+            # PERF START
             PERF_PID=""
             if [[ "$PERF_RECORD" -eq 1 ]]; then
                 DB_PID=$(find_db_pid "$ENGINE") || true
@@ -955,7 +946,7 @@ for BENCH in "${BENCHMARKS[@]}"; do
                 fi
             fi
 
-            # ---- TPC-C RUN ----
+            # TPC-C RUN
             if is_pg_engine "$ENGINE"; then
                 gen_pg_tpcc_run "${LOG_PREFIX}_run.tcl"
             else
@@ -965,7 +956,7 @@ for BENCH in "${BENCHMARKS[@]}"; do
             (cd "$HAMMERDB_DIR" && TMP="$TMP" "$HAMMERDBCLI" auto "${LOG_PREFIX}_run.tcl") 2>&1 | tee "${LOG_PREFIX}_run.log" || true
             echo ""
 
-            # ---- PERF STOP ----
+            # PERF STOP
             if [[ -n "$PERF_PID" ]] && kill -0 "$PERF_PID" 2>/dev/null; then
                 echo "[$(date +%H:%M:%S)] Stopping perf..."
                 $SUDO kill -INT "$PERF_PID"
@@ -1012,7 +1003,7 @@ for BENCH in "${BENCHMARKS[@]}"; do
                 echo ""
             fi
 
-            # ---- TPC-C RESULT ----
+            # TPC-C RESULT
             if is_pg_engine "$ENGINE"; then
                 gen_pg_tpcc_result "${LOG_PREFIX}_result.tcl"
             else
@@ -1022,13 +1013,13 @@ for BENCH in "${BENCHMARKS[@]}"; do
             (cd "$HAMMERDB_DIR" && TMP="$TMP" "$HAMMERDBCLI" auto "${LOG_PREFIX}_result.tcl") 2>&1 | tee "${LOG_PREFIX}_result.log" || true
             echo ""
 
-            # ---- PARSE ----
+            # PARSE
             NOPM_TPM=$(parse_tpcc "${LOG_PREFIX}_run.log")
             TIMING=$(parse_tpcc_timing "${LOG_PREFIX}_result.log" 2>/dev/null) || TIMING="0,0,0,0,0,0"
 
             echo "${BENCH},${ENGINE},${NOPM_TPM},${TPCC_WAREHOUSES},${TPCC_VU},${TPCC_RAMPUP},${TPCC_DURATION},,,${BUILD_ELAPSED},${SETTLE},${TIMING},,," >> "$CSV_FILE"
 
-            # ---- TPC-C DELETE ----
+            # TPC-C DELETE
             if is_pg_engine "$ENGINE"; then
                 gen_pg_tpcc_delete "${LOG_PREFIX}_delete.tcl"
             else
@@ -1039,7 +1030,7 @@ for BENCH in "${BENCHMARKS[@]}"; do
             echo ""
 
         elif [[ "$BENCH" == "TPC-H" ]]; then
-            # ---- TPC-H BUILD ----
+            # TPC-H BUILD
             if is_pg_engine "$ENGINE"; then
                 gen_pg_tpch_build "${LOG_PREFIX}_build.tcl"
             else
@@ -1055,7 +1046,7 @@ for BENCH in "${BENCHMARKS[@]}"; do
 
             do_settle
 
-            # ---- TPC-H RUN ----
+            # TPC-H RUN
             if is_pg_engine "$ENGINE"; then
                 gen_pg_tpch_run "${LOG_PREFIX}_run.tcl"
             else
@@ -1065,12 +1056,12 @@ for BENCH in "${BENCHMARKS[@]}"; do
             (cd "$HAMMERDB_DIR" && TMP="$TMP" "$HAMMERDBCLI" auto "${LOG_PREFIX}_run.tcl") 2>&1 | tee "${LOG_PREFIX}_run.log" || true
             echo ""
 
-            # ---- PARSE ----
+            # PARSE
             TPCH_METRICS=$(parse_tpch "${LOG_PREFIX}_run.log")
 
             echo "${BENCH},${ENGINE},,,,,,,${TPCH_SCALE},${TPCH_QUERYSETS},${BUILD_ELAPSED},${SETTLE},,,,,,${TPCH_METRICS}" >> "$CSV_FILE"
 
-            # ---- TPC-H DELETE ----
+            # TPC-H DELETE
             if is_pg_engine "$ENGINE"; then
                 gen_pg_tpch_delete "${LOG_PREFIX}_delete.tcl"
             else
@@ -1173,7 +1164,7 @@ def safe_float(v):
     try: return float(v) if v else 0
     except: return 0
 
-# ---- TPC-C charts ----
+# TPC-C charts
 if tpcc_rows:
     engines = []
     seen = set()
@@ -1264,7 +1255,7 @@ if tpcc_rows:
         fig.savefig(path); plt.close(fig)
         print(f"  Chart: {path}")
 
-# ---- TPC-H charts ----
+# TPC-H charts
 if tpch_rows:
     engines = []
     seen = set()
@@ -1318,7 +1309,7 @@ if tpch_rows:
     fig.savefig(path); plt.close(fig)
     print(f"  Chart: {path}")
 
-# ---- Build time chart (all benchmarks) ----
+# Build time chart (all benchmarks)
 if len(rows) >= 2:
     labels = [f"{r['benchmark']}\n{r['engine']}" for r in rows]
     build_vals = [safe_float(r.get("build_sec", 0)) for r in rows]
