@@ -1198,6 +1198,39 @@ tidesdb_txn_commit(txn);
 tidesdb_txn_free(txn);
 ```
 
+### Single-Delete
+
+`tidesdb_txn_single_delete` writes a tombstone with the same read semantics as `tidesdb_txn_delete`, but carries a caller-provided promise that lets compaction drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward until it reaches the largest active level.
+
+Between any two single-deletes on the same key, and between the start of the key's history and its first single-delete, the key has been put **at most once**. The engine does not and cannot verify this at runtime; violating the contract can leave older puts visible after the single-delete and is a bug in the caller.
+
+This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+const uint8_t *key = (uint8_t *)"mykey";
+tidesdb_txn_single_delete(txn, cf, key, 5);
+
+tidesdb_txn_commit(txn);
+tidesdb_txn_free(txn);
+```
+
+Signature:
+
+```c
+int tidesdb_txn_single_delete(tidesdb_txn_t *txn,
+                              tidesdb_column_family_t *cf,
+                              const uint8_t *key,
+                              size_t key_size);
+```
+
+Returns `TDB_SUCCESS` on success or a negative error code on failure. When in doubt, prefer `tidesdb_txn_delete`.
+
 ### Multi-Operation Transaction
 
 ```c
@@ -1865,7 +1898,8 @@ if (tidesdb_flush_memtable(cf) != 0)
 - Graceful shutdown · Flush pending data before closing the database
 
 **Behavior**
-- Enqueues flush work in the global flush thread pool
+- Rotates the column family's active memtable and enqueues the rotated memtable for flush regardless of its current size (no write-buffer threshold gate)
+- In unified-memtable mode the shared memtable is rotated through the unified flush path, so the call behaves the same whether the database is in per-CF or unified-memtable mode
 - Returns immediately (non-blocking) -- flush runs asynchronously in background threads
 - If flush is already running for the column family, the call succeeds but doesn't queue duplicate work
 - Thread-safe -- can be called concurrently from multiple threads
