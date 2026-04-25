@@ -23,6 +23,10 @@ You **must** have the TidesDB shared C library installed on your system.  You ca
 npm install git+https://github.com/tidesdb/tidesdb-node.git
 ```
 
+```bash
+npm i @tidesdb/tidesdb
+```
+
 Or clone and install locally:
 
 ```bash
@@ -207,6 +211,27 @@ txn.delete(cf, Buffer.from('key'));
 txn.commit();
 txn.free();
 ```
+
+#### Single-Delete
+
+`txn.singleDelete()` writes a tombstone with the same read semantics as `txn.delete()`, but carries a caller-provided promise that lets compaction drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward until it reaches the largest active level.
+
+Between any two single-deletes on the same key, and between the start of the key's history and its first single-delete, the key has been put **at most once**. The engine does not and cannot verify this at runtime; violating the contract can leave older puts visible after the single-delete and is a bug in the caller.
+
+This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const txn = db.beginTransaction();
+
+txn.singleDelete(cf, Buffer.from('key'));
+
+txn.commit();
+txn.free();
+```
+
+When in doubt, prefer `txn.delete()`.
 
 #### Multi-Operation Transactions
 

@@ -270,6 +270,27 @@ txn:commit()
 txn:free()
 ```
 
+#### Single-Delete
+
+`txn:single_delete(cf, key)` writes a tombstone with the same read semantics as `txn:delete`, but carries a caller-provided promise that lets compaction drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward until it reaches the largest active level.
+
+Between any two single-deletes on the same key, and between the start of the key's history and its first single-delete, the key has been put **at most once**. The engine does not and cannot verify this at runtime; violating the contract can leave older puts visible after the single-delete and is a bug in the caller.
+
+This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local txn = db:begin_txn()
+
+txn:single_delete(cf, "mykey")
+
+txn:commit()
+txn:free()
+```
+
+When in doubt, prefer `txn:delete`.
+
 #### Multi-Operation Transactions
 
 ```lua
@@ -1401,6 +1422,7 @@ lua test_tidesdb.lua
 | `txn:put(cf, key, value, ttl)` | Put a key-value pair |
 | `txn:get(cf, key)` | Get a value by key |
 | `txn:delete(cf, key)` | Delete a key |
+| `txn:single_delete(cf, key)` | Delete a key with at-most-one-put promise (see Single-Delete) |
 | `txn:commit()` | Commit the transaction |
 | `txn:rollback()` | Rollback the transaction |
 | `txn:reset(isolation)` | Reset transaction for reuse with new isolation level |

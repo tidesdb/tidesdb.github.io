@@ -208,20 +208,20 @@ The engine supports Index Condition Pushdown for secondary index scans. When the
 
 ### Multi-Range Read (MRR)
 
-The engine implements a custom MRR path for point-lookup batches such as `WHERE col IN (v1, v2, ..., vN)` on a primary or full-key unique index. When every range the optimizer hands the engine is a full-key point equality (`UNIQUE_RANGE | EQ_RANGE`) and there are at least two ranges, the engine buffers them, converts each key into comparable bytes, and sorts by those bytes so the LSM sees a monotone stream of seeks — much friendlier to the block cache and the merge-heap than N scattered seeks in user-supplied order. Primary-key lookups bypass the iterator entirely via `fetch_row_by_pk`; secondary-index lookups reuse a single cached iterator and do one seek per entry. Ranges whose rows have been deleted concurrently are silently skipped.
+The engine implements a custom MRR path for point-lookup batches such as `WHERE col IN (v1, v2, ..., vN)` on a primary or full-key unique index. When every range the optimizer hands the engine is a full-key point equality (`UNIQUE_RANGE | EQ_RANGE`) and there are at least two ranges, the engine buffers them, converts each key into comparable bytes, and sorts by those bytes so the LSM sees a monotone stream of seeks - much friendlier to the block cache and the merge-heap than N scattered seeks in user-supplied order. Primary-key lookups bypass the iterator entirely via `fetch_row_by_pk`; secondary-index lookups reuse a single cached iterator and do one seek per entry. Ranges whose rows have been deleted concurrently are silently skipped.
 
 The engine deliberately declines MRR in three cases, falling back to the base handler's default implementation:
 
-- Single-range scans (`count < 2`) — MRR has no sorting win for one key, and the eq_ref path is where pessimistic row locking engages.
-- Non-point ranges — true `BETWEEN`/`<`/`>` scans stay on `read_range_first`.
-- Partitioned tables — `ha_partition` already dispatches MRR across children using its own DS-MRR logic.
+- Single-range scans (`count < 2`) - MRR has no sorting win for one key, and the eq_ref path is where pessimistic row locking engages.
+- Non-point ranges - true `BETWEEN`/`<`/`>` scans stay on `read_range_first`.
+- Partitioned tables - `ha_partition` already dispatches MRR across children using its own DS-MRR logic.
 
 
 ## Auto-Increment
 
 Auto-increment works in a similar way to InnoDB. The engine calls MariaDB's built-in `update_auto_increment()` mechanism during `write_row()`. Rather than calling `index_last()` on every INSERT (which would create and destroy a TidesDB merge-heap iterator each time), the engine maintains an in-memory atomic counter on the shared table descriptor. The counter is seeded once at table open time by seeking to the last key in the primary key column family, and is atomically incremented via a CAS loop on each INSERT - making auto-increment assignment O(1). When a user inserts an explicit value larger than the current counter, `write_row()` bumps the counter to match.
 
-`TRUNCATE TABLE` and `ALTER TABLE ... AUTO_INCREMENT=N` both reset the counter via the engine's `reset_auto_increment` handler hook — the next generated ID equals `N` (or `1` after a bare `TRUNCATE`). This applies to both user-defined AUTO_INCREMENT columns and hidden-PK tables.
+`TRUNCATE TABLE` and `ALTER TABLE ... AUTO_INCREMENT=N` both reset the counter via the engine's `reset_auto_increment` handler hook - the next generated ID equals `N` (or `1` after a bare `TRUNCATE`). This applies to both user-defined AUTO_INCREMENT columns and hidden-PK tables.
 
 ```sql
 CREATE TABLE tickets (

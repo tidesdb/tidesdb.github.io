@@ -81,7 +81,7 @@ def start_mariadbd():
 
 
 def patch_header(bulk_ops, idx_batch):
-    """Rewrite the two batch constants in ha_tidesdb.h. Idempotent — always starts
+    """Rewrite the two batch constants in ha_tidesdb.h. Idempotent - always starts
     from the pristine header backup."""
     with open(HEADER_BAK) as f:
         src = f.read()

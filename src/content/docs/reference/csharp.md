@@ -19,6 +19,14 @@ You **must** have the TidesDB shared C library installed on your system. You can
 
 ### Installation
 
+Install the package from NuGet:
+
+```bash
+dotnet add package TidesDB
+```
+
+Or build from source:
+
 ```bash
 git clone https://github.com/tidesdb/tidesdb-cs.git
 cd tidesdb-cs
@@ -325,6 +333,26 @@ txn.Delete(cf, Encoding.UTF8.GetBytes("key"));
 
 txn.Commit();
 ```
+
+#### Single-Delete
+
+`Transaction.SingleDelete` writes a tombstone with the same read semantics as `Delete`, but carries a caller-provided promise that lets compaction drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward until it reaches the largest active level.
+
+Between any two single-deletes on the same key, and between the start of the key's history and its first single-delete, the key has been put **at most once**. The engine does not and cannot verify this at runtime; violating the contract can leave older puts visible after the single-delete and is a bug in the caller.
+
+This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+using var txn = db.BeginTransaction();
+
+txn.SingleDelete(cf, Encoding.UTF8.GetBytes("key"));
+
+txn.Commit();
+```
+
+When in doubt, prefer `Transaction.Delete`.
 
 #### Multi-Operation Transactions
 
@@ -1236,6 +1264,7 @@ using TidesDB;
 // -- ColumnFamily.UpdateRuntimeConfig(ColumnFamilyConfig config, bool persistToDisk)
 // -- ColumnFamily.Purge()
 // -- ColumnFamily.SyncWal()
+// -- Transaction.SingleDelete(ColumnFamily cf, ReadOnlySpan<byte> key)
 // -- Iterator.KeyValue()
 
 // Enums
