@@ -192,6 +192,25 @@ try (Transaction txn = db.beginTransaction()) {
 }
 ```
 
+#### Single-Delete
+
+`txn.singleDelete` writes a tombstone with the same read semantics as `txn.delete`, but carries a caller-provided promise that lets compaction drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward until it reaches the largest active level.
+
+Between any two single-deletes on the same key, and between the start of the key's history and its first single-delete, the key has been put **at most once**. The engine does not and cannot verify this at runtime; violating the contract can leave older puts visible after the single-delete and is a bug in the caller.
+
+This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key.
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+try (Transaction txn = db.beginTransaction()) {
+    txn.singleDelete(cf, "key".getBytes());
+    txn.commit();
+}
+```
+
+When in doubt, prefer `txn.delete`.
+
 #### Transaction Rollback
 
 ```java
@@ -748,7 +767,7 @@ try (TidesDB db = TidesDB.open(config)) {
 
 ### Per-CF Object Store Tuning
 
-Column family configurations include three object store tuning fields:
+Column family configurations include two object store tuning fields:
 
 ```java
 ColumnFamilyConfig cfConfig = ColumnFamilyConfig.builder()

@@ -40,7 +40,7 @@ The easiest way to add TidesDB to your project is via [crates.io](https://crates
 
 ```toml
 [dependencies]
-tidesdb = "0.6"
+tidesdb = "0.7"
 ```
 
 Or using `cargo add`:
@@ -65,14 +65,14 @@ Each crate release defaults to a specific TidesDB C library version. You can sel
 
 ```toml
 [dependencies]
-# Uses the default version (currently v9.0.6)
-tidesdb = "0.6"
+# Uses the default version (currently v9.1.0)
+tidesdb = "0.7"
 
 # Pin to a specific TidesDB version
-tidesdb = { version = "0.6", default-features = false, features = ["v9_0_5"] }
+tidesdb = { version = "0.7", default-features = false, features = ["v9_0_5"] }
 ```
 
-Only one version feature can be enabled at a time. The version feature (e.g., `v9_0_6`) maps directly to the TidesDB C library release tag (e.g., `v9.0.6`).
+Only one version feature can be enabled at a time. The version feature (e.g., `v9_1_0`) maps directly to the TidesDB C library release tag (e.g., `v9.1.0`).
 
 ### Object Store Support
 
@@ -80,7 +80,7 @@ To enable S3 object store support, enable the `objectstore` feature:
 
 ```toml
 [dependencies]
-tidesdb = { version = "0.6", features = ["objectstore"] }
+tidesdb = { version = "0.7", features = ["objectstore"] }
 ```
 
 This requires additional dependencies:
@@ -368,6 +368,41 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+#### Single-Delete
+
+`Transaction::single_delete` writes a tombstone with the same read semantics as `Transaction::delete`, but carries a caller-provided promise that lets compaction drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward until it reaches the largest active level.
+
+Between any two single-deletes on the same key, and between the start of the key's history and its first single-delete, the key has been put **at most once**. The engine does not and cannot verify this at runtime; violating the contract can leave older puts visible after the single-delete and is a bug in the caller.
+
+This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key. When in doubt, prefer `Transaction::delete`.
+
+Requires tidesdb >= 9.1.0 (the `v9_1_0` Cargo feature, enabled by default in `tidesdb` 0.7).
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+
+    let cf = db.get_column_family("my_cf")?;
+
+    let mut txn = db.begin_transaction()?;
+    txn.single_delete(&cf, b"key")?;
+    txn.commit()?;
+
+    Ok(())
+}
+```
+
+Signature:
+
+```rust
+pub fn single_delete(&self, cf: &ColumnFamily, key: &[u8]) -> Result<()>;
+```
+
+Returns `Ok(())` on success or an `Error` on failure.
 
 #### Multi-Operation Transactions
 

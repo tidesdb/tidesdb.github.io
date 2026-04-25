@@ -231,6 +231,18 @@ txn.del(cf, "key");
 txn.commit();
 ```
 
+#### Single Delete
+
+`singleDelete` emits a single-delete tombstone. When the tombstone meets exactly one prior put for the same key during compaction, both records are dropped, so the tombstone does not persist past its matching put. Use it only when the caller guarantees at most one put precedes the delete; otherwise prefer `del`.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+auto txn = db.beginTransaction();
+txn.singleDelete(cf, "key");
+txn.commit();
+```
+
 #### Multi-Operation Transactions
 
 ```cpp
@@ -1093,7 +1105,7 @@ Use `ObjectStoreConfig::defaultConfig()` for sensible defaults, then override fi
 
 ### Per-CF Object Store Tuning
 
-Column family configurations include three object store tuning fields.
+Column family configurations include two object store tuning fields.
 
 - `objectLazyCompaction` · 1 to compact less aggressively for remote storage (default: 0)
 - `objectPrefetchCompaction` · 1 to download all inputs before compaction merge (default: 1)

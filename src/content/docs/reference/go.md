@@ -408,6 +408,39 @@ if err != nil {
 }
 ```
 
+#### Single-Delete
+
+`SingleDelete` writes a tombstone with the same read semantics as `Delete`, but carries a caller-provided promise that lets compaction drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward until it reaches the largest active level.
+
+Between any two single-deletes on the same key, and between the start of the key's history and its first single-delete, the key has been put **at most once**. The engine does not and cannot verify this at runtime; violating the contract can leave older puts visible after the single-delete and is a bug in the caller.
+
+This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+txn, err := db.BeginTxn()
+if err != nil {
+    log.Fatal(err)
+}
+defer txn.Free()
+
+err = txn.SingleDelete(cf, []byte("key"))
+if err != nil {
+    log.Fatal(err)
+}
+
+err = txn.Commit()
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+Returns `nil` on success or a non-nil error on failure. When in doubt, prefer `Delete`.
+
 #### Multi-Operation Transactions
 
 ```go
@@ -1807,4 +1840,7 @@ go test -v -run TestCfConfigIni
 
 # Run error code readonly test
 go test -v -run TestErrorCodeReadonly
+
+# Run single-delete transaction test
+go test -v -run TestTransactionSingleDelete
 ```
