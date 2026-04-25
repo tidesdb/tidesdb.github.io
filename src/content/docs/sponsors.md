@@ -143,8 +143,8 @@ Interested in supporting TidesDB development?  We'd love to have you as a sponso
 
 <!-- sponsors -->
 <ul class="sponsors-list">
-<li>Bruno Schaatsbergen</li>
-<li><a href="https://inferal.com/">Yurii Rashkovskii (Inferal)</a></li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://www.bschaatsbergen.com/">Bruno Schaatsbergen</a></li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://inferal.com/">Yurii Rashkovskii (Inferal)</a></li>
 <li>Your name here</li>
 <li>..</li>
 </ul>
