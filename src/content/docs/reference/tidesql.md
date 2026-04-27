@@ -405,6 +405,66 @@ Leave it OFF for any session that may issue `UPDATE` on a non-PK column, `REPLAC
 The larger the tombstone backlog at the scan head of your DELETE statements, the more the single-delete pair-cancellation helps. On iibench-shaped insert-then-delete workloads, with three secondary indexes, turning both automatic secondary-index SD and the primary-CF session variable together typically cuts the `max_d` sawtooth peak by 60 to 95 percent, depending on how long deletes have been running against the same key range without compaction catching up. On workloads with no DELETE, no benefit -- and no risk either, since the secondary-index path only changes behaviour on DELETE and UPDATE.
 
 
+## Tombstone Density Trigger
+
+Single-delete + pair-cancellation handles INSERT+DELETE workloads where the contract holds. For everything else (UPDATEs of indexed columns, REPLACE INTO on tables without secondary indexes, mixed read-write OLTP) tombstones still accumulate inside SSTables until a compaction at the largest level reclaims them. Reads over a deleted region pay for every tombstone the merge iterator has to skip, and a column family with infrequent natural compactions can accumulate enough tombstones to seriously degrade range-scan latency.
+
+The library's tombstone-density trigger lets the engine notice and act on this state without waiting for capacity-based or file-count-based triggers. After every flush, the engine inspects level-1 SSTables and asks whether any single SSTable's tombstone count divided by entry count exceeds a configurable ratio while having at least a configurable minimum entry count. A single witness is enough to escalate compaction.
+
+TideSQL exposes the trigger as two per-table options that map onto the underlying column family's `tombstone_density_trigger` and `tombstone_density_min_entries` settings:
+
+```sql
+CREATE TABLE events (
+  id    BIGINT PRIMARY KEY,
+  ts    DATETIME,
+  body  TEXT,
+  KEY (ts)
+) ENGINE=TIDESDB
+  TOMBSTONE_DENSITY_TRIGGER=5000      -- 50% (parts per 10000)
+  TOMBSTONE_DENSITY_MIN_ENTRIES=2048;
+```
+
+`TOMBSTONE_DENSITY_TRIGGER` is in parts per 10000, where `5000` means 0.50. A value of `0` (the default) disables the check and preserves the previous structural-trigger-only behavior. `TOMBSTONE_DENSITY_MIN_ENTRIES` (default `1024`) is a floor that prevents a single-entry SSTable that happens to be a tombstone from noisily firing compaction.
+
+Both options are also surfaced as session defaults so a deployment can switch the policy globally without touching every CREATE TABLE statement:
+
+```sql
+SET GLOBAL tidesdb_default_tombstone_density_trigger = 5000;
+SET GLOBAL tidesdb_default_tombstone_density_min_entries = 2048;
+```
+
+`ALTER TABLE ... TOMBSTONE_DENSITY_TRIGGER=N` updates the live column family configuration via `tidesdb_cf_update_runtime_config`, so the new ratio takes effect on the next post-flush check without requiring a restart.
+
+The aggregates surface in monitoring as four global status variables which read from a once-per-refresh CF-list walk so the cost is paid by the monitoring caller, not the write path:
+
+| Variable | Meaning |
+|----------|---------|
+| `Tidesdb_total_tombstones` | Sum of tombstone entries across every CF |
+| `Tidesdb_tombstone_ratio` | Database-wide tombstone count divided by entry count (0.0 to 1.0) |
+| `Tidesdb_max_sst_tombstone_density` | Worst single-SSTable tombstone density observed |
+| `Tidesdb_max_sst_tombstone_density_level` | LSM level (1-based) where the worst SSTable lives |
+
+`SHOW ENGINE TIDESDB STATUS` includes a `--- Tombstones ---` block with the same four numbers in human-readable form.
+
+## Auto Compact After Range Delete
+
+Bulk operations such as sliding-window expiry, tenant eviction, and time-bucketed log rotation share a shape: a multi-row DELETE over a known primary-key range followed by a wait for compaction to physically reclaim the tombstoned space. The tombstone-density trigger handles this eventually, but a caller that already knows the range can skip the wait by asking the engine to compact that range synchronously at end-of-statement.
+
+The session variable `tidesdb_compact_after_range_delete_min_rows` enables this:
+
+```sql
+SET SESSION tidesdb_compact_after_range_delete_min_rows = 100000;
+DELETE FROM events WHERE ts < NOW() - INTERVAL 30 DAY;
+-- end_bulk_delete fires tidesdb_compact_range over the touched PK range
+```
+
+The default is `0`, which disables the feature. A non-zero value is both an opt-in and a row-count threshold: only DELETE statements that touch at least that many rows trigger the synchronous compaction, so a one-row primary-key DELETE never pays the cost. The plugin tracks the comparable minimum and maximum primary-key bytes seen during the statement (no additional locking, no scan, just two `std::string` swaps per `delete_row` call) and on `end_bulk_delete` calls `tidesdb_compact_range` over the observed range on the table's primary CF.
+
+Secondary index tombstones are not directly compacted by this feature, since their key shape is `(col_values, pk)` rather than just the PK and a PK range does not bound a secondary-index range. Secondary-index tombstones are reclaimed by the per-CF tombstone density trigger above instead, which is the natural division of labor.
+
+The compaction is synchronous and runs on the caller's thread, so the trade-off is that the DELETE statement returns only after the compaction commits. The threshold should be set high enough that the synchronous compaction time is small relative to the DELETE work that triggered it. Typical values are 10000 to 1000000 depending on row size and disk throughput.
+
+
 ## Table Options
 
 TidesDB exposes a rich set of per-table options that control the underlying column family's behavior. These are specified as table-level options in `CREATE TABLE` and are baked into the column family at creation time. They appear in `SHOW CREATE TABLE` output.
@@ -573,6 +633,23 @@ CREATE TABLE remote_logs (
 ```
 
 `OBJECT_LAZY_COMPACTION` (default 0) doubles the L1 file count compaction trigger when enabled, reducing the frequency of compaction and thus remote I/O at the cost of higher read amplification. `OBJECT_PREFETCH_COMPACTION` (default 1) downloads all input SSTables in parallel before the compaction merge begins, using bounded threads. When disabled, input SSTables are downloaded on demand during merge source creation one at a time. These options are persisted to the column family config and have corresponding session-level defaults `tidesdb_default_object_lazy_compaction` and `tidesdb_default_object_prefetch_compaction`. In non-object-store deployments, these options have no effect.
+
+### Tombstone Density
+
+Two per-table options arm the post-flush tombstone-density compaction trigger described under [Tombstone Density Trigger](#tombstone-density-trigger):
+
+```sql
+CREATE TABLE events (
+  id    BIGINT PRIMARY KEY,
+  ts    DATETIME,
+  body  TEXT,
+  KEY (ts)
+) ENGINE=TIDESDB
+  TOMBSTONE_DENSITY_TRIGGER=5000      -- 50%, parts per 10000
+  TOMBSTONE_DENSITY_MIN_ENTRIES=2048;
+```
+
+`TOMBSTONE_DENSITY_TRIGGER` is in parts per 10000, where `5000` means 0.50. Default `0` disables the check. `TOMBSTONE_DENSITY_MIN_ENTRIES` (default `1024`) is a floor on the SSTable entry count before the density check considers it. Both options are session-defaultable via `tidesdb_default_tombstone_density_trigger` and `tidesdb_default_tombstone_density_min_entries`. ALTER TABLE updates the runtime CF config so changes take effect on the next post-flush check.
 
 ### Combining Multiple Options
 
@@ -1226,6 +1303,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_ttl` | 0 | Per-session TTL in seconds applied to INSERT/UPDATE; 0 means use the table-level default. Can be set with `SET SESSION` or `SET STATEMENT` |
 | `tidesdb_skip_unique_check` | OFF | Skip uniqueness checks on primary key and unique secondary indexes during INSERT. Only safe when the application guarantees no duplicates (e.g., bulk loads with monotonic PKs) |
 | `tidesdb_single_delete_primary` | OFF | Use single-delete semantics on the primary row CF for this session's DELETEs. See [Single-Delete Optimization](#single-delete-optimization) |
+| `tidesdb_compact_after_range_delete_min_rows` | 0 | If non-zero, after a multi-row DELETE that touches at least this many rows, the engine calls `tidesdb_compact_range` over the touched primary-key range to physically reclaim tombstoned space synchronously. See [Auto Compact After Range Delete](#auto-compact-after-range-delete) |
 | `tidesdb_default_compression` | LZ4 | Default compression algorithm (NONE, SNAPPY, LZ4, ZSTD, LZ4_FAST) |
 | `tidesdb_default_write_buffer_size` | 128 MB | Default write buffer size in bytes |
 | `tidesdb_default_bloom_filter` | ON | Default bloom filter setting |
@@ -1248,6 +1326,8 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_default_isolation_level` | REPEATABLE_READ | Default isolation level |
 | `tidesdb_default_object_lazy_compaction` | OFF | Double L1 compaction trigger in object store mode |
 | `tidesdb_default_object_prefetch_compaction` | ON | Prefetch input SSTables before compaction merge |
+| `tidesdb_default_tombstone_density_trigger` | 0 | Default tombstone-density compaction trigger ratio for new tables, in parts per 10000 (5000 = 0.50). Default 0 disables the check |
+| `tidesdb_default_tombstone_density_min_entries` | 1024 | Minimum entry count for an SSTable to be considered by the tombstone-density trigger; smaller SSTables are ignored |
 
 Every table option has a corresponding `tidesdb_default_*` session variable. When `CREATE TABLE` does not explicitly set an option, the session (or global) default is used. Table-level options in `CREATE TABLE` override the default. This design mirrors InnoDB's approach of having global defaults that individual tables can override, and makes it straightforward to configure all tables uniformly for benchmarking or deployment without repeating options in every DDL statement:
 

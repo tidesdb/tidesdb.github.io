@@ -208,6 +208,7 @@ tidesdb_config_t config = {
     .unified_memtable_skip_list_probability = 0,  /* Skip list probability for unified memtable (default: 0 = 0.25) */
     .unified_memtable_sync_mode = 0,              /* Sync mode for unified WAL (default: 0 = TDB_SYNC_NONE) */
     .unified_memtable_sync_interval_us = 0,       /* Sync interval for unified WAL in microseconds (default: 0) */
+    .max_concurrent_flushes = 4,                  /* Global cap on in-flight memtable flushes (default: 4, 0 = use TDB_DEFAULT_MAX_CONCURRENT_FLUSHES) */
 };
 
 tidesdb_t *db = NULL;
@@ -423,6 +424,8 @@ tidesdb_column_family_config_t cf_config = {
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
     .l1_file_count_trigger = 4,                               /* L1 file count trigger for compaction (default: 4) */
     .l0_queue_stall_threshold = 20,                           /* L0 queue stall threshold (default: 20) */
+    .tombstone_density_trigger = 0.0,                         /* Tombstone ratio above which compaction escalates (default: 0.0 = disabled, range 0.0 to 1.0) */
+    .tombstone_density_min_entries = 1024,                    /* Minimum entry count for an SSTable to be considered by the density trigger (default: 1024) */
     .use_btree = 0                                            /* Use B+tree format for klog (default: 0 = block-based) */
 };
 
@@ -611,6 +614,16 @@ if (tidesdb_get_stats(cf, &stats) == 0)
         printf("B+tree Max Height: %u\n", stats->btree_max_height);
         printf("B+tree Avg Height: %.2f\n", stats->btree_avg_height);
     }
+
+    /* Tombstone density observability */
+    printf("Total Tombstones: %" PRIu64 "\n", stats->total_tombstones);
+    printf("Tombstone Ratio: %.2f%%\n", stats->tombstone_ratio * 100.0);
+    printf("Worst SSTable Density: %.2f%% at level %d\n",
+           stats->max_sst_density * 100.0, stats->max_sst_density_level + 1);
+    for (int i = 0; i < stats->num_levels; i++)
+    {
+        printf("Level %d tombstones: %" PRIu64 "\n", i + 1, stats->level_tombstone_counts[i]);
+    }
     
     /* Access configuration */
     printf("Write Buffer Size: %zu\n", stats->config->write_buffer_size);
@@ -641,6 +654,11 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 | `btree_total_nodes` | `uint64_t` | Total B+tree nodes across all SSTables |
 | `btree_max_height` | `uint32_t` | Maximum tree height across all SSTables |
 | `btree_avg_height` | `double` | Average tree height across all SSTables |
+| `total_tombstones` | `uint64_t` | Total tombstones across all SSTables |
+| `tombstone_ratio` | `double` | Database-wide tombstone count divided by entry count (0.0 to 1.0) |
+| `level_tombstone_counts` | `uint64_t*` | Per-level tombstone counts |
+| `max_sst_density` | `double` | Worst single-SSTable tombstone density seen |
+| `max_sst_density_level` | `int` | Level index where the worst SSTable lives |
 
 :::tip[B+tree Statistics]
 The B+tree stats (`btree_total_nodes`, `btree_max_height`, `btree_avg_height`) are only populated when `use_btree=1` in the column family configuration. These provide insight into the index structure overhead and lookup depth.
@@ -1944,6 +1962,45 @@ if (tidesdb_compact(cf) != 0)
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on compaction algorithms, merge strategies, and parallel compaction.
 
+### Targeted Range Compaction
+
+`tidesdb_compact_range` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+const uint8_t start[] = "tenant_42:";
+const uint8_t end[]   = "tenant_42;";
+
+if (tidesdb_compact_range(cf, start, sizeof(start) - 1, end, sizeof(end) - 1) != 0)
+{
+    fprintf(stderr, "Targeted compaction failed\n");
+    return -1;
+}
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `tidesdb_txn_put` followed by `tidesdb_txn_delete`
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous, blocks the caller until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool, the calling thread does the work
+- Selects only SSTables whose key range overlaps the requested range using the column family's comparator, SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Return values**
+
+- `TDB_SUCCESS` on success
+- `TDB_ERR_INVALID_ARGS` if `cf` or either key pointer is NULL, or sizes are zero
+- Standard I/O and memory error codes if the merge cannot complete
+
 ### Purge Column Family
 
 `tidesdb_purge_cf` forces a synchronous flush and aggressive compaction for a single column family. Unlike `tidesdb_flush_memtable` and `tidesdb_compact` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
@@ -2012,12 +2069,13 @@ TidesDB uses separate thread pools for flush and compaction operations. Understa
 
 **Parallelism semantics**
 - Cross-CF parallelism · Multiple flush/compaction workers CAN process different column families in parallel
-- Within-CF serialization · A single column family can only have one flush and one compaction running at any time (enforced by atomic `is_flushing` and `is_compacting` flags)
-- No intra-CF memtable parallelism · Even if a CF has multiple immutable memtables queued, they are flushed sequentially
+- Intra-CF flush parallelism · A single column family can have multiple memtables flushing concurrently up to the global `max_concurrent_flushes` cap, so a hot CF drains its immutable queue at the speed of the worker pool rather than serially
+- Within-CF compaction serialization · Compaction is still one-per-CF (enforced by the atomic `is_compacting` flag) so level invariants and manifest ordering stay consistent
+- Global flush semaphore · `max_concurrent_flushes` (default 4) caps total in-flight flushes across all CFs combined, so deployments with many column families bound transient memory and queue depth
 
 **Thread pool sizing guidance**
-- Single column family · Set `num_flush_threads = 1` and `num_compaction_threads = 1`. Additional threads provide no benefit since only one operation per CF can run at a time -- extra threads will simply wait idle.
-- Multiple column families · Set thread counts up to the number of column families for maximum parallelism. With N column families and M workers (where M ≤ N), throughput scales linearly.
+- Single column family with sustained write pressure · Increase `num_flush_threads` toward `max_concurrent_flushes` to drain the immutable queue faster, since multiple flushes per CF are now allowed
+- Multiple column families · Set flush thread counts up to `min(num_cfs, max_concurrent_flushes)` and compaction thread counts up to the number of column families for maximum parallelism
 
 **Configuration**
 ```c
@@ -2025,6 +2083,7 @@ tidesdb_config_t config = {
     .db_path = "./mydb",
     .num_flush_threads = 2,                /* Flush thread pool size (default: 2) */
     .num_compaction_threads = 2,           /* Compaction thread pool size (default: 2) */
+    .max_concurrent_flushes = 4,           /* Global cap on in-flight flushes (default: 4) */
     .log_level = TDB_LOG_INFO,
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
     .max_open_sstables = 256,              /* LRU cache for SSTable objects (default: 256, each has 2 FDs) */

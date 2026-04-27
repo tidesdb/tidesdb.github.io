@@ -636,7 +636,7 @@ All parameters are configurable via `-D` system properties:
 | `benchmark.compaction.batches` | 5 | Number of batches for compaction pressure test |
 | `benchmark.range.data` | 50000 | Data size for range scan benchmark |
 | `benchmark.range.sizes` | 10,100,1000,5000,10000 | Comma-separated range sizes |
-| `benchmark.mixed.ratio` | 50 | Read percentage for mixed workload (0–100) |
+| `benchmark.mixed.ratio` | 50 | Read percentage for mixed workload (0-100) |
 | `benchmark.seed` | 42 | Random seed for reproducibility |
 | `benchmark.percentiles` | true | Enable per-operation latency percentile tracking |
 

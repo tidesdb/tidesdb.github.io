@@ -40,7 +40,7 @@ I ran the benchmarks using `tidesdb_rocksdb.sh` within the <a href="https://gith
 **Gains from v7.4.3**
 ![Gains from v7.4.3](/tidesdb-v7-4-4-rocksdb-v10-9-1/fig1.png)
 
-Overall, v7.4.4 delivers consistent and often substantial performance gains across the majority of workloads. Many read-, seek-, and range-oriented workloads show improvements in the 1.2x–1.6x range, with the largest gains exceeding 2.3x.
+Overall, v7.4.4 delivers consistent and often substantial performance gains across the majority of workloads. Many read-, seek-, and range-oriented workloads show improvements in the 1.2x-1.6x range, with the largest gains exceeding 2.3x.
 
 
 ## TidesDB v7.4.4 & RocksDB v10.9.1 Comparisons
