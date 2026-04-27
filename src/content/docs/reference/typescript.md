@@ -94,6 +94,7 @@ const db = TidesDB.open({
   unifiedMemtableSkipListProbability: 0,  // Skip list probability (0 = default 0.25)
   unifiedMemtableSyncMode: SyncMode.None, // Sync mode for unified WAL
   unifiedMemtableSyncIntervalUs: 0,       // Sync interval for unified WAL (0 = default)
+  maxConcurrentFlushes: 0,                // Cap on in-flight memtable flushes across all CFs (0 = library default)
   objectStoreFsPath: '/path/to/store',    // Enable object store mode (FS connector)
   objectStoreConfig: { ... },             // Object store behavior config (optional)
 });
@@ -102,6 +103,14 @@ console.log('Database opened successfully');
 
 db.close();
 ```
+
+:::note[maxConcurrentFlushes]
+`maxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
+
+:::note[Default Configuration]
+`defaultConfig()` returns values sourced from the underlying C library, so settings such as `maxConcurrentFlushes` and the unified-memtable defaults track the engine automatically. If you previously relied on the binding's hardcoded defaults (`numFlushThreads: 2`, `numCompactionThreads: 2`, `blockCacheSize: 64MB`, `maxOpenSSTables: 256`), re-test after upgrading -- the library may have evolved past those constants.
+:::
 
 ### Creating and Dropping Column Families
 
@@ -129,7 +138,9 @@ db.createColumnFamily('my_cf', {
   syncMode: SyncMode.Interval,
   syncIntervalUs: 128000,
   defaultIsolationLevel: IsolationLevel.ReadCommitted,
-  useBtree: false,  // Use B+tree format for klog (default: false = block-based)
+  tombstoneDensityTrigger: 0.0,    // Per-SSTable tombstone density above which compaction escalates (0.0 = disabled, range 0.0 to 1.0)
+  tombstoneDensityMinEntries: 1024, // Minimum entry count for an SSTable to be considered by the density trigger
+  useBtree: false,                 // Use B+tree format for klog (default: false = block-based)
 });
 
 db.dropColumnFamily('my_cf');
@@ -408,7 +419,7 @@ console.log(`Read Amplification: ${stats.readAmp}`);
 console.log(`Cache Hit Rate: ${stats.hitRate}`);
 
 for (let i = 0; i < stats.numLevels; i++) {
-  console.log(`Level ${i + 1}: ${stats.levelNumSSTables[i]} SSTables, ${stats.levelSizes[i]} bytes, ${stats.levelKeyCounts[i]} keys`);
+  console.log(`Level ${i + 1}: ${stats.levelNumSSTables[i]} SSTables, ${stats.levelSizes[i]} bytes, ${stats.levelKeyCounts[i]} keys, ${stats.levelTombstoneCounts[i]} tombstones`);
 }
 
 if (stats.useBtree) {
@@ -417,13 +428,32 @@ if (stats.useBtree) {
   console.log(`B+tree Avg Height: ${stats.btreeAvgHeight}`);
 }
 
+console.log(`Total Tombstones: ${stats.totalTombstones}`);
+console.log(`Tombstone Ratio: ${(stats.tombstoneRatio * 100).toFixed(2)}%`);
+console.log(`Worst Per-SSTable Density: ${(stats.maxSstDensity * 100).toFixed(2)}%`);
+if (stats.maxSstDensityLevel > 0) {
+  console.log(`Worst-density level: ${stats.maxSstDensityLevel}`); // 1-based
+}
+
 if (stats.config) {
   console.log(`Write Buffer Size: ${stats.config.writeBufferSize}`);
   console.log(`Compression: ${stats.config.compressionAlgorithm}`);
   console.log(`Bloom Filter: ${stats.config.enableBloomFilter}`);
   console.log(`Sync Mode: ${stats.config.syncMode}`);
+  console.log(`Tombstone Density Trigger: ${stats.config.tombstoneDensityTrigger}`);
+  console.log(`Tombstone Density Min Entries: ${stats.config.tombstoneDensityMinEntries}`);
 }
 ```
+
+**Tombstone observability fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `totalTombstones` | `number` | Sum of tombstone counts across every SSTable in the column family |
+| `tombstoneRatio` | `number` | `totalTombstones / totalKeys` (0.0 if `totalKeys == 0`); range `[0.0, 1.0]` |
+| `levelTombstoneCounts` | `number[]` | Per-level tombstone counts; parallels `levelKeyCounts`, length equals `numLevels` |
+| `maxSstDensity` | `number` | Worst per-SSTable tombstone density observed in the column family; range `[0.0, 1.0]` |
+| `maxSstDensityLevel` | `number` | 1-based level index where `maxSstDensity` was observed (`0` if no SSTables) |
 
 ### Listing Column Families
 
@@ -523,6 +553,45 @@ const cf = db.getColumnFamily('my_cf');
 
 cf.compact();
 ```
+
+#### Targeted Range Compaction
+
+`compactRange` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+const start = Buffer.from('tenant_42:');
+const end = Buffer.from('tenant_42;');
+
+cf.compactRange(start, end);
+
+// Pass null for an unbounded endpoint on that side
+cf.compactRange(null, Buffer.from('cutoff_key'));
+cf.compactRange(Buffer.from('start_key'), null);
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `put` followed by `delete`
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous; blocks the calling thread until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool -- the calling thread does the work itself
+- Selects only SSTables whose key range overlaps the requested range using the column family's comparator; SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Return values**
+
+- Returns normally on success
+- Throws `TidesDBError` with `ErrorCode.ErrInvalidArgs` if both endpoints are `null`/empty (use `compact()` for full CF compaction)
+- Throws `TidesDBError` with `ErrorCode.ErrLocked` if another compaction is running for the column family
+- Throws `TidesDBError` with standard I/O or memory error codes if the merge cannot complete
 
 #### Manual Memtable Flush
 

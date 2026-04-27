@@ -65,14 +65,14 @@ Each crate release defaults to a specific TidesDB C library version. You can sel
 
 ```toml
 [dependencies]
-# Uses the default version (currently v9.1.0)
-tidesdb = "0.7"
+# Uses the default version (currently v9.2.0)
+tidesdb = "0.8"
 
 # Pin to a specific TidesDB version
-tidesdb = { version = "0.7", default-features = false, features = ["v9_0_5"] }
+tidesdb = { version = "0.8", default-features = false, features = ["v9_0_5"] }
 ```
 
-Only one version feature can be enabled at a time. The version feature (e.g., `v9_1_0`) maps directly to the TidesDB C library release tag (e.g., `v9.1.0`).
+Only one version feature should be enabled at a time. The version feature (e.g., `v9_2_0`) maps directly to the TidesDB C library release tag (e.g., `v9.2.0`); when multiple are enabled (such as via dependency unification), the highest version is selected.
 
 ### Object Store Support
 
@@ -201,7 +201,8 @@ fn main() -> tidesdb::Result<()> {
         .log_truncation_at(24 * 1024 * 1024)   // Log file truncation threshold (24MB)
         .unified_memtable(false)               // Enable unified memtable mode (default: false)
         .unified_memtable_write_buffer_size(0) // 0 = auto
-        .unified_memtable_sync_mode(SyncMode::None);
+        .unified_memtable_sync_mode(SyncMode::None)
+        .max_concurrent_flushes(0);            // Cap on in-flight memtable flushes across all CFs (0 = library default)
 
     let db = TidesDB::open(config)?;
 
@@ -210,6 +211,12 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+`Config::default()` (and therefore `Config::new()`) now mirrors the library's defaults rather than carrying duplicate constants in Rust, so values such as `max_concurrent_flushes` and the unified-memtable settings track the engine's defaults automatically. If you previously relied on the binding's hardcoded defaults (e.g. `block_cache_size = 64 MiB`), re-test with the library defaults or set the values explicitly.
+
+:::note[max_concurrent_flushes]
+`max_concurrent_flushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
 
 ### Creating and Dropping Column Families
 
@@ -235,7 +242,9 @@ fn main() -> tidesdb::Result<()> {
         .sync_mode(SyncMode::Interval)
         .sync_interval_us(128000)
         .default_isolation_level(IsolationLevel::ReadCommitted)
-        .use_btree(false); // Use block-based format (default)
+        .tombstone_density_trigger(0.5)         // Per-SSTable tombstone ratio that escalates compaction priority (0.0 = disabled)
+        .tombstone_density_min_entries(1024)    // Minimum entry count for an SSTable to be considered by the density trigger
+        .use_btree(false);                      // Use block-based format (default)
 
     db.create_column_family("custom_cf", cf_config)?;
 
@@ -701,6 +710,15 @@ fn main() -> tidesdb::Result<()> {
         println!("B+tree Avg Height: {:.2}", stats.btree_avg_height);
     }
 
+    // Tombstone stats
+    println!("Total Tombstones: {}", stats.total_tombstones);
+    println!("Tombstone Ratio: {:.2}%", stats.tombstone_ratio * 100.0);
+    println!("Worst SSTable Density: {:.2}% (level {})",
+        stats.max_sst_density * 100.0, stats.max_sst_density_level);
+    for (i, count) in stats.level_tombstone_counts.iter().enumerate() {
+        println!("Level {} tombstones: {}", i + 1, count);
+    }
+
     Ok(())
 }
 ```
@@ -725,6 +743,11 @@ fn main() -> tidesdb::Result<()> {
 | `btree_total_nodes` | `u64` | Total B+tree nodes across all SSTables |
 | `btree_max_height` | `u32` | Maximum tree height across all SSTables |
 | `btree_avg_height` | `f64` | Average tree height across all SSTables |
+| `total_tombstones` | `u64` | Sum of `tombstone_count` across every SSTable in the CF |
+| `tombstone_ratio` | `f64` | `total_tombstones / total_keys` (0.0 if `total_keys == 0`) |
+| `level_tombstone_counts` | `Vec<u64>` | Per-level tombstone counts (parallels `level_key_counts`) |
+| `max_sst_density` | `f64` | Worst per-SSTable tombstone density observed in the CF |
+| `max_sst_density_level` | `i32` | 1-based level where `max_sst_density` was observed (0 if none) |
 
 ### Getting Cache Statistics
 
@@ -975,6 +998,48 @@ fn main() -> tidesdb::Result<()> {
     Ok(())
 }
 ```
+
+#### Targeted Range Compaction
+
+`ColumnFamily::compact_range` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```rust
+use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
+
+fn main() -> tidesdb::Result<()> {
+    let db = TidesDB::open(Config::new("./mydb"))?;
+    db.create_column_family("my_cf", ColumnFamilyConfig::default())?;
+    let cf = db.get_column_family("my_cf")?;
+
+    // Compact only SSTables whose key range overlaps [b"user:000", b"user:100").
+    cf.compact_range(Some(b"user:000"), Some(b"user:100"))?;
+
+    // Pass `None` for an unbounded endpoint.
+    cf.compact_range(None, Some(b"user:050"))?;
+
+    Ok(())
+}
+```
+
+**When to use**
+
+- After a bulk delete or backfill scoped to a known key range, to reclaim space without scheduling a full-CF compaction.
+- To pre-warm or reshape a hot range before an expected read burst.
+- To bound the worst-case I/O of an opportunistic maintenance pass; the merge is restricted to overlapping SSTables.
+
+**Behavior**
+
+- Synchronous: blocks the calling thread until the merge commits or fails. It does *not* enqueue work onto the compaction thread pool, so it is safe to call from a maintenance worker without contending with background compactions.
+- Endpoints are interpreted as `[start_key, end_key)`. `None` means unbounded on that side. Empty slices (`Some(&[])`) are treated as `None`.
+- Both endpoints `None` (or both empty) is rejected with `ErrorCode::InvalidArgs` -- callers wanting to compact the whole column family must use [`ColumnFamily::compact`](#manual-compaction) instead.
+- Concurrent calls return `ErrorCode::Locked` if another compaction is already running on the column family.
+
+**Return values**
+
+- `Ok(())` -- the targeted range was compacted.
+- `Err(ErrorCode::InvalidArgs)` -- both endpoints were `None`/empty.
+- `Err(ErrorCode::Locked)` -- another compaction is already running.
+- Standard I/O / memory error codes for failures during the merge.
 
 #### Manual Memtable Flush
 
@@ -1735,6 +1800,7 @@ All available `Config` builder methods:
 | `unified_memtable_sync_interval_us(interval)` | `u64` | 0 | Sync interval for unified WAL in microseconds |
 | `object_store_fs(root_dir)` | `&str` | None | Enable object store with filesystem connector at `root_dir` |
 | `object_store_config(config)` | `ObjectStoreConfig` | None | Object store behavior configuration (see Object Store Configuration Reference) |
+| `max_concurrent_flushes(n)` | `i32` | library default | Global cap on in-flight memtable flushes across all CFs (0 = library default) |
 
 ## Column Family Configuration Reference
 
@@ -1762,6 +1828,8 @@ All available `ColumnFamilyConfig` builder methods:
 | `min_disk_space(space)` | `u64` | 100MB | Minimum disk space required |
 | `l1_file_count_trigger(trigger)` | `i32` | 4 | L1 file count trigger for compaction |
 | `l0_queue_stall_threshold(threshold)` | `i32` | 20 | L0 queue stall threshold |
+| `tombstone_density_trigger(ratio)` | `f64` | 0.0 | Per-SSTable tombstone density above which compaction priority escalates (range `[0.0, 1.0]`; `0.0` = disabled) |
+| `tombstone_density_min_entries(n)` | `u64` | 1024 | Minimum entry count for an SSTable to be considered by the density trigger (prevents tiny-sstable noise) |
 | `use_btree(enable)` | `bool` | false | Use B+tree format for klog |
 | `object_lazy_compaction(enable)` | `bool` | false | Compact less aggressively in object store mode |
 | `object_prefetch_compaction(enable)` | `bool` | true | Download all inputs before merge in object store mode |

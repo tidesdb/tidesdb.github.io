@@ -61,6 +61,7 @@ int main() {
     config.unifiedMemtableSkipListProbability = 0;            // Skip list probability (0 = default 0.25)
     config.unifiedMemtableSyncMode = tidesdb::SyncMode::None; // Sync mode for unified WAL
     config.unifiedMemtableSyncIntervalUs = 0;                 // Sync interval for unified WAL in microseconds
+    config.maxConcurrentFlushes = 0;                          // Cap on in-flight memtable flushes across all CFs (0 = library default)
     config.objectStore = nullptr;                             // Pluggable object store connector (nullptr = local only)
     config.objectStoreConfig = std::nullopt;                  // Object store behavior config (nullopt = defaults)
 
@@ -78,7 +79,7 @@ int main() {
 
 **Using default configuration**
 
-Use `TidesDB::defaultConfig()` to get a configuration with sensible defaults, then override specific fields as needed:
+Use `TidesDB::defaultConfig()` to get a configuration with sensible defaults, then override specific fields as needed. The defaults are pulled from the underlying C library, so values such as `maxConcurrentFlushes` and the unified-memtable settings track the engine's defaults automatically -- if you previously hardcoded these values when overriding fields, re-test after upgrading.
 
 ```cpp
 auto config = tidesdb::TidesDB::defaultConfig();
@@ -87,6 +88,10 @@ config.logLevel = tidesdb::LogLevel::Warn;  // Override: only warnings and error
 
 tidesdb::TidesDB db(config);
 ```
+
+:::note[maxConcurrentFlushes]
+`maxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
 
 ### Logging
 
@@ -159,6 +164,8 @@ cfConfig.enableBlockIndexes = true;
 cfConfig.syncMode = tidesdb::SyncMode::Interval;
 cfConfig.syncIntervalUs = 128000;
 cfConfig.defaultIsolationLevel = tidesdb::IsolationLevel::ReadCommitted;
+cfConfig.tombstoneDensityTrigger = 0.0;     // Per-SSTable tombstone density above which compaction escalates (0.0 = disabled, range 0.0 to 1.0)
+cfConfig.tombstoneDensityMinEntries = 1024; // Minimum entry count for an SSTable to be considered by the density trigger
 cfConfig.useBtree = false;  // Use block-based format (default), set true for B+tree klog format
 
 db.createColumnFamily("my_cf", cfConfig);
@@ -425,12 +432,21 @@ if (stats.useBtree) {
     std::cout << "B+tree Avg Height: " << stats.btreeAvgHeight << std::endl;
 }
 
+// Tombstone density observability
+std::cout << "Total Tombstones: " << stats.totalTombstones << std::endl;
+std::cout << "Tombstone Ratio: " << (stats.tombstoneRatio * 100.0) << "%" << std::endl;
+std::cout << "Max SSTable Density: " << stats.maxSstDensity << std::endl;
+if (stats.maxSstDensityLevel != 0) {
+    std::cout << "Max SSTable Density Level: " << stats.maxSstDensityLevel << std::endl;
+}
+
 // Per-level statistics
 for (int i = 0; i < stats.numLevels; ++i) {
-    std::cout << "Level " << i << ": "
+    std::cout << "Level " << (i + 1) << ": "
               << stats.levelNumSSTables[i] << " SSTables, "
               << stats.levelSizes[i] << " bytes, "
-              << stats.levelKeyCounts[i] << " keys" << std::endl;
+              << stats.levelKeyCounts[i] << " keys, "
+              << stats.levelTombstoneCounts[i] << " tombstones" << std::endl;
 }
 
 if (stats.config.has_value()) {
@@ -456,6 +472,11 @@ if (stats.config.has_value()) {
 - `btreeTotalNodes` · Total B+tree nodes across all SSTables (only if `useBtree=true`)
 - `btreeMaxHeight` · Maximum tree height across all SSTables (only if `useBtree=true`)
 - `btreeAvgHeight` · Average tree height across all SSTables (only if `useBtree=true`)
+- `totalTombstones` · Sum of tombstone counts across all SSTables in the column family
+- `tombstoneRatio` · `totalTombstones / totalKeys` (0.0 to 1.0, 0.0 if `totalKeys` is 0)
+- `levelTombstoneCounts` · Per-level tombstone counts (parallels `levelKeyCounts`)
+- `maxSstDensity` · Worst per-SSTable tombstone density observed in the CF (0.0 to 1.0)
+- `maxSstDensityLevel` · 1-based level index where `maxSstDensity` was observed (0 if none)
 - `config` · Column family configuration (optional)
 
 ### Database-Level Statistics
@@ -592,6 +613,62 @@ auto cf = db.getColumnFamily("my_cf");
 
 cf.compact();
 ```
+
+#### Targeted Range Compaction
+
+`compactRange` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```cpp
+auto cf = db.getColumnFamily("my_cf");
+
+std::vector<std::uint8_t> start{'t','e','n','a','n','t','_','4','2',':'};
+std::vector<std::uint8_t> end{'t','e','n','a','n','t','_','4','2',';'};
+
+cf.compactRange(start, end);
+```
+
+Pass `std::nullopt` for either endpoint to leave that side unbounded:
+
+```cpp
+using OptKey = std::optional<std::vector<std::uint8_t>>;
+
+// Compact everything from `start` upward
+cf.compactRange(OptKey{start}, OptKey{});
+
+// Compact everything below `end`
+cf.compactRange(OptKey{}, OptKey{end});
+```
+
+A `string_view` overload is also provided for the common case of textual keys:
+
+```cpp
+using OptSV = std::optional<std::string_view>;
+
+cf.compactRange(OptSV{std::string_view{"tenant_42:"}},
+                OptSV{std::string_view{"tenant_42;"}});
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `put` followed by `del`
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous, blocks the caller until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool, the calling thread does the work
+- Selects only SSTables whose key range overlaps the requested range using the column family's comparator, SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Return values**
+
+- Returns normally on success
+- Throws `tidesdb::Exception` with `ErrorCode::InvalidArgs` if both endpoints are `std::nullopt` (use `compact()` for full CF compaction)
+- Throws `tidesdb::Exception` with `ErrorCode::Locked` if another compaction is running for the column family
+- Throws `tidesdb::Exception` with standard I/O and memory error codes if the merge cannot complete
 
 #### Manual Memtable Flush
 
@@ -1527,6 +1604,8 @@ tidesdb::TidesDB db(defaultDbConfig);
 auto defaultCfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
 db.createColumnFamily("my_cf", defaultCfConfig);
 ```
+
+`defaultConfig()` (both DB and CF variants) now mirrors the underlying C library defaults rather than duplicating constants in the binding. Fields like `maxConcurrentFlushes`, `tombstoneDensityMinEntries`, and the unified-memtable settings track the engine automatically. If you previously relied on hardcoded defaults when overriding only some fields, re-test after upgrading.
 
 ## Configuration Persistence
 

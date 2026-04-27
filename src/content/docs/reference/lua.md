@@ -82,11 +82,28 @@ local db = tidesdb.TidesDB.open("./mydb", {
     unified_memtable_skip_list_probability = 0.25,               -- Skip list probability for unified memtable
     unified_memtable_sync_mode = tidesdb.SyncMode.SYNC_INTERVAL, -- Unified memtable sync mode
     unified_memtable_sync_interval_us = 128000,                  -- Unified memtable sync interval (128ms)
+    max_concurrent_flushes = 0,                                  -- Cap on in-flight memtable flushes across all CFs (0 = library default)
 })
 
 print("Database opened successfully")
 
 db:close()
+```
+
+:::note[max_concurrent_flushes]
+`max_concurrent_flushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
+
+### Default Configuration
+
+`tidesdb.default_config()` and `tidesdb.default_column_family_config()` mirror the underlying C library defaults. Values such as `max_concurrent_flushes`, `tombstone_density_min_entries`, and the unified-memtable settings track the engine's defaults automatically -- if you previously hardcoded copies of these values, re-test after upgrading.
+
+```lua
+local cfg = tidesdb.default_config()
+cfg.db_path = "./mydb"
+cfg.log_level = tidesdb.LogLevel.LOG_WARN
+
+local db = tidesdb.TidesDB.new(cfg)
 ```
 
 ### Creating and Dropping Column Families
@@ -117,6 +134,8 @@ cf_config.min_disk_space = 100 * 1024 * 1024   -- Minimum disk space required (1
 cf_config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
 cf_config.l1_file_count_trigger = 4            -- L1 file count trigger for compaction
 cf_config.l0_queue_stall_threshold = 20        -- L0 queue stall threshold
+cf_config.tombstone_density_trigger = 0.0      -- Per-SSTable tombstone density above which compaction priority escalates (0.0 = disabled, range [0.0, 1.0])
+cf_config.tombstone_density_min_entries = 1024 -- Minimum entry count for an SSTable to be considered by the density trigger
 cf_config.use_btree = false                    -- Use B+tree format for klog (default: false)
 cf_config.object_lazy_compaction = false       -- Enable lazy compaction for object store
 cf_config.object_prefetch_compaction = false   -- Enable prefetch during object store compaction
@@ -513,6 +532,15 @@ if stats.use_btree then
     print(string.format("B+tree Avg Height: %.2f", stats.btree_avg_height))
 end
 
+-- Tombstone density observability
+print(string.format("Total Tombstones: %d", stats.total_tombstones))
+print(string.format("Tombstone Ratio: %.2f%%", stats.tombstone_ratio * 100))
+print(string.format("Worst SSTable Density: %.2f%% at level %d",
+    stats.max_sst_density * 100, stats.max_sst_density_level))
+for i, count in ipairs(stats.level_tombstone_counts) do
+    print(string.format("Level %d tombstones: %d", i, count))
+end
+
 if stats.config then
     print(string.format("Write Buffer Size: %d", stats.config.write_buffer_size))
     print(string.format("Compression: %d", stats.config.compression_algorithm))
@@ -538,6 +566,11 @@ end
 - `btree_total_nodes` · Total B+tree nodes across all SSTables (only if use_btree=true)
 - `btree_max_height` · Maximum tree height across all SSTables (only if use_btree=true)
 - `btree_avg_height` · Average tree height across all SSTables (only if use_btree=true)
+- `total_tombstones` · Sum of `tombstone_count` across every SSTable in the column family
+- `tombstone_ratio` · `total_tombstones / total_keys` (range `[0.0, 1.0]`, 0.0 if `total_keys == 0`)
+- `level_tombstone_counts` · Per-level tombstone counts (parallels `level_key_counts`)
+- `max_sst_density` · Worst per-SSTable tombstone density observed in the column family (range `[0.0, 1.0]`)
+- `max_sst_density_level` · 1-based level index where `max_sst_density` was observed (0 if none)
 - `config` · Column family configuration
 
 ### Getting Database-Level Statistics
@@ -696,6 +729,51 @@ if not ok then
     print("Compaction note: " .. tostring(err))
 end
 ```
+
+#### Targeted Range Compaction
+
+`cf:compact_range(start_key, end_key)` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```lua
+local cf = db:get_column_family("my_cf")
+
+local start_key = "tenant_42:"
+local end_key = "tenant_42;"
+
+cf:compact_range(start_key, end_key)
+```
+
+Pass `nil` for either endpoint to make that side unbounded:
+
+```lua
+-- Compact everything from "tenant_42:" upward
+cf:compact_range("tenant_42:", nil)
+
+-- Compact everything up to "tenant_42;"
+cf:compact_range(nil, "tenant_42;")
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `txn:put` followed by `txn:delete`
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous, blocks the caller until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool, the calling thread does the work
+- Selects only SSTables whose key range overlaps `[start_key, end_key)` using the column family's comparator, SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Return values**
+
+- Returns nothing on success
+- Raises `TDB_ERR_INVALID_ARGS` if both endpoints are `nil` or empty (use `cf:compact()` for full CF compaction)
+- Raises `TDB_ERR_LOCKED` if another compaction is running for the column family
+- Raises a standard I/O or memory error if the merge cannot complete
 
 #### Manual Memtable Flush
 
@@ -1404,6 +1482,7 @@ lua test_tidesdb.lua
 | Method | Description |
 |--------|-------------|
 | `cf:compact()` | Trigger manual compaction |
+| `cf:compact_range(start_key, end_key)` | Synchronous compaction over a key range (`nil` endpoint = unbounded) |
 | `cf:flush_memtable()` | Trigger manual memtable flush |
 | `cf:is_flushing()` | Check if flush is in progress |
 | `cf:is_compacting()` | Check if compaction is in progress |
