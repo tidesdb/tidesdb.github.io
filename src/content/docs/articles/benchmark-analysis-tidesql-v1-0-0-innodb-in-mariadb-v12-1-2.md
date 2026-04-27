@@ -97,22 +97,22 @@ This plot shows a large and meaningful gap. InnoDB uses roughly 12 MB to store a
 
 That's not noise and it's not tuning; it's a consequence of structure. InnoDB pays for B-trees, pages, free space, and metadata. If storage footprint matters, this result alone is hard to ignore.
 
-## P95 latency – INSERT
+## P95 latency - INSERT
 
-![P95 latency – INSERT](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/fig10.png)
+![P95 latency - INSERT](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/fig10.png)
 
 At the 95th percentile, TidesDB inserts are dramatically more predictable. InnoDB shows a long tail, with occasional stalls that push p95 close to 0.4 ms, while TidesDB stays well under 0.1 ms 
 
 
-## P95 latency – SELECT
+## P95 latency - SELECT
 
-![P95 latency – SELECT](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/fig11.png)
+![P95 latency - SELECT](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/fig11.png)
 
 For reads, the situation reverses. InnoDB's p95 SELECT latency is significantly lower, while TidesDB shows both higher average and worse tail latency obviously.
 
-## P95 latency – UPDATE
+## P95 latency - UPDATE
 
-![P95 latency – UPDATE](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/fig12.png)
+![P95 latency - UPDATE](/benchmark-analysis-tidesdb-innodb-in-mariadb-v12-1-2-feb1-2026/fig12.png)
 
 Updates land somewhere in between. TidesDB again has tighter tail latency, while InnoDB shows more variance and higher p95 
 

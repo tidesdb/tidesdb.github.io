@@ -102,13 +102,13 @@ Sequential write p99/p50 ratio is 1.82x for TidesDB (611/1111 µs) vs 1.48x for 
 
 **Write Amplification**
 
-TidesDB stays between 1.04–1.25 across all workloads; RocksDB ranges 1.05–1.52.  The tightest is Zipfian at 1.04 vs 1.05 where hot-key overwrites keep both engines lean.  The widest gap is on 50M small-value random writes at 1.25 vs 1.52.  Lower write amplification means less SSD wear and less background I/O contention.
+TidesDB stays between 1.04-1.25 across all workloads; RocksDB ranges 1.05-1.52.  The tightest is Zipfian at 1.04 vs 1.05 where hot-key overwrites keep both engines lean.  The widest gap is on 50M small-value random writes at 1.25 vs 1.52.  Lower write amplification means less SSD wear and less background I/O contention.
 
 ![Write Amplification](/analysis-tidesdb-v8-7-1-rocksdb-11-0-3/10_write_amplification.png)
 
 **Space Efficiency**
 
-Sequential 10M keys land at 111 MB vs 205 MB (46% smaller), random 10M at 90 MB vs 140 MB (36% smaller).  Small-value 50M sits at 522 MB vs 503 MB (4% larger for TidesDB).  Large-value 1M is 302 MB vs 348 MB (13% smaller).  Space amplification ratios are TidesDB 0.07–0.14 vs RocksDB 0.08–0.19.
+Sequential 10M keys land at 111 MB vs 205 MB (46% smaller), random 10M at 90 MB vs 140 MB (36% smaller).  Small-value 50M sits at 522 MB vs 503 MB (4% larger for TidesDB).  Large-value 1M is 302 MB vs 348 MB (13% smaller).  Space amplification ratios are TidesDB 0.07-0.14 vs RocksDB 0.08-0.19.
 
 ![Space Efficiency](/analysis-tidesdb-v8-7-1-rocksdb-11-0-3/11_space_efficiency.png)
 
@@ -132,7 +132,7 @@ On 4KB values TidesDB p99/avg is 1.79x (35,326 µs / 19,723 µs) while RocksDB i
 
 **Latency Variability**
 
-Write CV is TidesDB 11–38% vs RocksDB 11–457% across write workloads.  Zipfian writes are the tightest at 11% for both engines.  Random write CV is 37% for TidesDB vs 253% for RocksDB, a 6.8x consistency advantage.  Read CV shows TidesDB random reads at 187% vs RocksDB at 48%, the same pattern as before where higher relative variability sits around much smaller absolute latencies (2.13 µs vs 5.06 µs).  Random seek CV is very high for TidesDB at 22,750% but that's a quirk of sub-microsecond median latency where even tiny absolute jitter produces a large coefficient.
+Write CV is TidesDB 11-38% vs RocksDB 11-457% across write workloads.  Zipfian writes are the tightest at 11% for both engines.  Random write CV is 37% for TidesDB vs 253% for RocksDB, a 6.8x consistency advantage.  Read CV shows TidesDB random reads at 187% vs RocksDB at 48%, the same pattern as before where higher relative variability sits around much smaller absolute latencies (2.13 µs vs 5.06 µs).  Random seek CV is very high for TidesDB at 22,750% but that's a quirk of sub-microsecond median latency where even tiny absolute jitter produces a large coefficient.
 
 ![Latency Variability](/analysis-tidesdb-v8-7-1-rocksdb-11-0-3/15_latency_variability.png)
 
@@ -142,7 +142,7 @@ TidesDB v8.7.1 delivers rather great improvements across the board versus v8.6.x
 
 The backpressure consolidation from per-op to per-column-family-per-commit fixed TidesDB's historical weakness on single-key operations.  Batch-1 writes and single-key deletes now favor TidesDB where previously RocksDB won, and the double-sleep elimination means mixed workloads no longer over-throttle under combined L0 and memory pressure.
 
-The raw byte cache replacing the old block cache improved cache utilization and shows up in the random read improvement from 2.23x to 2.43x.  Write amplification remains consistently lower than RocksDB at 1.04–1.25 vs 1.05–1.52, and space efficiency holds with 36–46% smaller on-disk sizes for standard workloads.
+The raw byte cache replacing the old block cache improved cache utilization and shows up in the random read improvement from 2.23x to 2.43x.  Write amplification remains consistently lower than RocksDB at 1.04-1.25 vs 1.05-1.52, and space efficiency holds with 36-46% smaller on-disk sizes for standard workloads.
 
 The reaper's stack-allocated eviction buffer and the pwritev block manager writes are less visible in the headline numbers but contribute to the overall consistency, removing per-cycle mallocs and reducing syscalls on the write path.
 

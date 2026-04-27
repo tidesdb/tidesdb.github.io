@@ -124,19 +124,19 @@ Sequential write p99/p50 ratio is 1.9x for TidesDB vs 4.4x for RocksDB, where th
 
 **Write Amplification**
 
-TidesDB stays between 1.03–1.21 across all workloads; RocksDB ranges 1.22–1.51. The 15–24% gap translates directly to less SSD wear, less background I/O contention, and tighter tail latencies. Tightest amplification is on large values (1.03 vs 1.22) and the widest gap is on 50M small-value writes (1.21 vs 1.51).
+TidesDB stays between 1.03-1.21 across all workloads; RocksDB ranges 1.22-1.51. The 15-24% gap translates directly to less SSD wear, less background I/O contention, and tighter tail latencies. Tightest amplification is on large values (1.03 vs 1.22) and the widest gap is on 50M small-value writes (1.21 vs 1.51).
 
 ![Write Amplification](/tidesdb-v8-6-0-rocksdb-v10-10-1/plots1/10_write_amplification.png)
 
 **Space Efficiency**
 
-Sequential 10M keys land at 111 MB vs 208 MB (47% smaller), random 10M at 87 MB vs 142 MB (38%). Space amplification ratios are TidesDB 0.07–0.14 vs RocksDB 0.08–0.19. Sequential writes produce the tightest compaction on our sorted runs.
+Sequential 10M keys land at 111 MB vs 208 MB (47% smaller), random 10M at 87 MB vs 142 MB (38%). Space amplification ratios are TidesDB 0.07-0.14 vs RocksDB 0.08-0.19. Sequential writes produce the tightest compaction on our sorted runs.
 
 ![Space Efficiency](/tidesdb-v8-6-0-rocksdb-v10-10-1/plots1/11_space_efficiency.png)
 
 **Resource Usage**
 
-TidesDB uses ~4x more memory (2,035 MB vs 485 MB peak RSS on sequential writes), an intentional trade-off for speed. We write 18–24% less data to disk. CPU is higher on writes (582% vs 258%) due to more aggressive parallelism across 8 threads. The new `max_memory_usage` cap in v8.6.0 keeps this bounded.
+TidesDB uses ~4x more memory (2,035 MB vs 485 MB peak RSS on sequential writes), an intentional trade-off for speed. We write 18-24% less data to disk. CPU is higher on writes (582% vs 258%) due to more aggressive parallelism across 8 threads. The new `max_memory_usage` cap in v8.6.0 keeps this bounded.
 
 ![Resource Usage](/tidesdb-v8-6-0-rocksdb-v10-10-1/plots1/12_resource_usage.png)
 
@@ -154,7 +154,7 @@ On 4KB values, TidesDB p99/avg ratio is 1.92x (36,427 µs / 18,959 µs) while Ro
 
 **Latency Variability**
 
-Write CV is TidesDB 25–35% vs RocksDB 200–497%, making us 9–19x more consistent on writes as RocksDB's compaction stalls create huge latency spikes. Read and seek CV reverses with RocksDB's random read CV at 48% vs our 163%. The higher relative variability is spread around much smaller absolute numbers (2 µs vs 4.6 µs), meaning faster reads with a bit more jitter.
+Write CV is TidesDB 25-35% vs RocksDB 200-497%, making us 9-19x more consistent on writes as RocksDB's compaction stalls create huge latency spikes. Read and seek CV reverses with RocksDB's random read CV at 48% vs our 163%. The higher relative variability is spread around much smaller absolute numbers (2 µs vs 4.6 µs), meaning faster reads with a bit more jitter.
 
 ![Latency Variability](/tidesdb-v8-6-0-rocksdb-v10-10-1/plots1/15_latency_variability.png)
 
@@ -242,7 +242,7 @@ Sequential writes at 8 threads show TidesDB p50 1,194 µs, p99 2,035 µs (ratio 
 
 **Write Amplification**
 
-TidesDB ranges 1.04–1.23 across all workloads while RocksDB ranges 1.23–1.75. The gap is wider here than in Environment 1, with RocksDB's sequential write amplification at 16 threads hitting 1.75 (versus 1.07 for TidesDB). Zipfian remains the tightest at 1.04 for TidesDB.
+TidesDB ranges 1.04-1.23 across all workloads while RocksDB ranges 1.23-1.75. The gap is wider here than in Environment 1, with RocksDB's sequential write amplification at 16 threads hitting 1.75 (versus 1.07 for TidesDB). Zipfian remains the tightest at 1.04 for TidesDB.
 
 ![Write Amplification](/tidesdb-v8-6-0-rocksdb-v10-10-1/plots2/10_write_amplification.png)
 
@@ -282,7 +282,7 @@ Write CV for TidesDB sequential is 16.4% vs RocksDB at 8.2%, and interestingly R
 
 TidesDB v8.6.0 outperforms RocksDB v10.10.1 across the vast majority of workloads on both environments. On Environment 1 (i7-11700K, 48 GB, SATA SSD, 8 threads), speedups range from 1.27x to 4.97x with a geometric mean around 2.2x. On Environment 2 (Threadripper 2950X, 128 GB, NVMe, 8 + 16 threads), the same workloads show wider margins, with sequential write speedups reaching 8.32x at 8 threads and 9.90x at 16 threads, and synchronous writes scaling to 14.7x at 16 threads.
 
-The consistent strengths across both environments include sequential and batched writes (5–10x), range scans (2–3x), seeks with skewed access patterns (3–5x), large-value writes (3–4x with dramatically better tail latency), and low write amplification (1.03–1.23 vs 1.22–1.75). The consistent weaknesses include single-key writes and deletes without batching (RocksDB wins by 1.5–2.5x), read/seek latency variability (RocksDB delivers more uniform timing despite higher absolute latencies), and higher memory usage (~4–6x RSS at 8 threads, narrowing to ~1.7x at 16 threads).
+The consistent strengths across both environments include sequential and batched writes (5-10x), range scans (2-3x), seeks with skewed access patterns (3-5x), large-value writes (3-4x with dramatically better tail latency), and low write amplification (1.03-1.23 vs 1.22-1.75). The consistent weaknesses include single-key writes and deletes without batching (RocksDB wins by 1.5-2.5x), read/seek latency variability (RocksDB delivers more uniform timing despite higher absolute latencies), and higher memory usage (~4-6x RSS at 8 threads, narrowing to ~1.7x at 16 threads).
 
 Environment 2 also exposed a new weak spot not visible at 8 threads. Under extreme concurrent write pressure at 16 threads, the mixed random GET path drops as the back-pressure systems over-throttle operations. 
 

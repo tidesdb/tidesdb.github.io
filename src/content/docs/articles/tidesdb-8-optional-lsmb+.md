@@ -48,7 +48,7 @@ This figure captures the core architectural win. For point lookups and seeks, th
 ## PUT tail latency (p95 with p99 markers)
 ![PUT tail latency (p95 with p99 markers)](/tidesdb-8-optional-lsmb+/plotC_put_latency_tail.png)
 
-In random, mixed, and populate phases, p95 latency drops by roughly 30–40%, and p99 follows the same trend. The exception is range-populate, where B+tree p95 is worse, consistent with its lower PUT throughput there, but not too concerning.
+In random, mixed, and populate phases, p95 latency drops by roughly 30-40%, and p99 follows the same trend. The exception is range-populate, where B+tree p95 is worse, consistent with its lower PUT throughput there, but not too concerning.
 
 ## Read / seek / range tail latency (log scale)
 ![Read / seek / range tail latency (log scale)](/tidesdb-8-optional-lsmb+/plotD2_read_seek_range_latency_log.png)
@@ -58,7 +58,7 @@ On a log scale, this plot highlights how the B+tree collapses read-side tail lat
 ## On-disk database size
 ![ On-disk database size](/tidesdb-8-optional-lsmb+/plotE2_db_size.png)
 
-The B+tree variant consumes an order of magnitude more disk space than the block layout in several workloads (~1.1–1.2GB vs ~100MB). This makes sense, as the block layout is highly optimized for space efficiency.
+The B+tree variant consumes an order of magnitude more disk space than the block layout in several workloads (~1.1-1.2GB vs ~100MB). This makes sense, as the block layout is highly optimized for space efficiency.
 
 ## Peak RSS
 ![ Peak RSS](/tidesdb-8-optional-lsmb+/plotG2_peak_rss_mb.png)

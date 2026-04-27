@@ -341,6 +341,10 @@ cmake --build build --clean-first --verbose
 cmake --install build
 ```
 
+:::note[Static archives are position independent]
+Even with `BUILD_SHARED_LIBS=OFF`, all object files compile with `-fPIC` (via `CMAKE_POSITION_INDEPENDENT_CODE ON`). This means the static archive can link directly into a shared module like the MariaDB engine plugin without a recompile-with-fPIC step. The flag has negligible runtime cost on modern x86_64 and ARM64 toolchains.
+:::
+
 ### Windows
 
 :::note[BUILD_SHARED_LIBS on Windows]
