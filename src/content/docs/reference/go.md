@@ -100,6 +100,7 @@ func main() {
         MaxMemoryUsage:       0,                    // Global memory limit in bytes (0 = auto, 80% of system RAM)
         LogToFile:            false,                // Write logs to file instead of stderr
         LogTruncationAt:      24 * 1024 * 1024,     // Log file truncation size (24MB default)
+        MaxConcurrentFlushes: 0,                    // Cap on in-flight memtable flushes across all CFs (0 = library default)
         ObjectStore:          nil,                  // Object store connector (nil = local only)
         ObjectStoreConfig:    nil,                  // Object store behavior config (nil = defaults)
     }
@@ -116,7 +117,7 @@ func main() {
 
 ### Default Configuration
 
-Use `DefaultConfig()` to get a configuration with sensible defaults, then override specific fields as needed:
+Use `DefaultConfig()` to get a configuration with sensible defaults, then override specific fields as needed. The defaults are pulled from the underlying C library, so values such as `MaxConcurrentFlushes` and the unified-memtable settings track the engine's defaults automatically.
 
 ```go
 config := tidesdb.DefaultConfig()
@@ -129,6 +130,10 @@ if err != nil {
 }
 defer db.Close()
 ```
+
+:::note[MaxConcurrentFlushes]
+`MaxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
 
 ### Backup
 
@@ -214,6 +219,8 @@ cfConfig.BlockIndexPrefixLen = 16                  // Block index prefix length
 cfConfig.MinDiskSpace = 100 * 1024 * 1024          // Minimum disk space required (100MB)
 cfConfig.L1FileCountTrigger = 4                    // L1 file count trigger for compaction
 cfConfig.L0QueueStallThreshold = 20                // L0 queue stall threshold
+cfConfig.TombstoneDensityTrigger = 0.0             // Per-SSTable tombstone density above which compaction escalates (0.0 = disabled, range 0.0 to 1.0)
+cfConfig.TombstoneDensityMinEntries = 1024         // Minimum entry count for an SSTable to be considered by the density trigger
 cfConfig.UseBtree = 0                              // Use B+tree format for klog (0 = block-based)
 cfConfig.ObjectLazyCompaction = 0                  // Less aggressive compaction in object store mode
 cfConfig.ObjectPrefetchCompaction = 1              // Download all inputs before merge
@@ -690,6 +697,15 @@ for i := 0; i < stats.NumLevels; i++ {
         i+1, stats.LevelNumSSTables[i], stats.LevelSizes[i], stats.LevelKeyCounts[i])
 }
 
+// Tombstone density observability
+fmt.Printf("Total Tombstones: %d\n", stats.TotalTombstones)
+fmt.Printf("Tombstone Ratio: %.2f%%\n", stats.TombstoneRatio*100.0)
+fmt.Printf("Worst SSTable Density: %.2f%% at level %d\n",
+    stats.MaxSSTDensity*100.0, stats.MaxSSTDensityLevel)
+for i := 0; i < stats.NumLevels; i++ {
+    fmt.Printf("Level %d tombstones: %d\n", i+1, stats.LevelTombstoneCounts[i])
+}
+
 if stats.Config != nil {
     fmt.Printf("Write Buffer Size: %d\n", stats.Config.WriteBufferSize)
     fmt.Printf("Compression: %d\n", stats.Config.CompressionAlgorithm)
@@ -718,6 +734,11 @@ if stats.Config != nil {
 | `BtreeTotalNodes` | `uint64` | Total B+tree nodes across all SSTables |
 | `BtreeMaxHeight` | `uint32` | Maximum tree height across all SSTables |
 | `BtreeAvgHeight` | `float64` | Average tree height across all SSTables |
+| `TotalTombstones` | `uint64` | Total tombstones across all SSTables |
+| `TombstoneRatio` | `float64` | Database-wide tombstone count divided by entry count (0.0 to 1.0) |
+| `LevelTombstoneCounts` | `[]uint64` | Per-level tombstone counts (parallels `LevelKeyCounts`) |
+| `MaxSSTDensity` | `float64` | Worst single-SSTable tombstone density observed (0.0 to 1.0) |
+| `MaxSSTDensityLevel` | `int` | 1-based level index where the worst SSTable lives (0 if none) |
 
 ### Getting Block Cache Statistics
 
@@ -914,6 +935,46 @@ if err != nil {
     log.Printf("Compaction note: %v", err)
 }
 ```
+
+#### Targeted Range Compaction
+
+`CompactRange` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```go
+cf, err := db.GetColumnFamily("my_cf")
+if err != nil {
+    log.Fatal(err)
+}
+
+start := []byte("tenant_42:")
+end := []byte("tenant_42;")
+
+if err := cf.CompactRange(start, end); err != nil {
+    log.Fatalf("Targeted compaction failed: %v", err)
+}
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `Put` followed by `Delete`
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous, blocks the caller until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool, the calling goroutine does the work
+- Selects only SSTables whose key range overlaps the requested range using the column family's comparator, SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Return values**
+
+- `nil` on success
+- Error with `ErrInvalidArgs` if `cf` is nil or both endpoints are nil/empty (use `Compact` for full CF compaction)
+- Error with `ErrLocked` if another compaction is running for the column family
+- Standard I/O and memory error codes if the merge cannot complete
 
 #### Manual Memtable Flush
 

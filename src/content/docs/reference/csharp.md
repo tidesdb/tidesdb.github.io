@@ -79,13 +79,18 @@ var config = new Config
     MaxOpenSstables = 256,
     MaxMemoryUsage = 0, // 0 = auto (50% of system RAM)
     LogToFile = false,
-    LogTruncationAt = 0
+    LogTruncationAt = 0,
+    MaxConcurrentFlushes = 0, // 0 = library default (set by tidesdb_default_config)
 };
 
 using var db = TidesDb.Open(config);
 Console.WriteLine("Database opened successfully");
 
 ```
+
+:::note[MaxConcurrentFlushes]
+`MaxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at the default (sourced from `tidesdb_default_config`) to inherit the library's value, or lower it on memory-constrained hosts to throttle peak flush concurrency. `Config.Default(path)` and the parameterless `Config { ... }` initializer both pull `MaxConcurrentFlushes` from the C library, so anyone overriding the previous hardcoded values should re-test.
+:::
 
 ### Opening with Unified Memtable
 
@@ -222,6 +227,8 @@ db.CreateColumnFamily("my_cf", new ColumnFamilyConfig
     SyncMode = SyncMode.Interval,
     SyncIntervalUs = 128000,
     DefaultIsolationLevel = IsolationLevel.ReadCommitted,
+    TombstoneDensityTrigger = 0.0,        // Per-SSTable tombstone density above which compaction priority escalates (0.0 = disabled, range 0.0 to 1.0)
+    TombstoneDensityMinEntries = 1024,    // Minimum entry count for an SSTable to be considered by the density trigger
     UseBtree = false, // Use B+tree format for klog (default: false = block-based)
 });
 
@@ -530,6 +537,21 @@ if (stats.UseBtree)
     Console.WriteLine($"B+tree Max Height: {stats.BtreeMaxHeight}");
     Console.WriteLine($"B+tree Avg Height: {stats.BtreeAvgHeight:F2}");
 }
+
+// Tombstone density observability
+Console.WriteLine($"Total Tombstones: {stats.TotalTombstones}");
+Console.WriteLine($"Tombstone Ratio: {stats.TombstoneRatio * 100:F2}%");
+Console.WriteLine($"Worst SSTable Density: {stats.MaxSstDensity * 100:F2}% at level {stats.MaxSstDensityLevel}");
+for (int i = 0; i < stats.NumLevels; i++)
+{
+    Console.WriteLine($"Level {i + 1} tombstones: {stats.LevelTombstoneCounts[i]}");
+}
+
+if (stats.Config != null)
+{
+    Console.WriteLine($"Tombstone Density Trigger: {stats.Config.TombstoneDensityTrigger}");
+    Console.WriteLine($"Tombstone Density Min Entries: {stats.Config.TombstoneDensityMinEntries}");
+}
 ```
 
 ### Listing Column Families
@@ -607,6 +629,46 @@ var cf = db.GetColumnFamily("my_cf")!;
 
 cf.Compact();
 ```
+
+#### Targeted Range Compaction
+
+`CompactRange` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```csharp
+var cf = db.GetColumnFamily("my_cf")!;
+
+var start = Encoding.UTF8.GetBytes("tenant_42:");
+var end   = Encoding.UTF8.GetBytes("tenant_42;");
+
+cf.CompactRange(start, end);
+
+// Either endpoint may be empty/default to indicate "unbounded on that side":
+cf.CompactRange(default, end);   // compact everything up to "tenant_42;"
+cf.CompactRange(start, default); // compact everything from "tenant_42:" forward
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `Put` followed by `Delete`
+- Operational counterpart to the automatic tombstone density trigger (`TombstoneDensityTrigger`) when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous; blocks the calling thread until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool, the calling thread does the work
+- Selects only SSTables whose key range overlaps the requested range using the column family's comparator; SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+- An empty `ReadOnlySpan<byte>` (or `default`) is treated as `NULL` and means "unbounded on that side"
+
+**Return values**
+
+- Returns normally on success
+- Throws `TidesDBException` with `ErrorCode.InvalidArgs` if both endpoints are empty (use `Compact` for full CF compaction)
+- Throws `TidesDBException` with `ErrorCode.Locked` if another compaction is running for the column family
+- Throws `TidesDBException` with the underlying I/O or memory error code if the merge cannot complete
 
 #### Manual Memtable Flush
 
@@ -1297,6 +1359,7 @@ using TidesDB;
 | `UnifiedMemtableSyncMode` | SyncMode | None | Sync mode for unified WAL |
 | `UnifiedMemtableSyncIntervalUs` | ulong | 0 | Sync interval for unified WAL in microseconds |
 | `ObjectStoreConfig` | ObjectStoreConfig? | null | Object store behavior configuration (null = disabled) |
+| `MaxConcurrentFlushes` | int | library default | Global semaphore on in-flight memtable flushes across all CFs (0 = library default). Default sourced from `tidesdb_default_config()`. |
 
 ### Column Family Configuration (ColumnFamilyConfig)
 
@@ -1322,6 +1385,8 @@ using TidesDB;
 | `MinDiskSpace` | ulong | 100MB | Minimum disk space required |
 | `L1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `L0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
+| `TombstoneDensityTrigger` | double | 0.0 | Per-SSTable tombstone density (`tombstone_count / num_entries`) above which compaction priority escalates. Range [0.0, 1.0]. 0.0 disables the check. |
+| `TombstoneDensityMinEntries` | ulong | 1024 | SSTables with fewer entries than this are ignored by the density trigger (prevents tiny-SSTable noise). |
 | `UseBtree` | bool | false | Use B+tree format for klog |
 | `ObjectLazyCompaction` | bool | false | Compact less aggressively in object store mode |
 | `ObjectPrefetchCompaction` | bool | true | Download all inputs before merge in object store mode |
@@ -1346,6 +1411,11 @@ using TidesDB;
 | `BtreeTotalNodes` | ulong | Total B+tree nodes (only if UseBtree=true) |
 | `BtreeMaxHeight` | uint | Maximum tree height (only if UseBtree=true) |
 | `BtreeAvgHeight` | double | Average tree height (only if UseBtree=true) |
+| `TotalTombstones` | ulong | Sum of tombstone counts across every SSTable in the column family |
+| `TombstoneRatio` | double | `TotalTombstones / TotalKeys` (0.0 if no keys). Range [0.0, 1.0]. |
+| `LevelTombstoneCounts` | ulong[] | Per-level tombstone counts (parallels `LevelKeyCounts`) |
+| `MaxSstDensity` | double | Worst per-SSTable tombstone density observed (0.0 to 1.0) |
+| `MaxSstDensityLevel` | int | 1-based level index where `MaxSstDensity` was observed (0 if none) |
 
 ### Database Statistics (DbStats)
 

@@ -59,6 +59,7 @@ public class Example {
             .blockCacheSize(64 * 1024 * 1024)
             .maxOpenSSTables(256)
             .maxMemoryUsage(0)
+            .maxConcurrentFlushes(0)            // Cap on in-flight memtable flushes across all CFs (0 = library default)
             .unifiedMemtable(false)
             .build();
         
@@ -68,6 +69,12 @@ public class Example {
     }
 }
 ```
+
+`Config.defaultConfig()` returns a configuration with sensible defaults. The `maxConcurrentFlushes` default is sourced from the underlying C library via `tidesdb_default_config()`, so the binding tracks the engine's defaults automatically. If you previously hardcoded values such as `maxConcurrentFlushes`, re-test after upgrading.
+
+:::note[maxConcurrentFlushes]
+`maxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
 
 ### Unified Memtable Mode
 
@@ -114,6 +121,8 @@ ColumnFamilyConfig customConfig = ColumnFamilyConfig.builder()
     .syncMode(SyncMode.SYNC_INTERVAL)
     .syncIntervalUs(128000)
     .defaultIsolationLevel(IsolationLevel.READ_COMMITTED)
+    .tombstoneDensityTrigger(0.0)              // Per-SSTable tombstone density above which compaction escalates (0.0 = disabled, range 0.0 to 1.0)
+    .tombstoneDensityMinEntries(1024)          // Minimum entry count for an SSTable to be considered by the density trigger
     .build();
 
 db.createColumnFamily("custom_cf", customConfig);
@@ -368,6 +377,16 @@ if (stats.isUseBtree()) {
 long[] levelSizes = stats.getLevelSizes();
 int[] levelSSTables = stats.getLevelNumSSTables();
 long[] levelKeyCounts = stats.getLevelKeyCounts();
+
+// Tombstone density observability
+System.out.println("Total tombstones: " + stats.getTotalTombstones());
+System.out.printf("Tombstone ratio: %.2f%%%n", stats.getTombstoneRatio() * 100.0);
+System.out.printf("Worst SSTable density: %.2f%% at level %d%n",
+    stats.getMaxSstDensity() * 100.0, stats.getMaxSstDensityLevel());
+long[] levelTombstoneCounts = stats.getLevelTombstoneCounts();
+for (int i = 0; i < stats.getNumLevels(); i++) {
+    System.out.printf("Level %d tombstones: %d%n", i + 1, levelTombstoneCounts[i]);
+}
 ```
 
 **Stats Fields**
@@ -389,6 +408,11 @@ long[] levelKeyCounts = stats.getLevelKeyCounts();
 | `btreeTotalNodes` | long | Total B+tree nodes (only if useBtree=true) |
 | `btreeMaxHeight` | int | Maximum B+tree height (only if useBtree=true) |
 | `btreeAvgHeight` | double | Average B+tree height (only if useBtree=true) |
+| `totalTombstones` | long | Total tombstones across every SSTable in the column family |
+| `tombstoneRatio` | double | `totalTombstones / totalKeys` (0.0 if `totalKeys` is 0; range 0.0 to 1.0) |
+| `levelTombstoneCounts` | long[] | Per-level tombstone counts (parallels `levelKeyCounts`) |
+| `maxSstDensity` | double | Worst single-SSTable tombstone density observed (0.0 to 1.0) |
+| `maxSstDensityLevel` | int | 1-based level index where the worst SSTable lives (0 if none) |
 | `config` | ColumnFamilyConfig | Column family configuration |
 
 ### Getting Cache Statistics
@@ -485,6 +509,42 @@ cf.flushMemtable();
 boolean flushing = cf.isFlushing();
 boolean compacting = cf.isCompacting();
 ```
+
+#### Targeted Range Compaction
+
+`compactRange` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```java
+ColumnFamily cf = db.getColumnFamily("my_cf");
+
+byte[] start = "tenant_42:".getBytes(StandardCharsets.UTF_8);
+byte[] end   = "tenant_42;".getBytes(StandardCharsets.UTF_8);
+
+cf.compactRange(start, end);
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `put` followed by `delete`
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous, blocks the caller until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool, the calling thread does the work
+- A `null` or empty endpoint means unbounded on that side; both `null`/empty is rejected with `ERR_INVALID_ARGS` (use `compact()` for full CF compaction)
+- Selects only SSTables whose key range overlaps the requested range using the column family's comparator, SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Return values**
+
+- Returns normally on success
+- Throws `TidesDBException` with `ERR_INVALID_ARGS` if both endpoints are null/empty
+- Throws `TidesDBException` with `ERR_LOCKED` if another compaction is running for the column family
+- Throws `TidesDBException` with standard I/O or memory error codes if the merge cannot complete
 
 ### Purge Column Family
 
@@ -1033,6 +1093,7 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `unifiedMemtableSyncIntervalUs` | long | 0 | Sync interval for unified WAL in microseconds |
 | `objectStoreFsPath` | String | null | Filesystem connector root directory (null = no object store) |
 | `objectStoreConfig` | ObjectStoreConfig | null | Object store behavior configuration (null = use defaults) |
+| `maxConcurrentFlushes` | int | 0 (library default) | Global semaphore on in-flight memtable flushes across all CFs (0 = library default) |
 
 ### Object Store Configuration
 
@@ -1079,6 +1140,8 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `minDiskSpace` | long | 100MB | Minimum disk space required |
 | `l1FileCountTrigger` | int | 4 | L1 file count trigger for compaction |
 | `l0QueueStallThreshold` | int | 20 | L0 queue stall threshold |
+| `tombstoneDensityTrigger` | double | 0.0 | Per-SSTable tombstone density above which compaction priority escalates (0.0 = disabled, range 0.0 to 1.0) |
+| `tombstoneDensityMinEntries` | long | 1024 | Minimum entry count for an SSTable to be considered by the tombstone density trigger |
 | `useBtree` | boolean | false | Use B+tree format for klog (faster point lookups) |
 | `objectLazyCompaction` | boolean | false | Compact less aggressively for remote storage |
 | `objectPrefetchCompaction` | boolean | true | Download all inputs before compaction merge |

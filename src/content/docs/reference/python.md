@@ -87,6 +87,7 @@ config = tidesdb.Config(
     unified_memtable_sync_interval_us=0,                    # Unified memtable sync interval in microseconds
     object_store=None,                                      # Object store connector (from objstore_fs_create())
     object_store_config=None,                               # Object store behavior config (ObjStoreConfig)
+    max_concurrent_flushes=0,                               # Cap on in-flight memtable flushes across all CFs (0 = library default)
 )
 db = tidesdb.TidesDB(config)
 
@@ -95,6 +96,12 @@ with tidesdb.TidesDB.open("./mydb") as db:
     # ... use database
     pass  # automatically closed
 ```
+
+`tidesdb.default_config()` returns a `Config` whose values are pulled directly from the underlying C library, so settings such as `max_concurrent_flushes` and the unified-memtable defaults track the engine's defaults automatically. Anyone overriding the previously hardcoded Python defaults should re-test after upgrading.
+
+:::note[max_concurrent_flushes]
+`max_concurrent_flushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
 
 ### Column Families
 
@@ -127,6 +134,15 @@ print(f"Total keys: {stats.total_keys}, Total data size: {stats.total_data_size}
 print(f"Avg key size: {stats.avg_key_size:.2f}, Avg value size: {stats.avg_value_size:.2f}")
 print(f"Read amplification: {stats.read_amp:.2f}, Hit rate: {stats.hit_rate:.2%}")
 print(f"Keys per level: {stats.level_key_counts}")
+
+# Tombstone observability
+print(f"Total tombstones: {stats.total_tombstones}")
+print(f"Tombstone ratio: {stats.tombstone_ratio:.2%}")
+print(f"Tombstones per level: {stats.level_tombstone_counts}")
+print(
+    f"Worst SSTable density: {stats.max_sst_density:.2%} "
+    f"(level {stats.max_sst_density_level})"
+)
 
 # B+tree klog stats (only populated if use_btree=True)
 if stats.use_btree:
@@ -371,6 +387,45 @@ cache_stats = db.get_cache_stats()
 print(f"Cache hits: {cache_stats.hits}, misses: {cache_stats.misses}")
 print(f"Hit rate: {cache_stats.hit_rate:.2%}")
 ```
+
+### Targeted Range Compaction
+
+`compact_range` runs a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+
+```python
+cf = db.get_column_family("my_cf")
+
+start = b"tenant_42:"
+end = b"tenant_42;"
+
+cf.compact_range(start, end)
+
+# Pass None for an unbounded endpoint
+cf.compact_range(None, b"tenant_42;")  # everything below "tenant_42;"
+cf.compact_range(b"tenant_42:", None)  # everything from "tenant_42:" onward
+```
+
+**When to use**
+
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones and obsolete versions on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range loaded with `put` followed by `delete`
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next natural threshold crossing
+
+**Behavior**
+
+- Synchronous, blocks the caller until the merge commits or fails
+- Does not enqueue work onto the compaction thread pool; the calling thread does the work
+- Selects only SSTables whose key range overlaps the requested range using the column family's comparator; SSTables outside the range are not touched
+- Applies the same emit-loop logic as background compactions (tombstone reclamation rules, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Return values**
+
+- Returns `None` on success
+- Raises `TidesDBError` with code `TDB_ERR_INVALID_ARGS` if both endpoints are `None`/empty (use `compact()` for full CF compaction)
+- Raises `TidesDBError` with code `TDB_ERR_LOCKED` if another compaction is running for the column family
+- Standard I/O and memory error codes if the merge cannot complete
 
 ### Manual WAL Sync
 
@@ -817,6 +872,10 @@ config.default_isolation_level = tidesdb.IsolationLevel.READ_COMMITTED
 # Compaction triggers
 config.l1_file_count_trigger = 4              # L1 file count trigger (default: 4)
 config.l0_queue_stall_threshold = 20          # L0 queue stall threshold (default: 20)
+
+# Tombstone-driven compaction escalation
+config.tombstone_density_trigger = 0.0        # Per-SSTable tombstone density that escalates compaction priority (default: 0.0 = disabled, range [0.0, 1.0])
+config.tombstone_density_min_entries = 1024   # SSTables with fewer entries are ignored by the density trigger (default: 1024)
 
 # B+tree klog format (optional)
 config.use_btree = False                      # Use B+tree klog format (default: False)
