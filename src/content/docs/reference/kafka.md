@@ -34,7 +34,7 @@ Switching from RocksDB to TidesDB requires no changes to your stream topology. Y
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-kafka</artifactId>
-    <version>0.3.1</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 
@@ -134,6 +134,7 @@ These settings control the TidesDB database instance that backs the state store.
 | `maxMemoryUsage` | long | 0 (auto) | Global memory limit in bytes; 0 lets TidesDB auto-detect (50% of system RAM) |
 | `logToFile` | boolean | false | Write TidesDB logs to a file instead of stderr |
 | `logTruncationAt` | long | 24 MB | Log file truncation size; 0 disables truncation |
+| `maxConcurrentFlushes` | int | 0 (library default) | Global semaphore on in-flight memtable flushes across all column families; 0 inherits the engine default |
 | `objectStoreFsPath` | String | null | Filesystem path for object store connector; null disables object store mode |
 | `objectStoreConfig` | ObjectStoreConfig | null | Object store behavior configuration; null uses defaults |
 | `unifiedMemtable` | boolean | false | Enable unified memtable mode (single memtable + WAL for all CFs) |
@@ -171,6 +172,8 @@ Each state store maps to a single TidesDB column family. These settings control 
 | `dividingLevelOffset` | int | 2 | Compaction dividing level offset |
 | `minDiskSpace` | long | 100 MB | Minimum free disk space required before writes are rejected |
 | `comparatorName` | String | "" (memcmp) | Custom comparator name; empty uses default binary comparison |
+| `tombstoneDensityTrigger` | double | 0.0 (disabled) | Per-SSTable tombstone density above which compaction priority escalates; range 0.0 to 1.0 |
+| `tombstoneDensityMinEntries` | long | 1024 | Minimum entry count for an SSTable to be considered by the tombstone density trigger |
 | `objectLazyCompaction` | boolean | false | Compact less aggressively in object store mode |
 | `objectPrefetchCompaction` | boolean | true | Download all inputs before merge in object store mode |
 
@@ -337,7 +340,16 @@ System.out.println("Data size: " + stats.getTotalDataSize());
 System.out.println("Memtable size: " + stats.getMemtableSize());
 System.out.println("Read amplification: " + stats.getReadAmp());
 System.out.println("Cache hit rate: " + stats.getHitRate());
+
+// Tombstone observability
+System.out.println("Total tombstones: " + stats.getTotalTombstones());
+System.out.printf("Tombstone ratio: %.2f%%%n", stats.getTombstoneRatio() * 100.0);
+System.out.printf("Worst SSTable density: %.2f%% at level %d%n",
+    stats.getMaxSstDensity() * 100.0, stats.getMaxSstDensityLevel());
+long[] levelTombstoneCounts = stats.getLevelTombstoneCounts();
 ```
+
+`getTotalKeys()` includes the active memtable plus every SSTable, so writes are visible to stats without a prior flush. The tombstone observability fields (`getTotalTombstones`, `getTombstoneRatio`, `getMaxSstDensity`, `getMaxSstDensityLevel`, `getLevelTombstoneCounts`) pair with the column family `tombstoneDensityTrigger` and `tombstoneDensityMinEntries` settings to monitor and drive density-based compaction escalation.
 
 **Database-level statistics**
 ```java
@@ -380,6 +392,19 @@ boolean compacting = store.isCompacting();
 ```
 
 Use `purge()` before backup, after bulk deletes, or during maintenance windows. Use `compact()` and `flush()` for non-blocking background work.
+
+### Targeted Range Compaction
+
+`compactRange` runs a synchronous compaction over a specific key range. Only SSTables whose key range overlaps the bounds participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree.
+
+```java
+byte[] start = "tenant_42:".getBytes(StandardCharsets.UTF_8);
+byte[] end   = "tenant_42;".getBytes(StandardCharsets.UTF_8);
+
+store.compactRange(start, end);
+```
+
+A null or empty endpoint means unbounded on that side; both null/empty is rejected (use `compact()` for full-CF compaction). Use this after a large range delete, tenant eviction, or when you want to reclaim space immediately rather than waiting for the natural tombstone density trigger to fire.
 
 ### WAL Sync
 
@@ -426,6 +451,17 @@ store.updateRuntimeConfig(newConfig, true);
 ```
 
 Updatable settings include `writeBufferSize`, `skipListMaxLevel`, `skipListProbability`, `bloomFPR`, `indexSampleRatio`, `syncMode`, and `syncIntervalUs`.
+
+### Single-Delete
+
+`singleDelete` writes a tombstone with the same read semantics as `delete`, but lets compaction drop the put and tombstone together as soon as both appear in the same merge input - rather than carrying the tombstone forward until it reaches the largest active level.
+
+```java
+TidesDBStore store = (TidesDBStore) context.getStateStore("my-store");
+store.singleDelete(Bytes.wrap("session:42".getBytes()));
+```
+
+**Caller contract**: between any two single-deletes on the same key, the key has been put **at most once**. The engine cannot verify this; violating the contract can leave older puts visible after the single-delete. Use only for insert-once / delete-once workloads (session caches, secondary-index entries that are never updated, log-style state with scheduled purges). When in doubt, prefer `delete`.
 
 ### Range Cost Estimation
 
@@ -557,6 +593,13 @@ store.renameColumnFamily("old_name", "new_name");
 
 ```java
 store.dropColumnFamily("old_cf");
+```
+
+A handle-based variant accepts a `ColumnFamily` object directly:
+
+```java
+ColumnFamily cf = store.getDb().getColumnFamily("old_cf");
+store.deleteColumnFamily(cf);
 ```
 
 ### Custom Comparators

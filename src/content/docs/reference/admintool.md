@@ -65,13 +65,25 @@ open <path> [options]
 |--------|-------------|
 | `--unified` | Enable unified memtable mode |
 | `--unified-buffer-size <n>` | Unified memtable write buffer size (bytes) |
+| `--unified-skip-list-max-level <n>` | Skip list max level for unified memtable (0 = default 12) |
+| `--unified-skip-list-probability <f>` | Skip list probability for unified memtable (0 = default 0.25) |
 | `--unified-sync <mode>` | Unified WAL sync mode (`none`\|`interval`\|`full`) |
 | `--unified-sync-interval <us>` | Unified WAL sync interval (microseconds) |
 | `--cache-size <n>` | Block cache size (bytes, 0 to disable) |
 | `--max-open-sstables <n>` | Max cached SSTable structures |
 | `--flush-threads <n>` | Flush thread pool size |
 | `--compaction-threads <n>` | Compaction thread pool size |
+| `--max-concurrent-flushes <n>` | Global cap on in-flight memtable flushes across all CFs (0 = default) |
 | `--max-memory <n>` | Global memory limit (bytes, 0 = auto) |
+| `--log-level <level>` | Log level: `debug`\|`info`\|`warn`\|`error`\|`fatal`\|`none` (default: `none`) |
+| `--log-to-file` | Write logs to `<db_path>/LOG` instead of stderr |
+| `--log-truncation-at <n>` | Log truncation size in bytes (0 = no truncation) |
+| `--object-store-fs <root_dir>` | Enable filesystem object-store connector. Auto-enables unified memtable mode |
+| `--obj-cache-path <dir>` | Local cache directory for object store (default: `<db_path>`) |
+| `--obj-cache-max-bytes <n>` | Maximum local cache size in bytes (0 = unlimited) |
+| `--obj-replica-mode` | Open the database in read-only replica mode |
+| `--obj-replica-sync-interval <us>` | Replica MANIFEST poll interval (default: 5000000) |
+| `--obj-wal-sync-on-commit` | Upload the WAL to the object store after every commit (RPO=0) |
 
 **Examples**
 ```
@@ -83,10 +95,20 @@ Opened database at './mydb' (unified memtable)
 
 admintool> open ./mydb --unified --cache-size 134217728 --flush-threads 4
 Opened database at './mydb' (unified memtable)
+
+admintool> open ./mydb --log-level info --log-to-file
+Opened database at './mydb'
+
+admintool> open ./mydb --object-store-fs /mnt/objects
+Opened database at './mydb' (object-store fs:/mnt/objects)
 ```
 
 :::note[Unified Memtable Mode]
 When `--unified` is set, all column families share a single skip list and WAL instead of each column family maintaining its own. A transaction touching N column families results in 1 WAL write instead of N. On-disk SSTables remain per-column-family. This mode is beneficial for write-heavy multi-CF workloads.
+:::
+
+:::note[Filesystem Object Store]
+`--object-store-fs <root_dir>` attaches a filesystem-backed object-store connector that mirrors objects under the given directory. This is intended for testing and local replication scenarios. Object-store mode automatically enables unified memtable mode. The connector is destroyed when the database is closed. Combine with `--obj-cache-max-bytes`, `--obj-replica-mode`, `--obj-replica-sync-interval`, and `--obj-wal-sync-on-commit` to tune behavior.
 :::
 
 ### close
@@ -158,6 +180,11 @@ cf-create <name> [options]
 | `--l0-stall <n>` | L0 queue stall threshold |
 | `--level-size-ratio <n>` | Level size multiplier |
 | `--min-levels <n>` | Minimum LSM levels |
+| `--dividing-level-offset <n>` | Compaction dividing level offset |
+| `--tombstone-density-trigger <ratio>` | Tombstone density above which compaction priority escalates (`0.0` to `1.0`, `0` disables) |
+| `--tombstone-density-min-entries <n>` | Minimum entry count for an SSTable to be considered by the density trigger |
+| `--object-lazy-compaction` / `--no-object-lazy-compaction` | Lazy compaction in object-store mode (doubles the L1 trigger, reducing remote I/O) |
+| `--object-prefetch-compaction` / `--no-object-prefetch-compaction` | Prefetch all input SSTables in parallel before a compaction merge (default: enabled) |
 
 **Examples**
 ```
@@ -242,8 +269,9 @@ cf-stats <name>
 - Memtable size, levels, total keys
 - Data size, avg key/value sizes
 - Read amplification, cache hit rate
-- Full configuration (compression, bloom filter, sync mode, etc.)
-- Per-level SSTable counts and sizes
+- Full configuration (compression, bloom filter, sync mode, dividing level offset, tombstone density trigger and minimum, object-store lazy/prefetch compaction, etc.)
+- Per-level SSTable counts, sizes, key counts, and tombstone counts
+- Tombstone observability: total tombstones, database-wide ratio, and the worst single-SSTable tombstone density (with the level it lives on)
 - B+tree statistics (if enabled)
 
 ### cf-status
@@ -276,8 +304,10 @@ All options from `cf-create` are supported except `--btree` and `--comparator` (
 - `--block-index-prefix-len`, `--index-sample-ratio`, `--no-block-indexes` · Block index settings for new SSTables
 - `--skip-list-max-level`, `--skip-list-probability` · Skip list settings for new memtables
 - `--isolation` · Default transaction isolation level
-- `--level-size-ratio`, `--min-levels` · LSM level sizing
+- `--level-size-ratio`, `--min-levels`, `--dividing-level-offset` · LSM level sizing
 - `--l1-trigger`, `--l0-stall` · Compaction and backpressure thresholds
+- `--tombstone-density-trigger`, `--tombstone-density-min-entries` · Tombstone-density compaction escalation
+- `--object-lazy-compaction` / `--no-object-lazy-compaction`, `--object-prefetch-compaction` / `--no-object-prefetch-compaction` · Object-store mode tuning
 - `--min-disk-space` · Minimum disk space required
 
 **Non-updatable settings**
@@ -291,6 +321,30 @@ Configuration updated for 'users' (persisted to disk)
 
 admintool(./mydb)> cf-update cache --write-buffer-size 268435456 --no-persist
 Configuration updated for 'cache' (in-memory only)
+```
+
+### cf-config-save
+Save the current column family configuration to an INI file. The optional `section_name` defaults to the column family name.
+```
+cf-config-save <cf> <ini_file> [section_name]
+```
+
+**Example**
+```
+admintool(./mydb)> cf-config-save users ./users.ini
+Saved configuration of 'users' to './users.ini' (section [users])
+```
+
+### cf-config-load
+Create a column family by loading its configuration from an INI file section. Useful for replicating a tuned configuration across databases or for templating column families.
+```
+cf-config-load <ini_file> <section_name> <cf_name>
+```
+
+**Example**
+```
+admintool(./mydb)> cf-config-load ./users.ini users users_replica
+Created column family 'users_replica' from './users.ini' [users]
 ```
 
 ## Key-Value Operations
@@ -321,6 +375,22 @@ get <cf> <key>
 Delete a key.
 ```
 delete <cf> <key>
+```
+
+### single-delete
+Tombstone a key with single-delete semantics. Compaction can drop the put and the tombstone together as soon as both appear in the same merge input, rather than carrying the tombstone forward to the largest level.
+```
+single-delete <cf> <key>
+```
+
+:::caution[When to use]
+`single-delete` is only safe when each key is put at most once between any two single-deletes (and at most once before the first single-delete on that key). Violating the contract can leave older puts visible after the tombstone. Prefer `delete` for any workload that issues repeated updates to the same key.
+:::
+
+**Example**
+```
+admintool(./mydb)> single-delete users user:1
+OK
 ```
 
 ### scan
@@ -481,6 +551,31 @@ verify <cf>
 Trigger compaction on a column family.
 ```
 compact <cf>
+```
+
+### compact-range
+Run a synchronous compaction over a specific key range. Only SSTables whose minimum and maximum keys overlap the requested range participate in the merge, so the work and I/O are bounded to the affected portion of the LSM tree rather than the whole column family.
+```
+compact-range <cf> <start_key> <end_key>
+```
+
+**Behavior**
+- Synchronous, blocks the caller until the merge commits or fails
+- Selects only SSTables whose key range overlaps `[start_key, end_key)`
+- Applies the same emit-loop logic as background compactions (tombstone reclamation, single-delete pair cancellation, sequence-based deduplication, value recompression)
+- Output SSTables are committed to the manifest atomically and old inputs are marked for deletion
+
+**Use cases**
+- Bulk reclaim after a large range delete, where waiting for natural compaction would leave tombstones on disk
+- Tenant eviction or sliding-window expiration that does not fit TTL semantics
+- Post-import cleanup of a known key range
+- Operational counterpart to the automatic tombstone density trigger when an operator wants reclaim now rather than at the next threshold crossing
+
+**Example**
+```
+admintool(./mydb)> compact-range users tenant_42: tenant_42;
+Compacting range 'users' [tenant_42: .. tenant_42;)...
+Range compaction completed for 'users'
 ```
 
 ### flush
