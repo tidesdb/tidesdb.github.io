@@ -167,6 +167,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'Benchmark Analysis on TidesDB v9.2.1 and RocksDB v11.1.1',
+							link: 'articles/benchmark-analysis-tidesdb-v9-2-1-rocksdb-v11-1-1'
+						},
+						{
 							label: 'Benchmark Analysis on TideSQL v4.3.0 in MariaDB v11.8.6 TPC-C with jemalloc and PGO',
 							link: 'articles/benchmark-analysis-tidesql-v4-3-0-mariadb-v11-8-6-tpc-c-pgo-jemalloc'
 						},
@@ -181,10 +185,6 @@ export default defineConfig({
 						{
 							label: 'MariaDB 11.8.6 with TidesDB(TideSQL v4.2.4) TPC-C Benchmark Analysis',
 							link: 'articles/mariadb-11-8-6-innodb-and-tidesql-v4-2-4-tpc-c-benchmark-analysis'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v9.8.0 and RocksDB v11.0.4',
-							link: 'articles/benchmark-analysis-tidesdb-v9-8-0-rocksdb-v11-0-4'
 						},
 						{
 							label: 'Deploying TideSQL on AWS Kubernetes with S3 Object Store (Cloud-Native MariaDB)',
