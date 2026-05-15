@@ -43,7 +43,7 @@ on the cold random read workload. Keys are 16 B and values are 100 B unless
 noted. Both engines share a 64 MB write buffer, 64 MB block cache, 10 bits per
 key bloom filters, LZ4 compression, and 8 shared background flush and compaction threads.
  
-*Throughput*
+**Throughput**
  
 ![Fig. 1](/analysis-tidesdb-v9-2-1-rocksdb-v11-1-1/fig1_throughput_headline.png)
 *Fig. 1. Throughput across seven representative workloads (ops/sec, median of three runs). Annotations show the TidesDB over RocksDB ratio.*
@@ -56,7 +56,7 @@ Seek and range go to TidesDB by a larger margin. Random seek lands at 24.4x and 
  
 Cold random read goes to RocksDB at 0.49x. After a full populate and flush, RocksDB serves random GETs about 2x faster than TidesDB. This is the one workload where the comparison is unambiguously the wrong way around.
  
-*Batching*
+**Batching**
  
 ![Fig. 2](/analysis-tidesdb-v9-2-1-rocksdb-v11-1-1/fig2_batch_scaling.png)
 *Fig. 2. Random PUT throughput vs batch size (10M ops, 8 threads, log x).*
@@ -65,7 +65,7 @@ Fig. 2 is sharp. At batch size 1, both engines sit near 350k ops/s and stay with
  
 The ratio at batch 10000 is 6.3x. If a workload submits one PUT at a time, the engines are roughly equivalent. If it batches, the gap is the whole story. Deletes show the same shape, with 1.06x at batch 1 and 2.9x at batch 100.
  
-*Latency tails*
+**Latency tails**
  
 ![Fig. 3](/analysis-tidesdb-v9-2-1-rocksdb-v11-1-1/fig3_p99_latency.png)
 *Fig. 3. p99 latency by workload (µs, log scale, lower is better).*
@@ -78,7 +78,7 @@ On the read side, the picture inverts. Mixed GET p99 is 126 µs on TidesDB versu
  
 Seek and range invert this back. TidesDB random seek p99 is 1 µs against 41 µs for RocksDB. Range 100 p99 is 14 µs against 75 µs.
  
-*Amplification and disk footprint*
+**Amplification and disk footprint**
  
 ![Fig. 4](/analysis-tidesdb-v9-2-1-rocksdb-v11-1-1/fig4_amplification_and_size.png)
 *Fig. 4. (a) Write amplification by workload, with the dotted line marking the no amplification floor at 1.0x. (b) On disk database size after the run.*
