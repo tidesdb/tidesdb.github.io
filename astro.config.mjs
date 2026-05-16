@@ -167,8 +167,8 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
-							label: 'Consumer TPC-C Analysis on TideSQL v4.5.0, MyRocks and InnoDB in MariaDB 11.8.6 using HammerDB',
-							link: 'articles/consumer-tpc-c-analysis-tidesql-v4-5-0-myrocks-mariadb-11-8-6'
+							label: 'Consumer TPC-C Analysis on TideSQL v4.5.0, MyRocks and InnoDB in MariaDB v11.8.6 using HammerDB',
+							link: 'articles/consumer-tpc-c-analysis-tidesql-v4-5-0-myrocks-mariadb-v11-8-6'
 						},
 						{
 							label: 'Benchmark Analysis on TidesDB v9.2.1 and RocksDB v11.1.1',

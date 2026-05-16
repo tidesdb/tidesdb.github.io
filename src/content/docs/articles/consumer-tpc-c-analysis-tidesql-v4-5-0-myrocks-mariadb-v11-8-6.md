@@ -1,5 +1,5 @@
 ---
-title: "Consumer TPC-C Analysis on TideSQL v4.5.0, MyRocks and InnoDB in MariaDB 11.8.6 using HammerDB"
+title: "Consumer TPC-C Analysis on TideSQL v4.5.0, MyRocks and InnoDB in MariaDB v11.8.6 using HammerDB"
 description: "Benchmark analysis on a consumer custom high-end desktop environment running TideSQL, MyRocks and InnoDB in MariaDB 11.8.6 running TPC-C (TPROC-C) with HammerDB"
 head:
   - tag: meta
@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![Consumer TPC-C Analysis on TideSQL, MyRocks and InnoDB in MariaDB 11.8.6 using HammerDB](/pexels-chris-spain-1559126760-37542740.jpg)
+![Consumer TPC-C Analysis on TideSQL, MyRocks and InnoDB in MariaDB v11.8.6 using HammerDB](/pexels-chris-spain-1559126760-37542740.jpg)
 
 </div>
 
@@ -22,7 +22,7 @@ head:
 
 *published on May 16th, 2026*
 
-In this analysis I will be going over results running <a href="https://github.com/tidesdb/tidesql">TideSQL</a> v4.5.0, <a href="https://github.com/facebook/mysql-5.6">MyRocks</a>, and InnoDB inside <a href="https://github.com/MariaDB/server/releases/tag/mariadb-11.8.6">MariaDB 11.8.6</a>.  
+In this analysis I will be going over results running <a href="https://github.com/tidesdb/tidesql">TideSQL</a> v4.5.0, <a href="https://github.com/facebook/mysql-5.6">MyRocks</a>, and InnoDB inside <a href="https://github.com/MariaDB/server/releases/tag/mariadb-11.8.6">MariaDB v11.8.6</a>.  
 
 <img style="float: left; margin-right: 20px;" src="/hammerDB-H-logo-FINAL.png" width="32" />
 I am using <a href="https://hammerdb.com">HammerDB</a> for this work utilizing TPROC-C in which is a <a href="https://en.wikipedia.org/wiki/TPC-C">TPC-C</a> derivative.
@@ -38,7 +38,7 @@ I used GCC (glibc) and the installed version of the TidesDB library used was v9.
 
 I used a custom HammerDB runner script as seen here <a href="https://github.com/tidesdb/hammer/blob/master/hammerdb_runner.sh">hammerdb_runner.sh</a>, a bash wrapper around HammerDB's hammerdbcli that drives one canonical run per (engine, benchmark) pair end to end.
 
-The command below runs one TPC-C iteration against the TidesDB(TideSQL) engine on a MariaDB reachable at /tmp/mariadb.sock as hammerdb / hammerdb123, using HammerDB 5.0 under ~/HammerDB-5.0. It builds a 40-warehouse TPC-C schema with 8 build VUs, settles for 5 s, runs the timed workload with 8 measured VUs for 1 minute of ramp-up + 2 minutes of measurement, also capturing the NOPM/TPM/p95 numbers.
+The command below runs one TPC-C iteration against the TidesDB(TideSQL) engine on a MariaDB reachable at /tmp/mariadb.sock as hammerdb / hammerdb123, using HammerDB under ~/HammerDB-5.0. It builds a 40-warehouse TPC-C schema with 8 build VUs, settles for 5 s, runs the timed workload with 8 measured VUs for 1 minute of ramp-up + 2 minutes of measurement, also capturing the NOPM/TPM/p95 numbers.
 ```bash
 ./hammerdb_runner.sh -b tpcc --warehouses 40 --tpcc-vu 8 --tpcc-build-vu 8 --rampup 1 --duration 2 --settle 5 -H ~/HammerDB-5.0 -e tidesdb -u hammerdb --pass hammerdb123 -S /tmp/mariadb.sock
 ```
