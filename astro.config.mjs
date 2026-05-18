@@ -167,7 +167,7 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
-							label: 'iibench Analysis on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB 11.8.6',
+							label: 'iibench Analysis on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB v11.8.6',
 							link: 'articles/iibench-tidesql-v4-5-1-myrocks-innodb-mariadb-v11-8-6-analysis'
 						},
 						{
