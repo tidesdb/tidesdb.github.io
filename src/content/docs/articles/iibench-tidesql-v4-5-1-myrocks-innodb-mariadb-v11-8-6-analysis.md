@@ -1,6 +1,6 @@
 ---
-title: "iibench Analysis on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB 11.8.6"
-description: "iibench(index-insertion) benchmark on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB 11.8.6"
+title: "iibench Analysis on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB v11.8.6"
+description: "iibench(index-insertion) benchmark on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB v11.8.6"
 head:
   - tag: meta
     attrs:
