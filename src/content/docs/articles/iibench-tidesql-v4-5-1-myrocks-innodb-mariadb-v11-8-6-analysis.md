@@ -24,7 +24,7 @@ head:
 
 Recently I wrote a port of Tim Callaghan's iibench in which was rather dated and in Java, you can find it <a target="_blank" href="https://github.com/tmcallaghan/iibench-mysql">here</a>, also I was unsure of the license thus I rewrote the spefication in GO, a language in which I love and is perfect for a benchmarking tool and it's licensed under <a target="_blank" href="https://opensource.org/license/bsd-2-clause">BSD 2</a>.
 
-The tool is very simple, it takes tasks in which you queue and run them.  For this work I setup the task queue below in TOML format.
+The <a target="_blank" href="https://github.com/guycipher/iibench">tool</a> is very simple, it takes tasks in which you queue and run them.  For this work I setup the task queue below in TOML format.
 ```toml
 
 [defaults]
