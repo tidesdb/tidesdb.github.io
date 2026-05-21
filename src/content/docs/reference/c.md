@@ -90,7 +90,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_IO` | `-4` | I/O operation failed (file read/write error) |
 | `TDB_ERR_CORRUPTION` | `-5` | Data corruption detected (checksum failure, invalid format version, truncated data) |
 | `TDB_ERR_EXISTS` | `-6` | Resource already exists (e.g., column family name collision) |
-| `TDB_ERR_CONFLICT` | `-7` | Transaction conflict detected (write-write conflict in SNAPSHOT, read-write + write-write in REPEATABLE_READ, full SSI in SERIALIZABLE) |
+| `TDB_ERR_CONFLICT` | `-7` | Transaction conflict detected (read-write conflict in REPEATABLE_READ, write-write conflict in SNAPSHOT, full SSI in SERIALIZABLE) |
 | `TDB_ERR_TOO_LARGE` | `-8` | Key or value size exceeds maximum allowed size |
 | `TDB_ERR_MEMORY_LIMIT` | `-9` | Operation would exceed memory limits (safety check to prevent OOM) |
 | `TDB_ERR_INVALID_DB` | `-10` | Database handle is invalid (e.g., after close) |
@@ -406,8 +406,8 @@ if (tidesdb_create_column_family(db, "my_cf", &cf_config) != 0)
 tidesdb_column_family_config_t cf_config = {
     .write_buffer_size = 128 * 1024 * 1024,                   /* 128MB memtable flush threshold */
     .level_size_ratio = 10,                                   /* Level size multiplier (default: 10) */
-    .min_levels = 5,                                          /* Minimum LSM levels (default: 5) */
-    .dividing_level_offset = 2,                               /* Compaction dividing level offset (default: 2) */
+    .min_levels = 1,                                          /* Minimum LSM levels (default: 1) */
+    .dividing_level_offset = 1,                               /* Compaction dividing level offset (default: 1) */
     .skip_list_max_level = 12,                                /* Skip list max level */
     .skip_list_probability = 0.25f,                           /* Skip list probability */
     .compression_algorithm = TDB_COMPRESS_LZ4,                /* TDB_COMPRESS_LZ4, TDB_COMPRESS_LZ4_FAST, TDB_COMPRESS_ZSTD, TDB_COMPRESS_SNAPPY, or TDB_COMPRESS_NONE */
@@ -1808,7 +1808,7 @@ cf_config.sync_interval_us = 1000000;
 
 ### Manual WAL Sync
 
-`tidesdb_sync_wal` forces an immediate fsync of the active write-ahead log for a column family. This is useful for explicit durability control when using `TDB_SYNC_NONE` or `TDB_SYNC_INTERVAL` modes.
+`tidesdb_sync_wal` forces an immediate `fdatasync` of the active write-ahead log for a column family. This is useful for explicit durability control when using `TDB_SYNC_NONE` or `TDB_SYNC_INTERVAL` modes.
 
 ```c
 int tidesdb_sync_wal(tidesdb_column_family_t *cf);
@@ -2283,8 +2283,8 @@ Use `tidesdb_objstore_default_config()` for sensible defaults, then override fie
 | `cache_on_write` | `int` | `1` | Keep local copy after upload |
 | `max_concurrent_uploads` | `int` | `4` | Number of parallel upload threads |
 | `max_concurrent_downloads` | `int` | `8` | Number of parallel download threads |
-| `multipart_threshold` | `size_t` | `67108864` (64MB) | Use multipart upload above this size |
-| `multipart_part_size` | `size_t` | `8388608` (8MB) | Chunk size for multipart uploads |
+| `multipart_threshold` | `size_t` | `67108864` (64MB) | Reserved; not currently wired. The S3 connector uploads files at or above a fixed 64MB threshold as a multipart upload |
+| `multipart_part_size` | `size_t` | `8388608` (8MB) | Reserved; not currently wired. The S3 connector streams multipart uploads in a fixed 16MB part size |
 | `sync_manifest_to_object` | `int` | `1` | Upload MANIFEST after each compaction |
 | `replicate_wal` | `int` | `1` | Upload closed WAL segments for replication |
 | `wal_upload_sync` | `int` | `0` | 0 for background WAL upload, 1 to block flush |
@@ -2423,12 +2423,12 @@ tidesdb_txn_put(txn, cf, key, key_size, val, val_size, 0); /* succeeds */
 tidesdb_txn_commit(txn);
 ```
 
-`tidesdb_promote_to_primary` waits for any in-progress reaper sync cycle to complete, performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. The wait prevents lock contention between the sync thread and the first post-promotion query. The function returns `TDB_ERR_INVALID_ARGS` if the node is already a primary.
+`tidesdb_promote_to_primary` stops and joins the dedicated replica sync thread, draining any in-progress sync cycle, then performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. Stopping the sync thread first prevents lock contention with the first post-promotion query. The function returns `TDB_ERR_INVALID_ARGS` if the node is already a primary.
 
 ### How Replica Sync Works
 
-- Before each MANIFEST sync cycle, the reaper discovers new column families in the object store that do not exist locally and creates them automatically by downloading their config and MANIFEST
-- The reaper thread polls the remote MANIFEST for each CF every `replica_sync_interval_us`
+- Before each MANIFEST sync cycle, the dedicated replica sync thread discovers new column families in the object store that do not exist locally and creates them automatically by downloading their config and MANIFEST
+- The replica sync thread polls the remote MANIFEST for each CF every `replica_sync_interval_us`
 - New SSTables from the primary's flushes and compactions are added to the replica's levels
 - SSTables compacted away on the primary are removed from the replica's levels
 - When `replica_replay_wal` is enabled, all available WAL segments are discovered from the object store via listing and replayed in generation order into the memtable for near-real-time reads
