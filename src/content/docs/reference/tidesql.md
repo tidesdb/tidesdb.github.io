@@ -84,6 +84,7 @@ The script accepts several options:
 | `--jobs <n>` | Parallel build jobs (default: number of CPU cores) |
 | `--skip-deps` | Skip system dependency installation |
 | `--skip-tidesdb` | Skip building the TidesDB library (use if already installed) |
+| `--rebuild-plugin` | Rebuild and reinstall only `ha_tidesdb.so` against an existing MariaDB install (does not rebuild MariaDB or `libtidesdb`) |
 | `--skip-engines <list>` | Comma-separated storage engines to exclude from the build |
 | `--list-engines` | List available storage engines and exit |
 | `--pgo` | Enable profile-guided optimization (longer build, faster binaries) |
@@ -651,7 +652,7 @@ CREATE TABLE tuned (
   L0_QUEUE_STALL_THRESHOLD=20;
 ```
 
-`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 1, matching `TDB_DEFAULT_MIN_LEVELS`). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 1, matching `TDB_DEFAULT_DIVIDING_LEVEL_OFFSET`). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 20). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × min(L0_QUEUE_STALL_THRESHOLD, 16))`, with a hard cap of 16 immutable memtables regardless of the stall threshold.
+`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 1, matching `TDB_DEFAULT_MIN_LEVELS`). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 1, matching `TDB_DEFAULT_DIVIDING_LEVEL_OFFSET`). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 20). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)` since the stall threshold itself bounds how many immutable memtables can queue before new writes block.
 
 ### Object Store Compaction Tuning
 
@@ -1161,15 +1162,15 @@ MariaDB [demo]> ANALYZE TABLE products;
 +---------------+---------+----------+-------------------------------------------------------------------------------------+
 | Table         | Op      | Msg_type | Msg_text                                                                            |
 +---------------+---------+----------+-------------------------------------------------------------------------------------+
-| demo.products | analyze | Note     | TIDESDB: CF 'demo__products'  total_keys=10  data_size=636 bytes  memtable=0 bytes  |
+| demo.products | analyze | Note     | [TIDESDB] CF 'demo__products'  total_keys=10  data_size=636 bytes  memtable=0 bytes  |
 |               |         |          |   levels=5  read_amp=2.00  cache_hit=0.0%                                           |
-| demo.products | analyze | Note     | TIDESDB: avg_key=18.8 bytes  avg_value=44.0 bytes                                   |
-| demo.products | analyze | Note     | TIDESDB: level 1  sstables=0  size=0 bytes  keys=0                                  |
-| demo.products | analyze | Note     | TIDESDB: level 2  sstables=1  size=636 bytes  keys=10                               |
-| demo.products | analyze | Note     | TIDESDB: level 3  sstables=0  size=0 bytes  keys=0                                  |
-| demo.products | analyze | Note     | TIDESDB: level 4  sstables=0  size=0 bytes  keys=0                                  |
-| demo.products | analyze | Note     | TIDESDB: level 5  sstables=0  size=0 bytes  keys=0                                  |
-| demo.products | analyze | Note     | TIDESDB: idx CF 'demo__products__idx_idx_category'  keys=10  data_size=449 bytes     |
+| demo.products | analyze | Note     | [TIDESDB] avg_key=18.8 bytes  avg_value=44.0 bytes                                   |
+| demo.products | analyze | Note     | [TIDESDB] level 1  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | [TIDESDB] level 2  sstables=1  size=636 bytes  keys=10                               |
+| demo.products | analyze | Note     | [TIDESDB] level 3  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | [TIDESDB] level 4  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | [TIDESDB] level 5  sstables=0  size=0 bytes  keys=0                                  |
+| demo.products | analyze | Note     | [TIDESDB] idx CF 'demo__products__idx_idx_category'  keys=10  data_size=449 bytes     |
 |               |         |          |   levels=5                                                                          |
 | demo.products | analyze | status   | OK                                                                                  |
 +---------------+---------+----------+-------------------------------------------------------------------------------------+
@@ -1405,7 +1406,7 @@ CREATE TABLE t3 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses FULL
 
 The block cache is a read cache backed by two independent clock caches, one for raw klog block bytes (used by the default block-based SSTable format) and one for deserialized B+tree nodes (used by column families with `USE_BTREE=1`). Both caches share the configured `tidesdb_block_cache_size` budget. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use - only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families, data + one secondary index each). When `tidesdb_log_to_file` is enabled (the default), TidesDB writes to a `LOG` file in the data directory with automatic truncation controlled by `tidesdb_log_truncation_at` (default 24 MB, 0 to disable truncation). When disabled, logs are written to stderr.
 
-The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. When `tidesdb_unified_memtable=ON` (the default), all column families share a single memtable with its own write buffer (`tidesdb_unified_memtable_write_buffer_size`, default 256 MB), so per-CF `WRITE_BUFFER_SIZE` does not affect memtable memory. The per-CF `L0_QUEUE_STALL_THRESHOLD` (default 20) still applies for backpressure. A hard cap of 16 immutable memtables applies regardless of the stall threshold. When unified memtable is disabled, each CF has its own memtable and worst-case memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × min(L0_QUEUE_STALL_THRESHOLD, 16))`.
+The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. When `tidesdb_unified_memtable=ON` (the default), all column families share a single memtable with its own write buffer (`tidesdb_unified_memtable_write_buffer_size`, default 256 MB), so per-CF `WRITE_BUFFER_SIZE` does not affect memtable memory. The per-CF `L0_QUEUE_STALL_THRESHOLD` (default 20) still applies for backpressure and bounds the number of immutable memtables that can queue before new writes block. When unified memtable is disabled, each CF has its own memtable and worst-case memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`.
 
 
 ## How It Stores Data Internally
@@ -1414,7 +1415,7 @@ Understanding the physical layout helps when interpreting `ANALYZE TABLE` output
 
 Each table's data lives in a column family, which is an independent LSM-tree. Writes go to a skip-list memtable. When the memtable reaches the configured write buffer size, it becomes immutable and is flushed to disk as a sorted SSTable in Level 1. Compaction then merges overlapping SSTables from lower levels into higher levels, maintaining the sorted invariant.
 
-Row keys inside the column family use a namespace prefix byte. Data rows use `0x01`, and the byte `0x00` is reserved for future metadata entries. This prefix ensures that a table scan (which seeks to `0x01`) naturally skips over any non-data keys.
+Row keys inside the column family use a namespace prefix byte. Data rows use `0x01` and metadata entries use `0x00`. The metadata namespace is what holds FTS aggregate counters (total document count and total word count for BM25 scoring) so the data scan that seeks to `0x01` naturally skips them.
 
 Primary key bytes are encoded in a memcmp-comparable format. For a signed 32-bit integer, the encoding flips the sign bit and stores the result in big-endian byte order. This means that the integer -1 sorts before 0, and 0 sorts before 1, all under a simple byte comparison. The same principle extends to all numeric types and string collations.
 
