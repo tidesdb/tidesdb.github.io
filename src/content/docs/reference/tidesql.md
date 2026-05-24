@@ -649,10 +649,10 @@ CREATE TABLE tuned (
   SKIP_LIST_MAX_LEVEL=16
   SKIP_LIST_PROBABILITY=25
   L1_FILE_COUNT_TRIGGER=4
-  L0_QUEUE_STALL_THRESHOLD=20;
+  L0_QUEUE_STALL_THRESHOLD=10;
 ```
 
-`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 1, matching `TDB_DEFAULT_MIN_LEVELS`). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 1, matching `TDB_DEFAULT_DIVIDING_LEVEL_OFFSET`). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 20). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)` since the stall threshold itself bounds how many immutable memtables can queue before new writes block.
+`LEVEL_SIZE_RATIO` controls how much larger each level is compared to the previous one (default 10). `MIN_LEVELS` sets the minimum depth of the LSM-tree (default 1, matching `TDB_DEFAULT_MIN_LEVELS`). `DIVIDING_LEVEL_OFFSET` sets the offset used to compute the dividing level, which serves as the primary compaction target (default 1, matching `TDB_DEFAULT_DIVIDING_LEVEL_OFFSET`). The dividing level is calculated as `num_levels - 1 - DIVIDING_LEVEL_OFFSET`. TidesDB does not use traditional selectable compaction policies (like Leveled or Tiered); instead, it employs three complementary merge strategies - full preemptive merge, dividing merge, and partitioned merge - that are automatically selected based on the current state of the LSM-tree relative to the dividing level. The skip list parameters control the in-memory memtable structure. `L1_FILE_COUNT_TRIGGER` determines how many SSTables can accumulate at Level 1 before compaction merges them into deeper levels. `L0_QUEUE_STALL_THRESHOLD` sets how many immutable memtables can be queued for flush before the engine stalls new writes to allow flushes to catch up (default 10, matching `TDB_DEFAULT_L0_QUEUE_STALL_THRESHOLD`). Note that the flush threshold is adaptive, under idle conditions the active memtable can grow to 150% of `WRITE_BUFFER_SIZE` before flushing, dropping to 100% under pressure. Worst-case memtable memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)` since the stall threshold itself bounds how many immutable memtables can queue before new writes block.
 
 ### Object Store Compaction Tuning
 
@@ -1363,7 +1363,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_default_sync_interval_us` | 128000 | Default sync interval in microseconds (for INTERVAL mode) |
 | `tidesdb_default_bloom_fpr` | 100 | Default bloom FPR in parts per 10,000 (100 = 1%) |
 | `tidesdb_default_klog_value_threshold` | 512 | Default klog value threshold in bytes (values >= this go to vlog) |
-| `tidesdb_default_l0_queue_stall_threshold` | 20 | Default L0 queue stall threshold |
+| `tidesdb_default_l0_queue_stall_threshold` | 10 | Default L0 queue stall threshold |
 | `tidesdb_default_l1_file_count_trigger` | 4 | Default L1 file count compaction trigger |
 | `tidesdb_default_level_size_ratio` | 10 | Default level size ratio |
 | `tidesdb_default_min_levels` | 1 | Default minimum LSM-tree levels (matches `TDB_DEFAULT_MIN_LEVELS`) |
@@ -1389,7 +1389,7 @@ tidesdb_default_sync_mode=NONE
 tidesdb_default_compression=NONE
 tidesdb_default_bloom_fpr=10
 tidesdb_default_klog_value_threshold=1024
-tidesdb_default_l0_queue_stall_threshold=20
+tidesdb_default_l0_queue_stall_threshold=10
 ```
 
 ```sql
@@ -1406,7 +1406,7 @@ CREATE TABLE t3 (id INT PRIMARY KEY) ENGINE=TIDESDB;  -- uses FULL
 
 The block cache is a read cache backed by two independent clock caches, one for raw klog block bytes (used by the default block-based SSTable format) and one for deserialized B+tree nodes (used by column families with `USE_BTREE=1`). Both caches share the configured `tidesdb_block_cache_size` budget. A larger cache reduces read amplification for workloads that repeatedly access the same key ranges. The flush and compaction thread counts should be tuned based on the number of column families in use - only one flush and one compaction can run per column family at a time, so with N column families, up to N threads can be busy simultaneously. The default of 4 threads handles workloads with up to 4 tables (8 column families, data + one secondary index each). When `tidesdb_log_to_file` is enabled (the default), TidesDB writes to a `LOG` file in the data directory with automatic truncation controlled by `tidesdb_log_truncation_at` (default 24 MB, 0 to disable truncation). When disabled, logs are written to stderr.
 
-The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. When `tidesdb_unified_memtable=ON` (the default), all column families share a single memtable with its own write buffer (`tidesdb_unified_memtable_write_buffer_size`, default 256 MB), so per-CF `WRITE_BUFFER_SIZE` does not affect memtable memory. The per-CF `L0_QUEUE_STALL_THRESHOLD` (default 20) still applies for backpressure and bounds the number of immutable memtables that can queue before new writes block. When unified memtable is disabled, each CF has its own memtable and worst-case memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`.
+The `tidesdb_max_memory_usage` variable controls the global memory cap enforced by the library. When set to 0, the library auto-detects available system memory and targets 50% of it (with a minimum floor of 5% of total system RAM). In a shared MariaDB server where InnoDB and other components also consume memory, you may want to set an explicit limit. When `tidesdb_unified_memtable=ON` (the default), all column families share a single memtable with its own write buffer (`tidesdb_unified_memtable_write_buffer_size`, default 256 MB), so per-CF `WRITE_BUFFER_SIZE` does not affect memtable memory. The per-CF `L0_QUEUE_STALL_THRESHOLD` (default 10) still applies for backpressure and bounds the number of immutable memtables that can queue before new writes block. When unified memtable is disabled, each CF has its own memtable and worst-case memory per column family is approximately `(WRITE_BUFFER_SIZE × 1.5) + (WRITE_BUFFER_SIZE × L0_QUEUE_STALL_THRESHOLD)`.
 
 
 ## How It Stores Data Internally
