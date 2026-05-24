@@ -97,10 +97,11 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_UNKNOWN` | `-11` | Unknown or unspecified error |
 | `TDB_ERR_LOCKED` | `-12` | Database is locked by another process |
 | `TDB_ERR_READONLY` | `-13` | Database is in read-only replica mode (writes rejected) |
+| `TDB_ERR_BUSY` | `-14` | System is at capacity; the backpressure stall hit its no-progress budget. Transient -- the caller should retry. Matches POSIX `EBUSY` semantics |
 
 **Error categories**
 - `TDB_ERR_CORRUPTION` indicates data integrity issues requiring immediate attention
-- `TDB_ERR_CONFLICT` indicates transaction conflicts (retry may succeed)
+- `TDB_ERR_CONFLICT`, `TDB_ERR_BUSY` indicate transient conditions (retry may succeed)
 - `TDB_ERR_MEMORY`, `TDB_ERR_MEMORY_LIMIT`, `TDB_ERR_TOO_LARGE` indicate resource constraints
 - `TDB_ERR_NOT_FOUND`, `TDB_ERR_EXISTS` are normal operational conditions, not failures
 
@@ -198,7 +199,7 @@ tidesdb_config_t config = {
     .num_compaction_threads = 2,                  /* Compaction thread pool size (default: 2) */
     .log_level = TDB_LOG_INFO,                    /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,         /* 64MB global block cache (default: 64MB) */
-    .max_open_sstables = 256,                     /* Max cached SSTable structures (default: 256) */
+    .max_open_sstables = 256,                     /* Max cached SSTable structures (default: 256 on Linux/macOS/most BSDs, 64 on OpenBSD which has lower default fd limits) */
     .max_memory_usage = 0,                        /* Global memory limit in bytes (default: 0 = auto, 50% of system RAM; minimum: 5% of system RAM) */
     .log_to_file = 0,                             /* Write logs to file instead of stderr (default: 0) */
     .log_truncation_at = 24 * (1024*1024),        /* Log file truncation size (default: 24MB), 0 = no truncation */
@@ -208,7 +209,7 @@ tidesdb_config_t config = {
     .unified_memtable_skip_list_probability = 0,  /* Skip list probability for unified memtable (default: 0 = 0.25) */
     .unified_memtable_sync_mode = 0,              /* Sync mode for unified WAL (default: 0 = TDB_SYNC_NONE) */
     .unified_memtable_sync_interval_us = 0,       /* Sync interval for unified WAL in microseconds (default: 0) */
-    .max_concurrent_flushes = 4,                  /* Global cap on in-flight memtable flushes (default: 4, 0 = use TDB_DEFAULT_MAX_CONCURRENT_FLUSHES) */
+    .max_concurrent_flushes = 0,                  /* Pinned 1:1 to num_flush_threads at open. 0 = match the pool size automatically. Any other value is normalized to match num_flush_threads with a TDB_LOG_WARN */
 };
 
 tidesdb_t *db = NULL;
@@ -407,7 +408,7 @@ tidesdb_column_family_config_t cf_config = {
     .write_buffer_size = 128 * 1024 * 1024,                   /* 128MB memtable flush threshold */
     .level_size_ratio = 10,                                   /* Level size multiplier (default: 10) */
     .min_levels = 1,                                          /* Minimum LSM levels (default: 1) */
-    .dividing_level_offset = 1,                               /* Compaction dividing level offset (default: 1) */
+    .dividing_level_offset = 1,                               /* Spooky dividing level X = num_levels - 1 - offset, clamped to >= 1. offset=0 is 2L-Spooky (transient space-amp bounded by 1/T, highest write-amp); offset=1 is the paper's recommended generalized tuning (default); higher offsets reduce write-amp further but multiply the number of open files per Spooky Eq 12 */
     .skip_list_max_level = 12,                                /* Skip list max level */
     .skip_list_probability = 0.25f,                           /* Skip list probability */
     .compression_algorithm = TDB_COMPRESS_LZ4,                /* TDB_COMPRESS_LZ4, TDB_COMPRESS_LZ4_FAST, TDB_COMPRESS_ZSTD, TDB_COMPRESS_SNAPPY, or TDB_COMPRESS_NONE */
@@ -423,7 +424,7 @@ tidesdb_column_family_config_t cf_config = {
     .min_disk_space = 100 * 1024 * 1024,                      /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
     .l1_file_count_trigger = 4,                               /* L1 file count trigger for compaction (default: 4) */
-    .l0_queue_stall_threshold = 20,                           /* L0 queue stall threshold (default: 20) */
+    .l0_queue_stall_threshold = 10,                           /* L0 queue stall threshold (default: 10) */
     .tombstone_density_trigger = 0.0,                         /* Tombstone ratio above which compaction escalates (default: 0.0 = disabled, range 0.0 to 1.0) */
     .tombstone_density_min_entries = 1024,                    /* Minimum entry count for an SSTable to be considered by the density trigger (default: 1024) */
     .use_btree = 0                                            /* Use B+tree format for klog (default: 0 = block-based) */
@@ -698,8 +699,8 @@ if (tidesdb_get_db_stats(db, &db_stats) == 0)
 | `resolved_memory_limit` | `size_t` | Resolved memory limit (auto or configured) |
 | `memory_pressure_level` | `int` | Current memory pressure (0=normal, 1=elevated, 2=high, 3=critical) |
 | `flush_pending_count` | `int` | Number of pending flush operations (queued + in-flight) |
-| `total_memtable_bytes` | `int64_t` | Total bytes in active memtables across all CFs |
-| `total_immutable_count` | `int` | Total immutable memtables across all CFs |
+| `total_memtable_bytes` | `int64_t` | Total bytes in active **plus unflushed immutable** memtables across all CFs and the unified memtable. Active-only readings require pinning `cf->active_memtable` directly via `tidesdb_get_stats` and reading the per-CF `memtable_size`, which itself folds in the per-CF immutable queue |
+| `total_immutable_count` | `int` | Total per-CF immutable memtables across all CFs |
 | `total_sstable_count` | `int` | Total SSTables across all CFs and levels |
 | `total_data_size_bytes` | `uint64_t` | Total data size (klog + vlog) across all CFs |
 | `num_open_sstables` | `int` | Number of currently open SSTable file handles |
@@ -707,6 +708,22 @@ if (tidesdb_get_db_stats(db, &db_stats) == 0)
 | `txn_memory_bytes` | `int64_t` | Bytes held by in-flight transactions |
 | `compaction_queue_size` | `size_t` | Number of pending compaction tasks |
 | `flush_queue_size` | `size_t` | Number of pending flush tasks in queue |
+| `unified_memtable_enabled` | `int` | 1 if the database is in unified memtable mode |
+| `unified_memtable_bytes` | `int64_t` | Bytes in the unified active memtable (unified mode only) |
+| `unified_immutable_count` | `int` | Number of unified immutable memtables awaiting flush |
+| `unified_is_flushing` | `int` | 1 if a unified flush is currently in progress |
+| `unified_next_cf_index` | `uint32_t` | Next CF prefix index to assign in unified mode |
+| `unified_wal_generation` | `uint64_t` | Current generation number of the unified WAL |
+| `object_store_enabled` | `int` | 1 if an object store connector is attached |
+| `object_store_connector` | `const char*` | Name of the object store connector ("fs", "s3", or NULL) |
+| `local_cache_bytes_used` | `size_t` | Bytes currently used by the local SSTable cache (object store mode) |
+| `local_cache_bytes_max` | `size_t` | Local cache capacity in bytes (object store mode) |
+| `local_cache_num_files` | `int` | Number of SSTable files resident in the local cache |
+| `last_uploaded_generation` | `uint64_t` | Generation of the most recently uploaded WAL (object store mode) |
+| `upload_queue_depth` | `size_t` | Pending upload work items in the object store upload queue |
+| `total_uploads` | `uint64_t` | Cumulative successful uploads since open |
+| `total_upload_failures` | `uint64_t` | Cumulative upload failures since open |
+| `replica_mode` | `int` | 1 if the database is in read-only replica mode |
 
 :::note[Stack Allocated]
 Unlike `tidesdb_get_stats` (which heap-allocates), `tidesdb_get_db_stats` fills a caller-provided struct on the stack. No free is needed.
@@ -970,7 +987,7 @@ if (tidesdb_cf_update_runtime_config(cf, &new_config, persist_to_disk) == 0)
 - `use_btree` · Cannot change klog format after creation (existing SSTables use the original format)
 
 :::note[Backpressure Defaults]
-The default `l0_queue_stall_threshold` is 20. The default `l1_file_count_trigger` is 4.
+The default `l0_queue_stall_threshold` is 10. The default `l1_file_count_trigger` is 4. Both align with the Spooky paper's stop and trigger thresholds.
 :::
 
 **Configuration persistence**
@@ -1948,8 +1965,8 @@ if (tidesdb_compact(cf) != 0)
 **Behavior**
 
 - Enqueues compaction work in the global compaction thread pool
-- Returns immediately (non-blocking) -- compaction runs asynchronously in background threads
-- If compaction is already running for the column family, the call succeeds but doesn't queue duplicate work
+- **Blocks until the worker has finished servicing the request**, including any compaction already in flight on this column family. The call routes through an internal blocking entry point that attaches a per-call completion signal to the work item; the worker fires that signal on every exit path that consumes the item
+- The request is never coalesced -- even if another compaction is mid-flight, the caller's request runs as its own work item
 - Compaction merges SSTables across levels, removes tombstones, expired TTL entries, and obsolete versions
 - Thread-safe -- can be called concurrently from multiple threads
 
@@ -1959,6 +1976,7 @@ if (tidesdb_compact(cf) != 0)
 - Configure thread pool size via `config.num_compaction_threads` (default: 2)
 - Compaction is I/O intensive -- avoid triggering during peak write workloads
 - Multiple column families can compact in parallel up to the thread pool limit
+- Because the call blocks, application code that needs fire-and-forget semantics should run `tidesdb_compact` from a dedicated thread
 
 See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on compaction algorithms, merge strategies, and parallel compaction.
 
@@ -2003,7 +2021,7 @@ if (tidesdb_compact_range(cf, start, sizeof(start) - 1, end, sizeof(end) - 1) !=
 
 ### Purge Column Family
 
-`tidesdb_purge_cf` forces a synchronous flush and aggressive compaction for a single column family. Unlike `tidesdb_flush_memtable` and `tidesdb_compact` (which are non-blocking), purge blocks until all flush and compaction I/O is complete.
+`tidesdb_purge_cf` forces a synchronous flush and aggressive compaction for a single column family. Unlike `tidesdb_flush_memtable` (which is non-blocking and returns once flush work is enqueued), purge blocks until all flush and compaction I/O is complete; `tidesdb_compact` also blocks now but only on a single compaction round, whereas purge runs the full flush-wait-compact-drain pipeline.
 
 ```c
 tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
@@ -2060,7 +2078,7 @@ if (tidesdb_purge(db) != 0)
 - `TDB_ERR_INVALID_ARGS` if `db` is NULL
 
 :::tip[Purge vs Manual Flush + Compact]
-`tidesdb_flush_memtable` and `tidesdb_compact` are non-blocking - they enqueue work and return immediately. `tidesdb_purge_cf` and `tidesdb_purge` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
+`tidesdb_flush_memtable` is non-blocking -- it enqueues flush work and returns immediately. `tidesdb_compact`, `tidesdb_purge_cf`, and `tidesdb_purge` all block until the work they request has been serviced. Use purge when you need the additional flush + retry pipeline plus compaction in one call; use plain `tidesdb_compact` when you only need to wait for a compaction.
 :::
 
 ## Thread Pools
@@ -2071,22 +2089,23 @@ TidesDB uses separate thread pools for flush and compaction operations. Understa
 - Cross-CF parallelism · Multiple flush/compaction workers CAN process different column families in parallel
 - Intra-CF flush parallelism · A single column family can have multiple memtables flushing concurrently up to the global `max_concurrent_flushes` cap, so a hot CF drains its immutable queue at the speed of the worker pool rather than serially
 - Within-CF compaction serialization · Compaction is still one-per-CF (enforced by the atomic `is_compacting` flag) so level invariants and manifest ordering stay consistent
-- Global flush semaphore · `max_concurrent_flushes` (default 4) caps total in-flight flushes across all CFs combined, so deployments with many column families bound transient memory and queue depth
+- Global flush semaphore · `max_concurrent_flushes` is pinned 1:1 to `num_flush_threads` at open. A cap above the pool size would be meaningless because the pool size is the hard upper bound, a cap below the pool size would leave workers idle, so the open path normalizes any mismatch to `num_flush_threads` and emits a `TDB_LOG_WARN`
 
 **Thread pool sizing guidance**
-- Single column family with sustained write pressure · Increase `num_flush_threads` toward `max_concurrent_flushes` to drain the immutable queue faster, since multiple flushes per CF are now allowed
-- Multiple column families · Set flush thread counts up to `min(num_cfs, max_concurrent_flushes)` and compaction thread counts up to the number of column families for maximum parallelism
+- Tune `num_flush_threads` to the parallelism you want for in-flight flushes; `max_concurrent_flushes` will follow it
+- Single column family with sustained write pressure · Increase `num_flush_threads` so the immutable queue drains faster, since multiple flushes per CF are allowed
+- Multiple column families · Set flush thread count up to roughly the number of concurrently hot CFs, and compaction thread count up to the number of column families for maximum cross-CF parallelism
 
 **Configuration**
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 2,                /* Flush thread pool size (default: 2) */
-    .num_compaction_threads = 2,           /* Compaction thread pool size (default: 2) */
-    .max_concurrent_flushes = 4,           /* Global cap on in-flight flushes (default: 4) */
+    .num_flush_threads = 4,                /* Flush thread pool size (default: 2) */
+    .num_compaction_threads = 4,           /* Compaction thread pool size (default: 2) */
+    .max_concurrent_flushes = 0,           /* 0 = auto-match num_flush_threads (recommended) */
     .log_level = TDB_LOG_INFO,
     .block_cache_size = 64 * 1024 * 1024,  /* 64MB global block cache (default: 64MB) */
-    .max_open_sstables = 256,              /* LRU cache for SSTable objects (default: 256, each has 2 FDs) */
+    .max_open_sstables = 256,              /* LRU cache for SSTable objects (default: 256, 64 on OpenBSD; each has 2 FDs) */
 };
 
 tidesdb_t *db = NULL;
