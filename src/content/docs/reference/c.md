@@ -1978,7 +1978,7 @@ if (tidesdb_compact(cf) != 0)
 - Multiple column families can compact in parallel up to the thread pool limit
 - Because the call blocks, application code that needs fire-and-forget semantics should run `tidesdb_compact` from a dedicated thread
 
-See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#6-compaction-policy) for details on compaction algorithms, merge strategies, and parallel compaction.
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#compaction) for details on compaction algorithms, merge strategies, and parallel compaction.
 
 ### Targeted Range Compaction
 
@@ -2116,7 +2116,7 @@ tidesdb_open(&config, &db);
 `max_open_sstables` is a **storage-engine-level** configuration, not a column family configuration. It controls the LRU cache size for SSTable structures. Each SSTable uses 2 file descriptors (klog + vlog), so 256 SSTables = 512 file descriptors.
 :::
 
-See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#75-thread-pool-architecture) for details on thread pool architecture and work distribution.
+See [How does TidesDB work?](/getting-started/how-does-tidesdb-work#work-distribution) for details on thread pool architecture and work distribution.
 
 ## Unified Memtable
 
@@ -2302,8 +2302,8 @@ Use `tidesdb_objstore_default_config()` for sensible defaults, then override fie
 | `cache_on_write` | `int` | `1` | Keep local copy after upload |
 | `max_concurrent_uploads` | `int` | `4` | Number of parallel upload threads |
 | `max_concurrent_downloads` | `int` | `8` | Number of parallel download threads |
-| `multipart_threshold` | `size_t` | `67108864` (64MB) | Reserved; not currently wired. The S3 connector uploads files at or above a fixed 64MB threshold as a multipart upload |
-| `multipart_part_size` | `size_t` | `8388608` (8MB) | Reserved; not currently wired. The S3 connector streams multipart uploads in a fixed 16MB part size |
+| `multipart_threshold` | `size_t` | `67108864` (64MB) | Reserved; not currently wired on this DB-level config. The S3 connector uploads files at or above a fixed 64MB threshold (`TDB_S3_MULTIPART_THRESHOLD`) as a multipart upload; the per-connector `tidesdb_objstore_s3_config_t.multipart_threshold` can override it |
+| `multipart_part_size` | `size_t` | `8388608` (8MB) | Reserved; not currently wired on this DB-level config. The S3 connector streams multipart uploads in a fixed 8MB part size (`TDB_S3_MULTIPART_PART_SIZE`); the per-connector `tidesdb_objstore_s3_config_t.multipart_part_size` can override it |
 | `sync_manifest_to_object` | `int` | `1` | Upload MANIFEST after each compaction |
 | `replicate_wal` | `int` | `1` | Upload closed WAL segments for replication |
 | `wal_upload_sync` | `int` | `0` | 0 for background WAL upload, 1 to block flush |
