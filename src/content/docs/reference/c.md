@@ -2081,6 +2081,42 @@ if (tidesdb_purge(db) != 0)
 `tidesdb_flush_memtable` is non-blocking -- it enqueues flush work and returns immediately. `tidesdb_compact`, `tidesdb_purge_cf`, and `tidesdb_purge` all block until the work they request has been serviced. Use purge when you need the additional flush + retry pipeline plus compaction in one call; use plain `tidesdb_compact` when you only need to wait for a compaction.
 :::
 
+### Cancelling Background Work (Fast Shutdown)
+
+`tidesdb_cancel_background_work` cancels background compaction database-wide so that `tidesdb_close` does not have to wait for a large compaction backlog to drain. In-flight merges bail at their next checkpoint and queued compaction work is skipped. Flushes are left untouched, so durability is preserved.
+
+```c
+/* Fast shutdown: abandon pending compaction, then close immediately */
+if (tidesdb_cancel_background_work(db) != 0)
+{
+    fprintf(stderr, "Failed to cancel background work\n");
+}
+
+if (tidesdb_close(db) != 0)
+{
+    fprintf(stderr, "Failed to close database\n");
+}
+```
+
+**Behavior**
+- Signals every in-flight merge to bail at its next checkpoint; uncommitted output is discarded and the input SSTables are left intact, so the on-disk state stays recovery-safe
+- Skips any compaction work still sitting in the queue
+- Leaves flushes unaffected -- already-flushed data and durability are preserved
+- Blocks (bounded) until compaction has gone idle before returning
+- The cancellation is **sticky** for the current database session and is reset on the next `tidesdb_open`
+
+**When to use**
+- Fast shutdown · Call immediately before `tidesdb_close` when a large compaction backlog would otherwise make close take seconds to minutes
+- Bounded close latency · Cap how long teardown can block in latency-sensitive shutdown paths
+
+**Return values**
+- `TDB_SUCCESS` on success
+- `TDB_ERR_INVALID_ARGS` if `db` is NULL
+
+:::caution
+This trades compaction progress for shutdown speed: read amplification may be higher on the next open because the abandoned compactions did not reduce the SSTable count. The skipped work is picked up again by normal background compaction after the next `tidesdb_open`. Use `tidesdb_purge` instead when you want pending work *completed* before close rather than abandoned.
+:::
+
 ## Thread Pools
 
 TidesDB uses separate thread pools for flush and compaction operations. Understanding the parallelism model is important for optimal configuration.
