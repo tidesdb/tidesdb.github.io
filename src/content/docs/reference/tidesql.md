@@ -287,7 +287,9 @@ SET GLOBAL tidesdb_pessimistic_locking = ON;   -- default, row-level locks engag
 SET GLOBAL tidesdb_pessimistic_locking = OFF;  -- pure OCC, conflicts surface at commit
 ```
 
-The lock manager is a partitioned hash table with 65,536 partitions, each protected by its own mutex. The comparable bytes that identify a row (or a unique secondary key prefix) are hashed (XXH3) into a partition, and each partition maintains a chain of lock entries keyed by the full comparable bytes. This gives per-row granularity without a global bottleneck. Lock entries persist once allocated, but the engine recycles empty entries in place when a new key hashes to the same partition, so per-partition memory is bounded by the peak number of locks the partition has ever held concurrently rather than the running total of keys ever touched.
+The lock manager is a partitioned hash table sized at startup from CPU count, `8 * std::thread::hardware_concurrency()` clamped to the range 128..65,536. Each partition is `alignas(64)` so unrelated stripes never share a cache line, and each is protected by its own mutex. The partition array itself is allocated with `posix_memalign` (or `_aligned_malloc` on Windows) so the 64-byte alignment the struct declares is honoured at runtime. The comparable bytes that identify a row (or a unique secondary key prefix) are hashed (XXH3) into a partition, and each partition holds an active hash chain of lock entries keyed by the full comparable bytes.
+ 
+When a transaction commits or rolls back and the last grant on a slot is released, the slot is unlinked from the partition's active chain and pushed onto a per-partition freelist. The next acquire that needs a new slot in that partition pops from the freelist before mallocing. The slot's memory is retained across reuse so the deadlock walker can safely dereference cross-partition pointers it captured while holding another partition's mutex, but the chain length tracks the number of locks currently held in the partition rather than the running total of keys ever touched. Chain depth scales with concurrent active locks, not lifetime cardinality, which is what makes the manager safe to drive at OLTP write rates without the per-acquire chain walk degrading over time.
 
 #### Lock Modes
 
@@ -297,14 +299,14 @@ The same transaction may acquire the same lock more than once. A second acquire 
 
 #### Which Statements Acquire Locks
 
-Acquisition sits inside the row-materialisation path. `fetch_row_by_pk` acquires before reading the row, `iter_read_current` acquires after extracting the primary key from a data-key, and `write_row` acquires on its primary-key insert as well as on every unique secondary index prefix before the duplicate check. The mode picked at each site depends on whether the statement carries a write intent and on the session's isolation level.
+Acquisition sites split by statement intent. `fetch_row_by_pk` and `iter_read_current` acquire on the materialisation path for `SELECT ... FOR UPDATE` and for plain reads under `REPEATABLE-READ` / `SERIALIZABLE`, so the SQL cursor contract that every cursor-visible row is locked is preserved. `UPDATE` and `DELETE` deliberately skip the lock during their secondary-index scan and ICP filtering pass, then `update_row` and `delete_row` reacquire the X lock on the actual mutation target inside `write_row` / the delete path. This avoids X-locking every row a scan walks past when ICP discards most of them. `write_row` continues to acquire X on its primary-key insert and on every unique secondary index prefix before the duplicate check so two concurrent inserts of the same unique value cannot both pass dup-check and both commit.
 
 | Statement | Mode | Notes |
 |-----------|------|-------|
 | `INSERT` | X | Primary key always; unique secondary prefixes also locked so the dup-check and put are serialised |
-| `UPDATE` | X | Acquired during the row-materialisation pass that precedes the write |
-| `DELETE` | X | Same as `UPDATE` |
-| `SELECT ... FOR UPDATE` | X | Explicit write intent on the read |
+| `UPDATE` | X | Acquired in `update_row` on the target row; secondary-index scans under UPDATE do not lock the rows they walk past during ICP |
+| `DELETE` | X | Acquired in `delete_row` on the target row; secondary-index scans under DELETE do not lock the rows they walk past during ICP |
+| `SELECT ... FOR UPDATE` | X | Acquired during materialisation on every cursor-visible row, per the SQL locking-cursor contract |
 | `SELECT` under `READ-COMMITTED` or `SNAPSHOT` | none | MVCC snapshot already provides a consistent view |
 | `SELECT` under `REPEATABLE-READ` or `SERIALIZABLE` | S | Prevents concurrent modification of read rows within the transaction |
 
@@ -328,9 +330,9 @@ The same applies to UNIQUE secondary keys. The lock taken on the unique prefix d
 
 #### Deadlock Detection
 
-Before a transaction blocks on a held lock, the engine walks the wait-for graph looking for cycles. Starting from a conflicting holder on the target lock, it follows the holder's `waiting_on_lock` pointer to the next lock, examines that lock's granted set for the requesting transaction, and continues hop-by-hop up to a depth of 100. If the chain leads back to the requestor, granting the lock would close a cycle and the engine returns `ER_LOCK_DEADLOCK` (ERROR 1213) immediately rather than block. This is the same error code and semantics InnoDB uses for deadlocks.
+Before a transaction blocks on a held lock, the engine walks the wait-for graph looking for cycles. The walker is a fixed-capacity DFS over `(lock, mode)` frames. Starting from the target lock and the requested mode, it visits every conflicting holder of that lock, follows each holder's `waiting_on_lock` to the next lock, and pushes those frames onto the frontier. If any holder on the path is the requestor itself, granting the lock would close a cycle and the engine returns `ER_LOCK_DEADLOCK` (ERROR 1213) immediately rather than block. This is the same error code and semantics InnoDB uses for deadlocks.
 
-Each hop takes the partition mutex of the lock being inspected so the walker can read request fields safely, then releases the mutex before moving on. The cross-partition wait-for edge is followed through atomic `waiting_on_lock` and `waiting_on_mode` fields on the transaction; the walker never dereferences a request struct outside the partition mutex that protects it. Lock entries themselves are never freed at runtime (the recycle path overwrites key bytes in place, leaving the entry's mutex and condition variable intact), so the lock pointers stored in `waiting_on_lock` are always safe to follow.
+The DFS frontier and visited set are stack-allocated at `DEADLOCK_MAX_DEPTH * 4` (the depth cap is 100, so capacity is 400 frames). Frontier overflow and depth-cap exceeded both return "deadlock" so a false-positive triggers a cheap retry rather than a stall at `tidesdb_lock_wait_timeout_ms`. Each hop takes the partition mutex of the lock being inspected so the walker can read request fields safely, then releases the mutex before moving on. The cross-partition wait-for edge is followed through atomic `waiting_on_lock` and `waiting_on_mode` fields on the transaction; the walker never dereferences a request struct outside the partition mutex that protects it. Lock entries themselves are never freed at runtime (the recycle path overwrites key bytes in place, leaving the entry's mutex and condition variable intact), so the lock pointers stored in `waiting_on_lock` are always safe to follow.
 
 A waiter that receives `KILL QUERY` during its wait is woken promptly. The `kill_query` handlerton callback broadcasts on the waited-on lock's condition variable, the wait loop observes `thd_killed()` on its next iteration, and the statement returns `HA_ERR_LOCK_WAIT_TIMEOUT` instead of hanging until the holder commits.
 
@@ -365,7 +367,7 @@ All locks held by a transaction are released atomically when the transaction com
 
 #### Observability
 
-The lock manager surfaces seven status variables for monitoring contention and capacity. `Tidesdb_lock_waits` counts the number of times any thread blocked in the wait loop, and `Tidesdb_lock_wait_us` accumulates the total microseconds spent there. `Tidesdb_lock_deadlocks` counts cycle detections, `Tidesdb_lock_timeouts` counts deadline expirations, and `Tidesdb_lock_held` reports the current count of granted locks across all transactions. `Tidesdb_lock_entries` shows how many lock entries are allocated in the hash table, and `Tidesdb_lock_entry_recycles` counts in-place reuse events for memory-hygiene tracking.
+The lock manager surfaces eight status variables for monitoring contention and capacity. `Tidesdb_lock_waits` counts the number of times any thread blocked in the wait loop, and `Tidesdb_lock_wait_us` accumulates the total microseconds spent there. `Tidesdb_lock_deadlocks` counts cycle detections, `Tidesdb_lock_timeouts` counts deadline expirations, and `Tidesdb_lock_held` reports the current count of granted locks across all transactions. `Tidesdb_lock_entries` shows how many lock entries the manager has ever allocated in the hash table (slots are retained across reuse, so this is a lifetime counter rather than a current depth), `Tidesdb_lock_entry_recycles` counts freelist reuse events for memory-hygiene tracking, and `Tidesdb_lock_chain_max` reports the longest hash-chain length observed at acquire time across the run. The last is the canonical signal for "are my partitions degrading", a healthy run keeps it in the low double digits even under sustained OLTP write contention.
 
 #### When to Disable It
 
@@ -394,9 +396,9 @@ The mid commit logic is shared between INSERT, UPDATE, and DELETE via a single `
 
 The TidesDB library signals back-pressure with `TDB_ERR_MEMORY_LIMIT` when the unified memtable, flush queue, or L0 backlog hits a soft cap and writers should pause until flush and compaction free capacity. Earlier revisions surfaced this signal to the SQL layer as `HA_ERR_LOCK_DEADLOCK`, which broke clients that treat 1213 as fatal and do not retry (bulk loaders, schema-build scripts, batch ETL). The engine now absorbs the signal inside the plugin: every write entry point routes through a thin blocking wrapper that sleeps with exponential backoff and retries the operation until the library accepts it, the wait timeout expires, or the connection is killed. After the budget is exhausted, the unmodified `TDB_ERR_MEMORY_LIMIT` bubbles up through the error mapping and surfaces as `HA_ERR_LOCK_WAIT_TIMEOUT`, which is the accurate name since no lock is held.
 
-The wait budget is controlled by `tidesdb_backpressure_wait_timeout_ms`, a session variable defaulting to 60,000 milliseconds. Setting it to zero disables blocking and the back-pressure signal returns immediately. Two status counters expose activity: `Tidesdb_backpressure_waits` counts the number of times a writer blocked, and `Tidesdb_backpressure_wait_us` accumulates total microseconds spent in the wait.
+The wait budget is controlled by `tidesdb_backpressure_wait_timeout_ms`, a session variable defaulting to 60,000 milliseconds. Setting it to zero disables blocking and the back-pressure signal returns immediately. The deadline is anchored once per statement in `external_lock(F_WRLCK)` and consulted from every backpressure call inside that statement, so a multi-row INSERT respects the configured ms end-to-end instead of multiplying it by row count - a bulk INSERT of N rows with K secondary indexes does not multiply the budget by `N * K`. Two status counters expose activity: `Tidesdb_backpressure_waits` counts the number of times a writer blocked, and `Tidesdb_backpressure_wait_us` accumulates total microseconds spent in the wait.
 
-All hot write paths route through the wrappers, including `write_row` (primary and secondary maintenance), `update_row`, `delete_row`, `fts_update_meta`, the inplace ADD INDEX secondary population, and both `hton_commit` and the mid-statement `bulk_commit`. Tuning `tidesdb_unified_memtable_write_buffer_size` and the number of flush and compaction threads remains the right knob for sustained-write workloads, but the wrappers ensure that transient back-pressure spikes never present as deadlocks to the SQL layer.
+All hot write paths route through the wrappers, including `write_row` (primary and secondary maintenance), `update_row`, `delete_row`, `fts_update_meta`, the inplace ADD INDEX secondary population, and both `hton_commit` and the mid-statement `bulk_commit`. Iterator construction (`tidesdb_iter_new`) is also wrapped, so transient reader-fd starvation backs off and retries instead of immediately surfacing `HA_ERR_LOCK_WAIT_TIMEOUT` or being misreported as `HA_ERR_CRASHED`. Tuning `tidesdb_unified_memtable_write_buffer_size` and the number of flush and compaction threads remains the right knob for sustained-write workloads, but the wrappers ensure that transient back-pressure spikes never present as deadlocks to the SQL layer.
 
 
 ## Single-Delete Optimization
@@ -784,6 +786,8 @@ CREATE TABLE classified (
 
 Encryption works with all other features, including secondary indexes, BLOB columns, and TTL. The secondary index keys themselves are not encrypted (they need to remain comparable for seeking), but the row data pointed to by those keys is encrypted in the data column family.
 
+If `encryption_key_get()` cannot return the requested key (rotation hole, keyring plugin not loaded, version never existed), the encrypt or decrypt call fails closed - the engine logs the failure and returns an error to the SQL layer rather than feeding uninitialised stack bytes into `encryption_crypt`. A row written with a key version no longer in the keyring becomes unreadable until the key is restored; the engine never silently mis-encrypts or returns zeroed plaintext.
+
 
 ## Full-Text Search
 
@@ -1129,7 +1133,7 @@ ALTER TABLE events SYNC_MODE='NONE', ALGORITHM=INSTANT;
 
 ### Inplace Operations
 
-Adding or dropping secondary indexes is done inplace. When a new index is added, the engine creates a new column family for it, then performs a full table scan to populate all index entries. This runs with no server-level lock blocking (`HA_ALTER_INPLACE_NO_LOCK`), so concurrent reads and writes can proceed during the index build. When adding a `UNIQUE` index, the engine checks for duplicate values during the population scan and aborts with `ER_DUP_ENTRY` if any are found, preserving all existing rows.
+Adding or dropping non-FULLTEXT, non-SPATIAL secondary indexes is done inplace. When a new index is added, the engine creates a new column family for it, then performs a full table scan to populate all index entries. This runs with no server-level lock blocking (`HA_ALTER_INPLACE_NO_LOCK`), so concurrent reads and writes can proceed during the index build. When adding a `UNIQUE` index, the engine checks for duplicate values during the population scan and aborts with `ER_DUP_ENTRY` if any are found, preserving all existing rows. If any row's index put fails the entire ALTER is rolled back rather than shipping a silently incomplete index.
 
 ```sql
 ALTER TABLE events ADD INDEX idx_ts (ts), ALGORITHM=INPLACE;
@@ -1140,6 +1144,8 @@ ALTER TABLE events ADD INDEX idx_kind (event_kind), DROP INDEX idx_ts, ALGORITHM
 ```
 
 For large tables, the index population is batched in groups of 100 rows per transaction commit, to avoid unbounded memory growth in the transaction's write buffer.
+
+`ADD FULLTEXT` and `ADD SPATIAL` are not eligible for `ALGORITHM=INPLACE` because the inplace builder cannot populate the FTS or spatial column family from a row-by-row scan - the tokenizer and Hilbert-curve writer paths only run inside `write_row`. `check_if_supported_inplace_alter` returns `HA_ALTER_INPLACE_NOT_SUPPORTED` for these with a clear reason, so MariaDB falls back to `ALGORITHM=COPY` which routes every existing row through `write_row` and back-fills the new index correctly. An explicit `ALTER TABLE ... ADD FULLTEXT(...), ALGORITHM=INPLACE` is rejected with the reason; the default algorithm (or `ALGORITHM=COPY`) succeeds.
 
 ### Copy Operations
 
@@ -1203,8 +1209,8 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 
 | Variable | Description |
 |----------|-------------|
-| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.2.1`) |
-| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `262657` = `0x40201`) |
+| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.4`) |
+| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263940` = `0x40504`) |
 | `Tidesdb_column_families` | Number of active column families |
 | `Tidesdb_global_sequence` | Global MVCC sequence number |
 | `Tidesdb_memtable_bytes` | Total memtable memory usage in bytes |
@@ -1235,8 +1241,9 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 | `Tidesdb_lock_deadlocks` | Number of wait-for-graph cycle detections that returned `ER_LOCK_DEADLOCK` |
 | `Tidesdb_lock_timeouts` | Number of times `tidesdb_lock_wait_timeout_ms` expired during an acquire |
 | `Tidesdb_lock_held` | Currently held lock count across all live transactions |
-| `Tidesdb_lock_entries` | Current count of allocated entries in the lock hash table |
-| `Tidesdb_lock_entry_recycles` | Number of times an empty lock entry was reused in place for a new key |
+| `Tidesdb_lock_entries` | Lifetime count of allocated entries in the lock hash table (slots are retained across reuse) |
+| `Tidesdb_lock_entry_recycles` | Number of times a freelisted lock entry was reused for a new key |
+| `Tidesdb_lock_chain_max` | Longest hash-chain length observed at acquire time. Stays low under healthy contention; a creeping value points at a partition imbalance or chain regression |
 
 Values are refreshed every two seconds, aligned with the optimizer statistics refresh cycle. This provides the same monitoring integration that InnoDB offers via `SHOW GLOBAL STATUS LIKE 'innodb%'`.
 
@@ -1328,11 +1335,28 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_s3_region` | (empty) | S3 region (e.g. us-east-1, empty for MinIO) |
 | `tidesdb_s3_use_ssl` | ON | Use HTTPS for S3 connections |
 | `tidesdb_s3_path_style` | OFF | Use path-style S3 URLs (required for MinIO) |
+| `tidesdb_s3_tls_ca_path` | (empty) | Custom CA bundle path for the S3 TLS handshake; empty uses the system bundle |
+| `tidesdb_s3_tls_insecure_skip_verify` | OFF | Disable S3 TLS peer/host verification. INSECURE; intended for trusted test endpoints only. Logs a warning at start when ON |
+| `tidesdb_s3_multipart_threshold` | 0 | Object size in bytes that triggers S3 multipart upload; 0 keeps the library default |
+| `tidesdb_s3_multipart_part_size` | 0 | S3 multipart chunk size in bytes; 0 keeps the library default |
 | `tidesdb_objstore_local_cache_max` | 0 | Maximum local cache size in bytes (0 = unlimited) |
 | `tidesdb_objstore_wal_sync_threshold` | 1 MB | Sync active WAL to object store when it grows by this many bytes (0 = disable) |
 | `tidesdb_objstore_wal_sync_on_commit` | OFF | Upload WAL after every commit for RPO=0 replication |
+| `tidesdb_objstore_cache_on_read` | ON | Cache downloaded objects in the local cache |
+| `tidesdb_objstore_cache_on_write` | ON | Cache uploaded objects in the local cache |
+| `tidesdb_objstore_max_concurrent_uploads` | 0 | Concurrent upload threads; 0 keeps the library default |
+| `tidesdb_objstore_max_concurrent_downloads` | 0 | Concurrent download threads; 0 keeps the library default |
+| `tidesdb_objstore_multipart_threshold` | 0 | Object size in bytes that triggers multipart upload at the objstore layer; 0 keeps the library default |
+| `tidesdb_objstore_multipart_part_size` | 0 | Multipart chunk size in bytes at the objstore layer; 0 keeps the library default |
+| `tidesdb_objstore_sync_manifest_to_object` | ON | Upload MANIFEST after each compaction |
+| `tidesdb_objstore_wal_upload_sync` | OFF | Block memtable flush on WAL upload; OFF keeps WAL upload in the background |
+| `tidesdb_objstore_replicate_wal` | ON | Upload WAL segments for replica recovery |
+| `tidesdb_objstore_replica_replay_wal` | ON | Replay WAL on replicas for near-real-time visibility |
+| `tidesdb_unified_memtable_skip_list_max_level` | 0 | Skip-list max level for the unified memtable; 0 keeps the library default |
+| `tidesdb_unified_memtable_skip_list_probability` | 0.0 | Skip-list level promotion probability for the unified memtable; 0.0 keeps the library default |
 | `tidesdb_replica_mode` | OFF | Enable read-only replica mode (writes return SQL error) |
 | `tidesdb_replica_sync_interval` | 5000000 | MANIFEST poll interval for replica sync in microseconds |
+| `tidesdb_fast_shutdown` | OFF | When ON, deinit calls `tidesdb_cancel_background_work` before `tidesdb_close` so in-flight compactions bail at their next checkpoint and shutdown returns quickly. Default OFF lets `tidesdb_close` drain naturally, which is the safer setting for object-store and replica deployments where a mid-compaction cancel can leave S3 with referenced-but-not-yet-uploaded SSTables that confuse a syncing replica |
 
 ### Global Variables (dynamic)
 
@@ -1689,6 +1713,9 @@ Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail a
 | 11.8.6          | >= 4.0.0    | ✔    |
 | 12.2.2          | >= 1.0.0     | ✔     |
 | 12.3.1          | >= 4.2.6     | ✔     |
+| 13.0.2          | >= 4.5.4     | ✔     |
+
+Current TideSQL release is 4.5.4 (hex `0x40504`).
 
 *As versions are tested and confirmed working we update this table. Full Support means the system is tested against all known functionality.*
 

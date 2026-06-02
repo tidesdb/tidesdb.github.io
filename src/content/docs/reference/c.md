@@ -244,6 +244,22 @@ if (tidesdb_open(&config, &db) != 0)
 Multiple TidesDB instances can be opened in the same process, each with its own configuration and data directory.
 :::
 
+### Raising the Open File Limit
+
+Each open SSTable uses two file descriptors (klog and vlog), so a database with many SSTables can run into the process open-file ceiling. The engine sizes `max_open_sstables` to fit that ceiling at open time and never raises it on its own.
+
+```c
+long tidesdb_raise_open_file_limit(long desired);
+```
+
+Call it **before** `tidesdb_open()` to raise the process ceiling toward `desired` descriptors so a larger working set of SSTables can stay open. On POSIX it raises the `RLIMIT_NOFILE` soft limit toward the hard limit; on Windows it raises the CRT stdio cap. It returns the open-file ceiling in effect after the attempt. The call is opt-in, a failed or partial raise is non-fatal (the prior ceiling stands), and a `desired` at or below the current ceiling simply reports it.
+
+```c
+long ceiling = tidesdb_raise_open_file_limit(65536);
+printf("open-file ceiling is now %ld\n", ceiling);
+/* then open the database */
+```
+
 ### Logging
 
 TidesDB provides structured logging with multiple severity levels.
@@ -304,6 +320,14 @@ tidesdb_open(&config, &db);
 ```
 
 The log file is opened in append mode and uses line buffering for real-time logging. If the log file cannot be opened, logging falls back to default.
+
+**Writing your own log lines**
+
+Applications can emit lines into the same log stream through the engine's logger. `tidesdb_log_write(int level, const char *file, int line, const char *fmt, ...)` is the underlying primitive; it honors the configured `log_level` and respects the file-versus-stderr destination, so your messages are filtered and formatted exactly like the engine's own.
+
+```c
+tidesdb_log_write(TDB_LOG_INFO, __FILE__, __LINE__, "loaded %d tenants", n);
+```
 
 **Redirect stderr to file (alternative)**
 ```bash
@@ -766,6 +790,47 @@ if (tidesdb_get_cache_stats(db, &cache_stats) == 0)
 :::note[Block Cache]
 The block cache is a database-level resource shared across all column families. It caches raw klog block bytes (decompressed but not deserialized) to avoid repeated disk I/O. On cache hit, the block is deserialized on the fly. This yields much smaller cache entries compared to caching deserialized blocks, dramatically improving hit rates for a given cache size. Configure cache size via `config.block_cache_size` when opening the database. Set to 0 to disable caching.
 :::
+
+### Read Statistics
+
+Database-wide read counters track where reads are served from and how much work each read does. They are useful for tuning bloom filters, block indexes, and cache size.
+
+:::caution[Compile-time opt-in]
+The read-profiling API and the `tidesdb_read_stats_t` struct are gated behind the `TDB_ENABLE_READ_PROFILING` build macro. Build with `-DTDB_ENABLE_READ_PROFILING` to enable them. Without that flag the counters are not collected (the per-read instrumentation compiles to nothing) and these three functions are not declared, so leave this section out of the picture in a default build.
+:::
+
+```c
+int tidesdb_get_read_stats(tidesdb_t *db, tidesdb_read_stats_t *stats);
+void tidesdb_print_read_stats(tidesdb_t *db);
+void tidesdb_reset_read_stats(tidesdb_t *db);
+```
+
+`tidesdb_get_read_stats` copies the current counters into a caller-provided `tidesdb_read_stats_t`. `tidesdb_print_read_stats` writes a formatted summary to the log. `tidesdb_reset_read_stats` zeroes the counters, which is handy before measuring a specific workload.
+
+**`tidesdb_read_stats_t` fields**
+| Field | Description |
+|-------|-------------|
+| `total_reads` | Total point reads served |
+| `memtable_hits` | Reads satisfied by the active memtable |
+| `immutable_hits` | Reads satisfied by an immutable memtable |
+| `sstable_hits` | Reads satisfied by an SSTable |
+| `levels_searched` | Total levels visited across all reads |
+| `sstables_checked` | Total SSTables probed across all reads |
+| `bloom_checks` | Bloom filter lookups performed |
+| `bloom_hits` | Bloom lookups that passed (key may be present) |
+| `blocks_read` | klog blocks read |
+| `cache_block_hits` | Block reads served from the block cache |
+| `cache_block_misses` | Block reads that missed the cache and hit disk |
+| `disk_reads` | Block reads that went to disk |
+
+```c
+tidesdb_read_stats_t rs;
+tidesdb_get_read_stats(db, &rs);
+printf("reads=%llu  bloom %llu/%llu  cache %llu/%llu\n",
+       (unsigned long long)rs.total_reads,
+       (unsigned long long)rs.bloom_hits, (unsigned long long)rs.bloom_checks,
+       (unsigned long long)rs.cache_block_hits, (unsigned long long)rs.cache_block_misses);
+```
 
 ### Range Cost Estimation
 
@@ -1646,6 +1711,28 @@ if (tidesdb_iter_seek(iter, (uint8_t *)prefix, strlen(prefix) + 1) == 0)
 
 This pattern works across both memtables and SSTables. When block indexes are enabled, the seek operation uses binary search to jump directly to the relevant block, making prefix scans efficient even on large datasets.
 
+### Reading Key and Value Together
+
+`tidesdb_iter_key_value` returns the current entry's key and value in a single call, instead of calling `tidesdb_iter_key` and `tidesdb_iter_value` separately.
+
+```c
+int tidesdb_iter_key_value(tidesdb_iter_t *iter, uint8_t **key, size_t *key_size,
+                           uint8_t **value, size_t *value_size);
+```
+
+The returned key and value pointers are internal pointers owned by the iterator, with the same lifetime rules as `tidesdb_iter_key` and `tidesdb_iter_value`: do not free them, and copy them out if you need to retain the data past the next iterator step.
+
+```c
+uint8_t *key = NULL, *value = NULL;
+size_t key_size = 0, value_size = 0;
+while (tidesdb_iter_valid(iter))
+{
+    if (tidesdb_iter_key_value(iter, &key, &key_size, &value, &value_size) == TDB_SUCCESS)
+        printf("%.*s = %.*s\n", (int)key_size, key, (int)value_size, value);
+    if (tidesdb_iter_next(iter) != TDB_SUCCESS) break;
+}
+```
+
 ## Custom Comparators
 
 TidesDB uses comparators to determine the sort order of keys throughout the entire system, memtables, SSTables, block indexes, and iterators all use the same comparison logic. Once a comparator is set for a column family, it **cannot be changed** without corrupting data.
@@ -1722,6 +1809,8 @@ strncpy(cf_config.comparator_name, "timestamp_desc", TDB_MAX_COMPARATOR_NAME - 1
 cf_config.comparator_name[TDB_MAX_COMPARATOR_NAME - 1] = '\0';
 tidesdb_create_column_family(db, "events", &cf_config);
 ```
+
+The signature is `tidesdb_register_comparator(db, name, fn, ctx_str, ctx)`. The last two arguments are for parameterized comparators that need configuration. `ctx` is an in-memory context pointer passed to the comparator on every call. `ctx_str` is an optional string form of that context; setting it (or the matching `comparator_ctx_str` field on the column family config) persists the context so the comparator can be re-created with the same parameters after a restart. Pass `NULL` for both when the comparator is stateless, as in the example above.
 
 ### Retrieving a Registered Comparator
 
@@ -2324,6 +2413,43 @@ tidesdb_objstore_t *minio = tidesdb_objstore_s3_create(
     0,                  /* no SSL for local dev */
     1                   /* path-style URLs (required for MinIO) */
 );
+```
+
+### Advanced S3 Configuration
+
+`tidesdb_objstore_s3_create` is a thin wrapper with default settings. For options it cannot express (a key prefix, custom TLS, or multipart tuning), build a `tidesdb_objstore_s3_config_t`, zero-initialize it, set the fields you need, and pass it to `tidesdb_objstore_s3_create_config`.
+
+```c
+tidesdb_objstore_t *tidesdb_objstore_s3_create_config(const tidesdb_objstore_s3_config_t *config);
+```
+
+**`tidesdb_objstore_s3_config_t` fields**
+| Field | Description |
+|-------|-------------|
+| `endpoint` | S3 endpoint host and port |
+| `bucket` | Bucket name |
+| `prefix` | Optional key prefix prepended to every object key (`NULL` for none) |
+| `access_key` / `secret_key` | Credentials |
+| `region` | AWS region (`NULL` for MinIO and compatible servers) |
+| `use_ssl` | 1 for HTTPS, 0 for plain HTTP |
+| `use_path_style` | 1 for path-style URLs (MinIO), 0 for virtual-hosted (AWS) |
+| `tls_ca_path` | Path to a CA bundle for TLS verification (`NULL` for system default) |
+| `tls_insecure_skip_verify` | 1 to skip TLS certificate verification (testing only) |
+| `multipart_threshold` | File size at or above which multipart upload is used (0 uses the connector default of 64MB) |
+| `multipart_part_size` | Size of each multipart part (0 uses the connector default of 8MB) |
+
+```c
+tidesdb_objstore_s3_config_t s3 = {0};
+s3.endpoint = "s3.amazonaws.com";
+s3.bucket = "my-bucket";
+s3.prefix = "tenant-42/";
+s3.access_key = "AKIA...";
+s3.secret_key = "wJal...";
+s3.region = "us-east-1";
+s3.use_ssl = 1;
+s3.multipart_part_size = 16 * 1024 * 1024; /* 16MB parts */
+
+tidesdb_objstore_t *store = tidesdb_objstore_s3_create_config(&s3);
 ```
 
 ### Object Store Configuration
