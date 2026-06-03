@@ -168,6 +168,10 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+							label: 'HammerDB TPC-C Analysis on TidesDB v9.3.3/TideSQL v4.5.4 and InnoDB in MariaDB v11.8.6',
+							link: 'articles/hammerdb-tpc-c-analysis-tidesdb-v9-3-3-tidesql-v4-5-4-innodb-mariadb-v11-8-6'
+						},
+						{
 							label: 'iibench Analysis on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB v11.8.6',
 							link: 'articles/iibench-tidesql-v4-5-1-myrocks-innodb-mariadb-v11-8-6-analysis'
 						},
