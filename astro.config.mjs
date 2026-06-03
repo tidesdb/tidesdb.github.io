@@ -152,6 +152,7 @@ export default defineConfig({
 						{ label: 'TideSQL Reference', slug: 'reference/tidesql' },
 						{ label: 'Kafka Reference', slug: 'reference/kafka' },
 						{ label: 'Admintool Reference', slug: 'reference/admintool' },
+						{ label: 'Tuning Reference', link: 'reference/tuning' },
 					],
 				},
 				{
