@@ -18,11 +18,11 @@ head:
 
 </div>
 
-*by <a href="https://alexpadula.com">Alex Gaetano Padula</a>*
+*by <a target="_blank" href="https://alexpadula.com">Alex Gaetano Padula</a>*
  
 *published on June 3rd, 2026*
  
-This is a short article on the results of running the latest releases of <a href="https://github.com/tidesdb/tidesdb/releases/tag/v9.3.3">TidesDB v9.3.3</a> and <a href="https://github.com/tidesdb/tidesql/releases/tag/v4.5.4">TideSQL v4.5.4</a> against InnoDB in <a href="https://mariadb.org">MariaDB</a> v11.8.6.  Both TidesDB and TideSQL will now ship as part of MariaDB releases, as you can see in this <a href="https://github.com/MariaDB/server/pull/5166">PR #5166</a>.  This is exciting news for me, for the company, and, we believe, for the community.
+This is a short article on the results of running the latest releases of <a target="_blank" href="https://github.com/tidesdb/tidesdb/releases/tag/v9.3.3">TidesDB v9.3.3</a> and <a target="_blank" href="https://github.com/tidesdb/tidesql/releases/tag/v4.5.4">TideSQL v4.5.4</a> against InnoDB in <a target="_blank" href="https://mariadb.org">MariaDB</a> v11.8.6.  Both TidesDB and TideSQL will now ship as part of MariaDB releases, as you can see in this <a target="_blank" href="https://github.com/MariaDB/server/pull/5166">PR #5166</a>.  This is exciting news for me, for the company, and, we believe, for the community.
  
 For this analysis I used my consumer desktop with the following specs:
 ```
@@ -34,7 +34,7 @@ Ubuntu 23.04 x86_64 6.2.0-39-generic
  
 I compiled with GCC and used jemalloc as my allocator.
  
-I used <a href="https://hammerdb.com">HammerDB</a> v5.0.0, though I know v6.0.0 is available for testing — I just haven't updated my OS yet!  I will soon, though.
+I used <a target="_blank" href="https://hammerdb.com">HammerDB</a> v5.0.0, though I know v6.0.0 is available for testing, I just haven't updated my OS yet!  I will soon, though.
  
 I used my own HammerDB scripts, which you can find <a href="https://github.com/tidesdb/hammer">here</a>:
  
@@ -59,7 +59,7 @@ I used my own HammerDB scripts, which you can find <a href="https://github.com/t
     --mariadb-bin /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/bench/mariadb/bin/mariadb
 ```
  
-What I'm doing here is orchestrating a run across two engines — TidesDB, of course, and InnoDB — with a decently sized workload that exercises each engine's buffers/caches and disk I/O.  It comes out to about 15GB of data after ingestion.
+What I'm doing here is orchestrating a run across two engines, TidesDB, of course, and InnoDB, with a decently sized workload that exercises each engine's buffers/caches and disk I/O.  It comes out to about 15GB of data after ingestion.
  
 My `my.cnf` looks like this:
 ```
@@ -156,7 +156,7 @@ max_allowed_packet = 64M
 malloc-lib=/lib/x86_64-linux-gnu/libjemalloc.so.2
 ```
  
-Both engines are configured identically with regard to resource usage — same 2G of cache/buffer, same thread budgets, same flush behavior.  Now let's look at how the two of them ran.
+Both engines are configured identically with regard to resource usage, same 2G of cache/buffer, same thread budgets, same flush behavior.  Now let's look at how the two of them ran.
  
 ## Schema build time
  
