@@ -5,7 +5,7 @@ description: Official TidesDB tuning reference
 
 <div class="no-print">
 
-If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/tidesql.md).
+If you want to download the source of this document, you can find it [here](https://github.com/tidesdb/tidesdb.github.io/blob/master/src/content/docs/reference/tuning.md).
 
 <hr/>
 
@@ -19,7 +19,7 @@ is derived from the engine knobs, defaults, and clamps in `tidesdb.h` and
 `tidesdb.c`, not from guesswork. Read the mental model first, then pick the tier
 that matches your hardware and adjust it with the workload overlays.
 
-The code ships with a 64 MB write buffer, a level ratio of 10, a 1 percent bloom
+The library ships with a 64 MB write buffer, a level ratio of 10, a 1 percent bloom
 false-positive rate, a 512 byte value threshold, an L1 trigger of 4, an L0 stall
 of 10, two flush and two compaction threads, a 64 MB block cache, 256 open
 SSTables, a memory limit of 50 percent of RAM, READ_COMMITTED isolation, and LZ4
