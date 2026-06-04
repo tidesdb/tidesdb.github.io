@@ -57,13 +57,14 @@ Nothing is free, and the bargain has two costs. The first is write amplification
 
 On top of that foundation, TidesDB adds what a production engine needs: ACID transactions with five isolation levels, and data organized as a hierarchy of sorted files called sorted string tables, or SSTables. The hierarchy is arranged in levels, each holding roughly N times more data than the level above it. A background process called compaction continually merges SSTables from adjacent levels, throwing away obsolete entries and reclaiming space as it goes.
 
-Here is the whole lifecycle of a piece of data in one paragraph (Figure 1). A write first lands in an in-memory sorted structure called a memtable, and is simultaneously appended to a write-ahead log so it survives a crash. When the memtable grows past a configured size, it is frozen and a background worker writes it to disk as an SSTable at the top level of the hierarchy. SSTables accumulate there, and compaction merges them downward into larger, deeper levels. A read walks this same structure from newest to oldest and stops at the first copy of the key it finds. Everything else in this document is a refinement of that loop.
+Here is the whole lifecycle of a piece of data in one paragraph (Figure 1). A write first lands in a structure called a memtable, which comprises a sorted data structure called a skip-list and a block-managed WAL, known as a write-ahead log. The write is appended to the WAL and then the skip-list, so it survives a crash. When the memtable grows past a configured write buffer size, it is frozen and made immutable, and a background worker writes it to disk as an SSTable at the top level of the hierarchy. SSTables accumulate there, and compaction merges them downward into larger, deeper levels. A read walks this same structure from newest to oldest and stops at the first copy of the key it finds. Everything else in this document is a refinement of that loop.
 
 <div class="architecture-diagram">
 <img src="/design-diags/01_data_model.png" alt="Figure 1. Data flow through the LSM tree.">
 </div>
 
 (TidesDB builds its memtable from a skip list rather than a balanced tree. The reasons are practical: a skip list is simpler to implement correctly, and its structure lends itself naturally to lock-free concurrent access. The [Skip List](#skip-list) section returns to this once the rest of the system is in view.)
+
 ## The Data Model
 
 Before following a write or a read through the system, we need names for the parts. This section introduces them at the level of *what each thing is and why it exists*. The exact byte layouts are deferred to [On-Disk Format](#on-disk-format), once the parts have been seen in motion.
@@ -76,7 +77,7 @@ In the default mode, each column family owns one active memtable that receives n
 
 ### The Memtable
 
-The memtable is where writes live before they reach disk. It is an in-memory sorted map: keys stay in sorted order so the memtable can be scanned and flushed as a sorted run. Because memory does not survive a crash, every write to the memtable is first appended to a write-ahead log (WAL) on disk. The WAL is the durability backstop; the memtable is the fast, queryable copy. When the active memtable grows past its size threshold, it is frozen (made immutable) and a fresh empty memtable takes its place. The frozen memtable is then flushed to disk.
+The memtable is where writes live with a write ahead log before a sorted run creates an SSTable pair. 
 
 ### Sorted String Tables
 
