@@ -49,7 +49,7 @@ Riding The Tides - Building a Modern Storage Engine (MariaDB Foundation)
 
 ## Introduction
 
-This document explains how TidesDB works, from the idea it is built on down to the bytes on disk. It is organized so that understanding accumulates: each section relies only on what came before it. We start with the whole machine in miniature, then name its parts, then watch it run, and only at the end open up the on-disk formats and the modules that implement everything.
+This document explains how TidesDB works, from the idea it is built on down to the bytes on disk. It is organized so that understanding accumulates: each section relies only on what came before it. We start with the whole system in miniature, then name its parts, and only at the end open up the on-disk formats, the modules that implement everything and testing mechanics. 
 
 TidesDB is an embeddable key-value storage engine built on the log-structured merge tree, or LSM tree. The LSM tree rests on one old and well-understood bargain. Random writes scattered across a large sorted structure on disk are slow, because each one forces a seek and a rewrite. So instead of writing in place, an LSM tree batches writes in memory and then flushes them to disk all at once, as a sorted run. Writes become fast and sequential.
 
