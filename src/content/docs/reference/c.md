@@ -649,6 +649,22 @@ if (tidesdb_get_stats(cf, &stats) == 0)
     {
         printf("Level %d tombstones: %" PRIu64 "\n", i + 1, stats->level_tombstone_counts[i]);
     }
+
+    /* Write amplification counters (lifetime since open, on-disk framed bytes) */
+    printf("WAL Bytes Written: %" PRIu64 "\n", stats->wal_bytes_written);
+    printf("Flush Bytes Written: %" PRIu64 "\n", stats->flush_bytes_written);
+    printf("Compaction Bytes Written: %" PRIu64 "\n", stats->compaction_bytes_written);
+    printf("Compaction Bytes Read: %" PRIu64 "\n", stats->compaction_bytes_read);
+    printf("User Bytes Written: %" PRIu64 "\n", stats->user_bytes_written);
+    printf("Flushes: %" PRIu64 ", Compaction outputs: %" PRIu64 "\n",
+           stats->flush_count, stats->compaction_count);
+    if (stats->user_bytes_written > 0)
+    {
+        double wa = (double)(stats->wal_bytes_written + stats->flush_bytes_written +
+                             stats->compaction_bytes_written) /
+                    (double)stats->user_bytes_written;
+        printf("Write Amplification: %.2f\n", wa);
+    }
     
     /* Access configuration */
     printf("Write Buffer Size: %zu\n", stats->config->write_buffer_size);
@@ -684,6 +700,17 @@ if (tidesdb_get_stats(cf, &stats) == 0)
 | `level_tombstone_counts` | `uint64_t*` | Per-level tombstone counts |
 | `max_sst_density` | `double` | Worst single-SSTable tombstone density seen |
 | `max_sst_density_level` | `int` | Level index where the worst SSTable lives |
+| `wal_bytes_written` | `uint64_t` | Framed bytes appended to this CF's WAL. Stays 0 in unified mode, where the shared WAL volume is reported db-wide as `uwal_bytes_written` |
+| `flush_bytes_written` | `uint64_t` | On-disk bytes (klog + vlog, including framing, index and bloom blobs) this CF's flushes wrote to L0 |
+| `compaction_bytes_written` | `uint64_t` | On-disk bytes this CF's compactions wrote |
+| `compaction_bytes_read` | `uint64_t` | On-disk bytes this CF's compactions read as input. `compaction_bytes_read - compaction_bytes_written` is the space reclaimed by merges |
+| `user_bytes_written` | `uint64_t` | Logical key + value bytes committed to this CF, the write-amplification denominator. Counted on commit and re-established on WAL replay |
+| `flush_count` | `uint64_t` | Flushed L0 SSTables produced by this CF |
+| `compaction_count` | `uint64_t` | Compaction output SSTables produced by this CF (a single triggered compaction can produce several) |
+
+:::tip[Write Amplification]
+The write-amplification counters are lifetime totals since the database was opened, measured in on-disk framed bytes. Compute this CF's write amplification as `(wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`. For windowed analysis, snapshot the counters twice and subtract. They are not persisted, so they reset to zero on reopen (WAL replay re-establishes `user_bytes_written` for data that was not yet flushed).
+:::
 
 :::tip[B+tree Statistics]
 The B+tree stats (`btree_total_nodes`, `btree_max_height`, `btree_avg_height`) are only populated when `use_btree=1` in the column family configuration. These provide insight into the index structure overhead and lookup depth.
@@ -710,6 +737,14 @@ if (tidesdb_get_db_stats(db, &db_stats) == 0)
     printf("In-flight txn memory: %" PRId64 " bytes\n", db_stats.txn_memory_bytes);
     printf("Immutable memtables: %d\n", db_stats.total_immutable_count);
     printf("Memtable bytes: %" PRId64 "\n", db_stats.total_memtable_bytes);
+
+    /* Write amplification (uwal is db-scoped, the rest are summed across CFs) */
+    printf("Unified WAL bytes: %" PRIu64 "\n", db_stats.uwal_bytes_written);
+    printf("Per-CF WAL bytes: %" PRIu64 "\n", db_stats.wal_bytes_written);
+    printf("Flush bytes: %" PRIu64 "\n", db_stats.flush_bytes_written);
+    printf("Compaction bytes written: %" PRIu64 "\n", db_stats.compaction_bytes_written);
+    printf("Compaction bytes read: %" PRIu64 "\n", db_stats.compaction_bytes_read);
+    printf("User bytes written: %" PRIu64 "\n", db_stats.user_bytes_written);
 }
 ```
 
@@ -748,6 +783,18 @@ if (tidesdb_get_db_stats(db, &db_stats) == 0)
 | `total_uploads` | `uint64_t` | Cumulative successful uploads since open |
 | `total_upload_failures` | `uint64_t` | Cumulative upload failures since open |
 | `replica_mode` | `int` | 1 if the database is in read-only replica mode |
+| `uwal_bytes_written` | `uint64_t` | Framed bytes appended to the shared unified WAL. 0 when unified mode is off |
+| `wal_bytes_written` | `uint64_t` | Per-CF WAL bytes summed across all column families. 0 in unified mode |
+| `flush_bytes_written` | `uint64_t` | Flush output bytes summed across all column families |
+| `compaction_bytes_written` | `uint64_t` | Compaction output bytes summed across all column families |
+| `compaction_bytes_read` | `uint64_t` | Compaction input bytes summed across all column families |
+| `user_bytes_written` | `uint64_t` | Logical committed bytes summed across all column families |
+| `flush_count` | `uint64_t` | Flushed SSTables summed across all column families |
+| `compaction_count` | `uint64_t` | Compaction output SSTables summed across all column families |
+
+:::tip[Database-Wide Write Amplification]
+`uwal_bytes_written` is db-scoped because the unified WAL is shared; the remaining write-amplification fields are folded across every column family. Total WAL volume is `uwal_bytes_written + wal_bytes_written` (one term is always 0 depending on mode), and db-wide write amplification is `(uwal_bytes_written + wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`.
+:::
 
 :::note[Stack Allocated]
 Unlike `tidesdb_get_stats` (which heap-allocates), `tidesdb_get_db_stats` fills a caller-provided struct on the stack. No free is needed.
