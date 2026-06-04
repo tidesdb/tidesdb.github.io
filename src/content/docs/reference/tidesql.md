@@ -1184,6 +1184,14 @@ MariaDB [demo]> ANALYZE TABLE products;
 
 The output includes the total number of keys, data size, memtable size, number of LSM levels, read amplification factor, cache hit rate, average key and value sizes, and per-level SSTable counts and sizes. For tables with secondary indexes, each index CF's statistics are reported separately.
 
+When the column family has logged any user bytes, a per-CF write-amplification note is also emitted:
+
+```
+| demo.products | analyze | Note     | [TIDESDB] WA  user=4096  wal=4096  flush=8192 (1 ssts)  compact_write=12288 (1 ssts)  compact_read=8192  ratio=6.00x |
+```
+
+`user` is the logical bytes the plugin wrote through tidesdb's API, `wal` is the per-CF WAL bytes for that family (zero under unified memtable mode, which uses a single shared WAL accounted for separately in `SHOW ENGINE TIDESDB STATUS`), `flush` and `compact_write` are bytes emitted to SSTables by flush jobs and compaction jobs respectively, along with how many SSTables each produced, `compact_read` is bytes pulled in as compaction input, and `ratio` is `(wal + flush + compact_write) / user` rounded to two decimals. A high ratio with a low SSTable count tends to point at oversized flush memtables, a high ratio with many compactions points at unnecessary L0 churn or an under-sized `L1_FILE_COUNT_TRIGGER`.
+
 This information is useful for understanding the physical layout of your data and diagnosing performance characteristics.
 
 
@@ -1197,6 +1205,12 @@ SHOW ENGINE TIDESDB STATUS\G
 
 The output includes the data directory path, number of column families, global sequence number, memory usage (total system memory, resolved memory limit, memory pressure level, memtable bytes, transaction memory bytes), storage metrics (total SSTables, open SSTable handles, total data size, immutable memtable count), background queue sizes (flush pending, flush queue, compaction queue), and block cache statistics (enabled, entries, size, hits, misses, hit rate, partitions).
 
+When `tidesdb_unified_memtable=ON` an additional **Unified Memtable** block reports the active skip-list bytes, the number of immutables queued, whether a flush is currently in flight, the current WAL generation, and the round-robin next-CF index that the library uses when it scans for CF state to fold into the shared memtable.
+
+A **Write Amplification** block reports cumulative user bytes written through the plugin alongside unified-WAL bytes, per-CF WAL bytes, flush bytes written, compaction bytes written and read, and a derived total WA ratio computed as `(unified_wal + per_cf_wal + flush + compaction_write) / user_bytes_written`. The flush and compaction rows also include their SSTable counts, so the ratio between bytes and SSTable count gives a coarse view of average output-SSTable size at each stage.
+
+When an object-store backend is configured an **Object Store** block is included, and the last successfully uploaded unified-WAL generation is reported alongside the local cache footprint, upload queue depth, and lifetime upload counters.
+
 When `tidesdb_print_all_conflicts` is enabled, the last conflict event is also displayed under a Conflicts section.
 
 ### Status Variables
@@ -1209,8 +1223,8 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 
 | Variable | Description |
 |----------|-------------|
-| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.4`) |
-| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263940` = `0x40504`) |
+| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.5`) |
+| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263941` = `0x40505`) |
 | `Tidesdb_column_families` | Number of active column families |
 | `Tidesdb_global_sequence` | Global MVCC sequence number |
 | `Tidesdb_memtable_bytes` | Total memtable memory usage in bytes |
@@ -1236,6 +1250,27 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 | `Tidesdb_max_sst_tombstone_density_level` | LSM level of the SSTable with the maximum density |
 | `Tidesdb_backpressure_waits` | Number of times a writer blocked on TidesDB back-pressure inside the plugin |
 | `Tidesdb_backpressure_wait_us` | Total microseconds spent blocked on back-pressure |
+| `Tidesdb_unified_memtable_enabled` | 1 when the unified memtable is active, 0 when each column family carries its own memtable and WAL |
+| `Tidesdb_unified_memtable_bytes` | Live byte usage of the unified memtable's active skip list |
+| `Tidesdb_unified_immutable_count` | Number of unified-memtable immutables queued for flush |
+| `Tidesdb_unified_is_flushing` | 1 while a unified-memtable flush is in flight, 0 otherwise |
+| `Tidesdb_unified_wal_generation` | Current unified-WAL generation number; advances each time the active WAL segment rolls over |
+| `Tidesdb_object_store_enabled` | 1 when an object-store backend is configured (S3 or remote), 0 for purely local storage |
+| `Tidesdb_replica_mode_active` | 1 when this instance is running as a read-only object-store replica |
+| `Tidesdb_local_cache_bytes` | Bytes currently held in the local object-store cache directory |
+| `Tidesdb_local_cache_files` | Number of files in the local object-store cache |
+| `Tidesdb_upload_queue_depth` | Pending uploads waiting on the object-store uploader threads |
+| `Tidesdb_total_uploads` | Lifetime count of successful uploads to the object store |
+| `Tidesdb_upload_failures` | Lifetime count of upload attempts that failed and were retried |
+| `Tidesdb_last_uploaded_generation` | Highest unified-WAL generation acknowledged by the object store (lags `Tidesdb_unified_wal_generation` by the upload queue) |
+| `Tidesdb_uwal_bytes_written` | Bytes written by the plugin to the unified WAL over the process lifetime |
+| `Tidesdb_wal_bytes_written` | Bytes written to per-CF WALs (sum across column families when unified memtable is OFF) |
+| `Tidesdb_flush_bytes_written` | Bytes emitted to L0 SSTables by flush jobs across all column families |
+| `Tidesdb_compaction_bytes_written` | Bytes written by compaction jobs across all column families |
+| `Tidesdb_compaction_bytes_read` | Bytes read by compaction jobs as input across all column families |
+| `Tidesdb_user_bytes_written` | Logical user bytes ingested via the plugin's write path (key + value, before any WAL/SSTable framing) |
+| `Tidesdb_flush_count` | Number of flush operations completed across all column families |
+| `Tidesdb_compaction_count` | Number of compaction operations completed across all column families |
 | `Tidesdb_lock_waits` | Number of times any thread blocked in the pessimistic lock-wait loop |
 | `Tidesdb_lock_wait_us` | Total microseconds spent in the pessimistic lock-wait loop |
 | `Tidesdb_lock_deadlocks` | Number of wait-for-graph cycle detections that returned `ER_LOCK_DEADLOCK` |
