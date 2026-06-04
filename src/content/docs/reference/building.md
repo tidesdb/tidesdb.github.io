@@ -79,15 +79,21 @@ TidesDB is tested and supported on the following platforms:
   - Clang 6.0+ (macOS/Linux)
   - MSVC 2019 16.8+ (Windows with `/experimental:c11atomics`)
 
-### Required Dependencies
-TidesDB requires the following libraries for compression and threading:
+### Dependencies
 
-- **[Snappy](https://github.com/google/snappy)** · Fast compression/decompression (not available on SunOS/Illumos)
-- **[LZ4](https://github.com/lz4/lz4)** · Extremely fast compression
-- **[Zstandard](https://github.com/facebook/zstd)** · High compression ratio
+The only hard requirements are a C11 toolchain, CMake, and threading support:
+
 - **pthreads** · POSIX threads (Linux/macOS/BSD: built-in, Windows: PThreads4W via vcpkg)
 - **libatomic** · Atomic operations library (required for 32-bit architectures like PowerPC)
-- **C++ standard library** · Required by Snappy (automatically linked on Linux)
+
+#### Compression backends (optional, enabled by default)
+
+Each of the three compression libraries is optional. All three are built in by default; drop any with `-DTIDESDB_WITH_<NAME>=OFF`. A build with all three disabled has no compression dependencies at all and supports only `TDB_COMPRESS_NONE`, so TidesDB can be installed with nothing beyond libc and a thread library. See [Compression Backends](#compression-backends) under Build Options.
+
+- **[Snappy](https://github.com/google/snappy)** · Fast compression/decompression (`TIDESDB_WITH_SNAPPY`; not packaged on SunOS/Illumos, so disabled there by default)
+- **[LZ4](https://github.com/lz4/lz4)** · Extremely fast compression (`TIDESDB_WITH_LZ4`)
+- **[Zstandard](https://github.com/facebook/zstd)** · High compression ratio (`TIDESDB_WITH_ZSTD`)
+- **C++ standard library** · Pulled in only when Snappy is enabled (Snappy's implementation is C++); a build without Snappy carries no libstdc++ dependency
 
 ## Installing Dependencies
 
@@ -463,11 +469,49 @@ TidesDB provides several CMake options to customize the build:
 | `TIDESDB_BUILD_TESTS` | Build test suite | `ON` |
 | `BUILD_SHARED_LIBS` | Build shared libraries instead of static | `ON` (Unix), `OFF` (Windows) |
 | `ENABLE_READ_PROFILING` | Enable read profiling instrumentation | `OFF` |
+| `TIDESDB_WITH_SNAPPY` | Build with Snappy compression support | `ON` (`OFF` on SunOS) |
+| `TIDESDB_WITH_LZ4` | Build with LZ4 compression support | `ON` |
+| `TIDESDB_WITH_ZSTD` | Build with Zstandard compression support | `ON` |
+| `TIDESDB_SNAPPY_TARGET` | External Snappy link target/item to use instead of autodetect | (empty) |
+| `TIDESDB_LZ4_TARGET` | External LZ4 link target/item to use instead of autodetect | (empty) |
+| `TIDESDB_ZSTD_TARGET` | External Zstandard link target/item to use instead of autodetect | (empty) |
 | `TIDESDB_WITH_S3` | Build S3-compatible object store connector (requires libcurl + OpenSSL) | `OFF` |
 | `TIDESDB_WITH_MIMALLOC` | Use mimalloc as the memory allocator | `OFF` |
 | `TIDESDB_WITH_TCMALLOC` | Use tcmalloc as the memory allocator | `OFF` |
 | `TIDESDB_WITH_JEMALLOC` | Use jemalloc as the memory allocator | `OFF` |
 | `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | (unset) |
+
+### Compression Backends
+
+The Snappy, LZ4, and Zstandard backends are independently optional and all enabled by default. Disable any you do not need:
+
+```bash
+# build without Zstandard
+cmake -S . -B build -DTIDESDB_WITH_ZSTD=OFF
+
+# zero-dependency build -- no compression libraries linked, TDB_COMPRESS_NONE only
+cmake -S . -B build -DTIDESDB_WITH_SNAPPY=OFF -DTIDESDB_WITH_LZ4=OFF -DTIDESDB_WITH_ZSTD=OFF
+```
+
+The on-disk compression algorithm IDs are stable regardless of which backends are compiled in, so an SSTable written with an algorithm a given build lacks is reported with a clear error rather than misread. The default column family compression resolves to the best available backend at runtime (LZ4, then Zstandard, then Snappy, then none), so a default configuration always works against whatever was built.
+
+:::note[Consumers need no compression headers]
+The third-party compression headers are included only inside the library, so an application that links `libtidesdb` and includes `<tidesdb/tidesdb.h>` does not need the Snappy/LZ4/Zstandard development headers itself.
+:::
+
+#### Linking against a vendored compression library
+
+By default each backend links a known CMake target if one exists in the build (for example one provided by a parent project via `FetchContent` or `add_subdirectory`), and otherwise falls back to a system `-l<name>`. If you vendor a compression library under a target name the autodetect cannot guess, point TidesDB at it explicitly:
+
+```bash
+# an exact CMake target from your dependency
+cmake -S . -B build -DTIDESDB_ZSTD_TARGET=zstd::libzstd_static
+
+# or any target/link item your build produces
+cmake -S . -B build -DTIDESDB_ZSTD_TARGET=my_zstd_target
+```
+
+This avoids the forced system `-l` link that otherwise fails when the library is only available as an in-tree target rather than installed system-wide. The same applies to `TIDESDB_SNAPPY_TARGET` and `TIDESDB_LZ4_TARGET`.
 
 ### Mimalloc Memory Allocator
 
