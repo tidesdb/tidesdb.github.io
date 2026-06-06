@@ -469,6 +469,7 @@ TidesDB provides several CMake options to customize the build:
 | `TIDESDB_BUILD_TESTS` | Build test suite | `ON` |
 | `BUILD_SHARED_LIBS` | Build shared libraries instead of static | `ON` (Unix), `OFF` (Windows) |
 | `ENABLE_READ_PROFILING` | Enable read profiling instrumentation | `OFF` |
+| `TIDESDB_WARN_MAYBE_UNINIT` | Enable `-Wmaybe-uninitialized` (GCC only; requires an optimized build) | `OFF` |
 | `TIDESDB_WITH_SNAPPY` | Build with Snappy compression support | `ON` (`OFF` on SunOS) |
 | `TIDESDB_WITH_LZ4` | Build with LZ4 compression support | `ON` |
 | `TIDESDB_WITH_ZSTD` | Build with Zstandard compression support | `ON` |
