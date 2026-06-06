@@ -195,7 +195,7 @@ tidesdb_finalize();
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 2,                       /* Flush thread pool size (default: 2) */
+    .num_flush_threads = 2,                       /* Flush thread pool size (default: 0 = auto, min(cpu_count, 4)) */
     .num_compaction_threads = 2,                  /* Compaction thread pool size (default: 2) */
     .log_level = TDB_LOG_INFO,                    /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,         /* 64MB global block cache (default: 64MB) */
@@ -525,6 +525,7 @@ if (tidesdb_rename_column_family(db, "old_name", "new_name") != 0)
 
 **Return values**
 - `TDB_SUCCESS` · Rename completed successfully
+- `TDB_ERR_INVALID_ARGS` · `db`, `old_name`, or `new_name` is NULL
 - `TDB_ERR_NOT_FOUND` · Column family with `old_name` doesn't exist
 - `TDB_ERR_EXISTS` · Column family with `new_name` already exists
 - `TDB_ERR_IO` · Failed to rename directory on disk
@@ -774,7 +775,7 @@ if (tidesdb_get_db_stats(db, &db_stats) == 0)
 | `unified_next_cf_index` | `uint32_t` | Next CF prefix index to assign in unified mode |
 | `unified_wal_generation` | `uint64_t` | Current generation number of the unified WAL |
 | `object_store_enabled` | `int` | 1 if an object store connector is attached |
-| `object_store_connector` | `const char*` | Name of the object store connector ("fs", "s3", or NULL) |
+| `object_store_connector` | `const char*` | Name of the object store connector ("fs", "s3", "unknown", or NULL when no store is attached) |
 | `local_cache_bytes_used` | `size_t` | Bytes currently used by the local SSTable cache (object store mode) |
 | `local_cache_bytes_max` | `size_t` | Local cache capacity in bytes (object store mode) |
 | `local_cache_num_files` | `int` | Number of SSTable files resident in the local cache |
@@ -813,8 +814,8 @@ if (tidesdb_get_cache_stats(db, &cache_stats) == 0)
         printf("Cache enabled: yes\n");
         printf("Total entries: %zu\n", cache_stats.total_entries);
         printf("Total bytes: %.2f MB\n", cache_stats.total_bytes / (1024.0 * 1024.0));
-        printf("Hits: %lu\n", cache_stats.hits);
-        printf("Misses: %lu\n", cache_stats.misses);
+        printf("Hits: %" PRIu64 "\n", cache_stats.hits);
+        printf("Misses: %" PRIu64 "\n", cache_stats.misses);
         printf("Hit rate: %.1f%%\n", cache_stats.hit_rate * 100.0);
         printf("Partitions: %zu\n", cache_stats.num_partitions);
     }
@@ -2152,7 +2153,8 @@ if (tidesdb_compact_range(cf, start, sizeof(start) - 1, end, sizeof(end) - 1) !=
 **Return values**
 
 - `TDB_SUCCESS` on success
-- `TDB_ERR_INVALID_ARGS` if `cf` or either key pointer is NULL, or sizes are zero
+- `TDB_ERR_INVALID_ARGS` if `cf` is NULL, if both `start_key` and `end_key` are NULL, or if a non-NULL key has size zero (a single NULL key is allowed and means an unbounded bound on that side)
+- `TDB_ERR_LOCKED` if another compaction is already running on the column family
 - Standard I/O and memory error codes if the merge cannot complete
 
 ### Purge Column Family
@@ -2272,7 +2274,7 @@ TidesDB uses separate thread pools for flush and compaction operations. Understa
 ```c
 tidesdb_config_t config = {
     .db_path = "./mydb",
-    .num_flush_threads = 4,                /* Flush thread pool size (default: 2) */
+    .num_flush_threads = 4,                /* Flush thread pool size (default: 0 = auto, min(cpu_count, 4)) */
     .num_compaction_threads = 4,           /* Compaction thread pool size (default: 2) */
     .max_concurrent_flushes = 0,           /* 0 = auto-match num_flush_threads (recommended) */
     .log_level = TDB_LOG_INFO,
