@@ -199,7 +199,7 @@ tidesdb_config_t config = {
     .num_compaction_threads = 2,                  /* Compaction thread pool size (default: 2) */
     .log_level = TDB_LOG_INFO,                    /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,         /* 64MB global block cache (default: 64MB) */
-    .max_open_sstables = 256,                     /* Max cached SSTable structures (default: 256 on Linux/macOS/most BSDs, 64 on OpenBSD which has lower default fd limits) */
+    .max_open_sstables = 256,                     /* Max cached SSTable structures (default: 256 on Linux/macOS/most BSDs, 64 on OpenBSD which has lower default fd limits) / 0 for AUTO */
     .max_memory_usage = 0,                        /* Global memory limit in bytes (default: 0 = auto, 50% of system RAM; minimum: 5% of system RAM) */
     .log_to_file = 0,                             /* Write logs to file instead of stderr (default: 0) */
     .log_truncation_at = 24 * (1024*1024),        /* Log file truncation size (default: 24MB), 0 = no truncation */
@@ -210,6 +210,7 @@ tidesdb_config_t config = {
     .unified_memtable_sync_mode = 0,              /* Sync mode for unified WAL (default: 0 = TDB_SYNC_NONE) */
     .unified_memtable_sync_interval_us = 0,       /* Sync interval for unified WAL in microseconds (default: 0) */
     .max_concurrent_flushes = 0,                  /* Pinned 1:1 to num_flush_threads at open. 0 = match the pool size automatically. Any other value is normalized to match num_flush_threads with a TDB_LOG_WARN */
+    .finish_compactions_on_close = 0,             /* 0 (default) = cancel in-flight compactions at their next checkpoint for a fast shutdown (lossless; inputs are preserved and the merge is redone later). 1 = let in-flight compactions run to completion before close returns */
 };
 
 tidesdb_t *db = NULL;
@@ -444,6 +445,7 @@ tidesdb_column_family_config_t cf_config = {
     .sync_mode = TDB_SYNC_FULL,                               /* TDB_SYNC_NONE, TDB_SYNC_INTERVAL, or TDB_SYNC_FULL */
     .sync_interval_us = 1000000,                              /* Sync interval in microseconds (1 second, only for TDB_SYNC_INTERVAL) */
     .comparator_name = {0},                                   /* Empty = use default "memcmp" */
+    .comparator_ctx_str = {0},                                /* Optional persisted string context for a parameterized comparator, so it is re-created with the same parameters after a restart (empty = none) */
     .klog_value_threshold = 512,                              /* Values >= 512 bytes go to vlog (default: 512) */
     .min_disk_space = 100 * 1024 * 1024,                      /* Minimum disk space required (default: 100MB) */
     .default_isolation_level = TDB_ISOLATION_READ_COMMITTED,  /* Default transaction isolation */
@@ -1822,6 +1824,17 @@ TidesDB provides six built-in comparators that are automatically registered on d
 - Compares min(key1_size, key2_size) bytes
 - If bytes are equal (ignoring case), shorter key sorts first
 - **Use case** · Case-insensitive text keys, usernames, email addresses
+
+Each built-in is reachable both by the registered name above and as a public function, in case you want to register it under a different name or call it directly. Every one has the standard comparator signature `int cmp(const uint8_t *key1, size_t key1_size, const uint8_t *key2, size_t key2_size, void *ctx)`:
+
+| Name | Function |
+| --- | --- |
+| `"memcmp"` | `tidesdb_comparator_memcmp` |
+| `"lexicographic"` | `tidesdb_comparator_lexicographic` |
+| `"uint64"` | `tidesdb_comparator_uint64` |
+| `"int64"` | `tidesdb_comparator_int64` |
+| `"reverse"` | `tidesdb_comparator_reverse_memcmp` |
+| `"case_insensitive"` | `tidesdb_comparator_case_insensitive` |
 
 ### Custom Comparator Registration
 

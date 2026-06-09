@@ -168,6 +168,11 @@ export default defineConfig({
 					label: 'Articles',
 					items: [
 						{
+				
+							label: 'Keybench Analysis with TidesDB v9.3.6 and RocksDB v11.1.1',
+							link: 'articles/keybench-analysis-tidesdb-v9-3-6-rocksdb-v11-1-1'
+						},
+						{
 							label: 'TideSQL v4.5.5 & InnoDB Full-Text Search, Spatial, and Large Value Analysis in MariaDB v11.8.6',
 							link: 'articles/tidesql-v4-5-5-innodb-fts-spatial-and-large-value-analysis-in-mariadb-v11-8-6'
 						},
