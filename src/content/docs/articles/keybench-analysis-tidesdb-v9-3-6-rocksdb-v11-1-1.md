@@ -24,7 +24,7 @@ head:
 
 In this article I'll be going over the first public run with a new tool, so I will spend as much time on how the numbers were produced as on the numbers themselves. If you only read one section, read the caveats at the end before you quote anything here.
 
-For these results I used <a target="_blank" href="https://github.com/tidesdb/keybench">keybench</a>, a benchmark harness for sorted key value stores that I have been working on inspired by <a target="_blank" href="https://github.com/akopytov/sysbench">sysbench</a> and <a target="_blank"  href="https://hammerdb.com">HammerDB</a>.
+For these results I used <a target="_blank" href="https://github.com/guycipher/keybench">keybench</a>, a benchmark harness for sorted key value stores that I have been working on inspired by <a target="_blank" href="https://github.com/akopytov/sysbench">sysbench</a> and <a target="_blank"  href="https://hammerdb.com">HammerDB</a>.
 
 The idea is rather simple. You write the workload in Lua, the harness drives it across one or more storage engines, times every operation, and reports throughput and latency. The same script runs unchanged against every engine, so a comparison measures the engines and not the harness. A few design points matter for reading the rest of this article.
 
@@ -42,7 +42,7 @@ One more thing that shaped this run. A storage engine under write pressure will 
 - Ubuntu 23.03, Linux 6.2.0 x86_64
 - WD Blue WDS500G2B0A, a consumer SATA SSD, ext4, 159 GiB volume
 - gcc 12.3.0, linked against jemalloc so the whole malloc family agrees across both engines
-- TidesDB <a target="_blank" href="https://github.com/tidesdb/tidesdb">v9.3.6</a>, RocksDB <a target="_blank" href="https://github.com/facebook/rocksdb">v11.1.1</a>, keybench 0.1.1
+- TidesDB <a target="_blank" href="https://github.com/tidesdb/tidesdb/releases/tag/v9.3.6">v9.3.6</a>, RocksDB <a target="_blank" href="https://github.com/facebook/rocksdb/releases/tag/v11.1.1">v11.1.1</a>, keybench 0.1.1
 
 This is a modest consumer box on a SATA SSD, not a server with NVMe. 
 
