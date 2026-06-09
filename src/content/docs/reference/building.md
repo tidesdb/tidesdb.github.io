@@ -11,14 +11,14 @@ description: How to build and benchmark TidesDB.
   fetch('https://api.github.com/repos/tidesdb/tidesdb/releases/latest')
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var version = data.tag_name || 'v8.1.0';
+      var version = data.tag_name || 'v9.3.6';
       var url = data.html_url || 'https://github.com/tidesdb/tidesdb/releases';
       badge.innerHTML = 
         '<span>' + version + '</span></a>';
     })
     .catch(function() {
       badge.innerHTML = 
-        '<span>v9.0.0</span>';
+        '<span>v9.3.6</span>';
     });
 })();
 </script>
@@ -313,7 +313,7 @@ Once you have the dependencies installed, you can build using the commands below
 ### Unix (Linux/macOS)
 
 #### Standard Build (Production)
-By default, TidesDB builds with optimizations enabled and debugging features disabled:
+A release build enables optimizations and disables debugging features:
 
 ```bash
 rm -rf build && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -476,7 +476,7 @@ TidesDB provides several CMake options to customize the build:
 | `TIDESDB_SNAPPY_TARGET` | External Snappy link target/item to use instead of autodetect | (empty) |
 | `TIDESDB_LZ4_TARGET` | External LZ4 link target/item to use instead of autodetect | (empty) |
 | `TIDESDB_ZSTD_TARGET` | External Zstandard link target/item to use instead of autodetect | (empty) |
-| `TIDESDB_WITH_S3` | Build S3-compatible object store connector (requires libcurl + OpenSSL) | `OFF` |
+| `TIDESDB_WITH_S3` | Build S3-compatible object store connector (requires libcurl only) | `OFF` |
 | `TIDESDB_WITH_MIMALLOC` | Use mimalloc as the memory allocator | `OFF` |
 | `TIDESDB_WITH_TCMALLOC` | Use tcmalloc as the memory allocator | `OFF` |
 | `TIDESDB_WITH_JEMALLOC` | Use jemalloc as the memory allocator | `OFF` |
@@ -631,7 +631,7 @@ TidesDB optionally supports an S3-compatible object store connector for storing 
 
 ```bash
 # Linux
-sudo apt install -y libcurl4-openssl-dev libssl-dev
+sudo apt install -y libcurl4-openssl-dev
 
 cmake -S . -B build -DTIDESDB_WITH_S3=ON
 cmake --build build --clean-first --verbose
@@ -639,7 +639,7 @@ cmake --build build --clean-first --verbose
 
 ```bash
 # macOS
-brew install curl openssl
+brew install curl
 
 cmake -S . -B build -DTIDESDB_WITH_S3=ON
 cmake --build build --clean-first --verbose
@@ -647,7 +647,8 @@ cmake --build build --clean-first --verbose
 
 **Requirements**
 - [libcurl](https://curl.se/libcurl/) for HTTP requests to S3 endpoints
-- [OpenSSL](https://www.openssl.org/) for AWS SigV4 request signing (HMAC-SHA256)
+
+AWS SigV4 request signing (SHA-256 and HMAC-SHA256) is implemented inside TidesDB, so libcurl is the only external dependency — no separate crypto library is needed.
 
 **When to use object store mode**
 - Cloud-native deployments with separated compute and storage
@@ -822,6 +823,10 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 
 TidesDB includes a comprehensive benchmark suite with fully configurable parameters.
 
+:::caution[Build benchmarks in Release]
+Configure with `-DCMAKE_BUILD_TYPE=Release`. CMake sets no build type by default, which compiles at `-O0`, and an unoptimized binary produces numbers that do not represent real performance.
+:::
+
 ### Quick Start
 
 ```bash
@@ -858,7 +863,7 @@ All benchmark parameters can be customized at build time using CMake variables
 | `BENCH_CF_NAME` | Column family name | "benchmark_cf" |
 | `BENCH_DB_PATH` | Directory path | "benchmark_db" |
 | `BENCH_DB_LOG_LEVEL` | Database log level | TDB_LOG_DEBUG |
-| `BENCH_DB_MAX_MEMORY` | Global memory limit in bytes (0 = auto, 50% of system RAM) | 0 |
+| `BENCH_DB_MAX_MEMORY` | Global memory limit in bytes (0 = auto, 75% of system RAM) | 0 |
 | `BENCH_DB_FLUSH_POOL_THREADS` | Flush thread pool size | 2 |
 | `BENCH_DB_COMPACTION_POOL_THREADS` | Compaction thread pool size | 2 |
 

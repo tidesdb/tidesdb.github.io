@@ -101,6 +101,7 @@ func main() {
         LogToFile:            false,                // Write logs to file instead of stderr
         LogTruncationAt:      24 * 1024 * 1024,     // Log file truncation size (24MB default)
         MaxConcurrentFlushes: 0,                    // Cap on in-flight memtable flushes across all CFs (0 = library default)
+        FinishCompactionsOnClose: false,            // false = cancel in-flight compactions at next checkpoint for a fast close; true = let them finish
         ObjectStore:          nil,                  // Object store connector (nil = local only)
         ObjectStoreConfig:    nil,                  // Object store behavior config (nil = defaults)
     }
@@ -134,6 +135,31 @@ defer db.Close()
 :::note[MaxConcurrentFlushes]
 `MaxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
 :::
+
+:::note[FinishCompactionsOnClose]
+`FinishCompactionsOnClose` controls close behavior. The default (`false`) cancels in-flight compactions at their next checkpoint for a fast shutdown — the merge discards its uncommitted output and leaves inputs intact, so no data is lost (recovery handles a mid-merge state the same way). Set it to `true` to let in-flight compactions run to completion before `Close` returns.
+:::
+
+### Raising the Open-File Limit
+
+`RaiseOpenFileLimit` raises this process's open-file ceiling toward the requested number of descriptors so a database can keep more SSTables open. Because TidesDB sizes `MaxOpenSSTables` to fit this at open time, **call it before `Open`**. This is an explicit, opt-in operator action; TidesDB never raises the limit itself.
+
+```go
+// Raise toward 65536 descriptors before opening.
+ceiling := tidesdb.RaiseOpenFileLimit(65536)
+fmt.Printf("Open-file ceiling in effect: %d\n", ceiling)
+
+db, err := tidesdb.Open(config)
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+```
+
+**Behavior**
+- A `desired` value `<= 0` just reports the current ceiling without changing it
+- On POSIX systems it raises the `RLIMIT_NOFILE` soft limit toward the hard limit; on Windows it raises the CRT stdio cap (max 8192)
+- A failed or partial raise is non-fatal; the returned value is the ceiling in effect after the attempt
 
 ### Backup
 
@@ -222,6 +248,8 @@ cfConfig.L0QueueStallThreshold = 20                // L0 queue stall threshold
 cfConfig.TombstoneDensityTrigger = 0.0             // Per-SSTable tombstone density above which compaction escalates (0.0 = disabled, range 0.0 to 1.0)
 cfConfig.TombstoneDensityMinEntries = 1024         // Minimum entry count for an SSTable to be considered by the density trigger
 cfConfig.UseBtree = 0                              // Use B+tree format for klog (0 = block-based)
+cfConfig.ComparatorName = tidesdb.ComparatorMemcmp // Key ordering comparator (see Built-in comparators)
+cfConfig.ComparatorCtxStr = ""                     // Optional context string for parameterized comparators
 cfConfig.ObjectLazyCompaction = 0                  // Less aggressive compaction in object store mode
 cfConfig.ObjectPrefetchCompaction = 1              // Download all inputs before merge
 
@@ -713,6 +741,17 @@ if stats.Config != nil {
     fmt.Printf("Sync Mode: %d\n", stats.Config.SyncMode)
     fmt.Printf("Use B+tree: %d\n", stats.Config.UseBtree)
 }
+
+// Write-amplification counters (lifetime since open, on-disk framed bytes).
+// Divide each write total by UserBytesWritten to get this CF's write amplification.
+if stats.UserBytesWritten > 0 {
+    totalWrites := stats.WalBytesWritten + stats.FlushBytesWritten + stats.CompactionBytesWritten
+    fmt.Printf("User bytes written: %d\n", stats.UserBytesWritten)
+    fmt.Printf("Write amplification: %.2fx\n", float64(totalWrites)/float64(stats.UserBytesWritten))
+    fmt.Printf("Flush output: %d bytes in %d sstables\n", stats.FlushBytesWritten, stats.FlushCount)
+    fmt.Printf("Compaction: read %d / wrote %d bytes in %d sstables\n",
+        stats.CompactionBytesRead, stats.CompactionBytesWritten, stats.CompactionCount)
+}
 ```
 
 **Stats Fields**
@@ -739,6 +778,17 @@ if stats.Config != nil {
 | `LevelTombstoneCounts` | `[]uint64` | Per-level tombstone counts (parallels `LevelKeyCounts`) |
 | `MaxSSTDensity` | `float64` | Worst single-SSTable tombstone density observed (0.0 to 1.0) |
 | `MaxSSTDensityLevel` | `int` | 1-based level index where the worst SSTable lives (0 if none) |
+| `WalBytesWritten` | `uint64` | Framed bytes appended to this CF's WAL (0 in unified mode) |
+| `FlushBytesWritten` | `uint64` | On-disk bytes this CF's flushes wrote to L0 SSTables |
+| `CompactionBytesWritten` | `uint64` | On-disk bytes this CF's compactions wrote |
+| `CompactionBytesRead` | `uint64` | On-disk bytes this CF's compactions read as input |
+| `UserBytesWritten` | `uint64` | Logical key+value bytes committed to this CF (write-amplification denominator) |
+| `FlushCount` | `uint64` | Flushed SSTables produced by this CF |
+| `CompactionCount` | `uint64` | Compaction output SSTables produced by this CF |
+
+:::note[Write Amplification]
+The `*BytesWritten` / `*BytesRead` / `*Count` counters are lifetime totals since the database was opened, measured in on-disk framed bytes. Compute this column family's write amplification as `(WalBytesWritten + FlushBytesWritten + CompactionBytesWritten) / UserBytesWritten`. `WalBytesWritten` is zero in unified-memtable mode — the shared WAL volume is reported db-wide via `DbStats.UwalBytesWritten`.
+:::
 
 ### Getting Block Cache Statistics
 
@@ -833,6 +883,18 @@ fmt.Printf("Memtable bytes: %d\n", dbStats.TotalMemtableBytes)
 | `TotalUploads` | `uint64` | Lifetime count of objects uploaded to object store |
 | `TotalUploadFailures` | `uint64` | Lifetime count of permanently failed uploads |
 | `ReplicaMode` | `bool` | Whether running in read-only replica mode |
+| `UwalBytesWritten` | `uint64` | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
+| `WalBytesWritten` | `uint64` | Per-CF WAL bytes summed across all column families |
+| `FlushBytesWritten` | `uint64` | Flush output bytes summed across all column families |
+| `CompactionBytesWritten` | `uint64` | Compaction output bytes summed across all column families |
+| `CompactionBytesRead` | `uint64` | Compaction input bytes summed across all column families |
+| `UserBytesWritten` | `uint64` | Logical committed bytes summed across all column families |
+| `FlushCount` | `uint64` | Flushed SSTables summed across all column families |
+| `CompactionCount` | `uint64` | Compaction output SSTables summed across all column families |
+
+:::note[Database-Wide Write Amplification]
+Compute db-wide write amplification as `(UwalBytesWritten + WalBytesWritten + FlushBytesWritten + CompactionBytesWritten) / UserBytesWritten`. The `*Count` fields count output SSTables, not logical runs.
+:::
 
 :::note[Stack Allocated]
 Unlike `GetStats` (which heap-allocates), `GetDbStats` fills a caller-provided struct. No free is needed.
@@ -892,13 +954,37 @@ if found {
 }
 ```
 
-**Built-in comparators** (automatically registered on database open):
-- `"memcmp"` · Binary byte-by-byte comparison (default)
-- `"lexicographic"` · Null-terminated string comparison
-- `"uint64"` · Unsigned 64-bit integer comparison
-- `"int64"` · Signed 64-bit integer comparison
-- `"reverse"` · Reverse binary comparison
-- `"case_insensitive"` · Case-insensitive ASCII comparison
+**Built-in comparators** (automatically registered on database open). Assign one to `cfConfig.ComparatorName` using the exported constants — no `RegisterComparator` call is needed:
+
+| Constant | Name | Ordering |
+|----------|------|----------|
+| `tidesdb.ComparatorMemcmp` | `"memcmp"` | Unsigned byte-by-byte comparison (default) |
+| `tidesdb.ComparatorLexicographic` | `"lexicographic"` | Null-terminated string comparison |
+| `tidesdb.ComparatorUint64` | `"uint64"` | 8-byte key read as a `uint64` in host byte order |
+| `tidesdb.ComparatorInt64` | `"int64"` | 8-byte key read as an `int64` in host byte order |
+| `tidesdb.ComparatorReverse` | `"reverse"` | Reverse byte-by-byte comparison (descending) |
+| `tidesdb.ComparatorCaseInsensitive` | `"case_insensitive"` | Case-insensitive ASCII comparison |
+
+:::caution[uint64 / int64 byte order]
+The `uint64` and `int64` comparators reinterpret the raw 8 key bytes in **host byte order** (little-endian on x86-64 and ARM64), not big-endian. Encode keys with `encoding/binary.NativeEndian` so the numeric ordering matches. Keys that are not exactly 8 bytes fall back to `memcmp` ordering.
+:::
+
+```go
+import "encoding/binary"
+
+cfConfig := tidesdb.DefaultColumnFamilyConfig()
+cfConfig.ComparatorName = tidesdb.ComparatorUint64
+db.CreateColumnFamily("by_id", cfConfig)
+
+cf, _ := db.GetColumnFamily("by_id")
+key := make([]byte, 8)
+binary.NativeEndian.PutUint64(key, 42) // numerically ordered key
+
+txn, _ := db.BeginTxn()
+txn.Put(cf, key, []byte("value"), -1)
+txn.Commit()
+txn.Free()
+```
 
 **Use cases**
 - Validation · Check if a comparator is registered before creating a column family
@@ -1067,6 +1153,24 @@ if err != nil {
 :::tip[Purge vs Manual Flush + Compact]
 `FlushMemtable` and `Compact` are non-blocking - they enqueue work and return immediately. `PurgeCF` and `Purge` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
+
+#### Cancelling Background Work
+
+`CancelBackgroundWork` cancels background compaction across the whole database. In-flight merges bail out safely and queued compaction is skipped; flushes are unaffected, so durability is preserved. The call blocks (bounded) until compaction is idle.
+
+```go
+// Fast shutdown: stop compaction, then close.
+if err := db.CancelBackgroundWork(); err != nil {
+    log.Fatal(err)
+}
+db.Close()
+```
+
+**Behavior**
+- The cancellation is sticky for the session and resets on the next `Open`
+- Intended to be called right before `Close` for a fast shutdown
+- Flushes still run, so committed data remains durable
+- Complements the `FinishCompactionsOnClose` config field — leave that `false` (the default) for the fastest shutdown path
 
 ### Updating Runtime Configuration
 
@@ -1243,7 +1347,7 @@ if err != nil {
 
 ## Object Store
 
-TidesDB supports pluggable object store backends for cloud-native storage. The Go binding exposes the filesystem-backed connector for testing and local replication.
+TidesDB supports pluggable object store backends for cloud-native storage. The Go binding exposes the filesystem-backed connector for testing and local replication, and an S3-compatible connector (behind a build tag) for production cloud storage.
 
 ### Object Store Backends
 
@@ -1277,6 +1381,75 @@ if err != nil {
 }
 defer db.Close()
 ```
+
+### Creating an S3 Object Store
+
+The S3-compatible connector (AWS S3, MinIO, etc.) is available only when the TidesDB C library was built with `TIDESDB_WITH_S3=ON`. Because the `tidesdb_objstore_s3_*` symbols are otherwise unresolved at link time, the Go bindings are gated behind the **`tidesdb_s3` build tag**. Build and test with `-tags tidesdb_s3`:
+
+```bash
+go build -tags tidesdb_s3 ./...
+go test  -tags tidesdb_s3 ./...
+```
+
+The positional `ObjStoreS3Create` covers the common case with secure defaults:
+
+```go
+store, err := tidesdb.ObjStoreS3Create(
+    "s3.amazonaws.com", // endpoint (or "minio.local:9000")
+    "my-bucket",        // bucket
+    "production/db1/",  // prefix (may be empty)
+    "AKIA...",          // access key
+    "secret...",        // secret key
+    "us-east-1",        // region (empty for MinIO)
+    true,               // useSSL  (HTTPS)
+    false,              // usePathStyle (true for MinIO)
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+config := tidesdb.DefaultConfig()
+config.DBPath = "./mydb"
+config.ObjectStore = store
+db, err := tidesdb.Open(config)
+```
+
+For TLS and multipart tuning that the positional form cannot express, use `ObjStoreS3CreateConfig` with an `S3Config`. The zero value is secure (TLS verification on, no custom CA) and uses the library's built-in multipart sizes:
+
+```go
+store, err := tidesdb.ObjStoreS3CreateConfig(tidesdb.S3Config{
+    Endpoint:           "minio.local:9000",
+    Bucket:             "my-bucket",
+    Prefix:             "production/db1/",
+    AccessKey:          "minioadmin",
+    SecretKey:          "minioadmin",
+    Region:             "",     // empty for MinIO
+    UseSSL:             true,
+    UsePathStyle:       true,   // MinIO requires path-style URLs
+    TLSCAPath:          "/etc/ssl/custom-ca.pem", // empty for the system bundle
+    MultipartThreshold: 64 * 1024 * 1024,          // 0 = library default
+    MultipartPartSize:  8 * 1024 * 1024,           // 0 = library default
+})
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**S3Config Fields**
+| Field | Type | Description |
+|-------|------|-------------|
+| `Endpoint` | `string` | S3 endpoint (required), e.g. `"s3.amazonaws.com"` or `"minio.local:9000"` |
+| `Bucket` | `string` | Bucket name (required) |
+| `Prefix` | `string` | Key prefix (e.g. `"production/db1/"`), may be empty |
+| `AccessKey` | `string` | AWS access key ID (required) |
+| `SecretKey` | `string` | AWS secret access key (required) |
+| `Region` | `string` | AWS region (e.g. `"us-east-1"`), empty for the default / MinIO |
+| `UseSSL` | `bool` | true for HTTPS, false for HTTP |
+| `UsePathStyle` | `bool` | true for path-style URLs (MinIO), false for virtual-hosted (AWS) |
+| `TLSCAPath` | `string` | Custom CA bundle file path, empty for the system bundle |
+| `TLSInsecureSkipVerify` | `bool` | true disables TLS peer+host verification (test only, insecure) |
+| `MultipartThreshold` | `uint64` | Object size at/above which multipart upload is used; 0 = default |
+| `MultipartPartSize` | `uint64` | Multipart chunk size in bytes; 0 = default |
 
 ### Object Store Configuration
 
@@ -1538,6 +1711,7 @@ if err != nil {
 - `ErrUnknown` (-11) · Unknown error
 - `ErrLocked` (-12) · Database is locked
 - `ErrReadonly` (-13) · Database is read-only (replica mode)
+- `ErrBusy` (-14) · Resource busy
 
 ## Complete Example
 
@@ -1904,4 +2078,31 @@ go test -v -run TestErrorCodeReadonly
 
 # Run single-delete transaction test
 go test -v -run TestTransactionSingleDelete
+
+# Run raise open-file limit test
+go test -v -run TestRaiseOpenFileLimit
+
+# Run cancel background work test
+go test -v -run TestCancelBackgroundWork
+
+# Run finish-compactions-on-close config test
+go test -v -run TestFinishCompactionsOnCloseConfig
+
+# Run busy error code test
+go test -v -run TestErrorCodeBusy
+
+# Run built-in comparator name + uint64 ordering tests
+go test -v -run TestBuiltinComparatorNames
+go test -v -run TestUint64ComparatorOrdering
+
+# Run comparator context string INI round-trip test
+go test -v -run TestComparatorCtxStrIni
+
+# Run write-amplification stats tests
+go test -v -run TestStatsWriteAmplification
+go test -v -run TestDbStatsWriteAmplification
+
+# Run S3 object store connector tests (requires a library built with TIDESDB_WITH_S3=ON,
+# plus a reachable endpoint via TIDESDB_S3_ENDPOINT / TIDESDB_S3_BUCKET / etc.)
+go test -tags tidesdb_s3 -v -run TestObjStoreS3
 ```

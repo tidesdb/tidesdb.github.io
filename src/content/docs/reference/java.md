@@ -39,7 +39,7 @@ sudo cmake --install build
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-java</artifactId>
-    <version>0.6.8</version>
+    <version>0.8.1</version>
 </dependency>
 ```
 
@@ -75,6 +75,26 @@ public class Example {
 :::note[maxConcurrentFlushes]
 `maxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
 :::
+
+#### Raising the Open-File Limit
+
+`TidesDB.raiseOpenFileLimit(long)` raises this process's open-file ceiling so the database can keep more SSTables open. The engine sizes `maxOpenSSTables` to fit this ceiling at open time, so call it **before** `TidesDB.open()`. This is an explicit, opt-in operator action - TidesDB never raises the limit itself.
+
+```java
+// Raise the soft limit toward the hard limit before opening
+long ceiling = TidesDB.raiseOpenFileLimit(65536);
+System.out.println("Open-file ceiling now: " + ceiling);
+
+try (TidesDB db = TidesDB.open(config)) {
+    // engine can now keep more SSTables open
+}
+```
+
+**Behavior**
+- On POSIX systems (Linux, macOS, the BSDs, illumos) it raises the `RLIMIT_NOFILE` soft limit toward the hard limit; on Windows it raises the CRT stdio cap (max 8192)
+- A failed or partial raise is non-fatal
+- Passing a value `<= 0` just reports the current ceiling without changing it
+- Returns the open-file ceiling in effect after the attempt
 
 ### Unified Memtable Mode
 
@@ -413,7 +433,18 @@ for (int i = 0; i < stats.getNumLevels(); i++) {
 | `levelTombstoneCounts` | long[] | Per-level tombstone counts (parallels `levelKeyCounts`) |
 | `maxSstDensity` | double | Worst single-SSTable tombstone density observed (0.0 to 1.0) |
 | `maxSstDensityLevel` | int | 1-based level index where the worst SSTable lives (0 if none) |
+| `walBytesWritten` | long | Framed bytes appended to this CF's WAL (0 in unified mode; see `DbStats.uwalBytesWritten`) |
+| `flushBytesWritten` | long | On-disk bytes this CF's flushes wrote to L0 SSTables |
+| `compactionBytesWritten` | long | On-disk bytes this CF's compactions wrote |
+| `compactionBytesRead` | long | On-disk bytes this CF's compactions read as input |
+| `userBytesWritten` | long | Logical key+value bytes committed to this CF (write-amplification denominator) |
+| `flushCount` | long | Flushed SSTables produced by this CF |
+| `compactionCount` | long | Compaction output SSTables produced by this CF |
 | `config` | ColumnFamilyConfig | Column family configuration |
+
+:::note[Write amplification]
+The `*BytesWritten`/`*BytesRead` and `*Count` fields are lifetime counters since the database was opened (on-disk framed bytes). A column family's write amplification is `(walBytesWritten + flushBytesWritten + compactionBytesWritten) / userBytesWritten`. In unified memtable mode `walBytesWritten` is 0 — the shared WAL volume is reported db-wide via `DbStats.uwalBytesWritten`.
+:::
 
 ### Getting Cache Statistics
 
@@ -496,6 +527,16 @@ System.out.println("Replica mode: " + dbStats.isReplicaMode());
 | `totalUploads` | long | Lifetime count of objects uploaded to object store |
 | `totalUploadFailures` | long | Lifetime count of permanently failed uploads |
 | `replicaMode` | boolean | Whether running in read-only replica mode |
+| `uwalBytesWritten` | long | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
+| `walBytesWritten` | long | Per-CF WAL bytes summed across all column families |
+| `flushBytesWritten` | long | Flush output bytes summed across all column families |
+| `compactionBytesWritten` | long | Compaction output bytes summed across all column families |
+| `compactionBytesRead` | long | Compaction input bytes summed across all column families |
+| `userBytesWritten` | long | Logical committed bytes summed across all column families |
+| `flushCount` | long | Flushed SSTables summed across all column families |
+| `compactionCount` | long | Compaction output SSTables summed across all column families |
+
+The database-wide write amplification is `(uwalBytesWritten + walBytesWritten + flushBytesWritten + compactionBytesWritten) / userBytesWritten`. All fields are lifetime counters (on-disk framed bytes) since the database was opened.
 
 ### Manual Compaction and Flush
 
@@ -575,6 +616,20 @@ db.purge();
 `flushMemtable()` and `compact()` are non-blocking - they enqueue work and return immediately. `purge()` is synchronous - it blocks until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
 
+### Fast Shutdown (Cancel Background Work)
+
+`cancelBackgroundWork()` cancels background compaction database-wide so a subsequent `close()` returns quickly. In-flight merges bail safely at their next checkpoint - their uncommitted output is discarded and the inputs are left intact, so no data is lost (recovery handles a mid-merge state the same way). Queued compaction is skipped. Flushes are unaffected, so durability is preserved. The call blocks (bounded) until compaction is idle.
+
+```java
+db.cancelBackgroundWork();
+db.close();  // returns quickly without waiting for compaction to drain
+```
+
+**Behavior**
+- The cancellation is sticky for the session and is reset on the next `open()`
+- Intended to be called immediately before `close()` for a fast shutdown
+- This is the opposite end of the spectrum from `Config.finishCompactionsOnClose(true)`, which instead lets in-flight compactions run to completion before `close()` returns
+
 ### Manual WAL Sync
 
 Forces an immediate fsync of the active write-ahead log for a column family. Useful for explicit durability control when using `SYNC_NONE` or `SYNC_INTERVAL` modes.
@@ -639,6 +694,35 @@ cf.updateRuntimeConfig(newConfig, true);
 - `indexSampleRatio` · Index sampling ratio for new SSTables
 - `syncMode` · Durability mode
 - `syncIntervalUs` · Sync interval in microseconds
+
+### Saving and Loading Column Family Config (INI)
+
+A `ColumnFamilyConfig` can be serialized to an INI file and read back. This is useful for templating column family settings, version-controlling configuration, or inspecting the on-disk `config.ini` files the engine writes for each column family.
+
+```java
+ColumnFamilyConfig cfConfig = ColumnFamilyConfig.builder()
+    .writeBufferSize(96 * 1024 * 1024)
+    .compressionAlgorithm(CompressionAlgorithm.ZSTD_COMPRESSION)
+    .syncMode(SyncMode.SYNC_INTERVAL)
+    .syncIntervalUs(250000)
+    .tombstoneDensityTrigger(0.4)
+    .useBtree(true)
+    .build();
+
+// Write the configuration under a named section
+cfConfig.saveToIni("./cf_templates.ini", "analytics_cf");
+
+// Read it back (fields absent from the section fall back to engine defaults)
+ColumnFamilyConfig loaded = ColumnFamilyConfig.loadFromIni("./cf_templates.ini", "analytics_cf");
+
+db.createColumnFamily("analytics_cf", loaded);
+```
+
+**Behavior**
+- `saveToIni(iniFile, section)` is an instance method that writes this configuration under the given `[section]`. If the file exists it is overwritten, then fsynced.
+- `loadFromIni(iniFile, section)` is a static factory that returns a new `ColumnFamilyConfig`. Fields missing from the section keep the engine defaults.
+- Persisted fields: write buffer size, level ratios, value threshold, compression, bloom/index settings, sync mode and interval, skip-list parameters, default isolation level, compaction triggers, tombstone density settings, min disk space, B+tree and object-store flags, and the comparator name. Runtime-only fields (commit hooks) are not persisted.
+- Both methods throw `TidesDBException` on I/O errors (for example, a missing file on load) and `IllegalArgumentException` for null/empty paths or section names.
 
 ### Commit Hook (Change Data Capture)
 
@@ -777,6 +861,10 @@ db.checkpoint("./mydb_checkpoint");
 ## Object Store Mode
 
 Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
+
+:::note[Connector availability]
+The Java binding currently exposes the **filesystem connector** (`objectStoreFsPath`), which mirrors objects as files under a directory and is ideal for testing and NFS/shared-volume replication. The S3 connector requires a native library built with `-DTIDESDB_WITH_S3=ON`; when that build is in use, point `objectStoreFsPath` at a filesystem path or use the C API directly for S3-specific configuration.
+:::
 
 ### Enabling Object Store Mode (Filesystem Connector)
 
@@ -1094,6 +1182,7 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `objectStoreFsPath` | String | null | Filesystem connector root directory (null = no object store) |
 | `objectStoreConfig` | ObjectStoreConfig | null | Object store behavior configuration (null = use defaults) |
 | `maxConcurrentFlushes` | int | 0 (library default) | Global semaphore on in-flight memtable flushes across all CFs (0 = library default) |
+| `finishCompactionsOnClose` | boolean | false | Close behavior. `false` cancels in-flight compactions at their next checkpoint for a fast shutdown (no data is lost; recovery handles a mid-merge state). `true` lets in-flight compactions run to completion before `close()` returns |
 
 ### Object Store Configuration
 
@@ -1182,6 +1271,7 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `ERR_UNKNOWN` | -11 | Unknown error |
 | `ERR_LOCKED` | -12 | Database is locked |
 | `ERR_READONLY` | -13 | Database is read-only (replica mode) |
+| `ERR_BUSY` | -14 | Resource is busy |
 
 ## Testing
 
