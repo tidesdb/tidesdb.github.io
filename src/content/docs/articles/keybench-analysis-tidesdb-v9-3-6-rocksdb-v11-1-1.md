@@ -33,7 +33,7 @@ The idea is rather simple. You write the workload in Lua, the harness drives it 
 - Latency is a distribution, per operation kind. Each of put, get, del, range, mget, mput, mdel keeps its own histogram. The report gives p50, p99, p99.9, and the max. I care more about the tail than the median.
 - The seed is measured, not hidden. Loading the dataset is its own timed phase with its own thread count, and it streams progress, so I can see ingest rate separately from the timed workload.
 
-One more thing that shaped this run. A storage engine under write pressure will eventually push back, RocksDB by blocking the writer during a stall, TidesDB by returning a busy code that asks the caller to retry. keybench now treats both the same way, it waits and retries the busy code so a stall blocks the writer rather than dropping the write. That keeps the comparison honest, an engine cannot look fast by quietly failing writes, and it means the multi second tails you will see below are real stalls that a client would feel.
+One more thing that shaped this run. A storage engine under write pressure will eventually push back, RocksDB by blocking the writer during a stall, TidesDB by returning a busy code that asks the caller to retry. keybench now treats both the same way, it waits and retries the busy code so a stall blocks the writer rather than dropping the write. That keeps the comparison honest, an engine cannot look fast by quietly failing writes, and it means long tails you will see below are real stalls that a client would feel.
 
 **Environment**
 
@@ -44,13 +44,13 @@ One more thing that shaped this run. A storage engine under write pressure will 
 - gcc 12.3.0, linked against jemalloc so the whole malloc family agrees across both engines
 - TidesDB <a target="_blank" href="https://github.com/tidesdb/tidesdb">v9.3.6</a>, RocksDB <a target="_blank" href="https://github.com/facebook/rocksdb">v11.1.1</a>, keybench 0.1.1
 
-This is a modest consumer box on a SATA SSD, not a server with NVMe. I think that is a feature, not a bug, because it makes the write path and compaction actually hurt, which is where these two engines differ. Note the eight physical cores, the 1, 8, 16 thread sweep below runs at one thread, at the physical core count, and into the hyperthreads.
+This is a modest consumer box on a SATA SSD, not a server with NVMe. 
 
 **How the engines were run**
 
 Every workload was run against both engines across 1, 8, and 16 threads for 60 seconds per point, single run, with the median reported per point. The reason it is a single run rather than three is stated in the caveats.
 
-The dataset was 500,000 keys with 4 KiB values, the cart workload sized by 90,000 users of line items instead, so each workload's on disk dataset is roughly 2 GiB, about 16 times the 64 MiB memtable and block cache each engine was given. The intent was to push the data out of the memtable and into SSTables and compaction rather than let it sit in memory.
+The dataset was 500,000 keys with 4 KiB values, the cart workload sized by 90,000 users of line items instead. Each seed loaded that full dataset, half a million keys for mixed, scan, and batch and a comparable count of line items for cart, so the live data is roughly 2 GiB, about 16 times the combined 128 MiB of memtable and block cache each engine was given. The on disk footprint is larger than that and keeps growing through the run, because under seed once all three thread points write against the one store for 60 seconds each, and an uncompressed LSM holds obsolete versions and tombstones until compaction clears them. The point of the sizing was to push the data out of the memtable and into SSTables and compaction rather than let it sit in memory.
 
 Both engines were configured for parity as far as their knobs allow, which is the important hedge.
 
@@ -66,7 +66,7 @@ Both engines were configured for parity as far as their knobs allow, which is th
 
 These are matched in spirit, small memtable, no compression, a bloom filter on the read path, and an aggressive L0 setting so compaction has to keep up. They are not matched one to one, because the engines do not share knobs. Read the results as "these two configurations on this box", not "the best each engine can do".
 
-The seed used keybench's seed onced mode, the store is seeded a single time per engine and the whole thread sweep runs against that one store rather than reseeding for every point. That models the realistic shape of load once, then serve, and it means a later, higher thread point runs against a store the earlier points already lived in, with whatever compaction debt that left. I think that is the right thing to measure, but it is a choice and it shows up in the tails.
+The seed used keybench's seed once mode, the store is seeded a single time per engine and the whole thread sweep runs against that one store rather than reseeding for every point. That models the realistic shape of load once, then serve, and it means a later, higher thread point runs against a store the earlier points already lived in, with whatever compaction debt that left. I think that is the right thing to measure, but it is a choice and it shows up in the tails.
 
 **Workloads**
 
@@ -83,7 +83,7 @@ Four workloads, each a Lua file.
 
 ![throughput scaling with threads](/keybench-tidesdb-v9-3-6-rocksdb-v11-1-1/scalability.png)
 
-The single most consistent pattern across all four workloads is not the absolute numbers, it is the shape of the scaling curve. TidesDB tends to gain throughput from 1 to 8 threads and hold or keep gaining to 16. RocksDB, at this configuration, frequently peaks at 1 thread and degrades as threads are added. I will come back to why, because I do not think it is the whole story, but it is what the data shows.
+The most consistent pattern across the four workloads is not the absolute numbers, it is the shape of the scaling curve. TidesDB gains throughput from 1 to 8 threads on every workload, then from 8 to 16 it keeps gaining on cart and scan and eases back on mixed and batch. RocksDB, at this configuration, does not gain the same way, on the write heavy mixed and cart it is fastest at a single thread and slides down as threads are added, it scales up only on the read only scan, and on batch it is erratic. I will come back to the RocksDB write path, because I do not think it is the whole story, but it is what the data shows.
 
 **mixed**
 
@@ -129,7 +129,7 @@ It is also the workload with the widest gap at scale, and the reason is the scal
 
 This is the cleanest comparison in the set, read only, no writes, no stalls, so it is purely the range read path. Each unit scans 1,000 consecutive rows of 4 KiB, so these rates are streaming a lot of data, 389/s at one thread on RocksDB is roughly 1.5 GiB/s of value bytes touched.
 
-TidesDB is ahead throughout, by about 68% at one thread and around 30 to 40% at 8 and 16 threads. The p50 scan latency is 1.52ms against 2.61ms at one thread. Both scale cleanly to 8 threads and flatten by 16, which is what I expect when the work is read bound and the box has 8 physical cores. Because this is read only and the 2 GiB dataset fits comfortably in the 46 GiB of RAM, much of this is served from the OS page cache, so read the scan numbers as a warm cache range read comparison, not a cold disk one.
+TidesDB is ahead throughout, by about 68% at one thread and around 30 to 40% at 8 and 16 threads. The p50 scan latency is 1.52ms against 2.61ms at one thread. Both scale cleanly to 8 threads and flatten by 16, which is what I expect when the work is read bound and the box has 8 physical cores. One thing to be clear about, the SSTable files sit in the OS page cache, so the SSD is mostly out of the picture, but the 64 MiB engine block cache is tiny against the ~2 GiB dataset, so these scans are not served from a warm engine cache, they run the full read path and only the device latency is absorbed. Read the scan numbers as a comparison of the range read path at a warm device, not a cold disk one.
 
 **batch**
 
@@ -163,23 +163,23 @@ The L0 stop trigger was set to 10 to mirror TidesDB's L0 stall threshold of 10. 
 
 ![seed progress, keys loaded over time](/keybench-tidesdb-v9-3-6-rocksdb-v11-1-1/seed_progress.png)
 
-The ingest curves are a nice illustration of how differently the two engines absorb a bulk load. RocksDB rises as a smooth ramp, its delayed write throttle metering the ingest at a steady rate. TidesDB rises in steps, it buffers and then stalls flat while a flush drains, then jumps. Both finish the same 500,000 keys, the path there is just shaped by each engine's flush and stall machinery. There is nothing to declare a winner on here, it is a behavioural picture, and it is the kind of thing the timeline view was built to show.
+The ingest curves are a nice illustration of how differently the two engines absorb a bulk load. RocksDB rises as a smooth ramp, its delayed write throttle metering the ingest at a steady rate. TidesDB rises in steps, it buffers and then stalls flat while a flush drains, then jumps. Both finish loading the same dataset, the path there is just shaped by each engine's flush and stall machinery. There is nothing to declare a winner on here, it is a behavioural picture, and it is the kind of thing the timeline view was built to show.
 
 *tl;dr*
 
 On this box, this configuration, and these four workloads, with single 60 second runs:
 
 - TidesDB v9.3.6 led on throughput in most points, clearly so once past one thread, by roughly 2x on mixed at 8 threads, up to 3.7x on cart at 16 threads, about 30 to 40% on scans, and several fold on batched writes.
-- RocksDB v11.1.1 won cart at one thread by about 23%, and was within range of TidesDB at one thread on mixed.
-- RocksDB degraded with added threads on most workloads at this configuration. I believe the aggressive L0 stop trigger is a large part of that, and would rerun with RocksDB's default L0 settings before generalising.
-- Both engines severe write tails under write heavy and batched workloads, multi second p99.9 and max, which are real compaction stalls a client would feel. High throughput did not buy a clean tail for either engine.
+- RocksDB v11.1.1 won cart at one thread by about 23%, its only outright win in the run.
+- RocksDB was fastest at a single thread on the write heavy mixed and cart and slid down as threads were added, while it scaled up on the read only scan. I believe the aggressive L0 stop trigger is a large part of the write side story, and would rerun with RocksDB's default L0 settings before generalising.
+- Both engines showed severe write tails under write heavy and batched workloads, multi second p99.9 and max, which are real compaction stalls a client would feel. High throughput did not buy a clean tail for either engine.
 
 **Caveat Emptor**
 
 I would not build a decision on this run alone, and here is why.
 
 1. Single run per point. `repeat` was 1, so there is no variance estimate. A 60 second LSM benchmark can swing point to point depending on where compaction happens to be. The medians here are medians of one. I will rerun with repeat 3 next time.
-2. The data fits in RAM. A 2 GiB dataset on a 46 GiB box means the OS page cache holds much of it, so the read numbers, especially scan, are warm cache reads, not cold disk reads. This understates how much the read path would cost on a dataset that does not fit.
+2. The device is hidden by the OS page cache, the engine caches are not. The ~2 GiB of SSTable files sits in the 46 GiB of RAM, so a block cache miss is satisfied from the page cache rather than the SSD, and these numbers do not test cold, I/O bound reads. What they do test is the engine read path, because each engine was given only a 64 MiB block cache and a 64 MiB write buffer against that ~2 GiB dataset, far too small to serve reads from its own cache. So every get and scan still runs the full path, bloom filter, index, and SSTable block fetch, the page cache only removes the disk seek. Read these as read path efficiency at a warm device, not as device bound reads.
 3. Short runs, lived in store. 60 seconds per point under seed once means each point inherits the previous one's compaction debt and never reaches a long term steady state. That is realistic for serve after load, but it is not a soak test.
 4. The configuration is parity matched, not engine optimal. Neither engine was tuned to its best. The L0 settings in particular are aggressive and matched by number rather than by meaning, and they clearly shaped RocksDB's scaling.
 5. Modest single box. One consumer SATA SSD, eight physical cores. NVMe and more cores would change the balance, probably in favour of whichever engine is better at using parallel I/O.
@@ -195,4 +195,4 @@ Thank you for reading.
 
 Gist: <a href="https://gist.github.com/guycipher/04a7eaf65b332f662c8a8f968c0a3528">https://gist.github.com/guycipher/04a7eaf65b332f662c8a8f968c0a3528</a>
 
-Raw data: <a href="/home/agpmastersystem/tidesdb.github.io/public/keybench-tidesdb-v9-3-6-rocksdb-v11-1-1/20260609-100854.zip"> keybench-tidesdb-v9-3-6-rocksdb-v11-1-1/20260609-100854.zip (sha256: b1d9afc26a9940a850f05f47a91d2b7c4237e70f6e06fe8c84064b53dfa238d7)
+Raw data: <a href="/keybench-tidesdb-v9-3-6-rocksdb-v11-1-1/20260609-100854.zip">keybench-tidesdb-v9-3-6-rocksdb-v11-1-1/20260609-100854.zip</a> (sha256: b1d9afc26a9940a850f05f47a91d2b7c4237e70f6e06fe8c84064b53dfa238d7)
