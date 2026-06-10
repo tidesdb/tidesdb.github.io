@@ -40,7 +40,7 @@ The easiest way to add TidesDB to your project is via [crates.io](https://crates
 
 ```toml
 [dependencies]
-tidesdb = "0.7"
+tidesdb = "0.11"
 ```
 
 Or using `cargo add`:
@@ -61,18 +61,23 @@ The build script (`build.rs`) handles linking automatically:
 
 ### Version Selection
 
-Each crate release defaults to a specific TidesDB C library version. You can select a different version using Cargo features:
+Each crate release pins the TidesDB C library version it builds against via a Cargo feature. `tidesdb` 0.11 ships and defaults to **`v9_3_6`** (TidesDB v9.3.6):
 
 ```toml
 [dependencies]
-# Uses the default version (currently v9.2.0)
-tidesdb = "0.8"
-
-# Pin to a specific TidesDB version
-tidesdb = { version = "0.8", default-features = false, features = ["v9_0_5"] }
+# Uses the default version (v9.3.6)
+tidesdb = "0.11"
 ```
 
-Only one version feature should be enabled at a time. The version feature (e.g., `v9_2_0`) maps directly to the TidesDB C library release tag (e.g., `v9.2.0`); when multiple are enabled (such as via dependency unification), the highest version is selected.
+A version feature maps directly to the TidesDB C library release tag (e.g., `v9_3_6` → `v9.3.6`). Additional versions are published over time; when more than one is available you can pin a specific one with `default-features = false`:
+
+```toml
+[dependencies]
+# Pin to a specific TidesDB version (once that feature is offered)
+tidesdb = { version = "0.11", default-features = false, features = ["v9_3_6"] }
+```
+
+Only one version feature should be enabled at a time; when several are enabled (e.g. via dependency unification), the highest version is selected.
 
 ### Object Store Support
 
@@ -80,7 +85,7 @@ To enable S3 object store support, enable the `objectstore` feature:
 
 ```toml
 [dependencies]
-tidesdb = { version = "0.7", features = ["objectstore"] }
+tidesdb = { version = "0.11", features = ["objectstore"] }
 ```
 
 This requires additional dependencies:
@@ -386,7 +391,7 @@ Between any two single-deletes on the same key, and between the start of the key
 
 This is the right choice for workloads that insert each key exactly once and then delete it exactly once (classic insert-benchmark patterns, secondary-index entries on columns that are never updated, log-style tables with scheduled purges). It is **not** safe for tables that issue repeated updates to the same key. When in doubt, prefer `Transaction::delete`.
 
-Requires tidesdb >= 9.1.0 (the `v9_1_0` Cargo feature, enabled by default in `tidesdb` 0.7).
+Requires tidesdb >= 9.1.0; the default `v9_3_6` build satisfies this.
 
 ```rust
 use tidesdb::{TidesDB, Config, ColumnFamilyConfig};
@@ -768,7 +773,7 @@ fn main() -> tidesdb::Result<()> {
 | `compaction_count` | `u64` | Compaction output SSTables produced by this CF |
 
 :::note[Write-amplification counters]
-The `wal_bytes_written`, `flush_bytes_written`, `compaction_bytes_written`, `compaction_bytes_read`, `user_bytes_written`, `flush_count`, and `compaction_count` fields require tidesdb >= 9.3.4 (the `v9_3_4` Cargo feature or later, enabled by default). On older libraries they are reported as `0`. This CF's write amplification is `(wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`. In unified-memtable mode `wal_bytes_written` is `0` here — the shared WAL volume is reported db-wide as `DbStats::uwal_bytes_written`.
+The `wal_bytes_written`, `flush_bytes_written`, `compaction_bytes_written`, `compaction_bytes_read`, `user_bytes_written`, `flush_count`, and `compaction_count` fields require tidesdb >= 9.3.4; the default `v9_3_6` build includes them. On older libraries (e.g. an older system library found via pkg-config) they are reported as `0`. This CF's write amplification is `(wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`. In unified-memtable mode `wal_bytes_written` is `0` here — the shared WAL volume is reported db-wide as `DbStats::uwal_bytes_written`.
 :::
 
 ### Getting Cache Statistics
