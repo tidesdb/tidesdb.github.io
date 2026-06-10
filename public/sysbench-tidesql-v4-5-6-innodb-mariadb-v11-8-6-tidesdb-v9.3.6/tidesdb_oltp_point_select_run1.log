@@ -1,0 +1,51 @@
+sysbench 1.1.0-3ceba0b (using bundled LuaJIT 2.1.0-beta3)
+
+Running the test with following options:
+Number of threads: 16
+Report intermediate results every 10 second(s)
+Initializing random number generator from current time
+
+
+Initializing worker threads...
+
+Threads started!
+
+[ 10s ] thds: 16 tps: 1479.82 qps: 1479.82 (r/w/o: 1479.82/0.00/0.00) lat (ms,95%): 68.05 err/s: 0.00 reconn/s: 0.00
+[ 20s ] thds: 16 tps: 1153.60 qps: 1153.60 (r/w/o: 1153.60/0.00/0.00) lat (ms,95%): 71.83 err/s: 0.00 reconn/s: 0.00
+[ 30s ] thds: 16 tps: 962.39 qps: 962.39 (r/w/o: 962.39/0.00/0.00) lat (ms,95%): 74.46 err/s: 0.00 reconn/s: 0.00
+[ 40s ] thds: 16 tps: 921.01 qps: 921.01 (r/w/o: 921.01/0.00/0.00) lat (ms,95%): 104.84 err/s: 0.00 reconn/s: 0.00
+[ 50s ] thds: 16 tps: 561.90 qps: 561.90 (r/w/o: 561.90/0.00/0.00) lat (ms,95%): 257.95 err/s: 0.00 reconn/s: 0.00
+[ 60s ] thds: 16 tps: 458.80 qps: 458.80 (r/w/o: 458.80/0.00/0.00) lat (ms,95%): 248.83 err/s: 0.00 reconn/s: 0.00
+[ 70s ] thds: 16 tps: 679.20 qps: 679.20 (r/w/o: 679.20/0.00/0.00) lat (ms,95%): 176.73 err/s: 0.00 reconn/s: 0.00
+[ 80s ] thds: 16 tps: 833.70 qps: 833.70 (r/w/o: 833.70/0.00/0.00) lat (ms,95%): 127.81 err/s: 0.00 reconn/s: 0.00
+[ 90s ] thds: 16 tps: 600.40 qps: 600.40 (r/w/o: 600.40/0.00/0.00) lat (ms,95%): 170.48 err/s: 0.00 reconn/s: 0.00
+[ 100s ] thds: 16 tps: 679.70 qps: 679.70 (r/w/o: 679.70/0.00/0.00) lat (ms,95%): 110.66 err/s: 0.00 reconn/s: 0.00
+[ 110s ] thds: 16 tps: 666.50 qps: 666.50 (r/w/o: 666.50/0.00/0.00) lat (ms,95%): 147.61 err/s: 0.00 reconn/s: 0.00
+[ 120s ] thds: 16 tps: 648.40 qps: 648.40 (r/w/o: 648.40/0.00/0.00) lat (ms,95%): 196.89 err/s: 0.00 reconn/s: 0.00
+SQL statistics:
+    queries performed:
+        read:                            96471
+        write:                           0
+        other:                           0
+        total:                           96471
+    transactions:                        96471  (800.44 per sec.)
+    queries:                             96471  (800.44 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+Throughput:
+    events/s (eps):                      800.4402
+    time elapsed:                        120.5224s
+    total number of events:              96471
+
+Latency (ms):
+         min:                                    0.02
+         avg:                                   19.96
+         max:                                 2785.73
+         95th percentile:                      110.66
+         sum:                              1925259.00
+
+Threads fairness:
+    events (avg/stddev):           6029.4375/199.75
+    execution time (avg/stddev):   120.3287/0.19
+

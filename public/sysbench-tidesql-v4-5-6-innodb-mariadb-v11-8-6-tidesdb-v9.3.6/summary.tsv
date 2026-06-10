@@ -1,0 +1,13 @@
+engine	workload	median_tps	median_qps	p95_ms	ign_err_per_s
+innodb	oltp_point_select	18646.63	18646.63	1.25	0.00
+innodb	oltp_read_write	141.51	2830.20	397.39	0.00
+innodb	oltp_update_index	683.60	683.60	77.19	0.00
+innodb	oltp_update_non_index	1596.83	1596.83	28.16	0.00
+innodb	oltp_insert	3563.93	3563.93	12.98	0.00
+innodb	oltp_delete	878.76	878.76	41.10	0.00
+tidesdb	oltp_point_select	16860.79	16860.79	0.55	0.00
+tidesdb	oltp_read_write	1674.06	33481.18	17.63	0.00
+tidesdb	oltp_update_index	34774.51	34774.51	0.80	0.00
+tidesdb	oltp_update_non_index	29736.24	29736.24	0.95	0.00
+tidesdb	oltp_insert	33804.07	33804.07	1.18	0.00
+tidesdb	oltp_delete	13224.15	13224.15	2.22	0.00
