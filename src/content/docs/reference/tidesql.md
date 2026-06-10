@@ -422,7 +422,7 @@ The primary row CF is different. `UPDATE t SET non_pk_col = ...` writes a fresh 
 Primary-CF single-delete is therefore behind the session variable `tidesdb_single_delete_primary`, default OFF. Enabling it is the caller's explicit promise that:
 
 - The session performs no `UPDATE` on non-PK columns of TidesDB tables.
-- The session performs no `REPLACE INTO` or `INSERT ... ON DUPLICATE KEY UPDATE` that hits the line-5143 silent-overwrite path on a table without secondary indexes.
+- The session performs no `REPLACE INTO` or `INSERT ... ON DUPLICATE KEY UPDATE` that hits the silent-overwrite path on a table without secondary indexes.
 - New rows with a given PK are always preceded by a `DELETE` of that PK (append-only or insert-then-delete).
 
 Enable it only when the workload is known to fit this shape. Typical safe cases:
@@ -1224,7 +1224,8 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 | Variable | Description |
 |----------|-------------|
 | `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.5`) |
-| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263941` = `0x40505`) |
+| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263429` = `0x40505`) |
+| `Tidesdb_library_version` | Underlying TidesDB storage library (`libtidesdb`) version string |
 | `Tidesdb_column_families` | Number of active column families |
 | `Tidesdb_global_sequence` | Global MVCC sequence number |
 | `Tidesdb_memtable_bytes` | Total memtable memory usage in bytes |
@@ -1391,7 +1392,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_unified_memtable_skip_list_probability` | 0.0 | Skip-list level promotion probability for the unified memtable; 0.0 keeps the library default |
 | `tidesdb_replica_mode` | OFF | Enable read-only replica mode (writes return SQL error) |
 | `tidesdb_replica_sync_interval` | 5000000 | MANIFEST poll interval for replica sync in microseconds |
-| `tidesdb_fast_shutdown` | OFF | When ON, deinit calls `tidesdb_cancel_background_work` before `tidesdb_close` so in-flight compactions bail at their next checkpoint and shutdown returns quickly. Default OFF lets `tidesdb_close` drain naturally, which is the safer setting for object-store and replica deployments where a mid-compaction cancel can leave S3 with referenced-but-not-yet-uploaded SSTables that confuse a syncing replica |
+| `tidesdb_finish_compactions_on_close` | OFF | Maps to `tidesdb_config_t.finish_compactions_on_close`, applied at open. Default OFF (the library default) makes `tidesdb_close` cancel in-flight compactions at their next checkpoint for a fast shutdown; the cancelled merge discards its uncommitted output and leaves inputs intact, so no data is lost and recovery handles a mid-merge state the same way. Set ON to let in-flight compactions run to completion before close returns, which is the safer setting for object-store and replica deployments where a mid-compaction cancel can leave S3 with referenced-but-not-yet-uploaded SSTables that confuse a syncing replica |
 
 ### Global Variables (dynamic)
 
@@ -1750,7 +1751,7 @@ Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail a
 | 12.3.1          | >= 4.2.6     | ✔     |
 | 13.0.2          | >= 4.5.4     | ✔     |
 
-Current TideSQL release is 4.5.4 (hex `0x40504`).
+Current TideSQL release is 4.5.5 (hex `0x40505`).
 
 *As versions are tested and confirmed working we update this table. Full Support means the system is tested against all known functionality.*
 
