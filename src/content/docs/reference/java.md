@@ -39,7 +39,7 @@ sudo cmake --install build
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-java</artifactId>
-    <version>0.8.1</version>
+    <version>0.8.2</version>
 </dependency>
 ```
 
@@ -863,7 +863,7 @@ db.checkpoint("./mydb_checkpoint");
 Object store mode allows TidesDB to store SSTables in a remote object store (S3, MinIO, GCS, or any S3-compatible service) while using local disk as a cache. This separates compute from storage and enables cold start recovery from the remote store. Object store mode requires unified memtable mode and is automatically enforced when a connector is set.
 
 :::note[Connector availability]
-The Java binding currently exposes the **filesystem connector** (`objectStoreFsPath`), which mirrors objects as files under a directory and is ideal for testing and NFS/shared-volume replication. The S3 connector requires a native library built with `-DTIDESDB_WITH_S3=ON`; when that build is in use, point `objectStoreFsPath` at a filesystem path or use the C API directly for S3-specific configuration.
+The Java binding exposes two connectors: the **filesystem connector** (`objectStoreFsPath`), which mirrors objects as files under a directory (ideal for testing and NFS/shared-volume replication), and the **S3 connector** (`objectStoreS3Config`) for AWS S3, MinIO, GCS, and other S3-compatible services. The S3 connector requires a native library built with `-DTIDESDB_WITH_S3=ON`; call `TidesDB.isS3Available()` to probe support at runtime. When S3 is not compiled in, opening an S3-configured database throws a `TidesDBException` explaining that S3 support is missing.
 :::
 
 ### Enabling Object Store Mode (Filesystem Connector)
@@ -884,6 +884,51 @@ Config config = Config.builder("./mydb")
 try (TidesDB db = TidesDB.open(config)) {
     // SSTables are uploaded after flush
 }
+```
+
+### Enabling Object Store Mode (S3 Connector)
+
+Back the database with an S3-compatible object store. `endpoint`, `bucket`, `accessKey`, and `secretKey` are required; the remaining fields default to secure, AWS-friendly values (HTTPS on, virtual-hosted URLs, TLS verification enabled). The S3 connector takes precedence over `objectStoreFsPath` when both are set, and composes with `ObjectStoreConfig` for cache, multipart, and WAL-replication tuning.
+
+```java
+// Probe support first (requires a core build with -DTIDESDB_WITH_S3=ON)
+if (!TidesDB.isS3Available()) {
+    throw new IllegalStateException("TidesDB native library was built without S3 support");
+}
+
+S3Config s3 = S3Config.builder()
+    .endpoint("s3.amazonaws.com")
+    .bucket("my-tidesdb-bucket")
+    .prefix("production/db1/")     // optional
+    .accessKey(System.getenv("AWS_ACCESS_KEY_ID"))
+    .secretKey(System.getenv("AWS_SECRET_ACCESS_KEY"))
+    .region("us-east-1")
+    .build();
+
+Config config = Config.builder("./mydb")
+    .objectStoreS3Config(s3)
+    .objectStoreConfig(ObjectStoreConfig.builder()
+        .localCacheMaxBytes(1024L * 1024 * 1024)  // 1GB local cache
+        .maxConcurrentUploads(8)
+        .build())
+    .build();
+
+try (TidesDB db = TidesDB.open(config)) {
+    // SSTables are uploaded to S3 after flush; local disk is used as a cache
+}
+```
+
+For MinIO or another self-hosted S3 service, use path-style URLs and (for plain HTTP) disable SSL:
+
+```java
+S3Config minio = S3Config.builder()
+    .endpoint("minio.local:9000")
+    .bucket("tidesdb")
+    .accessKey("minioadmin")
+    .secretKey("minioadmin")
+    .usePathStyle(true)   // MinIO requires path-style addressing
+    .useSsl(false)        // plain HTTP; omit for HTTPS
+    .build();
 ```
 
 ### Custom Object Store Configuration
@@ -1204,6 +1249,25 @@ For a single transaction, `reset` is functionally equivalent to calling `free` f
 | `replicaMode` | boolean | false | Enable read-only replica mode |
 | `replicaSyncIntervalUs` | long | 5000000 | MANIFEST poll interval for replica sync in microseconds |
 | `replicaReplayWal` | boolean | true | Replay WAL from object store for near-real-time reads on replicas |
+
+### S3 Connector Configuration
+
+`S3Config` selects an S3-compatible backend (set via `Config.Builder.objectStoreS3Config`). Requires a native build with `-DTIDESDB_WITH_S3=ON`; probe with `TidesDB.isS3Available()`.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `endpoint` | String | — (required) | S3 endpoint, e.g. `s3.amazonaws.com` or `minio.local:9000` |
+| `bucket` | String | — (required) | Bucket name |
+| `prefix` | String | null | Key prefix, e.g. `production/db1/` |
+| `accessKey` | String | — (required) | AWS access key ID |
+| `secretKey` | String | — (required) | AWS secret access key |
+| `region` | String | null | AWS region, e.g. `us-east-1`; null for MinIO/default |
+| `useSsl` | boolean | true | HTTPS when true, HTTP when false |
+| `usePathStyle` | boolean | false | Path-style URLs (MinIO) when true, virtual-hosted (AWS) when false |
+| `tlsCaPath` | String | null | Custom CA bundle file path, or null for the system bundle |
+| `tlsInsecureSkipVerify` | boolean | false | Disable TLS peer/host verification (test only, insecure) |
+| `multipartThreshold` | long | 0 (library default) | Object size at/above which multipart upload is used |
+| `multipartPartSize` | long | 0 (library default) | Multipart chunk size in bytes |
 
 ### Column Family Configuration
 

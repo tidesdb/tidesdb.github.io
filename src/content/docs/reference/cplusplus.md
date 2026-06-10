@@ -93,6 +93,54 @@ tidesdb::TidesDB db(config);
 `maxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
 :::
 
+### Initialization and Custom Allocators
+
+Calling `tidesdb::init()` is **optional** -- the first database open lazily initializes the library
+with the system allocator. Call `init()` explicitly only when you need to install custom memory
+allocation functions (for example, when embedding TidesDB inside a host that owns memory, such as a
+Redis module). It must be called once, before opening any database.
+
+```cpp
+// Optional: install custom allocators before opening any database
+bool initialized = tidesdb::init(myMalloc, myCalloc, myRealloc, myFree);
+// initialized == true if this call performed initialization,
+// false if TidesDB was already initialized (allocators left unchanged)
+
+// ... open databases, do work ...
+
+tidesdb::finalize();  // reset the allocator after all databases are closed
+```
+
+Pass `nullptr` (the default for each parameter) to keep the corresponding system allocator. After
+`finalize()` returns, `init()` may be called again with different allocators.
+
+**Function signatures**
+
+```cpp
+bool init(tidesdb_malloc_fn mallocFn = nullptr, tidesdb_calloc_fn callocFn = nullptr,
+          tidesdb_realloc_fn reallocFn = nullptr, tidesdb_free_fn freeFn = nullptr);
+void finalize();
+```
+
+### Raising the Open-File Limit
+
+`tidesdb::raiseOpenFileLimit()` raises the process's open-file ceiling so a database can keep more
+SSTables open. Call it **before** opening the database -- the engine sizes `maxOpenSSTables` to fit
+the ceiling at open time. This is an explicit, opt-in operator action; TidesDB never raises the
+limit itself. A failed or partial raise is non-fatal.
+
+```cpp
+// Report the current ceiling (desired <= 0 just reports)
+long current = tidesdb::raiseOpenFileLimit(0);
+
+// Request a higher ceiling before opening the database
+long effective = tidesdb::raiseOpenFileLimit(8192);
+std::cout << "Open-file ceiling now: " << effective << std::endl;
+```
+
+On POSIX systems this raises the `RLIMIT_NOFILE` soft limit toward the hard limit; on Windows it
+raises the CRT stdio cap (max 8192). The return value is the ceiling in effect after the attempt.
+
 ### Logging
 
 TidesDB provides structured logging with multiple severity levels.
@@ -477,7 +525,28 @@ if (stats.config.has_value()) {
 - `levelTombstoneCounts` · Per-level tombstone counts (parallels `levelKeyCounts`)
 - `maxSstDensity` · Worst per-SSTable tombstone density observed in the CF (0.0 to 1.0)
 - `maxSstDensityLevel` · 1-based level index where `maxSstDensity` was observed (0 if none)
+- `walBytesWritten` · Framed bytes appended to this CF's WAL (0 in unified memtable mode)
+- `flushBytesWritten` · On-disk bytes this CF's flushes wrote to L0 SSTables
+- `compactionBytesWritten` · On-disk bytes this CF's compactions wrote
+- `compactionBytesRead` · On-disk bytes this CF's compactions read as input
+- `userBytesWritten` · Logical key+value bytes committed to this CF (write-amplification denominator)
+- `flushCount` · Flushed SSTables produced by this CF
+- `compactionCount` · Compaction output SSTables produced by this CF
 - `config` · Column family configuration (optional)
+
+The write-amplification counters are lifetime totals since the database was opened. A column
+family's write amplification is `(walBytesWritten + flushBytesWritten + compactionBytesWritten)
+/ userBytesWritten`. In unified memtable mode `walBytesWritten` is 0 -- the shared WAL volume is
+reported db-wide as `DbStats::uwalBytesWritten`.
+
+```cpp
+if (stats.userBytesWritten > 0) {
+    double wa = static_cast<double>(stats.walBytesWritten + stats.flushBytesWritten +
+                                    stats.compactionBytesWritten) /
+                static_cast<double>(stats.userBytesWritten);
+    std::cout << "Write amplification: " << wa << "x" << std::endl;
+}
+```
 
 ### Database-Level Statistics
 
@@ -551,6 +620,19 @@ std::cout << "Replica mode: " << dbStats.replicaMode << std::endl;
 - `totalUploads` · Lifetime count of objects uploaded to object store
 - `totalUploadFailures` · Lifetime count of permanently failed uploads
 - `replicaMode` · Whether running in read-only replica mode
+- `uwalBytesWritten` · Framed bytes appended to the shared unified WAL (0 when unified mode is off)
+- `walBytesWritten` · Per-CF WAL bytes summed across all column families
+- `flushBytesWritten` · Flush output bytes summed across all column families
+- `compactionBytesWritten` · Compaction output bytes summed across all column families
+- `compactionBytesRead` · Compaction input bytes summed across all column families
+- `userBytesWritten` · Logical committed bytes summed across all column families
+- `flushCount` · Flushed SSTables summed across all column families
+- `compactionCount` · Compaction output SSTables summed across all column families
+
+The write-amplification counters are lifetime totals since the database was opened. db-wide write
+amplification is `(uwalBytesWritten + walBytesWritten + flushBytesWritten + compactionBytesWritten)
+/ userBytesWritten`. `uwalBytesWritten` is the shared unified WAL volume (0 when unified mode is
+off); the remaining counters are summed across all column families.
 
 Unlike `getStats()` (which heap-allocates internally), `getDbStats()` fills a stack-allocated struct. No free is needed.
 
@@ -741,6 +823,24 @@ db.purge();
 :::tip[Purge vs Manual Flush + Compact]
 `flushMemtable()` and `compact()` are non-blocking, they enqueue work and return immediately. `ColumnFamily::purge()` and `TidesDB::purge()` are synchronous, they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
+
+### Cancel Background Work (Fast Shutdown)
+
+`cancelBackgroundWork()` cancels background compaction db-wide so the database can close quickly.
+In-flight merges bail out safely at their next checkpoint and queued compaction is skipped; flushes
+are left untouched, so durability is preserved. It blocks (bounded) until compaction is idle.
+
+```cpp
+// Just before closing for a fast shutdown
+db.cancelBackgroundWork();
+// db destructor / close now returns quickly without waiting on long merges
+```
+
+**Behavior**
+- Cancels compaction only -- flushes still run, so no committed data is lost
+- In-flight merges discard their uncommitted output and leave inputs intact (recovery handles the mid-merge state the same way)
+- The cancellation is sticky for the session and reset on the next open
+- Intended to be called right before closing the database
 
 ### Promote Replica to Primary
 
@@ -1099,7 +1199,7 @@ Object store mode allows TidesDB to store SSTables in a remote object store (S3,
 #include <tidesdb/tidesdb.hpp>
 
 // create a filesystem connector (for testing and local replication)
-tidesdb_objstore_t* store = tidesdb_objstore_fs_create("/mnt/nfs/tidesdb-objects");
+tidesdb_objstore_t* store = tidesdb::objstore::filesystem("/mnt/nfs/tidesdb-objects");
 
 auto osCfg = tidesdb::ObjectStoreConfig::defaultConfig();
 
@@ -1113,6 +1213,13 @@ tidesdb::TidesDB db(config);
 // use the database normally -- SSTables are uploaded after flush
 ```
 
+:::note[Connector ownership]
+A connector returned by `tidesdb::objstore::filesystem`, `tidesdb::objstore::s3`, or the raw C
+factories is owned by the database once it opens successfully -- the database frees it on close, so
+do not destroy it yourself. Build the connector immediately before opening: if `TidesDB`
+construction throws, the connector is leaked.
+:::
+
 ### Enabling Object Store Mode (S3/MinIO Connector)
 
 Build with `-DTIDESDB_WITH_S3=ON` to enable the S3 connector. This requires libcurl and OpenSSL.
@@ -1120,15 +1227,15 @@ Build with `-DTIDESDB_WITH_S3=ON` to enable the S3 connector. This requires libc
 ```cpp
 #include <tidesdb/tidesdb.hpp>
 
-tidesdb_objstore_t* s3 = tidesdb_objstore_s3_create(
+tidesdb_objstore_t* s3 = tidesdb::objstore::s3(
     "s3.amazonaws.com",                         // endpoint
     "my-tidesdb-bucket",                        // bucket
-    "production/db1/",                          // key prefix (or nullptr)
+    "production/db1/",                          // key prefix (or "" for none)
     "AKIAIOSFODNN7EXAMPLE",                     // access key
     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", // secret key
-    "us-east-1",                                // region
-    1,                                          // use_ssl (HTTPS)
-    0                                           // use_path_style (0 for AWS, 1 for MinIO)
+    "us-east-1",                                // region ("" for MinIO)
+    true,                                       // use SSL (HTTPS)
+    false                                       // path-style URLs (false for AWS, true for MinIO)
 );
 
 auto osCfg = tidesdb::ObjectStoreConfig::defaultConfig();
@@ -1146,17 +1253,55 @@ tidesdb::TidesDB db(config);
 ### MinIO Example
 
 ```cpp
-tidesdb_objstore_t* minio = tidesdb_objstore_s3_create(
+tidesdb_objstore_t* minio = tidesdb::objstore::s3(
     "localhost:9000",   // MinIO endpoint
     "tidesdb-bucket",   // bucket
-    nullptr,            // no key prefix
+    "",                 // no key prefix
     "minioadmin",       // access key
     "minioadmin",       // secret key
-    nullptr,            // region (nullptr for MinIO)
-    0,                  // no SSL for local dev
-    1                   // path-style URLs (required for MinIO)
+    "",                 // region ("" for MinIO)
+    false,              // no SSL for local dev
+    true                // path-style URLs (required for MinIO)
 );
 ```
+
+### Advanced S3 Configuration (TLS and Multipart Tuning)
+
+The positional `objstore::s3` overload covers the common case. For custom TLS settings or multipart
+tuning, pass a `tidesdb::objstore::S3Config` instead. Zero/empty fields fall back to secure defaults
+(TLS verification on, the system CA bundle, and the library's built-in multipart sizes).
+
+```cpp
+tidesdb::objstore::S3Config cfg;
+cfg.endpoint = "minio.internal:9000";
+cfg.bucket = "tidesdb-bucket";
+cfg.accessKey = "minioadmin";
+cfg.secretKey = "minioadmin";
+cfg.usePathStyle = true;
+cfg.tlsCaPath = "/etc/ssl/certs/internal-ca.pem";  // custom CA bundle
+cfg.multipartThreshold = 128 * 1024 * 1024;        // 128MB multipart threshold
+cfg.multipartPartSize = 16 * 1024 * 1024;          // 16MB chunks
+
+tidesdb_objstore_t* s3 = tidesdb::objstore::s3(cfg);
+```
+
+**`S3Config` fields**
+- `endpoint` · S3 endpoint (required)
+- `bucket` · Bucket name (required)
+- `prefix` · Key prefix, or empty for none
+- `accessKey` · AWS access key ID (required)
+- `secretKey` · AWS secret access key (required)
+- `region` · AWS region, or empty for the default
+- `useSsl` · true for HTTPS, false for HTTP (default: true)
+- `usePathStyle` · true for path-style URLs / MinIO (default: false)
+- `tlsCaPath` · Custom CA bundle file path, or empty for the system bundle
+- `tlsInsecureSkipVerify` · true disables TLS verification (test only, insecure; default: false)
+- `multipartThreshold` · Object size at/above which multipart upload is used (0 = library default)
+- `multipartPartSize` · Multipart chunk size in bytes (0 = library default)
+
+Both `objstore::s3` overloads require a libtidesdb built with `-DTIDESDB_WITH_S3=ON`; otherwise the
+connector symbols are unresolved at link time. Because the factories are header-inline, a build that
+never calls them links fine against an S3-less library.
 
 ### Object Store Configuration
 
@@ -1391,6 +1536,7 @@ try {
 - `ErrorCode::Unknown` (-11) · Unknown error
 - `ErrorCode::Locked` (-12) · Database is locked
 - `ErrorCode::Readonly` (-13) · Database is read-only
+- `ErrorCode::Busy` (-14) · Resource is temporarily busy
 
 **Error categories**
 - `ErrorCode::Corruption` indicates data integrity issues requiring immediate attention
@@ -1649,6 +1795,43 @@ db.createColumnFamily("reverse_cf", cfConfig);
 - `"int64"` · Signed 64-bit integer comparison
 - `"reverse"` · Reverse binary comparison
 - `"case_insensitive"` · Case-insensitive ASCII comparison
+
+Select a built-in comparator for a column family by setting its registered name:
+
+```cpp
+auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+cfConfig.comparatorName = "uint64";  // 8-byte big-endian integer keys
+db.createColumnFamily("metrics", cfConfig);
+```
+
+The built-in comparator function pointers are also exposed directly under
+`tidesdb::comparators`, which is handy for re-registering one under a custom name or referencing it
+in your own code:
+
+- `tidesdb::comparators::memcmp`
+- `tidesdb::comparators::lexicographic`
+- `tidesdb::comparators::uint64`
+- `tidesdb::comparators::int64`
+- `tidesdb::comparators::reverseMemcmp` (registered name `"reverse"`)
+- `tidesdb::comparators::caseInsensitive` (registered name `"case_insensitive"`)
+
+```cpp
+// Re-register a built-in under your own name
+db.registerComparator("desc", tidesdb::comparators::reverseMemcmp);
+```
+
+**Comparator context string**
+
+`ColumnFamilyConfig::comparatorCtxStr` carries an optional context string that is persisted to
+`config.ini` alongside `comparatorName`. Use it to parameterize a comparator (for example, an
+endianness or collation hint) so the setting survives a restart and a `loadFromIni` round-trip.
+
+```cpp
+auto cfConfig = tidesdb::ColumnFamilyConfig::defaultConfig();
+cfConfig.comparatorName = "uint64";
+cfConfig.comparatorCtxStr = "endian=big";
+db.createColumnFamily("ts_cf", cfConfig);
+```
 
 :::caution[Important]
 Once a comparator is set for a column family, it **cannot be changed** without corrupting data.

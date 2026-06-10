@@ -719,6 +719,17 @@ fn main() -> tidesdb::Result<()> {
         println!("Level {} tombstones: {}", i + 1, count);
     }
 
+    // Write-amplification counters (tidesdb >= 9.3.4)
+    let write_bytes = stats.wal_bytes_written
+        + stats.flush_bytes_written
+        + stats.compaction_bytes_written;
+    if stats.user_bytes_written > 0 {
+        println!("Write amplification: {:.2}x",
+            write_bytes as f64 / stats.user_bytes_written as f64);
+    }
+    println!("Flush count: {}, Compaction count: {}",
+        stats.flush_count, stats.compaction_count);
+
     Ok(())
 }
 ```
@@ -748,6 +759,17 @@ fn main() -> tidesdb::Result<()> {
 | `level_tombstone_counts` | `Vec<u64>` | Per-level tombstone counts (parallels `level_key_counts`) |
 | `max_sst_density` | `f64` | Worst per-SSTable tombstone density observed in the CF |
 | `max_sst_density_level` | `i32` | 1-based level where `max_sst_density` was observed (0 if none) |
+| `wal_bytes_written` | `u64` | Framed bytes appended to this CF's WAL (0 in unified mode) |
+| `flush_bytes_written` | `u64` | On-disk bytes this CF's flushes wrote to L0 SSTables |
+| `compaction_bytes_written` | `u64` | On-disk bytes this CF's compactions wrote |
+| `compaction_bytes_read` | `u64` | On-disk bytes this CF's compactions read as input |
+| `user_bytes_written` | `u64` | Logical key+value bytes committed to this CF (write-amplification denominator) |
+| `flush_count` | `u64` | Flushed SSTables produced by this CF |
+| `compaction_count` | `u64` | Compaction output SSTables produced by this CF |
+
+:::note[Write-amplification counters]
+The `wal_bytes_written`, `flush_bytes_written`, `compaction_bytes_written`, `compaction_bytes_read`, `user_bytes_written`, `flush_count`, and `compaction_count` fields require tidesdb >= 9.3.4 (the `v9_3_4` Cargo feature or later, enabled by default). On older libraries they are reported as `0`. This CF's write amplification is `(wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`. In unified-memtable mode `wal_bytes_written` is `0` here — the shared WAL volume is reported db-wide as `DbStats::uwal_bytes_written`.
+:::
 
 ### Getting Cache Statistics
 
@@ -804,6 +826,16 @@ fn main() -> tidesdb::Result<()> {
     println!("Immutable memtables: {}", stats.total_immutable_count);
     println!("Memtable bytes: {}", stats.total_memtable_bytes);
 
+    // Db-wide write-amplification counters (tidesdb >= 9.3.4)
+    let write_bytes = stats.uwal_bytes_written
+        + stats.wal_bytes_written
+        + stats.flush_bytes_written
+        + stats.compaction_bytes_written;
+    if stats.user_bytes_written > 0 {
+        println!("Write amplification (db-wide): {:.2}x",
+            write_bytes as f64 / stats.user_bytes_written as f64);
+    }
+
     Ok(())
 }
 ```
@@ -843,6 +875,18 @@ fn main() -> tidesdb::Result<()> {
 | `total_uploads` | `u64` | Lifetime count of objects uploaded to object store |
 | `total_upload_failures` | `u64` | Lifetime count of permanently failed uploads |
 | `replica_mode` | `bool` | Whether running in read-only replica mode |
+| `uwal_bytes_written` | `u64` | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
+| `wal_bytes_written` | `u64` | Per-CF WAL bytes summed across all column families |
+| `flush_bytes_written` | `u64` | Flush output bytes summed across all column families |
+| `compaction_bytes_written` | `u64` | Compaction output bytes summed across all column families |
+| `compaction_bytes_read` | `u64` | Compaction input bytes summed across all column families |
+| `user_bytes_written` | `u64` | Logical committed bytes summed across all column families |
+| `flush_count` | `u64` | Flushed SSTables summed across all column families |
+| `compaction_count` | `u64` | Compaction output SSTables summed across all column families |
+
+:::note[Write-amplification counters]
+The eight write-amplification fields (`uwal_bytes_written` through `compaction_count`) require tidesdb >= 9.3.4 (enabled by default) and are reported as `0` on older libraries. Db-wide write amplification is `(uwal_bytes_written + wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`. The `*_count` fields count output SSTables, not logical runs.
+:::
 
 :::note[Stack Allocated]
 Unlike `ColumnFamily::get_stats` (which heap-allocates), `get_db_stats` fills a struct on the stack. No manual free is needed.
@@ -1574,6 +1618,83 @@ fn main() -> tidesdb::Result<()> {
 }
 ```
 
+#### Enabling Object Store Mode (S3 Connector)
+
+To back a database with an S3-compatible bucket (AWS S3, MinIO, etc.), enable the
+`objectstore` Cargo feature and use `Config::object_store_s3` with an `S3Config`.
+This requires a TidesDB C library built with `TIDESDB_WITH_S3=ON` (the `objectstore`
+feature builds it that way automatically) plus `libcurl` and `openssl`.
+
+```toml
+[dependencies]
+tidesdb = { version = "0.11", features = ["objectstore"] }
+```
+
+```rust
+use tidesdb::{TidesDB, Config, S3Config};
+
+fn main() -> tidesdb::Result<()> {
+    // AWS S3
+    let s3 = S3Config::new(
+        "s3.amazonaws.com", // endpoint
+        "my-bucket",        // bucket
+        "AKIA...",          // access key
+        "secret...",        // secret key
+    )
+    .prefix("production/db1/")
+    .region("us-east-1")
+    .use_ssl(true);
+
+    let config = Config::new("./mydb").object_store_s3(s3);
+    let db = TidesDB::open(config)?;
+
+    Ok(())
+}
+```
+
+For MinIO (or any path-style, self-hosted endpoint), enable path-style URLs and,
+for development against a self-signed certificate, optionally skip TLS verification:
+
+```rust
+use tidesdb::{TidesDB, Config, S3Config};
+
+fn main() -> tidesdb::Result<()> {
+    let s3 = S3Config::new("minio.local:9000", "my-bucket", "minioadmin", "minioadmin")
+        .use_ssl(false)
+        .use_path_style(true);             // required for MinIO
+
+    let config = Config::new("./mydb").object_store_s3(s3);
+    let db = TidesDB::open(config)?;
+
+    Ok(())
+}
+```
+
+`object_store_s3` takes precedence over `object_store_fs` when both are set. The
+behavior knobs in [`ObjectStoreConfig`](#object-store-configuration-reference)
+(local cache, upload/download parallelism, WAL replication, replica mode) apply to
+S3 connectors exactly as they do to the filesystem connector.
+
+**`S3Config` builder reference**
+
+| Method | Type | Default | Description |
+|--------|------|---------|-------------|
+| `S3Config::new(endpoint, bucket, access_key, secret_key)` | `&str` | — | Required connection fields |
+| `prefix(p)` | `&str` | None | Key prefix (e.g. `"production/db1/"`) |
+| `region(r)` | `&str` | None | AWS region; omit for MinIO |
+| `use_ssl(enable)` | `bool` | false | `true` for HTTPS, `false` for HTTP |
+| `use_path_style(enable)` | `bool` | false | `true` for path-style URLs (MinIO) |
+| `tls_ca_path(path)` | `&str` | None | Custom CA bundle file path |
+| `tls_insecure_skip_verify(enable)` | `bool` | false | Disable TLS verification (test only, insecure) |
+| `multipart_threshold(size)` | `usize` | 0 (library default) | Object size at/above which multipart upload is used |
+| `multipart_part_size(size)` | `usize` | 0 (library default) | Multipart chunk size in bytes |
+
+:::caution[S3 build requirements]
+The S3 connector symbols are only present when the C library is built with
+`TIDESDB_WITH_S3=ON`. Without the `objectstore` feature, `S3Config` and
+`object_store_s3` are not compiled in. On Windows, S3 support requires tidesdb >= v9.0.6.
+:::
+
 #### Custom Object Store Configuration
 
 Use `ObjectStoreConfig::default()` for sensible defaults, then override fields as needed:
@@ -1897,6 +2018,7 @@ fn main() {
 - `ErrorCode::Unknown` (-11) · Unknown error
 - `ErrorCode::Locked` (-12) · Database is locked
 - `ErrorCode::ReadOnly` (-13) · Database is in read-only mode
+- `ErrorCode::Busy` (-14) · Resource is busy (another operation is in progress)
 
 ## Complete Example
 

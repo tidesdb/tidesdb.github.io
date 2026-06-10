@@ -84,6 +84,30 @@ open <path> [options]
 | `--obj-replica-mode` | Open the database in read-only replica mode |
 | `--obj-replica-sync-interval <us>` | Replica MANIFEST poll interval (default: 5000000) |
 | `--obj-wal-sync-on-commit` | Upload the WAL to the object store after every commit (RPO=0) |
+| `--obj-cache-on-read <0\|1>` | Cache downloaded object files locally (default 1) |
+| `--obj-cache-on-write <0\|1>` | Keep a local copy after upload (default 1) |
+| `--obj-max-uploads <n>` | Parallel upload threads (default 4) |
+| `--obj-max-downloads <n>` | Parallel download threads (default 8) |
+| `--obj-multipart-threshold <n>` | Use multipart upload at/above this object size (bytes) |
+| `--obj-multipart-part-size <n>` | Multipart chunk size (bytes) |
+| `--obj-sync-manifest <0\|1>` | Upload the MANIFEST after each compaction (default 1) |
+| `--obj-replicate-wal <0\|1>` | Upload closed WAL segments for node-failure recovery (default 1) |
+| `--obj-wal-upload-sync <0\|1>` | Block flush until the WAL is uploaded (default 0 = background) |
+| `--obj-wal-sync-threshold <n>` | Sync the active WAL when it grows by this many bytes (0 = off) |
+| `--obj-replica-replay-wal <0\|1>` | Replay the WAL for near-real-time replica reads (default 1) |
+| `--object-store-s3` | Enable the S3-compatible object-store connector (requires a library built with `TIDESDB_WITH_S3=ON`) |
+| `--s3-endpoint <ep>` | S3 endpoint (e.g. `s3.amazonaws.com` or `minio.local:9000`) |
+| `--s3-bucket <name>` | S3 bucket name |
+| `--s3-prefix <p>` | S3 key prefix (e.g. `production/db1/`) |
+| `--s3-access-key <k>` | AWS access key ID (falls back to `$AWS_ACCESS_KEY_ID`) |
+| `--s3-secret-key <k>` | AWS secret access key (falls back to `$AWS_SECRET_ACCESS_KEY`) |
+| `--s3-region <r>` | AWS region (falls back to `$AWS_REGION`) |
+| `--s3-no-ssl` | Use HTTP instead of HTTPS |
+| `--s3-path-style` | Use path-style URLs (required for MinIO) |
+| `--s3-ca-path <path>` | Custom CA bundle file for TLS verification |
+| `--s3-insecure-skip-verify` | Disable TLS verification (test endpoints only; insecure) |
+| `--s3-multipart-threshold <n>` | S3 multipart upload threshold (bytes) |
+| `--s3-multipart-part-size <n>` | S3 multipart chunk size (bytes) |
 
 **Examples**
 ```
@@ -101,6 +125,11 @@ Opened database at './mydb'
 
 admintool> open ./mydb --object-store-fs /mnt/objects
 Opened database at './mydb' (object-store fs:/mnt/objects)
+
+admintool> open ./mydb --object-store-s3 --s3-endpoint minio.local:9000 \
+             --s3-bucket tidesdb --s3-path-style --s3-no-ssl \
+             --s3-access-key minioadmin --s3-secret-key minioadmin
+Opened database at './mydb' (object-store s3:minio.local:9000/tidesdb)
 ```
 
 :::note[Unified Memtable Mode]
@@ -109,6 +138,10 @@ When `--unified` is set, all column families share a single skip list and WAL in
 
 :::note[Filesystem Object Store]
 `--object-store-fs <root_dir>` attaches a filesystem-backed object-store connector that mirrors objects under the given directory. This is intended for testing and local replication scenarios. Object-store mode automatically enables unified memtable mode. The connector is destroyed when the database is closed. Combine with `--obj-cache-max-bytes`, `--obj-replica-mode`, `--obj-replica-sync-interval`, and `--obj-wal-sync-on-commit` to tune behavior.
+:::
+
+:::note[S3 Object Store]
+`--object-store-s3` attaches an S3-compatible connector (AWS S3, MinIO, etc.). It is only available when the linked TidesDB library was built with `TIDESDB_WITH_S3=ON`; otherwise the command reports `This TidesDB library was built without S3 support` and the open is rejected (the connector symbol is resolved at runtime, so the tool still runs against an S3-off library). At a minimum supply `--s3-endpoint` and `--s3-bucket`; credentials may be passed with `--s3-access-key`/`--s3-secret-key` or left to the standard `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION` environment variables. Use `--s3-path-style` for MinIO. The shared `--obj-*` tuning flags apply to both the filesystem and S3 connectors.
 :::
 
 ### close
@@ -396,9 +429,26 @@ OK
 ### scan
 Scan all keys in a column family.
 ```
-scan <cf> [limit]
+scan <cf> [limit] [--reverse] [--isolation <level>]
 ```
 Default limit: 100
+
+**Options**
+| Option | Description |
+|--------|-------------|
+| `--reverse` | Iterate from the last key to the first (descending order) |
+| `--isolation <level>` | Open the read transaction at a specific isolation level: `read_uncommitted`\|`read_committed`\|`repeatable_read`\|`snapshot`\|`serializable` |
+
+**Examples**
+```
+admintool(./mydb)> scan users 10 --reverse
+1) "user:9" -> "..."
+2) "user:8" -> "..."
+...
+(10 entries, reverse)
+
+admintool(./mydb)> scan users --isolation snapshot
+```
 
 ### range
 Scan keys within a range.
@@ -426,27 +476,31 @@ Show SSTable file information.
 sstable-info <klog_path>
 ```
 
+:::note[On-disk format handling]
+The SSTable inspectors parse the klog directly off disk: they read the trailing metadata block to find how many leading blocks are key/value data blocks (the remaining blocks are the block-index, bloom and metadata blobs), skip each data block's header, and decompress data blocks with the column family's compression algorithm before decoding entries. Entries written by `single-delete` are labelled `[SINGLE-DEL]`; plain tombstones are labelled `[DEL]`.
+:::
+
 ### sstable-dump
-Dump SSTable entries (keys and values).
+Dump SSTable entries (keys and values). Tombstones are shown as `[DEL]`, single-deletes as `[SINGLE-DEL]`, expiring keys as `[TTL:<expiry>]`, and vlog-stored values as `[VLOG:<offset>]`.
 ```
 sstable-dump <klog_path> [limit]
 ```
 Default limit: 1000
 
 ### sstable-dump-full
-Dump SSTable entries with vlog value resolution.
+Dump SSTable entries with vlog value resolution. When `vlog_path` is supplied, values stored in the vlog are read back and decompressed (using the SSTable's compression algorithm) instead of being shown as `(in vlog, N bytes)`.
 ```
 sstable-dump-full <klog_path> [vlog_path] [limit]
 ```
 
 ### sstable-stats
-Show SSTable statistics.
+Show SSTable statistics, including total entries, tombstones (and how many are single-deletes), TTL entries, vlog references, sequence range, and key/value size distribution.
 ```
 sstable-stats <klog_path>
 ```
 
 ### sstable-keys
-List only keys from an SSTable.
+List only keys from an SSTable. Single-delete and plain tombstones are flagged inline.
 ```
 sstable-keys <klog_path> [limit]
 ```
@@ -458,7 +512,7 @@ sstable-checksum <klog_path>
 ```
 
 ### bloom-stats
-Show bloom filter statistics for an SSTable.
+Show bloom filter statistics for an SSTable, including the filter size, hash function count, hash version (1 = legacy, 2 = fmix-finalized), fill ratio, and estimated false-positive rate.
 ```
 bloom-stats <klog_path>
 ```
@@ -484,11 +538,11 @@ wal-dump <wal_path> [limit]
 ```
 Default limit: 1000
 
-For unified WAL files (created when using `--unified` mode), each entry is prefixed with `[CF:<index>]` showing which column family the entry belongs to. Unified WAL blocks can contain multiple entries per block.
+For unified WAL files (created when using `--unified` mode), each entry is prefixed with `[CF:<index>]` showing which column family the entry belongs to. Both WAL formats pack every operation of a committed transaction into a single block, so one block can hold many entries — `wal-dump` decodes them all. Entries are labelled `[PUT]`, `[DELETE]`, or `[SINGLE-DELETE]`.
 
 **Example (per-CF WAL)**
 ```
-admintool(./mydb)> wal-dump ./mydb/users/wal_000001.log 5
+admintool(./mydb)> wal-dump ./mydb/users/wal_1.log 5
 WAL Entries (limit: 5):
 1) [PUT] seq=1 key="user:1" value="John Doe"
 2) [PUT] [TTL:1711584000] seq=2 key="sess:abc" value="token123"
@@ -499,7 +553,7 @@ WAL Entries (limit: 5):
 
 **Example (unified WAL)**
 ```
-admintool(./mydb)> wal-dump ./mydb/uwal_000001.log 5
+admintool(./mydb)> wal-dump ./mydb/uwal_0.log 5
 WAL Entries (limit: 5):
 1) [CF:0] [PUT] seq=10 key="user:1" value="Alice"
 2) [CF:1] [PUT] seq=10 key="order:1" value="item_A"
@@ -516,8 +570,8 @@ wal-verify <wal_path>
 
 **Example**
 ```
-admintool(./mydb)> wal-verify ./mydb/users/wal_000001.log
-Verifying WAL: ./mydb/users/wal_000001.log
+admintool(./mydb)> wal-verify ./mydb/users/wal_1.log
+Verifying WAL: ./mydb/users/wal_1.log
   File Size: 4096 bytes
   Format: Per-CF WAL
   Valid Entries: 42
@@ -810,6 +864,123 @@ Promoted to primary successfully.
 - Atomically transitions from replica to primary mode
 - After promotion, writes are accepted normally
 - Returns an error if the database is already a primary
+
+### cancel-background-work
+Cancel background compaction across the whole database for a fast shutdown. In-flight merges bail out safely and queued compaction is skipped; flushes are left untouched so durability is preserved. The cancellation is sticky for the session and is reset on the next `open` — typically issued right before `close`.
+```
+cancel-background-work
+```
+
+**Example**
+```
+admintool(./mydb)> cancel-background-work
+Background compaction cancelled (flushes preserved). Sticky until next open.
+```
+
+### raise-open-file-limit
+Raise this process's open-file ceiling so the engine can keep more SSTables open. Because the engine sizes `max_open_sstables` to fit the ceiling at open time, run this **before** `open`. With no argument (or a non-positive one) it just reports the current ceiling.
+```
+raise-open-file-limit [n]
+```
+
+**Example**
+```
+admintool> raise-open-file-limit 100000
+Requested open-file ceiling 100000; effective ceiling now 100000.
+admintool> open ./mydb
+```
+
+## Transactions
+
+admintool can hold a single transaction open across interactive prompts, which makes the isolation, savepoint, and reset APIs reachable from the command line. Begin a transaction with `txn-begin`, stage operations with the `txn-*` commands, then finish with `txn-commit` or `txn-rollback`. Closing the database (or leaving admintool) automatically rolls back an open transaction.
+
+### txn-begin
+Begin a transaction, optionally at a specific isolation level (default `read_committed`).
+```
+txn-begin [read_uncommitted|read_committed|repeatable_read|snapshot|serializable]
+```
+
+### txn-status
+Show whether a transaction is active and its isolation level.
+```
+txn-status
+```
+
+### txn-put
+Stage a put in the active transaction.
+```
+txn-put <cf> <key> <value> [--ttl <seconds>]
+```
+
+### txn-get
+Read a key through the active transaction (sees the transaction's own uncommitted writes).
+```
+txn-get <cf> <key>
+```
+
+### txn-delete
+Stage a delete in the active transaction.
+```
+txn-delete <cf> <key>
+```
+
+### txn-single-delete
+Stage a single-delete in the active transaction (see [single-delete](#single-delete) for the contract).
+```
+txn-single-delete <cf> <key>
+```
+
+### txn-savepoint
+Create a named savepoint within the active transaction.
+```
+txn-savepoint <name>
+```
+
+### txn-rollback-to
+Roll the transaction back to a previously created savepoint, discarding everything staged after it.
+```
+txn-rollback-to <name>
+```
+
+### txn-release
+Release (drop) a savepoint without rolling back.
+```
+txn-release <name>
+```
+
+### txn-reset
+Reset the active transaction for reuse, optionally changing the isolation level.
+```
+txn-reset [read_uncommitted|read_committed|repeatable_read|snapshot|serializable]
+```
+
+### txn-commit
+Commit the active transaction.
+```
+txn-commit
+```
+
+### txn-rollback
+Roll back and discard the active transaction.
+```
+txn-rollback
+```
+
+**Example**
+```
+admintool(./mydb)> txn-begin snapshot
+Transaction started (isolation: snapshot).
+admintool(./mydb)> txn-put users user:1 "John"
+Staged put in transaction.
+admintool(./mydb)> txn-savepoint sp1
+Savepoint 'sp1' created.
+admintool(./mydb)> txn-put users user:2 "Jane"
+Staged put in transaction.
+admintool(./mydb)> txn-rollback-to sp1
+Rolled back to savepoint 'sp1'.
+admintool(./mydb)> txn-commit
+Transaction committed.
+```
 
 ## Interactive Mode
 

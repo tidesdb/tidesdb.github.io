@@ -34,7 +34,7 @@ Switching from RocksDB to TidesDB requires no changes to your stream topology. Y
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-kafka</artifactId>
-    <version>0.4.0</version>
+    <version>0.4.2</version>
 </dependency>
 ```
 
@@ -135,7 +135,10 @@ These settings control the TidesDB database instance that backs the state store.
 | `logToFile` | boolean | false | Write TidesDB logs to a file instead of stderr |
 | `logTruncationAt` | long | 24 MB | Log file truncation size; 0 disables truncation |
 | `maxConcurrentFlushes` | int | 0 (library default) | Global semaphore on in-flight memtable flushes across all column families; 0 inherits the engine default |
+| `raiseOpenFileLimit` | long | 0 (untouched) | Raise the process open-file ceiling toward this many descriptors before open, so the engine can keep more SSTables open; applied at init **before** the database opens. 0 leaves the limit untouched |
+| `cancelBackgroundWorkOnClose` | boolean | false | When true, cancel background compaction db-wide right before close for a fast shutdown; flushes are unaffected so durability is preserved |
 | `objectStoreFsPath` | String | null | Filesystem path for object store connector; null disables object store mode |
+| `objectStoreS3Config` | S3Config | null | S3-compatible object store connector (AWS S3, MinIO, GCS); takes precedence over `objectStoreFsPath`. Requires a native build with `TIDESDB_WITH_S3=ON` |
 | `objectStoreConfig` | ObjectStoreConfig | null | Object store behavior configuration; null uses defaults |
 | `unifiedMemtable` | boolean | false | Enable unified memtable mode (single memtable + WAL for all CFs) |
 | `unifiedMemtableWriteBufferSize` | long | 0 (auto) | Unified memtable write buffer size; 0 uses 64 MB default |
@@ -416,6 +419,44 @@ store.syncWal();
 
 This is useful when running with `SYNC_NONE` or `SYNC_INTERVAL` and you need to guarantee durability at a specific point.
 
+### Fast Shutdown
+
+`cancelBackgroundWork()` cancels background compaction across the whole database. In-flight merges bail safely at their next checkpoint (discarding uncommitted output, leaving inputs intact) and queued compaction is skipped. Flushes are unaffected, so durability is preserved. The cancellation is sticky for the session and resets on the next open.
+
+```java
+store.cancelBackgroundWork();
+store.close();
+```
+
+This is intended for a fast shutdown when you do not want to wait for long-running compactions to finish. Set `cancelBackgroundWorkOnClose(true)` on the config to have `close()` invoke it automatically — handy when a Kafka Streams task is reassigned or the application is shutting down and you want state stores to release quickly:
+
+```java
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .cancelBackgroundWorkOnClose(true)
+    .build();
+```
+
+### Raising the Open-File Limit
+
+A column family keeps SSTables open as file descriptors. On a busy store the process can hit its open-file ceiling, capping how many SSTables stay cached. `raiseOpenFileLimit(long)` raises this process's ceiling (the POSIX `RLIMIT_NOFILE` soft limit toward the hard limit) so the engine can keep more SSTables open.
+
+It is process-wide, opt-in, and **must be applied before the database opens** — the engine sizes `maxOpenSSTables` to fit the ceiling at open time. The static helper just reports the current ceiling when called with `<= 0`:
+
+```java
+long ceiling = TidesDBStore.raiseOpenFileLimit(65536); // returns the effective ceiling
+```
+
+The usual way is to set it on the config so it is applied automatically during `init()`, before open:
+
+```java
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .raiseOpenFileLimit(65536)
+    .maxOpenSSTables(8192)
+    .build();
+```
+
+A failed or partial raise is non-fatal — TidesDB simply works within whatever ceiling is in effect.
+
 ### Backup and Checkpoint
 
 Online backup · copies all data to a new directory without blocking reads or writes:
@@ -556,10 +597,72 @@ TidesDBStoreConfig config = TidesDBStoreConfig.builder()
     .build();
 ```
 
+### S3 Object Store
+
+Back a state store with a real S3-compatible service (AWS S3, MinIO, GCS) using `S3Config`. It takes precedence over `objectStoreFsPath` and composes with `objectStoreConfig` for cache and replication tuning. `endpoint`, `bucket`, `accessKey`, and `secretKey` are required; the rest default to secure, AWS-friendly values (HTTPS, virtual-hosted URLs, TLS verification on).
+
+```java
+import com.tidesdb.S3Config;
+import com.tidesdb.ObjectStoreConfig;
+
+S3Config s3 = S3Config.builder()
+    .endpoint("s3.amazonaws.com")
+    .bucket("my-streams-state")
+    .prefix("app1/")                          // optional
+    .accessKey(System.getenv("AWS_ACCESS_KEY_ID"))
+    .secretKey(System.getenv("AWS_SECRET_ACCESS_KEY"))
+    .region("us-east-1")
+    .build();
+
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .objectStoreS3Config(s3)
+    .objectStoreConfig(ObjectStoreConfig.builder()
+        .localCacheMaxBytes(1024L * 1024 * 1024)  // 1 GB local cache
+        .maxConcurrentUploads(8)
+        .build())
+    .build();
+```
+
+For MinIO or another self-hosted endpoint, use path-style addressing (and disable SSL for plain HTTP):
+
+```java
+S3Config minio = S3Config.builder()
+    .endpoint("minio.local:9000")
+    .bucket("tidesdb")
+    .accessKey("minioadmin")
+    .secretKey("minioadmin")
+    .usePathStyle(true)
+    .useSsl(false)
+    .build();
+```
+
+The S3 connector requires the native TidesDB library to be built with `TIDESDB_WITH_S3=ON`. Probe support before configuring it; opening an S3-backed store against a library without S3 support fails with a clear error:
+
+```java
+if (!TidesDBStore.isS3Available()) {
+    // fall back to objectStoreFsPath, or fail fast with a helpful message
+}
+```
+
 
 ## Column Family Management
 
-The store exposes column family management operations for advanced use cases.
+The store exposes column family management operations for advanced use cases. The store's own column family is created automatically during `init()`; these operations let you manage additional column families that share the same database instance.
+
+### Creating and Fetching a Column Family
+
+Create an extra column family and fetch its handle by name:
+
+```java
+ColumnFamilyConfig cfConfig = ColumnFamilyConfig.builder()
+    .compressionAlgorithm(CompressionAlgorithm.ZSTD_COMPRESSION)
+    .build();
+
+store.createColumnFamily("audit_cf", cfConfig);
+ColumnFamily cf = store.getColumnFamily("audit_cf");
+```
+
+Use the no-argument `getColumnFamily()` for the store's own column family.
 
 ### Listing Column Families
 
