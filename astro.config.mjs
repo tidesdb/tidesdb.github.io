@@ -169,6 +169,11 @@ export default defineConfig({
 					items: [
 						{
 				
+							label: 'sysbench Analysis on TideSQL v4.5.6 & InnoDB in MariaDB v11.8.6',
+							link: 'articles/sysbench-analysis-on-tidesql-v4-5-6-innodb-in-mariadb-v11-8-6-small-buffer-cache'
+						},
+						{
+				
 							label: 'Keybench Analysis with TidesDB v9.3.6 and RocksDB v11.1.1',
 							link: 'articles/keybench-analysis-tidesdb-v9-3-6-rocksdb-v11-1-1'
 						},
