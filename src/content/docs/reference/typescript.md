@@ -95,6 +95,7 @@ const db = TidesDB.open({
   unifiedMemtableSyncMode: SyncMode.None, // Sync mode for unified WAL
   unifiedMemtableSyncIntervalUs: 0,       // Sync interval for unified WAL (0 = default)
   maxConcurrentFlushes: 0,                // Cap on in-flight memtable flushes across all CFs (0 = library default)
+  finishCompactionsOnClose: false,        // false = fast shutdown (cancel in-flight compactions); true = let them finish
   objectStoreFsPath: '/path/to/store',    // Enable object store mode (FS connector)
   objectStoreConfig: { ... },             // Object store behavior config (optional)
 });
@@ -108,9 +109,59 @@ db.close();
 `maxConcurrentFlushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
 :::
 
+:::note[finishCompactionsOnClose]
+`finishCompactionsOnClose` controls shutdown behavior. The default `false` cancels in-flight compactions at their next checkpoint for a fast `close()` -- the merge discards its uncommitted output and leaves inputs intact, so **no data is lost** (recovery handles a mid-merge state the same way). Set it to `true` to let in-flight compactions run to completion before `close()` returns, at the cost of a slower shutdown. For an even more aggressive fast shutdown, call `db.cancelBackgroundWork()` right before `db.close()`.
+:::
+
 :::note[Default Configuration]
 `defaultConfig()` returns values sourced from the underlying C library, so settings such as `maxConcurrentFlushes` and the unified-memtable defaults track the engine automatically. If you previously relied on the binding's hardcoded defaults (`numFlushThreads: 2`, `numCompactionThreads: 2`, `blockCacheSize: 64MB`, `maxOpenSSTables: 256`), re-test after upgrading -- the library may have evolved past those constants.
 :::
+
+### Library Initialization & Utilities
+
+These static helpers on the `TidesDB` class operate at the library/process level rather than on a specific database handle.
+
+```typescript
+import { TidesDB, CompressionAlgorithm } from 'tidesdb';
+
+// Optional: explicitly initialize the library before any other call.
+// The library auto-initializes on first use, so this is rarely needed.
+// Returns true if this call performed the initialization, false if already initialized.
+const didInit = TidesDB.init();
+
+// Raise this process's open-file ceiling BEFORE opening a database so the engine
+// can keep more SSTables open. Pass <= 0 to just read the current ceiling.
+const ceiling = TidesDB.raiseOpenFileLimit(0);          // report current ceiling
+const raised = TidesDB.raiseOpenFileLimit(65536);       // attempt to raise toward 65536
+
+// Query whether a compression backend was compiled into the linked library.
+if (TidesDB.isCompressionAvailable(CompressionAlgorithm.ZstdCompression)) {
+  // safe to create a Zstd-compressed column family
+}
+
+// Advanced / teardown only: finalize the library and reset the allocator.
+// Do NOT call while any database, transaction, iterator, or callback is still live.
+TidesDB.finalize();
+```
+
+**`TidesDB.init()`**
+- Optional. The library auto-initializes with the system allocator on first use.
+- Custom memory allocators are not supported from TypeScript, so this always uses the system allocator.
+- Returns `true` if this call performed the initialization, `false` if it was already initialized.
+
+**`TidesDB.raiseOpenFileLimit(desired)`**
+- Raises this process's open-file ceiling (POSIX `RLIMIT_NOFILE` soft limit toward the hard limit; on Windows, the CRT stdio cap up to 8192).
+- Call **before** `TidesDB.open()` -- the engine sizes `maxOpenSSTables` to fit the ceiling at open time. TidesDB never raises the limit itself; this is an explicit, opt-in operator action.
+- `desired <= 0` just reports the current ceiling without changing it.
+- Returns the open-file ceiling in effect after the attempt. A failed or partial raise is non-fatal.
+
+**`TidesDB.isCompressionAvailable(algorithm)`**
+- Every algorithm enum value is always defined, but whether a backend can actually be used is a build-time choice (the `-DTIDESDB_WITH_*` CMake options).
+- Returns `true` if the backend is available at runtime. `CompressionAlgorithm.NoCompression` is always available.
+
+**`TidesDB.finalize()`**
+- Finalizes the library and resets the allocator; after this, `TidesDB.init()` can be called again.
+- Advanced / teardown use only -- calling it while any database, transaction, iterator, or registered callback is still live invalidates them.
 
 ### Creating and Dropping Column Families
 
@@ -454,6 +505,31 @@ if (stats.config) {
 | `levelTombstoneCounts` | `number[]` | Per-level tombstone counts; parallels `levelKeyCounts`, length equals `numLevels` |
 | `maxSstDensity` | `number` | Worst per-SSTable tombstone density observed in the column family; range `[0.0, 1.0]` |
 | `maxSstDensityLevel` | `number` | 1-based level index where `maxSstDensity` was observed (`0` if no SSTables) |
+
+**Write-amplification fields**
+
+All counters are lifetime-since-open totals of on-disk framed bytes. Divide the write totals by `userBytesWritten` to compute this column family's write amplification.
+
+```typescript
+const stats = cf.getStats();
+
+const writeBytes =
+  stats.walBytesWritten + stats.flushBytesWritten + stats.compactionBytesWritten;
+const writeAmp = stats.userBytesWritten > 0 ? writeBytes / stats.userBytesWritten : 0;
+
+console.log(`Write amplification: ${writeAmp.toFixed(2)}x`);
+console.log(`Flushes: ${stats.flushCount}, Compactions: ${stats.compactionCount}`);
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `walBytesWritten` | `number` | Framed bytes appended to this CF's WAL. Always `0` in unified-memtable mode (see `DbStats.uwalBytesWritten`) |
+| `flushBytesWritten` | `number` | On-disk bytes this CF's flushes wrote to L0 SSTables |
+| `compactionBytesWritten` | `number` | On-disk bytes this CF's compactions wrote |
+| `compactionBytesRead` | `number` | On-disk bytes this CF's compactions read as input |
+| `userBytesWritten` | `number` | Logical key+value bytes committed to this CF (write-amplification denominator) |
+| `flushCount` | `number` | Flushed SSTables produced by this CF |
+| `compactionCount` | `number` | Compaction output SSTables produced by this CF |
 
 ### Listing Column Families
 
@@ -845,6 +921,16 @@ console.log(`Memtable bytes: ${dbStats.totalMemtableBytes}`);
 | `totalUploads` | `number` | Lifetime count of objects uploaded to object store |
 | `totalUploadFailures` | `number` | Lifetime count of permanently failed uploads |
 | `replicaMode` | `boolean` | Whether running in read-only replica mode |
+| `uwalBytesWritten` | `number` | Framed bytes appended to the shared unified WAL (`0` when unified mode is off) |
+| `walBytesWritten` | `number` | Per-CF WAL bytes summed across all column families |
+| `flushBytesWritten` | `number` | Flush output bytes summed across all column families |
+| `compactionBytesWritten` | `number` | Compaction output bytes summed across all column families |
+| `compactionBytesRead` | `number` | Compaction input bytes summed across all column families |
+| `userBytesWritten` | `number` | Logical committed bytes summed across all column families |
+| `flushCount` | `number` | Flushed SSTables summed across all column families |
+| `compactionCount` | `number` | Compaction output SSTables summed across all column families |
+
+All write-amplification counters are lifetime-since-open totals of on-disk framed bytes. Db-wide write amplification = `(uwalBytesWritten + walBytesWritten + flushBytesWritten + compactionBytesWritten) / userBytesWritten`.
 
 :::note[Stack Allocated]
 Unlike `cf.getStats()` (which heap-allocates), `db.getDbStats()` fills a caller-provided struct. No free is needed.
@@ -1049,7 +1135,7 @@ db.close();
 
 #### Per-CF Object Store Tuning
 
-Column family configurations include three object store tuning fields.
+Column family configurations include two object store tuning fields.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -1150,6 +1236,31 @@ db.promoteToPrimary();
 - Only valid when the database was opened in replica mode
 - Throws `TidesDBError` with `ErrorCode.ErrInvalidArgs` if the database is not a replica
 
+### Cancelling Background Work
+
+`db.cancelBackgroundWork()` cancels background compaction db-wide for a fast shutdown. It is the most aggressive shutdown option, complementing the `finishCompactionsOnClose` open-time flag.
+
+```typescript
+// Fast shutdown: stop compaction, then close
+db.cancelBackgroundWork();
+db.close();
+```
+
+**Behavior**
+- In-flight merges bail safely at their next checkpoint and queued compaction is skipped
+- Flushes are **unaffected**, so durability is preserved -- no committed data is lost
+- Blocks (bounded) until compaction is idle
+- Sticky for the session and reset on the next `open()` -- intended to be called right before `close()`
+- Throws `TidesDBError` with `ErrorCode.ErrInvalidArgs` if the database handle is invalid
+
+**Shutdown options compared**
+
+| Approach | Speed | Behavior |
+|---|---|---|
+| `finishCompactionsOnClose: true` (config) | Slowest | Let in-flight compactions finish before `close()` returns |
+| Default `close()` | Fast | Cancel in-flight compactions at next checkpoint |
+| `cancelBackgroundWork()` then `close()` | Fastest | Proactively stop compaction db-wide, then close |
+
 ### Delete Column Family by Handle
 
 Delete a column family using its handle instead of its name.
@@ -1202,6 +1313,7 @@ try {
 - `ErrorCode.ErrUnknown` (-11) · Unknown error
 - `ErrorCode.ErrLocked` (-12) · Database is locked
 - `ErrorCode.ErrReadonly` (-13) · Database is read-only
+- `ErrorCode.ErrBusy` (-14) · Resource is busy
 
 ## Complete Example
 
@@ -1448,7 +1560,32 @@ TidesDB provides six built-in comparators that are automatically registered on d
 - **`"reverse"`** · Reverse binary comparison. Sorts keys in descending order.
 - **`"case_insensitive"`** · Case-insensitive ASCII comparison. Converts A-Z to a-z during comparison.
 
+Because they are auto-registered on open, built-in comparators can be used directly via `comparatorName` without calling `registerComparator()` first. The `BuiltinComparator` enum provides typo-safe constants for these names:
+
+```typescript
+import { TidesDB, BuiltinComparator } from 'tidesdb';
+
+db.createColumnFamily('numeric_cf', {
+  comparatorName: BuiltinComparator.Uint64,   // 8-byte keys ordered numerically
+});
+
+db.createColumnFamily('descending_cf', {
+  comparatorName: BuiltinComparator.Reverse,
+});
+```
+
+| Constant | Name |
+|---|---|
+| `BuiltinComparator.Memcmp` | `"memcmp"` |
+| `BuiltinComparator.Lexicographic` | `"lexicographic"` |
+| `BuiltinComparator.Uint64` | `"uint64"` |
+| `BuiltinComparator.Int64` | `"int64"` |
+| `BuiltinComparator.Reverse` | `"reverse"` |
+| `BuiltinComparator.CaseInsensitive` | `"case_insensitive"` |
+
 ### Registering a Comparator
+
+Built-in comparators are auto-registered, so `registerComparator()` is for custom comparators (and is also accepted as an explicit, harmless call for built-ins).
 
 ```typescript
 // Register comparator after opening database but before creating CF
@@ -1519,10 +1656,28 @@ import {
   LogLevel,
   IsolationLevel,
   ErrorCode,
-  
+  BuiltinComparator,
+  ObjStoreBackend,
+
+  // Commit hook (change data capture)
+  CommitOp,
+  CommitHookCallback,
+
   // Helper functions
   defaultConfig,
   defaultColumnFamilyConfig,
+  defaultObjectStoreConfig,
   checkResult,
 } from 'tidesdb';
+```
+
+### Library-Level Static Methods
+
+In addition to the instance methods on a database handle, the `TidesDB` class exposes process/library-level static helpers:
+
+```typescript
+TidesDB.init();                                       // optional explicit init -> boolean
+TidesDB.finalize();                                   // teardown (advanced)
+TidesDB.raiseOpenFileLimit(65536);                    // raise open-file ceiling -> number
+TidesDB.isCompressionAvailable(CompressionAlgorithm.ZstdCompression); // -> boolean
 ```

@@ -206,6 +206,55 @@ db.PromoteToPrimary();
 Object store mode automatically enables unified memtable mode. The S3 connector requires TidesDB built with `-DTIDESDB_WITH_S3=ON`. The filesystem connector is always available.
 :::
 
+**S3-compatible connector (AWS S3, MinIO, …)**
+
+```csharp
+using TidesDB;
+
+var config = new Config
+{
+    DbPath = "./mydb",
+    ObjectStoreConfig = new ObjectStoreConfig
+    {
+        ConnectorType = ObjectStoreConnectorType.S3,
+        S3Endpoint = "s3.amazonaws.com",   // or "localhost:9000" for MinIO
+        S3Bucket = "my-tidesdb",
+        S3KeyPrefix = "production/db1/",   // optional
+        S3AccessKey = "AKIA...",
+        S3SecretKey = "...",
+        S3Region = "us-east-1",            // null for MinIO
+        S3UseSsl = true,
+        S3UsePathStyle = false,            // true for MinIO
+        LocalCacheMaxBytes = 512 * 1024 * 1024,
+    },
+};
+
+using var db = TidesDb.Open(config);
+```
+
+**S3 Connector Options**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `S3Endpoint` | string? | null | S3 endpoint (required for S3). e.g. `s3.amazonaws.com` or `localhost:9000` |
+| `S3Bucket` | string? | null | Bucket name (required for S3) |
+| `S3KeyPrefix` | string? | null | Key prefix (optional), e.g. `production/db1/` |
+| `S3AccessKey` | string? | null | AWS access key ID (required for S3) |
+| `S3SecretKey` | string? | null | AWS secret access key (required for S3) |
+| `S3Region` | string? | null | AWS region, e.g. `us-east-1` (null for MinIO) |
+| `S3UseSsl` | bool | true | Use HTTPS |
+| `S3UsePathStyle` | bool | false | Path-style URLs (set true for MinIO) |
+| `S3TlsCaPath` | string? | null | Custom CA bundle file path (null = system bundle) |
+| `S3TlsInsecureSkipVerify` | bool | false | Disable TLS peer/host verification (test only, insecure) |
+| `S3MultipartThreshold` | ulong | 0 | Connector multipart threshold in bytes (0 = library default) |
+| `S3MultipartPartSize` | ulong | 0 | Connector multipart chunk size in bytes (0 = library default) |
+
+Setting any of `S3TlsCaPath`, `S3TlsInsecureSkipVerify`, `S3MultipartThreshold`, or `S3MultipartPartSize` routes connector creation through the full S3 config factory (`tidesdb_objstore_s3_create_config`); otherwise the positional factory (`tidesdb_objstore_s3_create`) is used.
+
+:::caution[TLS verification]
+`S3TlsInsecureSkipVerify = true` disables certificate verification and is for local testing only — never use it against a production endpoint.
+:::
+
 ### Creating and Dropping Column Families
 
 Column families are isolated key-value stores with independent configuration.
@@ -620,6 +669,27 @@ cf.UpdateRuntimeConfig(new ColumnFamilyConfig
 Changes apply immediately to new operations. Existing SSTables and memtables retain their original settings. The update operation is thread-safe.
 :::
 
+### Saving and Loading Configuration (INI)
+
+A `ColumnFamilyConfig` can be persisted to a named section of an INI file and reloaded later. Keys not present in the file fall back to the library defaults, so partial files are valid.
+
+```csharp
+var cfg = new ColumnFamilyConfig
+{
+    WriteBufferSize = 32 * 1024 * 1024,
+    CompressionAlgorithm = CompressionAlgorithm.Zstd,
+    BloomFpr = 0.005,
+    UseBtree = true,
+};
+
+// Write to (or update) a section in the INI file
+cfg.SaveToIni("cf-config.ini", "metrics");
+
+// Read it back and use it to create a column family
+var loaded = ColumnFamilyConfig.LoadFromIni("cf-config.ini", "metrics");
+db.CreateColumnFamily("metrics", loaded);
+```
+
 ### Compaction
 
 #### Manual Compaction
@@ -787,6 +857,17 @@ db.CreateColumnFamily("snappy_cf", new ColumnFamilyConfig
 });
 ```
 
+Whether a compression backend is actually compiled into the loaded native library depends on the build-time `-DTIDESDB_WITH_*` options. Query it up front instead of failing at compress/flush time:
+
+```csharp
+if (!Library.IsCompressionAvailable(CompressionAlgorithm.Zstd))
+{
+    Console.WriteLine("Zstd not compiled into this libtidesdb build; falling back to Lz4");
+}
+```
+
+`CompressionAlgorithm.None` is always available.
+
 ### B+tree KLog Format (Optional)
 
 Column families can optionally use a B+tree structure for the key log instead of the default block-based format. The B+tree klog format offers faster point lookups through O(log N) tree traversal.
@@ -815,6 +896,45 @@ db.CreateColumnFamily("btree_cf", new ColumnFamilyConfig
 :::caution[Important]
 `UseBtree` cannot be changed after column family creation.
 :::
+
+## Library Lifecycle and Open-File Limit
+
+The static `Library` class exposes process-wide lifecycle and capability helpers. Initialization is optional — `TidesDb.Open` lazily initializes the library on first use — but you can drive it explicitly when you need work to happen before the first open (such as raising the descriptor ceiling).
+
+```csharp
+using TidesDB;
+
+// Optional explicit init (system allocator). Returns false if already initialized.
+Library.Initialize();
+
+// Raise the process open-file ceiling BEFORE opening a database, so the engine can size
+// MaxOpenSstables to fit. Must be called before TidesDb.Open. Pass <= 0 to just report the
+// current ceiling. A failed or partial raise is non-fatal.
+long ceiling = Library.RaiseOpenFileLimit(65536);
+Console.WriteLine($"open-file ceiling now {ceiling}");
+
+using (var db = TidesDb.Open(Config.Default("./mydb")))
+{
+    // ... use the database ...
+}
+
+// Optional: finalize the library and reset the allocator after all databases are closed.
+// After this, Library.Initialize() can be called again.
+Library.Shutdown();
+```
+
+:::note
+`RaiseOpenFileLimit` is an explicit, opt-in operator action — TidesDB never raises the limit on its own. On POSIX it raises the `RLIMIT_NOFILE` soft limit toward the hard limit; on Windows it raises the CRT stdio cap (max 8192).
+:::
+
+## Cancelling Background Work
+
+`CancelBackgroundWork` cancels background compaction db-wide: in-flight merges bail out safely and queued compaction is skipped. Flushes are unaffected, so durability is preserved. It blocks (bounded) until compaction is idle, and the effect is sticky for the session (reset on the next open). Call it right before disposing the database for a fast shutdown.
+
+```csharp
+db.CancelBackgroundWork();
+db.Dispose();
+```
 
 ## Error Handling
 
@@ -854,6 +974,9 @@ catch (TidesDBException ex)
 - `TDB_ERR_UNKNOWN` (-11) · Unknown error
 - `TDB_ERR_LOCKED` (-12) · Database is locked
 - `TDB_ERR_READONLY` (-13) · Database is read-only
+- `TDB_ERR_BUSY` (-14) · Resource busy
+
+These map to the `ErrorCode` enum (`ErrorCode.Locked`, `ErrorCode.Readonly`, `ErrorCode.Busy`, …) exposed on `TidesDBException.ErrorCode`.
 
 ## Complete Example
 
@@ -1190,11 +1313,42 @@ TidesDB provides six built-in comparators that are automatically registered on d
 - **`"reverse"`** · Reverse binary comparison
 - **`"case_insensitive"`** · Case-insensitive ASCII comparison
 
-### Registering a Comparator
+### Registering a Built-in Comparator Under a Custom Name
+
+Register one of the built-in native comparators under an additional name. This runs at native speed with no managed transition on the comparison hot path:
 
 ```csharp
-db.RegisterComparator("my_comparator");
+db.RegisterBuiltInComparator("my_uint64", BuiltInComparator.Uint64);
+
+db.CreateColumnFamily("metrics", new ColumnFamilyConfig
+{
+    ComparatorName = "my_uint64"
+});
 ```
+
+`BuiltInComparator` values: `Memcmp`, `Lexicographic`, `Uint64`, `Int64`, `ReverseMemcmp`, `CaseInsensitive`.
+
+### Registering a Custom Managed Comparator
+
+Provide your own ordering as a C# delegate. The callback returns a negative value when the first key sorts before the second, zero when equal, and positive when after:
+
+```csharp
+// Order by key length first, then by bytes (a total order).
+db.RegisterComparator("by_length", (key1, key2) =>
+{
+    if (key1.Length != key2.Length) return key1.Length - key2.Length;
+    return key1.SequenceCompareTo(key2);
+});
+
+db.CreateColumnFamily("len_cf", new ColumnFamilyConfig
+{
+    ComparatorName = "by_length"
+});
+```
+
+:::caution[Performance & threading]
+A managed comparator is invoked from native code on the hot path of **every** memtable and compaction comparison, potentially concurrently on background threads. It must be deterministic, total, thread-safe, and must not throw (an exception is caught and treated as "equal"). The key spans are valid only for the duration of the call — do not retain them. For standard key shapes prefer `RegisterBuiltInComparator`, which avoids the managed transition entirely. The delegate is kept alive for the lifetime of the database instance.
+:::
 
 ### Getting a Registered Comparator
 
@@ -1317,15 +1471,29 @@ using TidesDB;
 // -- CommitOp
 // -- CommitHookHandler
 
+// Comparators
+// -- ComparatorFunction (delegate)
+
+// Library lifecycle / capability helpers (static)
+// -- Library.Initialize()
+// -- Library.Shutdown()
+// -- Library.RaiseOpenFileLimit(long desired)
+// -- Library.IsCompressionAvailable(CompressionAlgorithm algorithm)
+
 // Methods
 // -- TidesDb.GetComparator(string name)
+// -- TidesDb.RegisterComparator(string name, ComparatorFunction comparator, string? ctxStr)
+// -- TidesDb.RegisterBuiltInComparator(string name, BuiltInComparator comparator, string? ctxStr)
 // -- TidesDb.DeleteColumnFamily(ColumnFamily cf)
 // -- TidesDb.Purge()
+// -- TidesDb.CancelBackgroundWork()
 // -- TidesDb.GetDbStats()
 // -- TidesDb.PromoteToPrimary()
 // -- ColumnFamily.UpdateRuntimeConfig(ColumnFamilyConfig config, bool persistToDisk)
 // -- ColumnFamily.Purge()
 // -- ColumnFamily.SyncWal()
+// -- ColumnFamilyConfig.SaveToIni(string iniFile, string sectionName)
+// -- ColumnFamilyConfig.LoadFromIni(string iniFile, string sectionName)  // static
 // -- Transaction.SingleDelete(ColumnFamily cf, ReadOnlySpan<byte> key)
 // -- Iterator.KeyValue()
 
@@ -1335,6 +1503,8 @@ using TidesDB;
 // -- LogLevel
 // -- IsolationLevel
 // -- ObjectStoreConnectorType
+// -- BuiltInComparator
+// -- ErrorCode
 ```
 
 ## Configuration Reference
@@ -1360,6 +1530,7 @@ using TidesDB;
 | `UnifiedMemtableSyncIntervalUs` | ulong | 0 | Sync interval for unified WAL in microseconds |
 | `ObjectStoreConfig` | ObjectStoreConfig? | null | Object store behavior configuration (null = disabled) |
 | `MaxConcurrentFlushes` | int | library default | Global semaphore on in-flight memtable flushes across all CFs (0 = library default). Default sourced from `tidesdb_default_config()`. |
+| `FinishCompactionsOnClose` | bool | false | Close behavior. False cancels in-flight compactions at their next checkpoint for a fast shutdown (no data loss). True lets them run to completion before close returns. |
 
 ### Column Family Configuration (ColumnFamilyConfig)
 
@@ -1416,6 +1587,15 @@ using TidesDB;
 | `LevelTombstoneCounts` | ulong[] | Per-level tombstone counts (parallels `LevelKeyCounts`) |
 | `MaxSstDensity` | double | Worst per-SSTable tombstone density observed (0.0 to 1.0) |
 | `MaxSstDensityLevel` | int | 1-based level index where `MaxSstDensity` was observed (0 if none) |
+| `WalBytesWritten` | ulong | Framed bytes appended to this CF's WAL (0 in unified mode). Lifetime since open |
+| `FlushBytesWritten` | ulong | On-disk bytes this CF's flushes wrote to L0 SSTables |
+| `CompactionBytesWritten` | ulong | On-disk bytes this CF's compactions wrote |
+| `CompactionBytesRead` | ulong | On-disk bytes this CF's compactions read as input |
+| `UserBytesWritten` | ulong | Logical key+value bytes committed to this CF (write-amplification denominator) |
+| `FlushCount` | ulong | Flushed SSTables produced by this CF |
+| `CompactionCount` | ulong | Compaction output SSTables produced by this CF |
+
+Per-CF write amplification = (`WalBytesWritten` + `FlushBytesWritten` + `CompactionBytesWritten`) / `UserBytesWritten`.
 
 ### Database Statistics (DbStats)
 
@@ -1452,3 +1632,13 @@ using TidesDB;
 | `TotalUploads` | ulong | Lifetime count of objects uploaded to object store |
 | `TotalUploadFailures` | ulong | Lifetime count of permanently failed uploads |
 | `ReplicaMode` | bool | Whether running in read-only replica mode |
+| `UwalBytesWritten` | ulong | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
+| `WalBytesWritten` | ulong | Per-CF WAL bytes summed across all column families |
+| `FlushBytesWritten` | ulong | Flush output bytes summed across all column families |
+| `CompactionBytesWritten` | ulong | Compaction output bytes summed across all column families |
+| `CompactionBytesRead` | ulong | Compaction input bytes summed across all column families |
+| `UserBytesWritten` | ulong | Logical committed bytes summed across all CFs (write-amplification denominator) |
+| `FlushCount` | ulong | Flushed SSTables summed across all column families |
+| `CompactionCount` | ulong | Compaction output SSTables summed across all column families |
+
+Db-wide write amplification = (`UwalBytesWritten` + `WalBytesWritten` + `FlushBytesWritten` + `CompactionBytesWritten`) / `UserBytesWritten`.

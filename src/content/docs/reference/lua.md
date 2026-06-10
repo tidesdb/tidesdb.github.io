@@ -83,6 +83,7 @@ local db = tidesdb.TidesDB.open("./mydb", {
     unified_memtable_sync_mode = tidesdb.SyncMode.SYNC_INTERVAL, -- Unified memtable sync mode
     unified_memtable_sync_interval_us = 128000,                  -- Unified memtable sync interval (128ms)
     max_concurrent_flushes = 0,                                  -- Cap on in-flight memtable flushes across all CFs (0 = library default)
+    finish_compactions_on_close = false,                         -- false (default) cancels in-flight compactions at close for a fast shutdown; true lets them finish first
 })
 
 print("Database opened successfully")
@@ -93,6 +94,36 @@ db:close()
 :::note[max_concurrent_flushes]
 `max_concurrent_flushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
 :::
+
+:::note[finish_compactions_on_close]
+Controls close behavior. `false` (default) cancels in-flight compactions at their next checkpoint for a fast shutdown - the merge discards its uncommitted output and leaves inputs intact, so no data is lost (recovery handles a mid-merge state the same way). `true` lets in-flight compactions run to completion before `db:close()` returns. For an explicit fast shutdown at runtime, see `db:cancel_background_work()`.
+:::
+
+### Raising the Open-File Limit
+
+`tidesdb.raise_open_file_limit(desired)` raises this process's open-file ceiling toward `desired` descriptors so a database can keep more SSTables open. The engine sizes `max_open_sstables` to fit this at open time, so **call it before opening a database**. A `desired` value `<= 0` just reports the current ceiling. It returns the open-file ceiling in effect after the attempt. A failed or partial raise is non-fatal; TidesDB never raises the limit itself (it is an explicit, opt-in operator action).
+
+```lua
+local tidesdb = require("tidesdb")
+
+local ceiling = tidesdb.raise_open_file_limit(65536)
+print("open-file ceiling is now", ceiling)
+
+local db = tidesdb.TidesDB.open("./mydb")
+```
+
+### Custom Allocators (Optional)
+
+TidesDB initializes itself lazily the first time you use it, so most programs never call `tidesdb.init`. Call it only to install custom allocation functions, and call it **before** any other TidesDB operation. Pass `nil` for any function to use the system default. It returns `0` on success or `-1` if the library was already initialized. `tidesdb.finalize()` finalizes the library and resets the allocator; afterwards `tidesdb.init()` may be called again.
+
+```lua
+-- Use system allocators explicitly (equivalent to lazy init)
+tidesdb.init(nil, nil, nil, nil)
+
+-- ... use the database ...
+
+tidesdb.finalize()
+```
 
 ### Default Configuration
 
@@ -573,6 +604,15 @@ end
 - `max_sst_density_level` · 1-based level index where `max_sst_density` was observed (0 if none)
 - `config` · Column family configuration
 
+**Write-amplification counters** (lifetime since open, on-disk framed bytes; divide the write totals by `user_bytes_written` for this column family's write amplification)
+- `wal_bytes_written` · Framed bytes appended to this CF's WAL (0 in unified memtable mode - see `uwal_bytes_written` in database stats)
+- `flush_bytes_written` · On-disk bytes this CF's flushes wrote to L0 SSTables
+- `compaction_bytes_written` · On-disk bytes this CF's compactions wrote
+- `compaction_bytes_read` · On-disk bytes this CF's compactions read as input
+- `user_bytes_written` · Logical key+value bytes committed to this CF (the write-amplification denominator)
+- `flush_count` · Number of flushed SSTables produced by this CF
+- `compaction_count` · Number of compaction output SSTables produced by this CF
+
 ### Getting Database-Level Statistics
 
 Get aggregate statistics across the entire database instance.
@@ -647,6 +687,16 @@ print(string.format("Replica mode: %s", tostring(db_stats.replica_mode)))
 - `total_uploads` · Total number of successful uploads
 - `total_upload_failures` · Total number of failed uploads
 - `replica_mode` · Whether the database is in replica mode
+
+**Write-amplification counters** (lifetime since open, on-disk framed bytes; db-wide write amplification = `(uwal_bytes_written + wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`)
+- `uwal_bytes_written` · Framed bytes appended to the shared unified WAL (0 when unified memtable mode is off)
+- `wal_bytes_written` · Per-CF WAL bytes summed across all column families
+- `flush_bytes_written` · Flush output bytes summed across all column families
+- `compaction_bytes_written` · Compaction output bytes summed across all column families
+- `compaction_bytes_read` · Compaction input bytes summed across all column families
+- `user_bytes_written` · Logical committed bytes summed across all column families
+- `flush_count` · Flushed SSTables summed across all column families
+- `compaction_count` · Compaction output SSTables summed across all column families
 
 :::note[Stack Allocated]
 Unlike `cf:get_stats()` (which heap-allocates), `db:get_db_stats()` fills a caller-provided struct on the stack. No free is needed.
@@ -857,6 +907,17 @@ db:purge()
 `cf:flush_memtable()` and `cf:compact()` are non-blocking - they enqueue work and return immediately. `cf:purge()` and `db:purge()` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
 
+#### Cancel Background Work (Fast Shutdown)
+
+`db:cancel_background_work()` cancels background compaction db-wide. In-flight merges bail safely and queued compaction is skipped; flushes are unaffected so durability is preserved. It blocks (bounded) until compaction is idle. The cancellation is sticky for the session and reset on the next open - it is intended to be called right before `db:close()` for a fast shutdown.
+
+```lua
+db:cancel_background_work()  -- stop compaction so close returns quickly
+db:close()
+```
+
+This is the runtime counterpart to the `finish_compactions_on_close` config flag: set `finish_compactions_on_close = true` to let in-flight compactions run to completion before `db:close()` returns, or call `db:cancel_background_work()` for the opposite (fastest) behavior.
+
 ### Promote Replica to Primary
 
 `db:promote_to_primary()` switches a replica database to primary mode, allowing it to accept writes.
@@ -929,6 +990,52 @@ db:close()
 
 :::note[Unified Memtable]
 Object store mode requires unified memtable mode. Setting `object_store` on the config automatically enables `unified_memtable`.
+:::
+
+### Enabling Object Store Mode (S3 Connector)
+
+For AWS S3, MinIO, or any S3-compatible service, use `tidesdb.objstore_s3_create` (positional) or `tidesdb.objstore_s3_create_config` (full configuration with TLS and multipart tuning).
+
+```lua
+local tidesdb = require("tidesdb")
+
+-- Positional form
+local store = tidesdb.objstore_s3_create({
+    endpoint = "s3.amazonaws.com",   -- or "minio.local:9000"
+    bucket = "my-bucket",
+    prefix = "production/db1/",        -- optional, may be nil
+    access_key = "AKIA...",
+    secret_key = "...",
+    region = "us-east-1",             -- nil for MinIO
+    use_ssl = true,                    -- HTTPS
+    use_path_style = false,            -- true for MinIO, false for AWS virtual-hosted
+})
+
+local db = tidesdb.TidesDB.open("./mydb", {
+    object_store = store,
+    object_store_config = tidesdb.default_objstore_config(),
+})
+```
+
+The configuration form additionally exposes TLS and multipart controls:
+
+```lua
+local store = tidesdb.objstore_s3_create_config({
+    endpoint = "minio.local:9000",
+    bucket = "my-bucket",
+    access_key = "minioadmin",
+    secret_key = "minioadmin",
+    use_ssl = true,
+    use_path_style = true,
+    tls_ca_path = "/etc/ssl/certs/ca.pem",   -- custom CA bundle, or nil for the system bundle
+    tls_insecure_skip_verify = false,        -- true disables TLS verification (test only, insecure)
+    multipart_threshold = 64 * 1024 * 1024,  -- 0 = built-in default
+    multipart_part_size = 8 * 1024 * 1024,   -- 0 = built-in default
+})
+```
+
+:::caution[S3 build flag]
+The S3 connector is only available when the TidesDB C library was built with `TIDESDB_WITH_S3=ON`. If the library lacks S3 support, both factory functions raise a `TidesDBError` explaining that S3 support is unavailable.
 :::
 
 ### Per-CF Object Store Tuning
@@ -1451,8 +1558,15 @@ lua test_tidesdb.lua
 | `tidesdb.TidesDB.open(path, options)` | Open a database |
 | `tidesdb.default_config()` | Get default database configuration |
 | `tidesdb.default_column_family_config()` | Get default column family configuration |
+| `tidesdb.default_objstore_config()` | Get default object store configuration |
 | `tidesdb.load_config_from_ini(file, section)` | Load config from INI file |
 | `tidesdb.save_config_to_ini(file, section, config)` | Save config to INI file |
+| `tidesdb.objstore_fs_create(root_dir)` | Create a filesystem-backed object store connector |
+| `tidesdb.objstore_s3_create(opts)` | Create an S3-compatible object store connector (positional form) |
+| `tidesdb.objstore_s3_create_config(config)` | Create an S3 connector with full TLS / multipart tuning |
+| `tidesdb.init(malloc_fn, calloc_fn, realloc_fn, free_fn)` | Install custom allocators (optional; lazy init otherwise) |
+| `tidesdb.finalize()` | Finalize the library and reset the allocator |
+| `tidesdb.raise_open_file_limit(desired)` | Raise the process open-file ceiling before opening a database |
 
 ### TidesDB Class
 
@@ -1471,6 +1585,7 @@ lua test_tidesdb.lua
 | `db:get_cache_stats()` | Get block cache statistics |
 | `db:get_db_stats()` | Get database-level aggregate statistics |
 | `db:purge()` | Synchronous flush and compaction for all column families |
+| `db:cancel_background_work()` | Cancel background compaction db-wide for a fast shutdown |
 | `db:backup(dir)` | Create database backup |
 | `db:checkpoint(dir)` | Create lightweight database checkpoint using hard links |
 | `db:register_comparator(name, fn, ctx_str, ctx)` | Register custom comparator |
@@ -1571,3 +1686,4 @@ lua test_tidesdb.lua
 - `TDB_ERR_UNKNOWN` (-11)
 - `TDB_ERR_LOCKED` (-12)
 - `TDB_ERR_READONLY` (-13)
+- `TDB_ERR_BUSY` (-14)

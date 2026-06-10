@@ -88,6 +88,7 @@ config = tidesdb.Config(
     object_store=None,                                      # Object store connector (from objstore_fs_create())
     object_store_config=None,                               # Object store behavior config (ObjStoreConfig)
     max_concurrent_flushes=0,                               # Cap on in-flight memtable flushes across all CFs (0 = library default)
+    finish_compactions_on_close=False,                      # False = cancel in-flight compactions at close for a fast shutdown; True = run them to completion
 )
 db = tidesdb.TidesDB(config)
 
@@ -101,6 +102,41 @@ with tidesdb.TidesDB.open("./mydb") as db:
 
 :::note[max_concurrent_flushes]
 `max_concurrent_flushes` is a global semaphore on the number of in-flight memtable flushes across all column families. It bounds total transient memory and work-queue depth when many column families flush at once. Leave it at `0` to inherit the library default (recommended), or lower it on memory-constrained hosts to throttle peak flush concurrency.
+:::
+
+:::note[finish_compactions_on_close]
+`finish_compactions_on_close` controls shutdown behavior. The default `False` cancels in-flight compactions at their next checkpoint so `close()` returns quickly — the merge discards its uncommitted output and leaves the inputs intact, so **no data is lost** (recovery handles a mid-merge state the same way). Set it to `True` to let in-flight compactions run to completion before `close()` returns, which can leave the LSM tree in a more compacted state at the cost of a slower shutdown.
+:::
+
+### Initialization and Process Limits
+
+TidesDB lazily initializes itself on first use, so calling `init()` is optional. It exists so an embedder can initialize the library up front, and a matching `finalize()` resets the allocator once every database handle is closed. Both are process-wide and safe to call more than once.
+
+```python
+import tidesdb
+
+# Optional: initialize up front (otherwise done lazily on first use)
+tidesdb.init()
+
+# ... open databases, do work, close every handle ...
+
+# Optional: finalize after all databases are closed
+tidesdb.finalize()
+```
+
+`raise_open_file_limit()` raises this process's open-file ceiling so a database can keep more SSTables open. The engine sizes `max_open_sstables` to fit the ceiling at open time, so call this **before** opening a database. It is an explicit, opt-in operator action — TidesDB never raises the limit itself — and a failed or partial raise is non-fatal.
+
+```python
+# Raise toward 65536 descriptors; returns the ceiling actually in effect
+ceiling = tidesdb.raise_open_file_limit(65536)
+print(f"Open-file ceiling now: {ceiling}")
+
+# A non-positive value just reports the current ceiling without changing it
+current = tidesdb.raise_open_file_limit(-1)
+```
+
+:::note[Custom allocators]
+The C API lets `init()` accept custom `malloc`/`calloc`/`realloc`/`free` functions. The Python binding intentionally does **not** expose these — the lifetime of Python-side callbacks cannot be safely guaranteed for the entire life of the process — so the default system allocator is always used.
 :::
 
 ### Column Families
@@ -149,6 +185,22 @@ if stats.use_btree:
     print(f"B+tree total nodes: {stats.btree_total_nodes}")
     print(f"B+tree max height: {stats.btree_max_height}")
     print(f"B+tree avg height: {stats.btree_avg_height:.2f}")
+
+# Per-CF write-amplification counters (lifetime since open, on-disk framed bytes).
+# wal_bytes_written is 0 in unified-memtable mode (reported db-wide instead).
+print(f"WAL bytes written: {stats.wal_bytes_written}")
+print(f"Flush bytes written: {stats.flush_bytes_written}")
+print(f"Compaction bytes written: {stats.compaction_bytes_written}")
+print(f"Compaction bytes read: {stats.compaction_bytes_read}")
+print(f"User bytes written: {stats.user_bytes_written}")
+print(f"Flush count: {stats.flush_count}, Compaction count: {stats.compaction_count}")
+if stats.user_bytes_written > 0:
+    cf_wa = (
+        stats.wal_bytes_written
+        + stats.flush_bytes_written
+        + stats.compaction_bytes_written
+    ) / stats.user_bytes_written
+    print(f"CF write amplification: {cf_wa:.2f}x")
 
 db.rename_column_family("my_cf", "new_cf")
 
@@ -491,6 +543,26 @@ db.purge()
 `flush_memtable()` and `compact()` are non-blocking - they enqueue work and return immediately. `cf.purge()` and `db.purge()` are synchronous - they block until all work is complete. Use purge when you need a guarantee that all data is on disk and compacted before proceeding.
 :::
 
+### Fast Shutdown
+
+`cancel_background_work()` cancels background compaction database-wide so a subsequent `close()` returns quickly. It is intended to be called right before `close()` on databases carrying a heavy compaction backlog.
+
+```python
+db.cancel_background_work()
+db.close()
+```
+
+**Behavior**
+- In-flight merges bail out safely — their uncommitted output is discarded and the inputs are left intact, so **no data is lost**
+- Queued compaction tasks are skipped
+- Flushes are **unaffected**, so durability is preserved
+- The call blocks (bounded) until compaction is idle
+- The cancellation is sticky for the session and is reset on the next `open()`
+
+:::tip[finish_compactions_on_close vs cancel_background_work]
+These are two ends of the same dial. `finish_compactions_on_close=True` makes `close()` wait for in-flight compactions to *finish*; `cancel_background_work()` does the opposite, actively *cancelling* them for the fastest possible shutdown. Use the latter when shutdown latency matters more than leaving the tree maximally compacted.
+:::
+
 ### Database-Level Statistics
 
 Get aggregate statistics across the entire database instance.
@@ -561,6 +633,28 @@ if db_stats.object_store_enabled:
 | `total_uploads` | `int` | Total successful uploads |
 | `total_upload_failures` | `int` | Total failed uploads |
 | `replica_mode` | `bool` | Whether the database is in replica mode |
+| `uwal_bytes_written` | `int` | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
+| `wal_bytes_written` | `int` | Per-CF WAL bytes summed across all column families |
+| `flush_bytes_written` | `int` | Flush output bytes summed across all column families |
+| `compaction_bytes_written` | `int` | Compaction output bytes summed across all column families |
+| `compaction_bytes_read` | `int` | Compaction input bytes summed across all column families |
+| `user_bytes_written` | `int` | Logical committed key+value bytes summed across all column families |
+| `flush_count` | `int` | Flushed SSTables summed across all column families |
+| `compaction_count` | `int` | Compaction output SSTables summed across all column families |
+
+The trailing fields are **write-amplification counters** (lifetime since open, on-disk framed bytes). Database-wide write amplification is `(uwal_bytes_written + wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`.
+
+```python
+db_stats = db.get_db_stats()
+if db_stats.user_bytes_written > 0:
+    wa = (
+        db_stats.uwal_bytes_written
+        + db_stats.wal_bytes_written
+        + db_stats.flush_bytes_written
+        + db_stats.compaction_bytes_written
+    ) / db_stats.user_bytes_written
+    print(f"Write amplification: {wa:.2f}x")
+```
 
 :::note[Stack Allocated]
 Unlike `get_stats()` (which returns a heap-allocated struct), `get_db_stats()` fills a caller-provided struct. No manual free is needed - the Python binding handles this automatically.
@@ -787,6 +881,23 @@ config.compression_algorithm = tidesdb.CompressionAlgorithm.SNAPPY_COMPRESSION
 config.compression_algorithm = tidesdb.CompressionAlgorithm.LZ4_COMPRESSION
 config.compression_algorithm = tidesdb.CompressionAlgorithm.LZ4_FAST_COMPRESSION
 config.compression_algorithm = tidesdb.CompressionAlgorithm.ZSTD_COMPRESSION
+```
+
+Each backend except `NO_COMPRESSION` is an optional build-time feature. Use `compression_available()` to check whether a given algorithm is compiled into the linked library **before** assigning it, rather than discovering an unsupported codec at flush time:
+
+```python
+import tidesdb
+
+# NO_COMPRESSION is always available; the rest depend on how the library was built
+algo = tidesdb.CompressionAlgorithm.ZSTD_COMPRESSION
+if tidesdb.compression_available(algo):
+    config.compression_algorithm = algo
+else:
+    config.compression_algorithm = tidesdb.CompressionAlgorithm.LZ4_COMPRESSION
+
+# Report what this build supports
+for a in tidesdb.CompressionAlgorithm:
+    print(a.name, tidesdb.compression_available(a))
 ```
 
 ### Sync Modes
@@ -1032,6 +1143,54 @@ config = tidesdb.Config(
 db = tidesdb.TidesDB(config)
 ```
 
+#### S3-Compatible Connector
+
+For production use, connect to AWS S3, MinIO, or any S3-compatible service. `objstore_s3_create()` covers the common case; `objstore_s3_create_config()` additionally exposes TLS and multipart tuning.
+
+```python
+import tidesdb
+
+# Common case (AWS S3)
+store = tidesdb.objstore_s3_create(
+    endpoint="s3.amazonaws.com",
+    bucket="my-tidesdb-bucket",
+    access_key="AKIA...",
+    secret_key="...",
+    prefix="production/db1/",   # optional key prefix
+    region="us-east-1",
+    use_ssl=True,
+    use_path_style=False,       # virtual-hosted style for AWS
+)
+
+# MinIO (path-style URLs, no region)
+store = tidesdb.objstore_s3_create(
+    endpoint="minio.local:9000",
+    bucket="testbucket",
+    access_key="minioadmin",
+    secret_key="minioadmin",
+    use_path_style=True,
+)
+
+# Full configuration with TLS + multipart tuning
+store = tidesdb.objstore_s3_create_config(
+    endpoint="s3.amazonaws.com",
+    bucket="my-tidesdb-bucket",
+    access_key="AKIA...",
+    secret_key="...",
+    region="us-east-1",
+    tls_ca_path="/etc/ssl/certs/custom-ca.pem",  # None = system bundle
+    tls_insecure_skip_verify=False,              # True disables TLS verify (test only, insecure)
+    multipart_threshold=64 * 1024 * 1024,        # 0 = library default
+    multipart_part_size=8 * 1024 * 1024,         # 0 = library default
+)
+
+db = tidesdb.TidesDB.open("./mydb", object_store=store)
+```
+
+:::caution[S3 is a build-time feature]
+The S3 connector is only available when the TidesDB library is compiled with `-DTIDESDB_WITH_S3=ON`. On a build without it, `objstore_s3_create()` / `objstore_s3_create_config()` raise a `TidesDBError` explaining that S3 support is missing — they never crash the import. The filesystem connector (`objstore_fs_create()`) is always available.
+:::
+
 #### Object Store Configuration
 
 Use `objstore_default_config()` for sensible defaults, then override fields as needed.
@@ -1146,3 +1305,37 @@ except tidesdb.TidesDBError as e:
     print(f"Error: {e}")
     print(f"Error code: {e.code}")
 ```
+
+Every error code is exported as a module-level constant, so failures can be handled by comparing `e.code`:
+
+```python
+try:
+    txn.commit()
+except tidesdb.TidesDBError as e:
+    if e.code == tidesdb.TDB_ERR_CONFLICT:
+        # retry the transaction
+        ...
+    elif e.code == tidesdb.TDB_ERR_BUSY:
+        # resource temporarily busy, back off and retry
+        ...
+    else:
+        raise
+```
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `TDB_SUCCESS` | `0` | Operation succeeded |
+| `TDB_ERR_MEMORY` | `-1` | Memory allocation failed |
+| `TDB_ERR_INVALID_ARGS` | `-2` | Invalid arguments |
+| `TDB_ERR_NOT_FOUND` | `-3` | Key or resource not found |
+| `TDB_ERR_IO` | `-4` | I/O error |
+| `TDB_ERR_CORRUPTION` | `-5` | Data corruption detected |
+| `TDB_ERR_EXISTS` | `-6` | Resource already exists |
+| `TDB_ERR_CONFLICT` | `-7` | Transaction conflict |
+| `TDB_ERR_TOO_LARGE` | `-8` | Key or value too large |
+| `TDB_ERR_MEMORY_LIMIT` | `-9` | Memory limit exceeded |
+| `TDB_ERR_INVALID_DB` | `-10` | Invalid database handle |
+| `TDB_ERR_UNKNOWN` | `-11` | Unknown error |
+| `TDB_ERR_LOCKED` | `-12` | Database or resource is locked |
+| `TDB_ERR_READONLY` | `-13` | Database is read-only (e.g. replica mode) |
+| `TDB_ERR_BUSY` | `-14` | Resource is busy |
