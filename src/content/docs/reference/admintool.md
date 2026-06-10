@@ -542,7 +542,7 @@ For unified WAL files (created when using `--unified` mode), each entry is prefi
 
 **Example (per-CF WAL)**
 ```
-admintool(./mydb)> wal-dump ./mydb/users/wal_000001.log 5
+admintool(./mydb)> wal-dump ./mydb/users/wal_1.log 5
 WAL Entries (limit: 5):
 1) [PUT] seq=1 key="user:1" value="John Doe"
 2) [PUT] [TTL:1711584000] seq=2 key="sess:abc" value="token123"
@@ -553,7 +553,7 @@ WAL Entries (limit: 5):
 
 **Example (unified WAL)**
 ```
-admintool(./mydb)> wal-dump ./mydb/uwal_000001.log 5
+admintool(./mydb)> wal-dump ./mydb/uwal_0.log 5
 WAL Entries (limit: 5):
 1) [CF:0] [PUT] seq=10 key="user:1" value="Alice"
 2) [CF:1] [PUT] seq=10 key="order:1" value="item_A"
@@ -570,8 +570,8 @@ wal-verify <wal_path>
 
 **Example**
 ```
-admintool(./mydb)> wal-verify ./mydb/users/wal_000001.log
-Verifying WAL: ./mydb/users/wal_000001.log
+admintool(./mydb)> wal-verify ./mydb/users/wal_1.log
+Verifying WAL: ./mydb/users/wal_1.log
   File Size: 4096 bytes
   Format: Per-CF WAL
   Valid Entries: 42
