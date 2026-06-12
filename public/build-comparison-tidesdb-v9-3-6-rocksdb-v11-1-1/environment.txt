@@ -1,0 +1,16 @@
+Build-time benchmark environment
+date            : 2026-06-12 01:12:27 UTC
+host kernel     : Linux 6.2.0-39-generic x86_64
+cpu cores       : 16
+memory          : 46Gi
+cmake           : cmake version 3.25.1
+generator       : Ninja
+ninja           : 1.11.1
+cc              : cc (Ubuntu 12.3.0-1ubuntu1~23.04) 12.3.0
+cxx             : c++ (Ubuntu 12.3.0-1ubuntu1~23.04) 12.3.0
+build type      : Release
+parallel jobs   : 16
+runs (median)   : 3
+tidesdb tag     : v9.3.6
+rocksdb tag     : v11.1.1
+scope           : core static library target only (tidesdb / rocksdb)

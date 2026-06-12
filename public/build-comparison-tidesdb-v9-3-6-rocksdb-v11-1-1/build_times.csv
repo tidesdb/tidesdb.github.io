@@ -1,0 +1,7 @@
+project,run,seconds
+tidesdb,1,5.387
+tidesdb,2,5.429
+tidesdb,3,5.425
+rocksdb,1,132.374
+rocksdb,2,134.515
+rocksdb,3,134.838
