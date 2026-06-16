@@ -175,7 +175,7 @@ So how does this map to InnoDB, you may ask? If you've tuned InnoDB before, most
 | Read cache | `tidesdb_block_cache_size` | 256M | `innodb_buffer_pool_size` | 128M |
 | Global memory ceiling | `tidesdb_max_memory_usage` | 0 (75% RAM) | *(no single equivalent)* | — |
 | Commit durability | `tidesdb_unified_memtable_sync_mode` | FULL | `innodb_flush_log_at_trx_commit` | 1 |
-| Flush timer (INVERVAL mode only) | `tidesdb_default_sync_interval_us` | 128000 (µs) | `innodb_flush_log_at_timeout` | 1 (s) |
+| Flush timer (INTERVAL mode only) | `tidesdb_default_sync_interval_us` | 128000 (µs) | `innodb_flush_log_at_timeout` | 1 (s) |
 | Write buffer sizing | `tidesdb_unified_memtable_write_buffer_size` | 256M | `innodb_log_file_size` | 96M |
 | Background write workers | `tidesdb_flush_threads` + `tidesdb_compaction_threads` | 4 / 4 | `innodb_write_io_threads` + `innodb_io_capacity` | 4 / 200 |
 | Row-lock wait | `tidesdb_lock_wait_timeout_ms` | 50000 (ms) | `innodb_lock_wait_timeout` | 50 (s) |
