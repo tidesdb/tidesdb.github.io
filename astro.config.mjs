@@ -169,6 +169,11 @@ export default defineConfig({
 					items: [
 						{
 				
+							label: 'Configuring TideSQL in MariaDB',
+							link: 'articles/configuring-tidesql-in-mariadb'
+						},
+						{
+				
 							label: 'Build Comparison TidesDB v9.3.6 & RocksDB v11.1.1',
 							link: 'articles/build-comparison-tidesdb-v9-3-6-rocksdb-v11-1-1'
 						},
