@@ -192,7 +192,7 @@ Durability is one knob, not a checkpoint dance.  With the unified memtable on (t
 
 Background work is explicit.  InnoDB hides flushing behind `innodb_io_capacity` and a pool of IO threads, and you tune the *rate*.  TideSQL hands you the worker counts directly, `tidesdb_flush_threads` to drain l0 into l1, and `tidesdb_compaction_threads` to merge levels.  On a write-heavy box you give compaction more threads; flush at `0` auto sizes to `min(cpu, 4)`.
 
-Watch the lock-wait units.  Both default to a 50 second wait, but `tidesdb_lock_wait_timeout_ms` is in milliseconds and `innodb_lock_wait_timeout` is in seconds.  `50000` and `50` are the same wait.
+Watch the lock-wait units in pessimistic mode.  Both default to a 50 second wait, but `tidesdb_lock_wait_timeout_ms` is in milliseconds and `innodb_lock_wait_timeout` is in seconds.  `50000` and `50` are the same wait.
 
 ---
 
