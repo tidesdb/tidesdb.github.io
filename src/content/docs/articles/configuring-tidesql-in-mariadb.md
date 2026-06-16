@@ -1,6 +1,6 @@
 ---
 title: "Configuring TideSQL in MariaDB"
-description: "An article on configuring TideSQL, the TidesDB storage engine in MariaDB."
+description: "Configure the TidesDB storage engine (TideSQL) in MariaDB, from sync modes and memory to compaction and per-table options, with side-by-side InnoDB comparisons."
 head:
   - tag: meta
     attrs:
