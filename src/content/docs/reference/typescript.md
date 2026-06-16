@@ -698,6 +698,29 @@ if (cf.isCompacting()) {
 - Maintenance windows · Check if operations are running before triggering manual compaction
 - Monitoring · Track background operation status for observability
 
+### Purge (Force Flush + Compaction)
+
+Purge forces a full flush of the active memtable followed by aggressive compaction, blocking until all flush and compaction I/O has drained. Use it to reclaim space and collapse the LSM tree on demand -- for example before a backup, or after a large batch of deletes -- rather than waiting for background thresholds.
+
+Purge a single column family:
+
+```typescript
+const cf = db.getColumnFamily('my_cf');
+
+cf.purgeColumnFamily();   // flush + aggressive compaction for this CF, waits for I/O to finish
+```
+
+Purge every column family in the database:
+
+```typescript
+db.purge();               // flush + aggressive compaction across all CFs, waits for queues to drain
+```
+
+**Behavior**
+- Synchronous; blocks until all flush and compaction work has completed
+- `cf.purgeColumnFamily()` operates on one column family; `db.purge()` applies to all of them
+- Throws `TidesDBError` on failure (`db.purge()` reports the first non-zero error code encountered)
+
 ### Updating Runtime Configuration
 
 Update runtime-safe configuration settings. Changes apply to new operations only.
@@ -1220,9 +1243,77 @@ if (stats.objectStoreEnabled) {
 }
 ```
 
-:::note[S3/MinIO Connector]
-The filesystem connector is always available. For S3/MinIO support, TidesDB must be built with `-DTIDESDB_WITH_S3=ON`. The S3 connector is not exposed through the TypeScript binding -- use the C API directly for S3 configuration.
+#### S3 / MinIO Connector
+
+The S3-compatible connector (AWS S3, MinIO, and any S3 API-compatible store) is exposed through the TypeScript binding via the `objectStoreS3Config` option on `TidesDB.open()`. Provide an `S3Config` instead of `objectStoreFsPath`; the `objectStoreConfig` behavior options (cache sizing, WAL replication, replica mode, etc.) apply identically to both connectors.
+
+```typescript
+import { TidesDB } from 'tidesdb';
+
+const db = TidesDB.open({
+  dbPath: './mydb',
+  objectStoreS3Config: {
+    endpoint: 's3.amazonaws.com',
+    bucket: 'my-tidesdb-bucket',
+    prefix: 'production/db1/',
+    accessKey: process.env.AWS_ACCESS_KEY_ID!,
+    secretKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    region: 'us-east-1',
+    useSsl: true,
+  },
+  objectStoreConfig: {
+    localCacheMaxBytes: 512 * 1024 * 1024,  // 512MB local cache
+    maxConcurrentUploads: 8,
+  },
+});
+
+db.close();
+```
+
+For MinIO (or any self-hosted S3 gateway), use path-style URLs and the gateway endpoint:
+
+```typescript
+const db = TidesDB.open({
+  dbPath: './mydb',
+  objectStoreS3Config: {
+    endpoint: 'minio.local:9000',
+    bucket: 'tidesdb',
+    accessKey: 'minioadmin',
+    secretKey: 'minioadmin',
+    useSsl: false,
+    usePathStyle: true,   // required for MinIO
+  },
+});
+```
+
+##### `S3Config` Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `endpoint` | `string` | *(required)* | S3 endpoint (e.g. `"s3.amazonaws.com"` or `"minio.local:9000"`) |
+| `bucket` | `string` | *(required)* | Bucket name |
+| `accessKey` | `string` | *(required)* | AWS access key ID |
+| `secretKey` | `string` | *(required)* | AWS secret access key |
+| `prefix` | `string \| null` | `null` | Key prefix (e.g. `"production/db1/"`) |
+| `region` | `string \| null` | `null` | AWS region (e.g. `"us-east-1"`); `null` for MinIO |
+| `useSsl` | `boolean` | `true` | Use HTTPS |
+| `usePathStyle` | `boolean` | `false` | Use path-style URLs (required for MinIO); `false` = virtual-hosted (AWS) |
+| `tlsCaPath` | `string \| null` | `null` (system bundle) | Custom CA bundle file path |
+| `tlsInsecureSkipVerify` | `boolean` | `false` | Disable TLS peer + host verification (test only, insecure) |
+| `multipartThreshold` | `number` | `0` (library default) | Object size at/above which multipart upload is used |
+| `multipartPartSize` | `number` | `0` (library default) | Multipart chunk size in bytes |
+
+:::note[S3 build requirement]
+The filesystem connector is always available. The S3 connector requires a `libtidesdb` built with `-DTIDESDB_WITH_S3=ON`. On a library built without S3 support, passing `objectStoreS3Config` throws a `TidesDBError` explaining that the S3 connector is unavailable; rebuild with `TIDESDB_WITH_S3` to enable it.
 :::
+
+The `ObjStoreBackend` enum identifies which connector a database reports:
+
+| Member | Value | Backend |
+|--------|-------|---------|
+| `ObjStoreBackend.Fs` | `0` | Filesystem connector |
+| `ObjStoreBackend.S3` | `1` | S3-compatible connector |
+| `ObjStoreBackend.Unknown` | `99` | Unknown / not set |
 
 ### Promote Replica to Primary
 
@@ -1596,6 +1687,12 @@ db.createColumnFamily('sorted_cf', {
 });
 ```
 
+`registerComparator(name, ctxStr?)` accepts an optional second argument, a context string passed through to the comparator's context (default `""`). Use it to parameterize a comparator (for example, a collation locale) without a separate registration call:
+
+```typescript
+db.registerComparator('locale_aware', 'en_US');
+```
+
 ### Retrieving a Registered Comparator
 
 Use `getComparator` to check whether a comparator is registered:
@@ -1646,6 +1743,8 @@ import {
   // Configuration interfaces
   Config,
   ColumnFamilyConfig,
+  ObjectStoreConfig,
+  S3Config,
   Stats,
   DbStats,
   CacheStats,
