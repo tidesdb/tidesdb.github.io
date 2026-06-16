@@ -175,7 +175,7 @@ So how does this map to InnoDB, you may ask? If you've tuned InnoDB before, most
 | Read cache | `tidesdb_block_cache_size` | 256M | `innodb_buffer_pool_size` | 128M |
 | Global memory ceiling | `tidesdb_max_memory_usage` | 0 (75% RAM) | *(no single equivalent)* | — |
 | Commit durability | `tidesdb_unified_memtable_sync_mode` | FULL | `innodb_flush_log_at_trx_commit` | 1 |
-| Flush timer (interval mode) | `tidesdb_default_sync_interval_us` | 128000 (µs) | `innodb_flush_log_at_timeout` | 1 (s) |
+| Flush timer (INVERVAL mode only) | `tidesdb_default_sync_interval_us` | 128000 (µs) | `innodb_flush_log_at_timeout` | 1 (s) |
 | Write buffer sizing | `tidesdb_unified_memtable_write_buffer_size` | 256M | `innodb_log_file_size` | 96M |
 | Background write workers | `tidesdb_flush_threads` + `tidesdb_compaction_threads` | 4 / 4 | `innodb_write_io_threads` + `innodb_io_capacity` | 4 / 200 |
 | Row-lock wait | `tidesdb_lock_wait_timeout_ms` | 50000 (ms) | `innodb_lock_wait_timeout` | 50 (s) |
@@ -192,7 +192,7 @@ Durability is one knob, not a checkpoint dance.  With the unified memtable on (t
 
 Background work is explicit.  InnoDB hides flushing behind `innodb_io_capacity` and a pool of IO threads, and you tune the *rate*.  TideSQL hands you the worker counts directly, `tidesdb_flush_threads` to drain l0 into l1, and `tidesdb_compaction_threads` to merge levels.  On a write-heavy box you give compaction more threads; flush at `0` auto sizes to `min(cpu, 4)`.
 
-Watch the lock-wait units.  Both default to a 50 second wait, but `tidesdb_lock_wait_timeout_ms` is in milliseconds and `innodb_lock_wait_timeout` is in seconds.  `50000` and `50` are the same wait.
+Watch the lock-wait units in pessimistic mode.  Both default to a 50 second wait, but `tidesdb_lock_wait_timeout_ms` is in milliseconds and `innodb_lock_wait_timeout` is in seconds.  `50000` and `50` are the same wait.
 
 ---
 
