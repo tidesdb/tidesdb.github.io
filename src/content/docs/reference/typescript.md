@@ -24,7 +24,7 @@ npm install git+https://github.com/tidesdb/tidesdb-node.git
 ```
 
 ```bash
-npm i @tidesdb/tidesdb
+npm i tidesdb
 ```
 
 Or clone and install locally:
