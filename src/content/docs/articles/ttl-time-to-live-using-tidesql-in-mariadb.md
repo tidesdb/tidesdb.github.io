@@ -1,5 +1,5 @@
 ---
-title: "TTL (Time to live) using TideSQL In MariaDB"
+title: "TTL (Time to live) using TideSQL in MariaDB"
 description: "TTL, what is it? how to use it, in MariaDB using TidesDB's TideSQL plugin engine."
 head:
   - tag: meta
