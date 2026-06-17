@@ -169,7 +169,7 @@ export default defineConfig({
 					items: [
 						{
 				
-							label: 'TTL (Time to live) In MariaDB',
+							label: 'TTL (Time to live) using TideSQL in MariaDB',
 							link: 'articles/ttl-time-to-live-using-tidesql-in-mariadb'
 						},
 						{
