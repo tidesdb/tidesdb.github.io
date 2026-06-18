@@ -76,7 +76,7 @@ npm install tidesdb
 ### Opening and Closing a Database
 
 ```typescript
-import { TidesDB, LogLevel } from 'tidesdb';
+import { TidesDB, LogLevel, SyncMode } from 'tidesdb';
 
 const db = TidesDB.open({
   dbPath: './mydb',
@@ -97,6 +97,7 @@ const db = TidesDB.open({
   maxConcurrentFlushes: 0,                // Cap on in-flight memtable flushes across all CFs (0 = library default)
   finishCompactionsOnClose: false,        // false = fast shutdown (cancel in-flight compactions); true = let them finish
   objectStoreFsPath: '/path/to/store',    // Enable object store mode (FS connector)
+  objectStoreS3Config: { ... },           // Alternative connector: S3-compatible store (see Object Store Mode)
   objectStoreConfig: { ... },             // Object store behavior config (optional)
 });
 
@@ -204,6 +205,42 @@ db.renameColumnFamily('old_name', 'new_name');
 
 db.cloneColumnFamily('source_cf', 'cloned_cf');
 ```
+
+#### Column Family Configuration Reference
+
+Every field on `ColumnFamilyConfig` is optional; omitted fields inherit the library default returned by `defaultColumnFamilyConfig()`. The example above sets only a common subset.
+
+| Field | Type | Description |
+|---|---|---|
+| `writeBufferSize` | `number` | Memtable size in bytes that triggers a flush |
+| `levelSizeRatio` | `number` | Size ratio between adjacent LSM levels |
+| `minLevels` | `number` | Minimum number of LSM levels |
+| `dividingLevelOffset` | `number` | Offset for the dividing level |
+| `klogValueThreshold` | `number` | Value size at/above which values are separated into the vlog |
+| `compressionAlgorithm` | `CompressionAlgorithm` | Compression backend for this CF's SSTables |
+| `enableBloomFilter` | `boolean` | Enable bloom filters on SSTables |
+| `bloomFpr` | `number` | Bloom filter target false-positive rate |
+| `enableBlockIndexes` | `boolean` | Enable per-block indexes |
+| `indexSampleRatio` | `number` | Sample 1 in N keys when building sparse indexes |
+| `blockIndexPrefixLen` | `number` | Block index key prefix length |
+| `syncMode` | `SyncMode` | WAL durability mode |
+| `syncIntervalUs` | `number` | Sync interval in microseconds (used by `SyncMode.Interval`) |
+| `comparatorName` | `string` | Key comparator name (built-in or registered) |
+| `skipListMaxLevel` | `number` | Skip list max level for new memtables |
+| `skipListProbability` | `number` | Skip list level probability for new memtables |
+| `defaultIsolationLevel` | `IsolationLevel` | Default isolation level for transactions on this CF |
+| `minDiskSpace` | `number` | Minimum free disk space required, in bytes |
+| `l1FileCountTrigger` | `number` | L1 file count that triggers compaction |
+| `l0QueueStallThreshold` | `number` | L0 queue depth that applies write backpressure |
+| `tombstoneDensityTrigger` | `number` | Per-SSTable tombstone density above which compaction escalates (`[0.0, 1.0]`, `0.0` = disabled) |
+| `tombstoneDensityMinEntries` | `number` | Minimum entry count for an SSTable to be considered by the density trigger (default `1024`) |
+| `useBtree` | `boolean` | Use B+tree klog format instead of block-based (default `false`); cannot be changed after creation |
+| `objectLazyCompaction` | `boolean` | Compact less aggressively in object store mode (default `false`) |
+| `objectPrefetchCompaction` | `boolean` | Download all inputs before a compaction merge in object store mode (default `true`) |
+
+:::note[Immutable fields]
+Several fields cannot be changed once a column family exists -- see [Updating Runtime Configuration](#updating-runtime-configuration) for the exact updatable/non-updatable split.
+:::
 
 ### CRUD Operations
 
