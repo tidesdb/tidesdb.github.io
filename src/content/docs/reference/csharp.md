@@ -179,6 +179,19 @@ db.PromoteToPrimary();
 // Now writes are accepted
 ```
 
+When the object store enforces conditional writes, promotion acquires the primary lease by advancing its epoch with a compare-and-swap. If another node already holds the lease the call is refused with `ErrorCode.Precondition` (the node stays a working replica for an orchestrator to retry); it throws `ErrorCode.InvalidArgs` if the node is already a primary. The active lease epoch is observable through `DbStats.PrimaryEpoch` (held by this node) and `DbStats.SeenEpoch` (highest observed).
+
+```csharp
+try
+{
+    db.PromoteToPrimary();
+}
+catch (TidesDBException ex) when (ex.ErrorCode == ErrorCode.Precondition)
+{
+    // Another node won the promotion race; remain a replica and let the orchestrator retry.
+}
+```
+
 **Object Store Configuration Options**
 
 | Property | Type | Default | Description |
@@ -975,8 +988,9 @@ catch (TidesDBException ex)
 - `TDB_ERR_LOCKED` (-12) · Database is locked
 - `TDB_ERR_READONLY` (-13) · Database is read-only
 - `TDB_ERR_BUSY` (-14) · Resource busy
+- `TDB_ERR_PRECONDITION` (-15) · A conditional object-store write failed its precondition (HTTP 412). Raised by single-writer fencing — e.g. `PromoteToPrimary` when another node already holds the primary lease
 
-These map to the `ErrorCode` enum (`ErrorCode.Locked`, `ErrorCode.Readonly`, `ErrorCode.Busy`, …) exposed on `TidesDBException.ErrorCode`.
+These map to the `ErrorCode` enum (`ErrorCode.Locked`, `ErrorCode.Readonly`, `ErrorCode.Busy`, `ErrorCode.Precondition`, …) exposed on `TidesDBException.ErrorCode`.
 
 ## Complete Example
 
@@ -1237,7 +1251,12 @@ Console.WriteLine($"Unified is flushing: {dbStats.UnifiedIsFlushing}");
 
 // Object store stats (when enabled)
 Console.WriteLine($"Object store enabled: {dbStats.ObjectStoreEnabled}");
+Console.WriteLine($"Object store connector: {dbStats.ObjectStoreConnector}");
 Console.WriteLine($"Replica mode: {dbStats.ReplicaMode}");
+
+// Single-writer fencing (object store mode)
+Console.WriteLine($"Primary epoch (held): {dbStats.PrimaryEpoch}");
+Console.WriteLine($"Seen epoch (highest observed): {dbStats.SeenEpoch}");
 ```
 
 :::note[Stack Allocated]
@@ -1632,6 +1651,8 @@ Per-CF write amplification = (`WalBytesWritten` + `FlushBytesWritten` + `Compact
 | `TotalUploads` | ulong | Lifetime count of objects uploaded to object store |
 | `TotalUploadFailures` | ulong | Lifetime count of permanently failed uploads |
 | `ReplicaMode` | bool | Whether running in read-only replica mode |
+| `PrimaryEpoch` | ulong | Single-writer fencing (object store mode): the lease epoch this primary currently holds (0 when not a primary / no lease) |
+| `SeenEpoch` | ulong | Single-writer fencing (object store mode): the highest lease epoch this node has observed in the store |
 | `UwalBytesWritten` | ulong | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
 | `WalBytesWritten` | ulong | Per-CF WAL bytes summed across all column families |
 | `FlushBytesWritten` | ulong | Flush output bytes summed across all column families |
