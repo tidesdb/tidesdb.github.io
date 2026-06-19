@@ -76,11 +76,11 @@ The script accepts several options:
 
 | Option | Description |
 |--------|-------------|
-| `--mariadb-prefix <path>` | MariaDB installation directory (default: `/usr/local/mariadb-tidesdb`) |
+| `--mariadb-prefix <path>` | MariaDB installation directory (default: `/usr/local/mariadb`) |
 | `--tidesdb-prefix <path>` | TidesDB library installation directory (default: `/usr/local`) |
 | `--mariadb-version <tag>` | MariaDB version/branch to build (i.e: `mariadb-11.4.5`) |
 | `--tidesdb-version <tag>` | TidesDB library version/tag (i.e: `v8.9.2`) |
-| `--build-dir <path>` | Build directory (default: `./build`) |
+| `--build-dir <path>` | Build directory (default: `/tmp/tidesql-build`) |
 | `--jobs <n>` | Parallel build jobs (default: number of CPU cores) |
 | `--skip-deps` | Skip system dependency installation |
 | `--skip-tidesdb` | Skip building the TidesDB library (use if already installed) |
@@ -88,7 +88,7 @@ The script accepts several options:
 | `--skip-engines <list>` | Comma-separated storage engines to exclude from the build |
 | `--list-engines` | List available storage engines and exit |
 | `--pgo` | Enable profile-guided optimization (longer build, faster binaries) |
-| `--s3` | Build with S3 object store connector (requires libcurl + OpenSSL) |
+| `--s3` | Build with S3 object store connector (requires libcurl) |
 | `--allocator <name>` | Link libtidesdb against `system` (default), `jemalloc`, `mimalloc`, or `tcmalloc` |
 
 For object store mode with S3:
@@ -1223,8 +1223,8 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 
 | Variable | Description |
 |----------|-------------|
-| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.5`) |
-| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263429` = `0x40505`) |
+| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.7`) |
+| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263431` = `0x40507`) |
 | `Tidesdb_library_version` | Underlying TidesDB storage library (`libtidesdb`) version string |
 | `Tidesdb_column_families` | Number of active column families |
 | `Tidesdb_global_sequence` | Global MVCC sequence number |
@@ -1257,7 +1257,9 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 | `Tidesdb_unified_is_flushing` | 1 while a unified-memtable flush is in flight, 0 otherwise |
 | `Tidesdb_unified_wal_generation` | Current unified-WAL generation number; advances each time the active WAL segment rolls over |
 | `Tidesdb_object_store_enabled` | 1 when an object-store backend is configured (S3 or remote), 0 for purely local storage |
-| `Tidesdb_replica_mode_active` | 1 when this instance is running as a read-only object-store replica |
+| `Tidesdb_replica_mode_active` | 1 when this instance is currently a read-only object-store replica. Reflects the runtime role, so it flips back to 1 if a primary is fenced (self-demoted) by a newer one |
+| `Tidesdb_primary_epoch` | Lease epoch this node holds as primary under single-writer fencing. Advances each time a node is promoted; a controller confirms a promotion took by watching this rise |
+| `Tidesdb_seen_epoch` | Highest primary lease epoch this node has observed in the object store. A node whose own epoch is below `Tidesdb_seen_epoch` has been superseded and fences its writes |
 | `Tidesdb_local_cache_bytes` | Bytes currently held in the local object-store cache directory |
 | `Tidesdb_local_cache_files` | Number of files in the local object-store cache |
 | `Tidesdb_upload_queue_depth` | Pending uploads waiting on the object-store uploader threads |
@@ -1281,7 +1283,7 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 | `Tidesdb_lock_entry_recycles` | Number of times a freelisted lock entry was reused for a new key |
 | `Tidesdb_lock_chain_max` | Longest hash-chain length observed at acquire time. Stays low under healthy contention; a creeping value points at a partition imbalance or chain regression |
 
-Values are refreshed every two seconds, aligned with the optimizer statistics refresh cycle. This provides the same monitoring integration that InnoDB offers via `SHOW GLOBAL STATUS LIKE 'innodb%'`.
+Values are refreshed about once a second by a dedicated background thread, so a busy engine flushing and compacting never reads as idle even under a pure-write workload that never plans a query. This provides the same monitoring integration that InnoDB offers via `SHOW GLOBAL STATUS LIKE 'innodb%'`.
 
 
 ## Online Backup
@@ -1362,7 +1364,8 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_unified_memtable_write_buffer_size` | 256 MB | Write buffer size for the unified memtable (0 = library default). Only meaningful when `tidesdb_unified_memtable=ON` |
 | `tidesdb_unified_memtable_sync_mode` | FULL | Sync mode for the unified WAL (NONE, INTERVAL, FULL). Controls durability of all commits when unified memtable is enabled. Per-CF `SYNC_MODE` is ignored in unified mode since per-CF WALs do not exist |
 | `tidesdb_unified_memtable_sync_interval` | 128000 | Sync interval in microseconds for the unified WAL (only used when `unified_memtable_sync_mode=INTERVAL`) |
-| `tidesdb_object_store_backend` | LOCAL | Object store backend (LOCAL disables, S3 enables S3-compatible storage) |
+| `tidesdb_object_store_backend` | LOCAL | Object store backend. `LOCAL` disables object store mode, `S3` uses S3-compatible storage, `FS` uses a shared local filesystem directory as the bucket stand-in (cross-process single-writer safety via `flock`), which lets failover and replication be exercised without S3 |
+| `tidesdb_objstore_fs_path` | (empty) | Shared directory used as the bucket when `tidesdb_object_store_backend=FS`. Every node points at the same path; required for the FS backend and ignored otherwise |
 | `tidesdb_s3_endpoint` | (empty) | S3 endpoint hostname (e.g. s3.amazonaws.com or minio.local:9000) |
 | `tidesdb_s3_bucket` | (empty) | S3 bucket name |
 | `tidesdb_s3_prefix` | (empty) | S3 key prefix for multi-tenant buckets (e.g. production/db1/) |
@@ -1402,7 +1405,7 @@ The engine exposes several system variables that control TidesDB's runtime behav
 | `tidesdb_checkpoint_dir` | (empty) | Set to a path to trigger a hard-link checkpoint (near-instant, same filesystem only); clear with empty string |
 | `tidesdb_print_all_conflicts` | OFF | Log every `TDB_ERR_CONFLICT` event to the error log (similar to `innodb_print_all_deadlocks`). Last conflict info also shown in `SHOW ENGINE TIDESDB STATUS` |
 | `tidesdb_pessimistic_locking` | ON | Plugin-level row lock manager with shared (S) and exclusive (X) modes. ON (default) acquires X on every write-intent statement and S on plain reads under `REPEATABLE-READ` or `SERIALIZABLE`; reads under `READ-COMMITTED` and `SNAPSHOT` take no lock. Multiple S holders coexist; new S requests block while an X is queued so writers cannot be starved. Wait-for-graph deadlock detection up to 100 hops, bounded by `tidesdb_lock_wait_timeout_ms`. Locks can be acquired on non-existing PK values and on unique secondary key prefixes during `INSERT`. Locks are held until `COMMIT` or `ROLLBACK`. OFF reverts to pure optimistic MVCC where write-write conflicts surface at commit time and the application must retry. See [Pessimistic Row Locking](#pessimistic-row-locking) |
-| `tidesdb_promote_primary` | OFF | Set to ON to promote a replica to primary mode. Performs a final MANIFEST sync and WAL replay, creates a local WAL, and starts accepting writes. Resets to OFF after promotion |
+| `tidesdb_promote_primary` | OFF | Set to ON to promote a replica to primary. Claims a new primary lease epoch in the object store, performs a final MANIFEST sync and WAL replay, creates a local WAL, and starts accepting writes. The promotion can legitimately fail under single-writer fencing if another node already holds a newer lease, in which case `SET GLOBAL` returns an error and the node stays a replica, so a failover controller must check the return rather than assume success. Resets to OFF after the attempt |
 
 ### Session Variables
 
@@ -1664,9 +1667,19 @@ When the primary fails, a replica can be promoted to accept writes:
 SET GLOBAL tidesdb_promote_primary = ON;
 ```
 
-This waits for any in-progress replica sync to complete, performs a final MANIFEST sync and WAL replay to catch the last writes from the old primary, creates a local WAL for crash recovery, and starts accepting writes. The promotion is fast because the replica already has metadata in memory from the sync loop.
+This claims a new primary lease epoch in the object store, waits for any in-progress replica sync to complete, performs a final MANIFEST sync and WAL replay to catch the last writes from the old primary, creates a local WAL for crash recovery, establishes the schema column family so its own `CREATE TABLE` statements publish `.frm` images that downstream replicas can discover, and starts accepting writes. The promotion is fast because the replica already has metadata in memory from the sync loop.
+
+Promotion is not guaranteed to succeed. The lease epoch is claimed with a conditional write, so if another node has already promoted and holds a newer epoch, the claim loses the race and `SET GLOBAL tidesdb_promote_primary = ON` returns an error rather than silently becoming a second writer. The node stays a replica. A failover controller must therefore check the statement result (and confirm `Tidesdb_primary_epoch` advanced) instead of assuming the promotion took.
 
 After promotion, tables that were previously opened (and have their `.frm` cached on disk) are accessible immediately. Tables that have not been opened yet will be discovered from the schema CF on first access, provided their data column family has been synced. If a table's schema has been replicated but its data has not arrived yet, the query returns "table not found" rather than blocking.
+
+### Single-Writer Fencing
+
+Object store mode enforces a single writer through a lease epoch rather than relying on the orchestrator to fence a failed primary. Each promotion claims the next epoch with a conditional write against the bucket. A primary only stays authoritative while it holds the current epoch, and every manifest publish carries that epoch as the precondition for its conditional write.
+
+The consequence is that a stale primary cannot corrupt the shared store even if it is still alive and still thinks it is the writer. A primary that was network-partitioned from the bucket, or simply slow, finds on its next publish that the precondition fails because a newer primary has claimed a higher epoch. The library surfaces that as `TDB_ERR_PRECONDITION`, which the engine maps to `HA_ERR_READ_ONLY_TRANSACTION` and uses as the signal to self-demote: the node flips its runtime role back to replica, stops accepting writes, and its `Tidesdb_replica_mode_active` returns to 1. Writes it took locally while superseded never become authoritative because they can never win the conditional write. This is why `Tidesdb_replica_mode_active` tracks the runtime role and not just the startup setting, and why the safety of a failover does not depend on the controller killing the old primary in time.
+
+The two epoch status variables make this observable. `Tidesdb_primary_epoch` is the epoch a node holds; `Tidesdb_seen_epoch` is the highest epoch it has observed in the store. A node whose `Tidesdb_primary_epoch` is below the `Tidesdb_seen_epoch` published by another node has been superseded.
 
 ### WAL Sync Options
 
@@ -1690,34 +1703,37 @@ Connector: s3
 Total uploads: 1234
 Upload failures: 0
 Upload queue depth: 2
+Last uploaded generation: 87
 Local cache: 234567890 / 536870912 bytes (45 files)
 Replica mode: OFF
 ```
 
+The block reports the connector, lifetime upload counters, the pending upload queue depth, the highest unified-WAL generation the object store has acknowledged, and the local cache footprint against its cap. The node's primary/replica role and lease epoch are not printed here; they are exposed as the `Tidesdb_replica_mode_active`, `Tidesdb_primary_epoch`, and `Tidesdb_seen_epoch` status variables so a controller can poll them directly.
+
 ### Kubernetes Deployment
 
-The `k8s/` directory contains example manifests for deploying TidesQL with object store mode:
+The `k8s/production/` directory contains a production-oriented HA deployment, `tidesql-ha.yaml`, built around a single identical pool of pods rather than a separate primary and replica topology. There is no primary StatefulSet, replica Deployment, or external failover controller to keep in sync, the deployment is one `StatefulSet` of N identical pods that all boot read-only (`tidesdb_replica_mode=ON`), and exactly one of them is elected the writer at any moment.
 
-- `primary.yaml` - StatefulSet for the primary MariaDB with S3 configuration
-- `replica.yaml` - Deployment for read replicas with replica mode
-- `failover-controller.yaml` - Automated failover controller that health-checks the primary and promotes a replica when unresponsive
+Election runs inside each pod. A small agent sidecar competes for a Kubernetes `Lease` object (`tidesql-primary`) using optimistic concurrency, it reads the lease, then `kubectl replace`s it carrying the observed `resourceVersion`, so a stale write loses with a 409 and two pods can never both win. The pod that wins the lease promotes its local engine with `SET GLOBAL tidesdb_promote_primary = ON` and labels itself `role=primary`. Two Services route on that label, `tidesql-write` selects the `role=primary` pod and `tidesql-read` selects any pod. When the primary dies its lease expires, another pod wins and promotes, and the failed pod boots as a replica when Kubernetes reschedules it (it no longer holds the lease) and re-syncs from the object store. The topology self-heals without an operator in the loop.
 
-The failover controller runs as a separate pod, checks the primary every few seconds, and after consecutive failures promotes a replica via `SET GLOBAL tidesdb_promote_primary = ON`.
+What makes this safe is not the election but the engine's single-writer fence underneath it. Promotion claims a new lease epoch in the object store with a conditional write, and from that point a superseded primary's manifest publish fails its precondition and self-demotes, so its writes can never become authoritative regardless of how the Kubernetes lease resolves or how quickly the old pod is killed (see Single-Writer Fencing above). The lease is only responsible for availability and routing, the epoch fence is responsible for correctness, which is why the election layer does not have to be a perfect leader election to be safe. The same promote, zombie, and network-partition fencing is exercised end to end by the SQL-level failover suite under `test/ha_replication/`.
 
-Because MariaDB's default `root` user authenticates via unix socket (localhost only), the failover controller needs a dedicated user with TCP access to run the promotion command from a separate pod:
+The agent and any operator drive entirely off the engine's status variables, a node is primary when `Tidesdb_replica_mode_active = 0` and `Tidesdb_primary_epoch > 0`, a promotion took when `Tidesdb_primary_epoch` advances and `SET GLOBAL tidesdb_promote_primary = ON` returns no error, and a node was fenced when `Tidesdb_replica_mode_active` flips back to 1.
 
-```sql
-CREATE USER 'monitor'@'%' IDENTIFIED BY '<strong-password>';
-GRANT ALL PRIVILEGES ON *.* TO 'monitor'@'%' WITH GRANT OPTION;
+Getting going is a single apply:
+
+```bash
+kubectl apply -f k8s/production/tidesql-ha.yaml
+kubectl -n tidesql get pods -L role -w        # watch one pod become role=primary
 ```
 
-This user must be created on both the primary and every replica. If MariaDB's `simple_password_check` plugin is active, the password must meet complexity requirements (mixed case, digits, special characters).
+Applications then connect for writes through `tidesql-write.tidesql.svc` and for reads through `tidesql-read.tidesql.svc`. The pods carry no persistent local state worth preserving, a rescheduled pod starts with a fresh data directory, the plugin's schema discovery recreates the database directories at startup from the `__tidesql_schema` column family, and table definitions are materialized on first access, so no manual `CREATE DATABASE` is ever needed on a replica.
 
-Replica pods start with a fresh data directory. The plugin's schema discovery creates database directories at startup from the `__tidesql_schema` column family, and table definitions are materialized on first access. No manual `CREATE DATABASE` commands are needed on replicas.
+A few things to set for your own cluster, covered in `k8s/production/README.md`, fill the `tidesql-s3` secret with real keys (or drop it and use IRSA / workload identity), change `storageClassName: gp3` (AWS EKS-specific) to your platform's class, wire real engine auth in place of the placeholder passwordless-root-over-socket the probes use, decide `tidesdb_objstore_wal_sync_on_commit` (`OFF` for a small RPO and lower commit latency, `ON` for RPO near zero), and tune the lease TTL and the agent's renew interval together (keep renew below half the TTL) to trade failover speed against tolerance for blips. The agent sidecar image needs `kubectl`, `jq`, the `mariadb` client, and GNU `date` (BusyBox `date` cannot parse the RFC3339 lease timestamps), so build it on a glibc/coreutils base.
 
 ### Build Requirement
 
-The S3 connector requires TidesDB to be built with `-DTIDESDB_WITH_S3=ON`, which requires libcurl and OpenSSL. The filesystem connector is always available without additional dependencies and can be used for testing object store mode locally.
+The S3 connector requires TidesDB to be built with `-DTIDESDB_WITH_S3=ON`, which needs libcurl only. TidesDB uses its own internal crypto, so there is no OpenSSL dependency. The filesystem connector is always available without additional dependencies and is selected with `tidesdb_object_store_backend = FS` plus `tidesdb_objstore_fs_path = <shared dir>`. Pointing several nodes at the same directory lets you exercise replication and failover, including the single-writer fence, on one machine without standing up S3.
 
 
 ## Limitations
@@ -1751,7 +1767,7 @@ Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail a
 | 12.3.1          | >= 4.2.6     | ✔     |
 | 13.0.2          | >= 4.5.4     | ✔     |
 
-Current TideSQL release is 4.5.5 (hex `0x40505`).
+Current TideSQL release is 4.5.7 (hex `0x40507`).
 
 *As versions are tested and confirmed working we update this table. Full Support means the system is tested against all known functionality.*
 
