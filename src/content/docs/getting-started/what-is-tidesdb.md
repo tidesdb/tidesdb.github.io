@@ -40,6 +40,7 @@ reads through bloom filters, caching, block indices, and compaction.
 - Ability to clone column families
 - Easy pluggable custom allocator support
 - Object store mode with S3-compatible storage, local file caching, and node-failure recovery
+- Primary/replica replication over the object store · one primary and many read-only replicas share a bucket; replicas poll and lazily fetch, a replica promotes to primary on failure with a catch-up sync, and single-writer fencing (a lease epoch claimed via conditional writes) stops a superseded-but-alive primary from causing split-brain. Optional synchronous WAL upload for RPO=0 failover.
 
 ## Community
 

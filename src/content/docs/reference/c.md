@@ -98,6 +98,7 @@ TidesDB provides detailed error codes for production use.
 | `TDB_ERR_LOCKED` | `-12` | Database is locked by another process |
 | `TDB_ERR_READONLY` | `-13` | Database is in read-only replica mode (writes rejected) |
 | `TDB_ERR_BUSY` | `-14` | System is at capacity; the backpressure stall hit its no-progress budget. Transient -- the caller should retry. Matches POSIX `EBUSY` semantics |
+| `TDB_ERR_PRECONDITION` | `-15` | A conditional object-store write failed its precondition (HTTP 412). Raised by single-writer fencing -- e.g. `tidesdb_promote_to_primary` when another node already holds the primary lease |
 
 **Error categories**
 - `TDB_ERR_CORRUPTION` indicates data integrity issues requiring immediate attention
@@ -200,7 +201,7 @@ tidesdb_config_t config = {
     .log_level = TDB_LOG_INFO,                    /* Log level: TDB_LOG_DEBUG, TDB_LOG_INFO, TDB_LOG_WARN, TDB_LOG_ERROR, TDB_LOG_FATAL, TDB_LOG_NONE */
     .block_cache_size = 64 * 1024 * 1024,         /* 64MB global block cache (default: 64MB) */
     .max_open_sstables = 256,                     /* Max cached SSTable structures (default: 256 on Linux/macOS/most BSDs, 64 on OpenBSD which has lower default fd limits) / 0 for AUTO */
-    .max_memory_usage = 0,                        /* Global memory limit in bytes (default: 0 = auto, 50% of system RAM; minimum: 5% of system RAM) */
+    .max_memory_usage = 0,                        /* Global memory limit in bytes (default: 0 = auto, 75% of system RAM; minimum: 5% of system RAM) */
     .log_to_file = 0,                             /* Write logs to file instead of stderr (default: 0) */
     .log_truncation_at = 24 * (1024*1024),        /* Log file truncation size (default: 24MB), 0 = no truncation */
     .unified_memtable = 0,                        /* Enable unified memtable mode (default: 0 = per-CF memtables) */
@@ -209,6 +210,8 @@ tidesdb_config_t config = {
     .unified_memtable_skip_list_probability = 0,  /* Skip list probability for unified memtable (default: 0 = 0.25) */
     .unified_memtable_sync_mode = 0,              /* Sync mode for unified WAL (default: 0 = TDB_SYNC_NONE) */
     .unified_memtable_sync_interval_us = 0,       /* Sync interval for unified WAL in microseconds (default: 0) */
+    .object_store = NULL,                         /* Object store connector (default: NULL = local disk). Set via tidesdb_objstore_fs_create / tidesdb_objstore_s3_create; see Object Store Mode. Enabling it turns on unified memtable mode automatically */
+    .object_store_config = NULL,                  /* Object store behavior config (default: NULL = defaults from tidesdb_objstore_default_config()) */
     .max_concurrent_flushes = 0,                  /* Pinned 1:1 to num_flush_threads at open. 0 = match the pool size automatically. Any other value is normalized to match num_flush_threads with a TDB_LOG_WARN */
     .finish_compactions_on_close = 0,             /* 0 (default) = cancel in-flight compactions at their next checkpoint for a fast shutdown (lossless; inputs are preserved and the merge is redone later). 1 = let in-flight compactions run to completion before close returns */
 };
@@ -786,6 +789,8 @@ if (tidesdb_get_db_stats(db, &db_stats) == 0)
 | `total_uploads` | `uint64_t` | Cumulative successful uploads since open |
 | `total_upload_failures` | `uint64_t` | Cumulative upload failures since open |
 | `replica_mode` | `int` | 1 if the database is in read-only replica mode |
+| `primary_epoch` | `uint64_t` | Single-writer fencing: the lease epoch this primary currently holds (0 when not a primary / no lease). Advances on a successful promotion |
+| `seen_epoch` | `uint64_t` | Single-writer fencing: the highest lease epoch this replica has observed in the store |
 | `uwal_bytes_written` | `uint64_t` | Framed bytes appended to the shared unified WAL. 0 when unified mode is off |
 | `wal_bytes_written` | `uint64_t` | Per-CF WAL bytes summed across all column families. 0 in unified mode |
 | `flush_bytes_written` | `uint64_t` | Flush output bytes summed across all column families |
@@ -959,7 +964,7 @@ TidesDB supports multiple compression algorithms to reduce storage footprint and
   - Raw data written directly to disk
   - **Use case** · Pre-compressed data, maximum write throughput, CPU-constrained environments
 
-- **`TDB_COMPRESS_LZ4`** · LZ4 standard compression (value: 2, **default**)
+- **`TDB_COMPRESS_LZ4`** · LZ4 standard compression (value: 2; the **effective default** on a standard build -- see note below)
   - Fast compression and decompression with good compression ratios
   - **Use case** · General purpose, balanced performance and compression
   - **Performance** · ~500 MB/s compression, ~2000 MB/s decompression (typical)
@@ -980,12 +985,16 @@ TidesDB supports multiple compression algorithms to reduce storage footprint and
   - **Availability** · Not available on SunOS/Illumos/OmniOS platforms
   - **Use case** · Legacy compatibility, platforms where Snappy is preferred
 
+**Default resolution**
+
+`tidesdb_default_column_family_config()` leaves `compression_algorithm` as `TDB_COMPRESS_NONE`; at open the engine resolves an unset/none value to the best *available* backend -- preferring LZ4, then ZSTD, then Snappy, and falling back to no compression if none was built in. So LZ4 is the effective default on a standard build, but the resolved choice depends on which libraries were compiled in.
+
 **Configuration Example**
 
 ```c
 tidesdb_column_family_config_t cf_config = tidesdb_default_column_family_config();
 
-/* Use LZ4 compression (default) */
+/* Use LZ4 explicitly (also the resolved default on a standard build) */
 cf_config.compression_algorithm = TDB_COMPRESS_LZ4;
 
 /* Use Zstandard for better compression ratio */
@@ -2391,7 +2400,7 @@ tidesdb_txn_free(txn);
 
 ### Constraints
 
-- All column families sharing the unified memtable must use the same comparator (enforced at CF creation)
+- All column families sharing the unified memtable must use the default `memcmp` comparator; a custom comparator is rejected at CF creation with `TDB_ERR_INVALID_ARGS`, because the shared structure has a single sort order
 - The unified skip list always uses `memcmp` as its comparator for the prefixed keys
 - Per-CF backpressure still applies - each CF's L0 queue depth and L1 file count are checked independently at commit time
 
@@ -2563,6 +2572,9 @@ if (stats.object_store_enabled)
     printf("upload queue depth: %" PRIu64 "\n", stats.upload_queue_depth);
     printf("local cache: %zu / %zu bytes\n",
            stats.local_cache_bytes_used, stats.local_cache_bytes_max);
+    /* single-writer fencing: lease epoch held / highest observed */
+    printf("primary epoch: %" PRIu64 "  seen epoch: %" PRIu64 "\n",
+           stats.primary_epoch, stats.seen_epoch);
 }
 ```
 
@@ -2594,7 +2606,7 @@ tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
 - Point lookups on frozen SSTables (not present locally) fetch just the single needed klog block (~64KB) via one HTTP range request using `range_get`, bypassing the full file download. The block is cached in the clock cache so subsequent reads are pure memory hits. If the value is in the vlog, a second range request fetches just that vlog block
 - Iterators prefetch all needed SSTable files in parallel at creation time using bounded threads (`max_concurrent_downloads`, default 8), so sequential reads proceed at local disk speed. Prefetch runs at both initial iterator creation and after seek invalidation
 - A hash-indexed LRU local file cache manages disk usage, evicting least-recently-used SSTable file pairs (klog + vlog together) when `local_cache_max_bytes` is set
-- The MANIFEST is uploaded asynchronously after each flush so cold start recovery can reconstruct the SSTable inventory without blocking the flush worker
+- The MANIFEST is published under the single-writer fence: the primary re-asserts its lease and tags the MANIFEST with the lease epoch before uploading it (synchronously when fencing is active; asynchronously only on a legacy connector without conditional-write support). Cold-start recovery and replicas read the MANIFEST to reconstruct the SSTable inventory
 - During compaction, the MANIFEST is uploaded after the new merged SSTable is committed, before old input SSTables are cleaned up. This ensures replicas and cold-start nodes see the new SSTable before old inputs are removed
 - Compaction prefetches input SSTables in parallel when `object_prefetch_compaction` is enabled (default). Output SSTables are uploaded synchronously after the merge. Old input SSTables are deleted from the object store with retry and exponential backoff when their reference count reaches zero
 - The reaper thread periodically syncs the active WAL to the object store based on write volume (`wal_sync_threshold_bytes`, default 1MB). This reads the WAL's atomic file size lock-free and uploads when the delta since last sync exceeds the threshold, bounding the data loss window to write volume rather than wall clock time
@@ -2657,16 +2669,24 @@ When the primary fails, promote a replica to accept writes.
 
 /* promote this replica */
 int rc = tidesdb_promote_to_primary(db);
-/* rc == TDB_SUCCESS */
-
-/* now writes are accepted */
-tidesdb_txn_t *txn = NULL;
-tidesdb_txn_begin(db, &txn);
-tidesdb_txn_put(txn, cf, key, key_size, val, val_size, 0); /* succeeds */
-tidesdb_txn_commit(txn);
+if (rc == TDB_SUCCESS) {
+    /* now writes are accepted */
+    tidesdb_txn_t *txn = NULL;
+    tidesdb_txn_begin(db, &txn);
+    tidesdb_txn_put(txn, cf, key, key_size, val, val_size, 0); /* succeeds */
+    tidesdb_txn_commit(txn);
+} else if (rc == TDB_ERR_PRECONDITION) {
+    /* another node already holds the primary lease -- stay a replica and retry */
+}
 ```
 
-`tidesdb_promote_to_primary` stops and joins the dedicated replica sync thread, draining any in-progress sync cycle, then performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. Stopping the sync thread first prevents lock contention with the first post-promotion query. The function returns `TDB_ERR_INVALID_ARGS` if the node is already a primary.
+`tidesdb_promote_to_primary` first claims the bucket: it verifies the store enforces conditional writes, then acquires the primary lease by advancing its epoch with a conditional compare-and-swap write. If another node already holds the lease the acquire fails and promotion is **refused with `TDB_ERR_PRECONDITION`**, leaving this node a working replica for an orchestrator to retry (other lease-acquire failures return `TDB_ERR_IO`). Holding the lease, it stops and joins the dedicated replica sync thread (draining any in-progress sync cycle, which also prevents lock contention with the first post-promotion query), runs a final MANIFEST sync and WAL replay — gated on the *outgoing* primary's epoch so that primary's last writes are absorbed rather than skipped as stale — creates a local WAL for crash recovery, and atomically switches to primary mode. It returns `TDB_ERR_INVALID_ARGS` if the node is already a primary.
+
+### Single-Writer Fencing
+
+Only one node may write to a bucket at a time -- two nodes writing one bucket would otherwise produce conflicting manifests, colliding SSTable IDs, and racing deletes. Rather than leaving that invariant to the orchestrator, the engine enforces it at the store. The primary holds a lease object in the bucket whose epoch it advances with a conditional (compare-and-swap) write, and every MANIFEST publish re-asserts the lease before writing. A superseded primary -- one that lost the role but is still alive and can still reach the store -- fails its lease re-assertion with `TDB_ERR_PRECONDITION` and self-demotes to a replica instead of writing. MANIFEST and WAL objects carry the epoch that wrote them, and every reader (replica sync, cold start, WAL replay) ignores any object whose epoch is below the current lease, so even an object a fenced node uploads before it notices is never honored.
+
+The guarantee depends on the object store actually enforcing conditional writes (S3 `If-Match` / `If-None-Match`, or the equivalent on MinIO and GCS). A probe at open checks this; if the backend does not enforce them, fencing is disabled and logged, falling back to the orchestrator-honored single-writer invariant. The current lease epoch is observable through `primary_epoch` (held by this node) and `seen_epoch` (highest observed) on `tidesdb_db_stats_t`.
 
 ### How Replica Sync Works
 
