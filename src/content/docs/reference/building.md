@@ -580,7 +580,7 @@ vcpkg install gperftools:x64-windows
 - Excellent thread-local caching reduces lock contention
 - Minimal overhead when disabled (default)
 
-## Jemalloc Memory Allocator
+### Jemalloc Memory Allocator
 
 TidesDB optionally supports [jemalloc](https://github.com/jemalloc/jemalloc), Facebook's high-performance memory allocator. Like mimalloc and tcmalloc, jemalloc replaces the standard malloc/free at link time, providing improved allocation performance especially for multi-threaded workloads.
 
