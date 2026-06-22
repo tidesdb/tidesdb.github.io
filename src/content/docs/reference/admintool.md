@@ -74,6 +74,7 @@ open <path> [options]
 | `--flush-threads <n>` | Flush thread pool size |
 | `--compaction-threads <n>` | Compaction thread pool size |
 | `--max-concurrent-flushes <n>` | Global cap on in-flight memtable flushes across all CFs (0 = default) |
+| `--finish-compactions-on-close` | Let in-flight compactions run to completion before `close` returns (default cancels them at the next checkpoint for a fast shutdown — no data is lost either way) |
 | `--max-memory <n>` | Global memory limit (bytes, 0 = auto) |
 | `--log-level <level>` | Log level: `debug`\|`info`\|`warn`\|`error`\|`fatal`\|`none` (default: `none`) |
 | `--log-to-file` | Write logs to `<db_path>/LOG` instead of stderr |
@@ -200,6 +201,7 @@ cf-create <name> [options]
 | `--sync <mode>` | WAL sync mode: `none`\|`interval`\|`full` |
 | `--sync-interval <us>` | Sync interval in microseconds (for `interval` mode) |
 | `--comparator <name>` | Key comparator: `memcmp`\|`lexicographic`\|`uint64`\|`int64`\|`reverse`\|`case_insensitive` |
+| `--comparator-ctx <str>` | Comparator context string passed to the comparator (max 255 chars) |
 | `--write-buffer-size <n>` | Memtable flush threshold (bytes) |
 | `--klog-value-threshold <n>` | Value size threshold for vlog storage (bytes) |
 | `--block-index-prefix-len <n>` | Block index prefix length |
@@ -302,10 +304,11 @@ cf-stats <name>
 - Memtable size, levels, total keys
 - Data size, avg key/value sizes
 - Read amplification, cache hit rate
-- Full configuration (compression, bloom filter, sync mode, dividing level offset, tombstone density trigger and minimum, object-store lazy/prefetch compaction, etc.)
+- Full configuration (compression, bloom filter, sync mode, dividing level offset, tombstone density trigger and minimum, object-store lazy/prefetch compaction, comparator name and context string, etc.)
 - Per-level SSTable counts, sizes, key counts, and tombstone counts
 - Tombstone observability: total tombstones, database-wide ratio, and the worst single-SSTable tombstone density (with the level it lives on)
 - B+tree statistics (if enabled)
+- Write amplification: lifetime on-disk framed bytes written by the WAL, flushes, and compactions; bytes read by compactions; logical user bytes committed; flush and compaction output SSTable counts; and the derived write-amplification ratio
 
 ### cf-status
 Show flush/compaction status.
@@ -321,7 +324,7 @@ cf-update <name> [options]
 
 **Options**
 
-All options from `cf-create` are supported except `--btree` and `--comparator` (these cannot be changed after creation). Additionally:
+All options from `cf-create` are supported except `--btree`, `--comparator`, and `--comparator-ctx` (these cannot be changed after creation). Additionally:
 
 | Option | Description |
 |--------|-------------|
@@ -344,7 +347,7 @@ All options from `cf-create` are supported except `--btree` and `--comparator` (
 - `--min-disk-space` · Minimum disk space required
 
 **Non-updatable settings**
-- `--comparator` · Cannot change sort order after creation (would corrupt key ordering)
+- `--comparator`, `--comparator-ctx` · Cannot change sort order after creation (would corrupt key ordering)
 - `--btree` · Cannot change klog format after creation (existing SSTables use the original format)
 
 **Examples**
@@ -750,7 +753,8 @@ db-stats
 - In-flight transaction memory
 - Immutable memtable count and total memtable bytes
 - Unified memtable section (if enabled): memtable bytes, immutable count, flushing status, WAL generation, next CF index
-- Object store section (if enabled): connector type, replica mode, local cache usage, upload stats
+- Object store section (if enabled): connector type, replica mode, local cache usage, upload stats, and single-writer fencing epochs (primary epoch held by this node and the highest lease epoch seen)
+- Write amplification section: lifetime on-disk framed bytes for the shared unified WAL, per-CF WALs, flushes, and compactions (summed across all column families); compaction bytes read; logical user bytes committed; flush and compaction output SSTable counts; and the derived database-wide write-amplification ratio
 
 **Example**
 ```
@@ -779,6 +783,16 @@ Database Statistics:
     Is Flushing: no
     Next CF Index: 3
     WAL Generation: 7
+  Write Amplification (lifetime, on-disk framed bytes):
+    Unified WAL Bytes Written: 1048576
+    WAL Bytes Written: 0
+    Flush Bytes Written: 2097152
+    Compaction Bytes Written: 4194304
+    Compaction Bytes Read: 4194304
+    User Bytes Written: 1572864
+    Flush Count: 4
+    Compaction Count: 2
+    Write Amplification: 4.67x
 ```
 
 **Example with object store**
@@ -794,6 +808,8 @@ admintool(./mydb)> db-stats
     Upload Queue Depth: 0
     Total Uploads: 156
     Total Upload Failures: 0
+    Primary Epoch: 3
+    Seen Epoch: 3
 ```
 
 ### cache-stats

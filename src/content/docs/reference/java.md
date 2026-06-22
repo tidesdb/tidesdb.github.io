@@ -527,6 +527,8 @@ System.out.println("Replica mode: " + dbStats.isReplicaMode());
 | `totalUploads` | long | Lifetime count of objects uploaded to object store |
 | `totalUploadFailures` | long | Lifetime count of permanently failed uploads |
 | `replicaMode` | boolean | Whether running in read-only replica mode |
+| `primaryEpoch` | long | Object-store single-writer fencing: lease epoch this primary currently holds (0 when not a primary / no lease) |
+| `seenEpoch` | long | Object-store single-writer fencing: highest lease epoch this node has observed |
 | `uwalBytesWritten` | long | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
 | `walBytesWritten` | long | Per-CF WAL bytes summed across all column families |
 | `flushBytesWritten` | long | Flush output bytes summed across all column families |

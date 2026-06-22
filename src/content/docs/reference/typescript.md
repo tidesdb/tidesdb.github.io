@@ -789,6 +789,32 @@ cf.updateRuntimeConfig({
 **Non-updatable settings** (would corrupt existing data):
 - `compressionAlgorithm`, `enableBlockIndexes`, `enableBloomFilter`, `comparatorName`, `levelSizeRatio`, `klogValueThreshold`, `minLevels`, `dividingLevelOffset`, `blockIndexPrefixLen`, `l1FileCountTrigger`, `l0QueueStallThreshold`, `useBtree`
 
+### Persisting Column Family Config to INI
+
+A `ColumnFamilyConfig` can be saved to and loaded from an INI file section. These are standalone static helpers on `TidesDB` -- they operate purely on files and do **not** require an open database. This is handy for managing column family templates outside the database directory.
+
+```typescript
+import { TidesDB, CompressionAlgorithm, SyncMode } from 'tidesdb';
+
+// Save a config to a named section of an INI file (created if absent)
+TidesDB.saveColumnFamilyConfigToIni('./cf-templates.ini', 'analytics', {
+  writeBufferSize: 64 * 1024 * 1024,
+  compressionAlgorithm: CompressionAlgorithm.ZstdCompression,
+  enableBloomFilter: true,
+  bloomFpr: 0.01,
+  syncMode: SyncMode.Interval,
+  syncIntervalUs: 100000,
+});
+
+// Load it back -- fields absent from the section keep their library defaults,
+// so the result is a complete config ready for createColumnFamily()
+const config = TidesDB.loadColumnFamilyConfigFromIni('./cf-templates.ini', 'analytics');
+
+db.createColumnFamily('analytics', config);
+```
+
+The configuration passed to `saveColumnFamilyConfigToIni` is merged over the library defaults before writing, so a partial config still produces a complete, round-trippable section. Loading a missing file or section throws a `TidesDBError`.
+
 ### Range Cost Estimation
 
 Estimate the computational cost of iterating between two keys in a column family. The returned value is an opaque double - meaningful only for comparison with other values from the same method. It uses only in-memory metadata and performs no disk I/O.
@@ -981,6 +1007,8 @@ console.log(`Memtable bytes: ${dbStats.totalMemtableBytes}`);
 | `totalUploads` | `number` | Lifetime count of objects uploaded to object store |
 | `totalUploadFailures` | `number` | Lifetime count of permanently failed uploads |
 | `replicaMode` | `boolean` | Whether running in read-only replica mode |
+| `primaryEpoch` | `number` | Single-writer fencing (object-store mode): the lease epoch this primary currently holds (`0` when not a primary / no lease) |
+| `seenEpoch` | `number` | Single-writer fencing (object-store mode): the highest lease epoch a replica has observed |
 | `uwalBytesWritten` | `number` | Framed bytes appended to the shared unified WAL (`0` when unified mode is off) |
 | `walBytesWritten` | `number` | Per-CF WAL bytes summed across all column families |
 | `flushBytesWritten` | `number` | Flush output bytes summed across all column families |
@@ -1442,6 +1470,7 @@ try {
 - `ErrorCode.ErrLocked` (-12) · Database is locked
 - `ErrorCode.ErrReadonly` (-13) · Database is read-only
 - `ErrorCode.ErrBusy` (-14) · Resource is busy
+- `ErrorCode.ErrPrecondition` (-15) · Precondition failed
 
 ## Complete Example
 
@@ -1816,4 +1845,8 @@ TidesDB.init();                                       // optional explicit init 
 TidesDB.finalize();                                   // teardown (advanced)
 TidesDB.raiseOpenFileLimit(65536);                    // raise open-file ceiling -> number
 TidesDB.isCompressionAvailable(CompressionAlgorithm.ZstdCompression); // -> boolean
+
+// Column family config <-> INI file (no open database required)
+TidesDB.saveColumnFamilyConfigToIni('./cf.ini', 'my_cf', { /* ColumnFamilyConfig */ });
+TidesDB.loadColumnFamilyConfigFromIni('./cf.ini', 'my_cf'); // -> ColumnFamilyConfig
 ```
