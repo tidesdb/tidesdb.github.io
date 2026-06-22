@@ -62,6 +62,7 @@ int main() {
     config.unifiedMemtableSyncMode = tidesdb::SyncMode::None; // Sync mode for unified WAL
     config.unifiedMemtableSyncIntervalUs = 0;                 // Sync interval for unified WAL in microseconds
     config.maxConcurrentFlushes = 0;                          // Cap on in-flight memtable flushes across all CFs (0 = library default)
+    config.finishCompactionsOnClose = false;                  // false = cancel in-flight compactions at next checkpoint for fast shutdown (default); true = let them finish before close returns
     config.objectStore = nullptr;                             // Pluggable object store connector (nullptr = local only)
     config.objectStoreConfig = std::nullopt;                  // Object store behavior config (nullopt = defaults)
 
@@ -620,6 +621,8 @@ std::cout << "Replica mode: " << dbStats.replicaMode << std::endl;
 - `totalUploads` · Lifetime count of objects uploaded to object store
 - `totalUploadFailures` · Lifetime count of permanently failed uploads
 - `replicaMode` · Whether running in read-only replica mode
+- `primaryEpoch` · Single-writer fencing: lease epoch this primary currently holds (0 when not a primary / no lease)
+- `seenEpoch` · Single-writer fencing: highest lease epoch a replica has observed
 - `uwalBytesWritten` · Framed bytes appended to the shared unified WAL (0 when unified mode is off)
 - `walBytesWritten` · Per-CF WAL bytes summed across all column families
 - `flushBytesWritten` · Flush output bytes summed across all column families
@@ -841,6 +844,13 @@ db.cancelBackgroundWork();
 - In-flight merges discard their uncommitted output and leave inputs intact (recovery handles the mid-merge state the same way)
 - The cancellation is sticky for the session and reset on the next open
 - Intended to be called right before closing the database
+
+:::note[Close behavior: `finishCompactionsOnClose`]
+`cancelBackgroundWork()` is the explicit, on-demand way to make a single close fast. `Config::finishCompactionsOnClose` is the standing policy applied to every close of that database:
+
+- `false` (default) -- close cancels in-flight compactions at their next checkpoint for a fast shutdown. The merge discards its uncommitted output and leaves inputs intact, so no committed data is lost (recovery handles a mid-merge state the same way).
+- `true` -- close lets in-flight compactions run to completion before returning, trading shutdown latency for a fully compacted on-disk state.
+:::
 
 ### Promote Replica to Primary
 
@@ -1433,6 +1443,10 @@ txn.commit();
 
 `promoteToPrimary()` performs a final MANIFEST sync and WAL replay, creates a local WAL for crash recovery, and atomically switches to primary mode. Throws `ErrorCode::InvalidArgs` if the node is already a primary.
 
+:::note[Monitoring single-writer fencing]
+`getDbStats()` exposes the lease epochs used to fence stale primaries. `DbStats::primaryEpoch` is the lease epoch the local node holds as primary (0 when it is not a primary or holds no lease), and `DbStats::seenEpoch` is the highest lease epoch a replica has observed. A promotion that takes the lease bumps `primaryEpoch`; a primary that has been fenced by a newer promotion sees `replicaMode` flip back to `true`. Compare these across nodes to detect split-brain or a fenced primary.
+:::
+
 ### How Replica Sync Works
 
 - The reaper thread polls the remote MANIFEST for each CF every `replicaSyncIntervalUs`
@@ -1537,6 +1551,7 @@ try {
 - `ErrorCode::Locked` (-12) · Database is locked
 - `ErrorCode::Readonly` (-13) · Database is read-only
 - `ErrorCode::Busy` (-14) · Resource is temporarily busy
+- `ErrorCode::Precondition` (-15) · A required precondition was not met
 
 **Error categories**
 - `ErrorCode::Corruption` indicates data integrity issues requiring immediate attention

@@ -34,7 +34,7 @@ Switching from RocksDB to TidesDB requires no changes to your stream topology. Y
 <dependency>
     <groupId>com.tidesdb</groupId>
     <artifactId>tidesdb-kafka</artifactId>
-    <version>0.4.2</version>
+    <version>0.4.3</version>
 </dependency>
 ```
 
@@ -137,6 +137,7 @@ These settings control the TidesDB database instance that backs the state store.
 | `maxConcurrentFlushes` | int | 0 (library default) | Global semaphore on in-flight memtable flushes across all column families; 0 inherits the engine default |
 | `raiseOpenFileLimit` | long | 0 (untouched) | Raise the process open-file ceiling toward this many descriptors before open, so the engine can keep more SSTables open; applied at init **before** the database opens. 0 leaves the limit untouched |
 | `cancelBackgroundWorkOnClose` | boolean | false | When true, cancel background compaction db-wide right before close for a fast shutdown; flushes are unaffected so durability is preserved |
+| `finishCompactionsOnClose` | boolean | false | Close behavior for in-flight compactions. false (default) cancels them at their next checkpoint for a fast shutdown (no data lost; recovery handles a mid-merge state); true waits for in-flight compactions to finish before `close()` returns |
 | `objectStoreFsPath` | String | null | Filesystem path for object store connector; null disables object store mode |
 | `objectStoreS3Config` | S3Config | null | S3-compatible object store connector (AWS S3, MinIO, GCS); takes precedence over `objectStoreFsPath`. Requires a native build with `TIDESDB_WITH_S3=ON` |
 | `objectStoreConfig` | ObjectStoreConfig | null | Object store behavior configuration; null uses defaults |
@@ -363,7 +364,13 @@ System.out.println("Memory pressure: " + dbStats.getMemoryPressureLevel());
 System.out.println("Flush queue: " + dbStats.getFlushQueueSize());
 System.out.println("Compaction queue: " + dbStats.getCompactionQueueSize());
 System.out.println("Total SSTables: " + dbStats.getTotalSstableCount());
+
+// Object-store single-writer fencing (0 when not in object-store/replica mode)
+System.out.println("Primary lease epoch: " + dbStats.getPrimaryEpoch());
+System.out.println("Highest observed epoch: " + dbStats.getSeenEpoch());
 ```
+
+`getPrimaryEpoch()` is the lease epoch this primary currently holds (0 when it is not a primary or holds no lease); `getSeenEpoch()` is the highest lease epoch this node has observed. In object-store mode a fenced primary sees `isReplicaMode()` flip back to true once a newer epoch is seen, making these two counters the signal for detecting a lost write lease.
 
 **Block cache statistics**
 ```java
@@ -435,6 +442,16 @@ TidesDBStoreConfig config = TidesDBStoreConfig.builder()
     .cancelBackgroundWorkOnClose(true)
     .build();
 ```
+
+A related, lower-level knob is `finishCompactionsOnClose`, applied to the database at open time. When false (the default), `close()` cancels any in-flight compactions at their next checkpoint — the merge discards its uncommitted output and leaves inputs intact, so no data is lost and recovery handles the mid-merge state. When true, `close()` waits for in-flight compactions to run to completion before returning:
+
+```java
+TidesDBStoreConfig config = TidesDBStoreConfig.builder()
+    .finishCompactionsOnClose(true)   // wait for compactions to finish on close
+    .build();
+```
+
+The two settings are independent: `cancelBackgroundWorkOnClose` proactively cancels background work right before close, while `finishCompactionsOnClose` chooses whether close waits for or abandons compactions already running. Leave both at their defaults for the fastest shutdown.
 
 ### Raising the Open-File Limit
 

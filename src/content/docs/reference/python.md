@@ -633,6 +633,8 @@ if db_stats.object_store_enabled:
 | `total_uploads` | `int` | Total successful uploads |
 | `total_upload_failures` | `int` | Total failed uploads |
 | `replica_mode` | `bool` | Whether the database is in replica mode |
+| `primary_epoch` | `int` | Single-writer fencing lease epoch this primary currently holds (0 when not a primary / no lease) |
+| `seen_epoch` | `int` | Highest fencing lease epoch a replica has observed (0 in local mode) |
 | `uwal_bytes_written` | `int` | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
 | `wal_bytes_written` | `int` | Per-CF WAL bytes summed across all column families |
 | `flush_bytes_written` | `int` | Flush output bytes summed across all column families |
@@ -1339,3 +1341,4 @@ except tidesdb.TidesDBError as e:
 | `TDB_ERR_LOCKED` | `-12` | Database or resource is locked |
 | `TDB_ERR_READONLY` | `-13` | Database is read-only (e.g. replica mode) |
 | `TDB_ERR_BUSY` | `-14` | Resource is busy |
+| `TDB_ERR_PRECONDITION` | `-15` | A precondition was not met |

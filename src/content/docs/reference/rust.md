@@ -880,6 +880,8 @@ fn main() -> tidesdb::Result<()> {
 | `total_uploads` | `u64` | Lifetime count of objects uploaded to object store |
 | `total_upload_failures` | `u64` | Lifetime count of permanently failed uploads |
 | `replica_mode` | `bool` | Whether running in read-only replica mode |
+| `primary_epoch` | `u64` | Single-writer fencing: lease epoch this primary currently holds (0 when not a primary / no lease) |
+| `seen_epoch` | `u64` | Single-writer fencing: highest lease epoch a replica has observed |
 | `uwal_bytes_written` | `u64` | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
 | `wal_bytes_written` | `u64` | Per-CF WAL bytes summed across all column families |
 | `flush_bytes_written` | `u64` | Flush output bytes summed across all column families |
@@ -891,6 +893,10 @@ fn main() -> tidesdb::Result<()> {
 
 :::note[Write-amplification counters]
 The eight write-amplification fields (`uwal_bytes_written` through `compaction_count`) require tidesdb >= 9.3.4 (enabled by default) and are reported as `0` on older libraries. Db-wide write amplification is `(uwal_bytes_written + wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`. The `*_count` fields count output SSTables, not logical runs.
+:::
+
+:::note[Single-writer fencing]
+The `primary_epoch` and `seen_epoch` fields require tidesdb >= 9.3.8 and are reported as `0` on older libraries. They expose object-store single-writer fencing: a promotion that took bumps `primary_epoch`, while a fenced primary sees `replica_mode` flip back to `true`. Both are `0` on a local (non-object-store) database.
 :::
 
 :::note[Stack Allocated]
@@ -2024,6 +2030,7 @@ fn main() {
 - `ErrorCode::Locked` (-12) · Database is locked
 - `ErrorCode::ReadOnly` (-13) · Database is in read-only mode
 - `ErrorCode::Busy` (-14) · Resource is busy (another operation is in progress)
+- `ErrorCode::Precondition` (-15) · A required precondition was not met
 
 ## Complete Example
 

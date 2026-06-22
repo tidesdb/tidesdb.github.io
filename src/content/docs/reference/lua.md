@@ -687,6 +687,8 @@ print(string.format("Replica mode: %s", tostring(db_stats.replica_mode)))
 - `total_uploads` · Total number of successful uploads
 - `total_upload_failures` · Total number of failed uploads
 - `replica_mode` · Whether the database is in replica mode
+- `primary_epoch` · Single-writer lease epoch this primary currently holds (0 when not a primary / no lease)
+- `seen_epoch` · Highest lease epoch a replica has observed
 
 **Write-amplification counters** (lifetime since open, on-disk framed bytes; db-wide write amplification = `(uwal_bytes_written + wal_bytes_written + flush_bytes_written + compaction_bytes_written) / user_bytes_written`)
 - `uwal_bytes_written` · Framed bytes appended to the shared unified WAL (0 when unified memtable mode is off)
@@ -1351,6 +1353,8 @@ txn:free()
 - `TDB_ERR_UNKNOWN` (-11) · Unknown error
 - `TDB_ERR_LOCKED` (-12) · Database is locked
 - `TDB_ERR_READONLY` (-13) · Database is read-only
+- `TDB_ERR_BUSY` (-14) · Resource busy
+- `TDB_ERR_PRECONDITION` (-15) · Precondition failed
 
 ## Complete Example
 
@@ -1503,12 +1507,32 @@ TidesDB provides six built-in comparators that are automatically registered:
 - **`"reverse"`** · Reverse binary comparison (descending order)
 - **`"case_insensitive"`** · Case-insensitive ASCII comparison
 
+Select one by setting `comparator_name` on the column family config. The names are also available as the `tidesdb.Comparator` constant table, so you can avoid hard-coding the string literals:
+
 ```lua
 local cf_config = tidesdb.default_column_family_config()
-cf_config.comparator_name = "reverse"  -- Use reverse ordering
+cf_config.comparator_name = tidesdb.Comparator.REVERSE  -- same as "reverse"
 
 db:create_column_family("sorted_cf", cf_config)
 ```
+
+| Constant | Name string |
+|----------|-------------|
+| `tidesdb.Comparator.MEMCMP` | `"memcmp"` |
+| `tidesdb.Comparator.LEXICOGRAPHIC` | `"lexicographic"` |
+| `tidesdb.Comparator.UINT64` | `"uint64"` |
+| `tidesdb.Comparator.INT64` | `"int64"` |
+| `tidesdb.Comparator.REVERSE` | `"reverse"` |
+| `tidesdb.Comparator.CASE_INSENSITIVE` | `"case_insensitive"` |
+
+The underlying C comparator function pointers are also exposed in `tidesdb.builtin_comparators` (keys: `memcmp`, `lexicographic`, `uint64`, `int64`, `reverse_memcmp`, `case_insensitive`) for callers that want to register a built-in implementation under a custom name:
+
+```lua
+-- Alias the built-in uint64 comparator under a project-specific name.
+db:register_comparator("event_id", tidesdb.builtin_comparators.uint64, nil, nil)
+```
+
+> The `uint64` and `int64` comparators require 8-byte keys and interpret them in **native byte order** (little-endian on x86-64); encode integer keys accordingly so they sort numerically.
 
 ### Registering Custom Comparators
 
@@ -1671,6 +1695,14 @@ lua test_tidesdb.lua
 - `SNAPSHOT` (3)
 - `SERIALIZABLE` (4)
 
+**Built-in Comparators** (`tidesdb.Comparator`)
+- `MEMCMP` (`"memcmp"`) -- default
+- `LEXICOGRAPHIC` (`"lexicographic"`)
+- `UINT64` (`"uint64"`)
+- `INT64` (`"int64"`)
+- `REVERSE` (`"reverse"`)
+- `CASE_INSENSITIVE` (`"case_insensitive"`)
+
 **Error Codes**
 - `TDB_SUCCESS` (0)
 - `TDB_ERR_MEMORY` (-1)
@@ -1687,3 +1719,4 @@ lua test_tidesdb.lua
 - `TDB_ERR_LOCKED` (-12)
 - `TDB_ERR_READONLY` (-13)
 - `TDB_ERR_BUSY` (-14)
+- `TDB_ERR_PRECONDITION` (-15)

@@ -883,6 +883,8 @@ fmt.Printf("Memtable bytes: %d\n", dbStats.TotalMemtableBytes)
 | `TotalUploads` | `uint64` | Lifetime count of objects uploaded to object store |
 | `TotalUploadFailures` | `uint64` | Lifetime count of permanently failed uploads |
 | `ReplicaMode` | `bool` | Whether running in read-only replica mode |
+| `PrimaryEpoch` | `uint64` | Single-writer fencing (object-store mode): lease epoch this primary holds (0 when not a primary / no lease) |
+| `SeenEpoch` | `uint64` | Single-writer fencing (object-store mode): highest lease epoch a replica has observed |
 | `UwalBytesWritten` | `uint64` | Framed bytes appended to the shared unified WAL (0 if unified mode off) |
 | `WalBytesWritten` | `uint64` | Per-CF WAL bytes summed across all column families |
 | `FlushBytesWritten` | `uint64` | Flush output bytes summed across all column families |
@@ -1712,6 +1714,7 @@ if err != nil {
 - `ErrLocked` (-12) · Database is locked
 - `ErrReadonly` (-13) · Database is read-only (replica mode)
 - `ErrBusy` (-14) · Resource busy
+- `ErrPrecondition` (-15) · Precondition failed
 
 ## Complete Example
 
