@@ -307,8 +307,10 @@ Acquisition sites split by statement intent. `fetch_row_by_pk` and `iter_read_cu
 | `UPDATE` | X | Acquired in `update_row` on the target row; secondary-index scans under UPDATE do not lock the rows they walk past during ICP |
 | `DELETE` | X | Acquired in `delete_row` on the target row; secondary-index scans under DELETE do not lock the rows they walk past during ICP |
 | `SELECT ... FOR UPDATE` | X | Acquired during materialisation on every cursor-visible row, per the SQL locking-cursor contract |
-| `SELECT` under `READ-COMMITTED` or `SNAPSHOT` | none | MVCC snapshot already provides a consistent view |
-| `SELECT` under `REPEATABLE-READ` or `SERIALIZABLE` | S | Prevents concurrent modification of read rows within the transaction |
+| `SELECT` under session `READ UNCOMMITTED` or `READ COMMITTED` | none | MVCC snapshot already provides a consistent view |
+| `SELECT` under session `REPEATABLE READ` or `SERIALIZABLE` | S | Prevents concurrent modification of read rows within the transaction |
+
+The read-lock mode is decided from the **SQL session isolation level** (`thd_tx_isolation`), not from the table's effective TidesDB isolation. There is no SQL-level `SNAPSHOT`, so a table created with `ISOLATION_LEVEL='SNAPSHOT'` (which resolves from a default `REPEATABLE READ` session) still takes `S` read locks because the session level is `REPEATABLE READ`; the table option changes the library's MVCC behaviour, not the read-lock mode.
 
 Both explicit transactions (`BEGIN ... COMMIT`) and autocommit single-statement DML participate in locking. Autocommit statements block on locks held by other transactions, which prevents an autocommit `UPDATE` from silently bypassing a lock held by a `SELECT ... FOR UPDATE` in another session.
 
@@ -539,7 +541,7 @@ By default, TidesDB creates bloom filters for each SSTable, which allow point lo
 -- Disable bloom filters entirely
 CREATE TABLE no_bloom (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB BLOOM_FILTER=0;
 
--- Very low FPR (10 basis points = 0.01%)
+-- Very low FPR (10 parts per 10,000 = 0.1%)
 CREATE TABLE precise (id INT PRIMARY KEY, v INT) ENGINE=TIDESDB BLOOM_FPR=10;
 ```
 
@@ -863,7 +865,7 @@ The engine uses a charset-aware tokenizer that correctly handles multi-byte char
 
 ### Stop Words
 
-Common words like "the", "is", "a", "of" are excluded from the full-text index to reduce index bloat and improve search quality. By default, TidesDB uses the same 36 stop words as InnoDB (the list from `information_schema.INNODB_FT_DEFAULT_STOPWORD`). Stop words are filtered during tokenization, so they are never stored in the inverted index and never match in search queries.
+Common words like "the", "is", "a", "of" are excluded from the full-text index to reduce index bloat and improve search quality. By default, TidesDB uses the same default stop word list as InnoDB (`information_schema.INNODB_FT_DEFAULT_STOPWORD` — 36 entries, 35 distinct words, since InnoDB lists "the" twice). Stop words are filtered during tokenization, so they are never stored in the inverted index and never match in search queries.
 
 The stop word list can be customized via the `tidesdb_ft_stopword_table` system variable. When set to a `db_name/table_name` string, the engine loads stop words from the specified TidesDB table (which must have a `value` VARCHAR column containing one word per row). When set to NULL or empty string, the default stop words are restored:
 
@@ -1203,7 +1205,7 @@ The engine supports `SHOW ENGINE TIDESDB STATUS`, which displays database-level 
 SHOW ENGINE TIDESDB STATUS\G
 ```
 
-The output includes the data directory path, number of column families, global sequence number, memory usage (total system memory, resolved memory limit, memory pressure level, memtable bytes, transaction memory bytes), storage metrics (total SSTables, open SSTable handles, total data size, immutable memtable count), background queue sizes (flush pending, flush queue, compaction queue), and block cache statistics (enabled, entries, size, hits, misses, hit rate, partitions).
+The output includes the data directory path, number of column families, global sequence number, memory usage (total system memory, resolved memory limit, memory pressure level, memtable bytes, transaction memory bytes), storage metrics (total SSTables, open SSTable handles, total data size, immutable memtable count), background queue sizes (flush pending, flush queue, compaction queue), block cache statistics (enabled, entries, size, hits, misses, hit rate, partitions), and a **Tombstones** block (total tombstones, overall tombstone ratio, and the worst per-SSTable tombstone density together with the level it occurs at).
 
 When `tidesdb_unified_memtable=ON` an additional **Unified Memtable** block reports the active skip-list bytes, the number of immutables queued, whether a flush is currently in flight, the current WAL generation, and the round-robin next-CF index that the library uses when it scans for CF state to fold into the shared memtable.
 
@@ -1223,8 +1225,8 @@ SHOW GLOBAL STATUS LIKE 'tidesdb%';
 
 | Variable | Description |
 |----------|-------------|
-| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.7`) |
-| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263431` = `0x40507`) |
+| `Tidesdb_version` | TideSQL plugin version string (e.g. `4.5.8`) |
+| `Tidesdb_version_hex` | TideSQL plugin version as integer (e.g. `263432` = `0x40508`) |
 | `Tidesdb_library_version` | Underlying TidesDB storage library (`libtidesdb`) version string |
 | `Tidesdb_column_families` | Number of active column families |
 | `Tidesdb_global_sequence` | Global MVCC sequence number |
