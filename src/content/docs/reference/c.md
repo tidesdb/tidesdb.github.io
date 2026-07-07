@@ -722,6 +722,32 @@ The write-amplification counters are lifetime totals since the database was open
 The B+tree stats (`btree_total_nodes`, `btree_max_height`, `btree_avg_height`) are only populated when `use_btree=1` in the column family configuration. These provide insight into the index structure overhead and lookup depth.
 :::
 
+### Estimating Distinct Key Cardinality
+
+`tidesdb_cf_estimate_cardinality` estimates the number of distinct keys in a column family without scanning it. Every SSTable records, at write time, how many unique keys it holds — tallied for free during the sorted-run write, so counting it costs nothing at query time. The estimate sums those per-SSTable counts and adds the in-memory memtable entries.
+
+The result is an upper bound. A key that lives in several SSTables, or in both memory and on disk, is counted once per place it lives, because reconciling keys across SSTables would require the merge the call is designed to avoid. This makes it well suited to optimizer selectivity and row-count estimates rather than an exact count. An SSTable written before the distinct-key summary existed falls back to its entry count, so mixed-vintage databases still produce a usable number.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+uint64_t estimate = 0;
+if (tidesdb_cf_estimate_cardinality(cf, &estimate) == TDB_SUCCESS)
+{
+    printf("estimated distinct keys: %llu\n", (unsigned long long)estimate);
+}
+```
+
+Signature:
+
+```c
+int tidesdb_cf_estimate_cardinality(tidesdb_column_family_t *cf,
+                                    uint64_t *out_estimate);
+```
+
+Returns `TDB_SUCCESS` and writes the estimate to `out_estimate`, or `TDB_ERR_INVALID_ARGS` if `cf` or `out_estimate` is `NULL`.
+
 ### Database-Level Statistics
 
 Get aggregate statistics across the entire database instance.
@@ -1340,6 +1366,58 @@ if (tidesdb_txn_get(txn, cf, key, 5, &value, &value_size) == 0)
 
 tidesdb_txn_free(txn);
 ```
+
+### Non-Tracking Reads and Existence Checks
+
+`tidesdb_txn_get` records every point read into the transaction's read set so serializable validation and the write-write reservation can detect conflicts against the version actually read. That tracking is exactly wrong for an existence probe — a primary-key uniqueness check before an insert, for instance — because the probe read would pollute the writing transaction's conflict footprint and can cause it to abort against a key it only looked at.
+
+`tidesdb_txn_get_notrack` resolves the value at the transaction's snapshot just like `tidesdb_txn_get`, but does not record the read. It does not participate in read-write conflict detection and does not seed the write-write reservation base. Uniqueness stays enforced by the subsequent write's own reservation, so dropping the read tracking is safe for that use.
+
+`tidesdb_txn_contains` is an existence check built on the same non-tracking read. It never materializes the value to the caller — there is nothing to free — and returns `TDB_SUCCESS` when the key exists, `TDB_ERR_NOT_FOUND` when it does not.
+
+```c
+tidesdb_column_family_t *cf = tidesdb_get_column_family(db, "my_cf");
+if (!cf) return -1;
+
+tidesdb_txn_t *txn = NULL;
+tidesdb_txn_begin(db, &txn);
+
+const uint8_t *key = (uint8_t *)"user:1000";
+
+/* existence check without tracking the read */
+if (tidesdb_txn_contains(txn, cf, key, 9) == TDB_SUCCESS)
+{
+    /* key already present -- reject the insert */
+}
+
+/* or read the value without adding it to the conflict footprint */
+uint8_t *value = NULL;
+size_t value_size = 0;
+if (tidesdb_txn_get_notrack(txn, cf, key, 9, &value, &value_size) == TDB_SUCCESS)
+{
+    free(value);
+}
+
+tidesdb_txn_free(txn);
+```
+
+Signatures:
+
+```c
+int tidesdb_txn_get_notrack(tidesdb_txn_t *txn,
+                            tidesdb_column_family_t *cf,
+                            const uint8_t *key,
+                            size_t key_size,
+                            uint8_t **value,
+                            size_t *value_size);
+
+int tidesdb_txn_contains(tidesdb_txn_t *txn,
+                         tidesdb_column_family_t *cf,
+                         const uint8_t *key,
+                         size_t key_size);
+```
+
+`tidesdb_txn_get_notrack` returns `TDB_SUCCESS` and sets `value`/`value_size` (the caller frees `value`) on a hit, or a negative error code otherwise. `tidesdb_txn_contains` returns `TDB_SUCCESS` if the key exists, `TDB_ERR_NOT_FOUND` if it does not, or a negative error code on failure.
 
 ### Deleting a Key-Value Pair
 
