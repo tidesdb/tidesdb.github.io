@@ -5,11 +5,11 @@ head:
   - tag: meta
     attrs:
       property: og:image
-      content: https://tidesdb.com/pexels-lindsay-macnevin-17121675-6421224.jpg
+      content: https://tidesdb.com/pexels-jay-vn-281449015-34731472.jpg
   - tag: meta
     attrs:
       name: twitter:image
-      content: https://tidesdb.com/pexels-lindsay-macnevin-17121675-6421224.jpg
+      content: https://tidesdb.com/pexels-jay-vn-281449015-34731472.jpg
 ---
 
 <div class="article-image">
