@@ -32,7 +32,7 @@ I use <a href="/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myroc
 5.  512 threads, 4 tables, 1m rows per table, 60 seconds, zipfian(exp=0.8), no warmup, same seed (2024), LZ4 compressed, TidesDB unified ON, still RC
 
 
-Both engines have their cache and write buffers in parity.  TidesDB is utilizing unified mode, thus setting block cache to 128mb and write buffer to 128mb, as opposed to the non unified write buffer of 64mb, similar to RocksDB.  L0 and L1 queues are brought down to parity before a full stall.  I am using RC read committed isolation level for both engines, and durability is off on both.  Runs 1 and 2 are uncompressed, from run 3 on both engines run LZ4.
+Both engines have their cache and write buffers in parity.  TidesDB is utilizing unified mode, thus setting block cache to 128mb and write buffer to 128mb, as opposed to the non unified write buffer of 64mb, similar to RocksDB.  L0 and L1 queues are brought down to parity for both engines to reach graduated back-pressure similarly.  I am using RC read committed isolation level for both engines, and durability is off on both.  Runs 1 and 2 are uncompressed, from run 3 on both engines run LZ4.
 
 
 My environment:
