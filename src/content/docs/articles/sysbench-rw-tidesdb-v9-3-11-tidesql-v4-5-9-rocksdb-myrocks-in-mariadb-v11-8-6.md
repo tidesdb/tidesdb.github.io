@@ -29,10 +29,11 @@ I use <a href="/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myroc
 2.  24 threads, 4 tables, 2.5m rows per table, 300 seconds, zipfian(exp=0.8), no warmup
 3.  8 threads, 4 tables, 5m rows per table, 120 seconds, zipfian(exp=0.8), no warmup, same seed (2024), LZ4 compressed, TidesDB unified memtable OFF
 4.  8 threads, 4 tables, 5m rows per table, 120 seconds, zipfian(exp=0.8), no warmup, same seed (2024), LZ4 compressed, TidesDB unified ON
-5.  512 threads, 4 tables, 1m rows per table, 60 seconds, zipfian(exp=0.8), no warmup, same seed (2024), LZ4 compressed, TidesDB unified ON, still RC
+5.  512 threads, 4 tables, 1m rows per table, 60 seconds, zipfian(exp=0.8), no warmup, same seed (2024), LZ4 compressed, TidesDB unified ON
+6. 512 threads, 4 tables, 1m rows per table, 60 seconds, zipfian(exp=0.8), no warmup, same seed (2024), NO compressed, TidesDB unified ON
 
 
-Both engines have their cache and write buffers in parity.  TidesDB is utilizing unified mode, thus setting block cache to 128mb and write buffer to 128mb, as opposed to the non unified write buffer of 64mb, similar to RocksDB.  L0 and L1 queues are brought down to parity for both engines to reach graduated back-pressure similarly.  I am using RC read committed isolation level for both engines, and durability is off on both.  Runs 1 and 2 are uncompressed, from run 3 on both engines run LZ4.
+For basline both engines have their cache and write buffers in parity.  TidesDB is utilizing unified mode, thus setting block cache to 128mb and write buffer to 128mb, as opposed to the non unified write buffer of 64mb, similar to RocksDB.  L0 and L1 queues are brought down to parity for both engines to reach graduated back-pressure similarly.  I am using RC read committed isolation level for both engines, and durability is off on both.  Runs 1 and 2 are uncompressed, from run 3 on both engines run LZ4.
 
 
 My environment:
@@ -205,10 +206,30 @@ TidesDB pushes ~6.2k tps and 125k qps to RocksDB's ~664 tps, prepares in 14s aga
 
 ![transactions per second](/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/results/20260708_150314/tps_over_time.png)
 
+*Run 6*
+``
+tidesdb_default_compression = NONE
+rocksdb_default_cf_options  >> compression=kNoCompression (prepended)
+``
+
+Run 5 again with compression off on both engines, to see what LZ4 was actually buying each one.  The footprint story splits by engine.  RocksDB compresses well, LZ4 took it from 3.6 GB down to 2.6 GB, roughly 30% off.  TidesDB barely moved, 1.4 GB uncompressed against 1.6 GB with LZ4, so at a 60 second 512 thread churn the transient compaction state dominates and LZ4 is close to a wash on space here.  Throughput is where it gets interesting.  RocksDB jumped from ~664 tps with LZ4 to ~2.9k with it off, a 4.4x swing, so most of its run 5 deficit was LZ4 CPU cost and not the write path.  TidesDB was nearly indifferent, ~6.2k to ~6.5k tps, compression is close to free for it.  Even uncompressed, and even with RocksDB's big jump, TidesDB still leads, about 2.25x the throughput and 2.6x smaller on disk.
+
+![prepare](/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/results/20260708_155540/prepare_time.png)
+
+![disk over time](/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/results/20260708_155540/disk_over_time.png)
+
+![disk final](/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/results/20260708_155540/disk_final.png)
+
+![p95 latency](/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/results/20260708_155540/lat95_over_time.png)
+
+
+![queries per second](/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/results/20260708_155540/qps_over_time.png)
+
+![transactions per second](/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/results/20260708_155540/tps_over_time.png)
 
 --
 
-Across all five runs TidesDB came out ahead on throughput and tail latency, and the gap widened as threads, rows and contention went up.  On the 5m row runs it also prepared far faster and landed smaller on disk under the same LZ4.  A quick look at the numbers, tps and p95 are TidesDB against RocksDB.
+Across all six runs TidesDB came out ahead on throughput and tail latency, and the gap widened as threads, rows and contention went up.  On the 5m row runs it also prepared far faster and landed smaller on disk under the same LZ4.  A quick look at the numbers, tps and p95 are TidesDB against RocksDB.
 
 | run | workload | tps (tdb/rdb) | p95 ms (tdb/rdb) | prepare s (tdb/rdb) | final disk (tdb/rdb) |
 |-----|----------|---------------|------------------|---------------------|----------------------|
@@ -217,8 +238,9 @@ Across all five runs TidesDB came out ahead on throughput and tail latency, and 
 | 3 | 8t / 5m / 120s, LZ4, unified OFF | 2280 / 334 | 5.37 / 31.94 | 78 / 771 | 5.0 / 6.1 GB |
 | 4 | 8t / 5m / 120s, LZ4, unified ON | 1756 / 307 | 5.47 / 34.33 | 126 / 731 | 4.6 / 6.1 GB |
 | 5 | 512t / 1m / 60s, LZ4 | 6228 / 664 | 520.62 / 1708.63 | 14 / 106 | 1.6 / 2.6 GB |
+| 6 | 512t / 1m / 60s, no compression | 6512 / 2893 | 493.24 / 877.61 | 13 / 189 | 1.4 / 3.6 GB |
 
-Every run was zero errors on both engines except run 5, where the 512 thread contention pushed both into retries.  These are single runs on a consumer SSD, so treat the small deltas (runs 3 and 4) as ballpark, the order of magnitude gaps are what hold.
+Runs 1 through 4 were zero errors on both engines, runs 5 and 6 pushed the 512 thread contention into retries on both.  These are single runs on a consumer SSD, so treat the small deltas (runs 3 and 4) as ballpark, the order of magnitude gaps are what hold.  Run 6 is the honest footnote on compression, LZ4 costs RocksDB a lot of throughput at high concurrency while saving it real space, and costs TidesDB almost nothing either way.
 
 *Benchmark it yourself*
 <img src="/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/aw69t0.jpg" width="200">
@@ -245,6 +267,6 @@ That's all for now!
 
 -- 
 
-All data: <a href="/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/rwsysbench-tidesdb-rocksdb-jul7th2026.zip">zip (5f292d7fcf3794767c5fbade3d4365b6e01f5e77ce96874d7d20b6ac2011c9d5)</a>
+All data: <a href="/sysbench-read-write-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-mariadb-v11-8-6/rwsysbench-tidesdb-rocksdb-jul7th2026.zip">zip (40338a7256d9b8a75c882cca812d56a1e37ce6a4008b91f95e6b4340fbe11f61)</a>
 
 TideSQL: https://tidesdb.com/reference/tidesql/
