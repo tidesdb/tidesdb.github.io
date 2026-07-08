@@ -1,0 +1,3 @@
+engine,final_bytes,final_mb,rows,bytes_per_row
+rocksdb,2675470336,2551.5,4000000,668.9
+tidesdb,1670983680,1593.6,4000000,417.7

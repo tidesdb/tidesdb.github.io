@@ -1,0 +1,3 @@
+engine,threads,table_size,tables,duration_s,total_txn,tps,qps,lat_min_ms,lat_avg_ms,lat_max_ms,lat_95_ms,errors
+rocksdb,8,1000000,4,60,116890,1948.08,38961.55,1.32,4.11,340.10,10.84,0
+tidesdb,8,1000000,4,60,203876,3342.62,66852.43,0.75,2.36,993.61,3.55,0
