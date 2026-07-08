@@ -76,7 +76,7 @@ default_tmp_storage_engine = MyISAM
 rocksdb_block_cache_size          = 128M
 rocksdb_max_background_jobs       = 8
 rocksdb_flush_log_at_trx_commit   = 0
-rocksdb_default_cf_options = "write_buffer_size=64m;target_file_size_base=64m;max_bytes_for_level_base=1g;level0_file_num_compaction_trigger=4;level0_slowdown_writes_trigger=5;level0_stop_writes_trigger=10;max_write_buffer_number=4;block_based_table_factory={cache_index_and_filter_blocks=1;filter_policy=bloomfilter:10:false;whole_key_filtering=1};level_compaction_dynamic_level_bytes=true;optimize_filters_for_hits=true;compaction_pri=kMinOverlappingRatio"
+rocksdb_default_cf_options = "compression=kNoCompression;write_buffer_size=64m;target_file_size_base=64m;max_bytes_for_level_base=1g;level0_file_num_compaction_trigger=4;level0_slowdown_writes_trigger=5;level0_stop_writes_trigger=10;max_write_buffer_number=4;block_based_table_factory={cache_index_and_filter_blocks=1;filter_policy=bloomfilter:10:false;whole_key_filtering=1};level_compaction_dynamic_level_bytes=true;optimize_filters_for_hits=true;compaction_pri=kMinOverlappingRatio"
 rocksdb_compaction_sequential_deletes_count_sd = 1
 rocksdb_compaction_sequential_deletes          = 199999
 rocksdb_compaction_sequential_deletes_window   = 200000
