@@ -169,6 +169,11 @@ export default defineConfig({
 					items: [
 						{
 				
+							label: 'sysbench zipfian read-write Analysis on TidesDB v9.3.11/TideSQL v4.5.9, RocksDB (MyRocks), in MariaDB v11.8.6',
+							link: 'articles/sysbench-rw-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-in-mariadb-v11-8-6'
+						},
+						{
+				
 							label: 'TTL (Time to live) using TideSQL in MariaDB',
 							link: 'articles/ttl-time-to-live-using-tidesql-in-mariadb'
 						},
