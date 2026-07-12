@@ -1,0 +1,51 @@
+[mysqld]
+basedir = /data/mariadb
+datadir = /data/mariadb/data
+port    = 3306
+socket  = /tmp/mariadb.sock
+user    = root
+pid-file = /data/mariadb/data/mariadb.pid
+log-error = /data/mariadb/data/mariadb.err
+
+bind-address = 127.0.0.1
+max_connections = 500
+max_prepared_stmt_count=128000
+
+performance_schema=OFF
+table_open_cache = 16384
+table_open_cache_instances = 16
+back_log = 1500
+
+transaction_isolation      = READ-COMMITTED
+
+skip_log_bin=1
+
+default_storage_engine = InnoDB
+
+innodb_buffer_pool_size=32G
+innodb_log_buffer_size=64M
+innodb_doublewrite=0
+innodb_flush_log_at_trx_commit=0
+innodb_read_io_threads=16
+innodb_write_io_threads=8
+innodb_purge_threads=4
+
+slow_query_log = OFF
+
+character-set-server = utf8mb4
+collation-server = utf8mb4_general_ci
+
+[client]
+port = 3306
+socket = /tmp/mariadb.sock
+default-character-set = utf8mb4
+
+[mysqldump]
+quick
+max_allowed_packet = 64M
+
+[mariadb-backup]
+
+[mysqld_safe]
+malloc-lib = /lib/x86_64-linux-gnu/libjemalloc.so.2
+

@@ -1,0 +1,3 @@
+260712 15:05:28 mysqld_safe Adding '/lib/x86_64-linux-gnu/libjemalloc.so.2' to LD_PRELOAD for mysqld
+260712 15:05:28 mysqld_safe Logging to '/data/mariadb/data/mariadb.err'.
+260712 15:05:28 mysqld_safe Starting mariadbd daemon with databases from /data/mariadb/data
