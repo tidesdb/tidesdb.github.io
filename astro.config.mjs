@@ -167,6 +167,17 @@ export default defineConfig({
 				{
 					label: 'Articles',
 					items: [
+					
+						{
+				
+							label: 'HammerDB TPC-C TideSQL v4.6.1 & InnoDB Analysis in MariaDB v11.8.6',
+							link: 'articles/hammerdb-tpc-c-tidesql-v4-6-1-innodb-mariadb-v11-8-6'
+						},
+						{
+				
+							label: 'Retrieval-Augmented Generation on TideSQL - Hybrid full-text + vector search with TTL',
+							link: 'articles/retrieval-augmented-generation-on-tidesql-fts-vector-ttl'
+						},
 						{
 				
 							label: 'sysbench zipfian read-write Analysis on TidesDB v9.3.11/TideSQL v4.5.9, RocksDB (MyRocks), in MariaDB v11.8.6',
