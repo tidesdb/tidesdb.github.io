@@ -1777,7 +1777,7 @@ Multi-statement transactions at `REPEATABLE_READ` or higher isolation may fail a
 | 12.3.1          | >= 4.2.6     | ✔     |
 | 13.0.2          | >= 4.5.4     | ✔     |
 
-Current TideSQL release is 4.5.9 (hex `0x40509`).
+Current TideSQL release is 4.6.1 (hex `0x40601`).
 
 *As versions are tested and confirmed working we update this table. Full Support means the system is tested against all known functionality.*
 
