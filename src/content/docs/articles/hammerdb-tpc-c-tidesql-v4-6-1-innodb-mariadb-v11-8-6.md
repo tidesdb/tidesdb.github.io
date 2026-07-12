@@ -30,6 +30,7 @@ Environment
 - TidesDB v9.3.13
 - TideSQL v4.6.1
 - MariaDB v11.8.6
+- HammerDB v6.0.0
 
 Server
 - Intel Xeon Silver 4116 @ 2.10 GHz (Skylake-SP)
