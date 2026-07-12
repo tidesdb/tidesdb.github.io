@@ -5,16 +5,16 @@ head:
   - tag: meta
     attrs:
       property: og:image
-      content: https://tidesdb.com/pexels-enginakyurt-4562650.jpg
+      content: https://tidesdb.com/pexels-dmitriy-causelove-218646814-12030822.jpg
   - tag: meta
     attrs:
       name: twitter:image
-      content: https://tidesdb.com/pexels-enginakyurt-4562650.jpg
+      content: https://tidesdb.com/pexels-dmitriy-causelove-218646814-12030822.jpg
 ---
 
 <div class="article-image">
 
-![HammerDB TPC-C TideSQL v4.6.1 & InnoDB Analysis in MariaDB v11.8.6](/pexels-enginakyurt-4562650.jpg)
+![HammerDB TPC-C TideSQL v4.6.1 & InnoDB Analysis in MariaDB v11.8.6](/pexels-dmitriy-causelove-218646814-12030822.jpg)
 
 </div>
 
@@ -22,15 +22,15 @@ head:
 
 *published on July 12th, 2026*
 
-Retrieval-Augmented Generation (RAG) is only as good as its retrieval. Before a language model ever sees a prompt, something has to find the passages worth putting in front of it. Most stacks bolt a separate vector database onto their existing SQL database to do that, and then spend the rest of their life keeping two systems in sync.
+Retrieval-Augmented Generation (RAG) is only as good as its retrieval. Before a language model ever sees a prompt, something has to find the passages worth putting in front of it. Most stacks bolt a separate vector database onto their existing SQL database to do that, and then work having to keep the two systems in sync.
 
-In this article I build the entire retrieval layer of a RAG pipeline on one TideSQL table. TideSQL is the <a target="_blank" href="https://mariadb.com/docs/release-notes/community-server/11.8/11.8.6">MariaDB</a> storage-engine plugin over <a target="_blank" href="https://tidesdb.com">TidesDB</a>, and it gives us three things a RAG index needs, in the same table, under the same transaction:
+In this article I build the entire retrieval layer of a RAG pipeline on one TideSQL table, it gives us three things a RAG index needs, in the same table, under the same transaction:
 
 - a FULLTEXT index for exact keyword, boolean, and phrase search (relevance ranked),
 - a MariaDB VECTOR index (MHNSW) for approximate nearest-neighbour semantic search,
 - and TTL so stale context expires on its own.
 
-Everything below was run on MariaDB v11.8.6 with TideSQL v4.6.1 over TidesDB v9.3.13, and there is a complete, runnable Python script at the end.
+Everything below was run on <a target="_blank" href="https://github.com/MariaDB/server/releases/tag/mariadb-11.8.6">MariaDB v11.8.6</a> with TideSQL v4.6.1 over TidesDB v9.3.13, and there is a *complete*, runnable Python script at the end.
 
 Lexical search and semantic search fail in opposite directions. Keyword search nails exact names, error codes, and identifiers but misses paraphrase. Vector search catches "make rows disappear" ≈ "expire records" but drifts on rare tokens. Serious RAG retrieval is hybrid, run both and fuse the rankings.
 
@@ -63,7 +63,7 @@ CREATE TABLE docs (
 
 The `` `TTL`=1 `` column option marks `ttl_secs` as the per-row lifetime in seconds (`0` means "never expire"). You can also set a table-wide default with `ENGINE=TidesDB TTL=<seconds>`; a per-row value overrides it.
 
-`DISTANCE=cosine` on the vector index matters. MariaDB's vector index is built for one metric (the default is euclidean), and it is only used when the `VEC_DISTANCE_*` function in the query matches the metric the index was built for. Since we query with `VEC_DISTANCE_COSINE`, the index is declared `DISTANCE=cosine`, and a mismatch silently falls back to a full table scan.
+MariaDB's vector index is built for one metric (the default is euclidean), and it is only used when the `VEC_DISTANCE_*` function in the query matches the metric the index was built for. Since we query with `VEC_DISTANCE_COSINE`, the index is declared `DISTANCE=cosine`, and a mismatch silently falls back to a full table scan.
 
 Retrieval needs a vector for every document and for the query. In production that vector comes from an embedding model. To keep this article self-contained and reproducible offline, the example ships a tiny dependency-free embedder. It uses feature hashing over words plus character 3-grams, L2-normalised. The character 3-grams give it enough morphological reach that "expire", "expires", and "expiration" land near each other, which is what lets the vector arm surface passages the exact keyword arm misses.
 
