@@ -1,0 +1,127 @@
+---
+// A single top-nav dropdown (trigger + menu). Used for both the "Docs" and
+// "Company" menus in the header. Toggling/close behaviour is wired once in
+// SocialIcons.astro across all `.nav-dd` elements.
+interface Props {
+	label: string;
+	id: string;
+	links: { label: string; href: string }[];
+}
+const { label, id, links } = Astro.props;
+const menuId = `nav-dd-${id}`;
+---
+
+<div class="nav-dd">
+	<button
+		type="button"
+		class="header-nav-link nav-dd__btn"
+		aria-haspopup="true"
+		aria-expanded="false"
+		aria-controls={menuId}
+	>
+		{label}
+		<svg class="nav-dd__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<path d="M6 9l6 6 6-6" />
+		</svg>
+	</button>
+	<div class="nav-dd__menu" id={menuId} role="menu">
+		{
+			links.map((l) => (
+				<a class="nav-dd__item" href={l.href} role="menuitem">
+					{l.label}
+				</a>
+			))
+		}
+	</div>
+</div>
+
+<style>
+	.nav-dd {
+		position: relative;
+		align-self: center;
+	}
+	.nav-dd__btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2rem;
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: var(--sl-text-sm);
+		font-weight: 500;
+		white-space: nowrap;
+		color: var(--nav-fg);
+		padding-inline: 0.25rem;
+		transition: color 0.2s ease;
+	}
+	.nav-dd__btn:hover {
+		color: var(--nav-fg-strong);
+	}
+	.nav-dd__chev {
+		width: 14px;
+		height: 14px;
+		transition: transform 0.2s ease;
+	}
+
+	.nav-dd__menu {
+		position: absolute;
+		top: 100%;
+		right: 0;
+		margin-top: 0.5rem;
+		min-width: 210px;
+		padding: 0.35rem;
+		background: var(--sl-color-bg-nav);
+		border: 1px solid var(--sl-color-gray-6);
+		border-radius: 12px;
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+		opacity: 0;
+		visibility: hidden;
+		transform: translateY(-6px);
+		transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+		z-index: 200;
+	}
+	.nav-dd__item {
+		display: block;
+		padding: 0.5rem 0.75rem;
+		border-radius: 7px;
+		font-size: var(--sl-text-sm);
+		font-weight: 500;
+		white-space: nowrap;
+		color: var(--sl-color-white) !important;
+		text-decoration: none !important;
+		border-bottom: none !important;
+		transition: background 0.15s ease;
+	}
+	.nav-dd__item:hover,
+	.nav-dd__item:focus-visible {
+		background: var(--sl-color-gray-6);
+		color: var(--sl-color-white) !important;
+		outline: none;
+	}
+
+	.nav-dd.is-open .nav-dd__menu {
+		opacity: 1;
+		visibility: visible;
+		transform: none;
+	}
+	.nav-dd.is-open .nav-dd__chev {
+		transform: rotate(180deg);
+	}
+	@media (hover: hover) {
+		.nav-dd:hover .nav-dd__menu {
+			opacity: 1;
+			visibility: visible;
+			transform: none;
+		}
+		.nav-dd:hover .nav-dd__chev {
+			transform: rotate(180deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.nav-dd__menu,
+		.nav-dd__chev {
+			transition: none;
+		}
+	}
+</style>

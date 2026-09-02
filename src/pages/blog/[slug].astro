@@ -1,0 +1,39 @@
+---
+// SEO-safe alias: every article is reachable at /blog/<slug>, which redirects
+// to the canonical /articles/<slug>. The canonical page keeps all existing
+// search equity; these stubs are noindex + rel=canonical so Google consolidates
+// them onto the real article rather than treating them as duplicate content.
+import { getCollection } from 'astro:content';
+import { SITE } from '../../utils/articles.js';
+
+export async function getStaticPaths() {
+	const articles = (await getCollection('docs')).filter((entry) =>
+		entry.id.startsWith('articles/')
+	);
+	return articles.map((entry) => ({
+		params: { slug: entry.id.replace(/^articles\//, '') },
+		props: { target: `/${entry.id}/` },
+	}));
+}
+
+const { target } = Astro.props;
+const canonical = `${SITE}${target}`;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Redirecting…</title>
+		<link rel="canonical" href={canonical} />
+		<meta name="robots" content="noindex, follow" />
+		<meta http-equiv="refresh" content={`0; url=${target}`} />
+	</head>
+	<body>
+		<p>This article has moved to <a href={target}>{target}</a>.</p>
+		<script is:inline define:vars={{ target }}>
+			window.location.replace(target);
+		</script>
+	</body>
+</html>

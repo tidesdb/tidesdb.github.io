@@ -1,0 +1,252 @@
+---
+// Ecosystem "start here" hub at /getting-started/. Orients newcomers across the
+// whole distribution — the C engine, language bindings, TideSQL, Kafka — and
+// routes each to the right versioned docs. Links are derived from the committed
+// nav manifest so they stay correct as component docs are restructured.
+import { LATEST } from '../../config/versions.js';
+
+const v = LATEST.id;
+const GITHUB = 'https://github.com/tidesdb/tidesdb';
+const DISCORD = 'https://discord.gg/tWEmjR66cy';
+
+// Load the active version's nav tree to resolve component landing pages.
+const navModules = import.meta.glob('../../config/nav/*.json', { eager: true });
+let nav: any = null;
+for (const mod of Object.values(navModules)) {
+	const n = (mod as any).default;
+	if (n.id === v) nav = n;
+}
+
+function landingHref(node: any): string | null {
+	if (!node) return null;
+	if (node.kind === 'page') return `/${node.slug}/`;
+	if (node.kind === 'link') return node.href;
+	if (node.kind === 'group') {
+		for (const e of node.entries) {
+			const h = landingHref(e);
+			if (h) return h;
+		}
+	}
+	return null;
+}
+const topNode = (label: string) => nav?.tree.find((n: any) => n.label === label) ?? null;
+
+const glyphs: Record<string, string> = {
+	'C++': '++',
+	Rust: 'Rs',
+	Go: 'Go',
+	Python: 'Py',
+	Java: 'Jv',
+	'C#': 'C#',
+	TypeScript: 'TS',
+	Lua: 'Lua',
+};
+const bindingsGroup = topNode('Language bindings');
+const bindings = (bindingsGroup?.entries ?? []).map((n: any) => {
+	// A binding node is a `page` (single-page → uses `title`) or a `group`
+	// (multi-part → uses `label`).
+	const label = n.label ?? n.title ?? '';
+	return { label, href: landingHref(n), glyph: glyphs[label] ?? label.slice(0, 2) };
+});
+
+const paths = [
+	{
+		title: 'The storage engine',
+		lang: 'C',
+		text: 'Embed the TidesDB engine directly in your application.',
+		href: `/docs/${v}/preface`,
+		icon: '<path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 12l10 5 10-5"/><path d="M2 16l10 5 10-5"/>',
+	},
+	{
+		title: 'TideSQL',
+		lang: 'SQL',
+		text: 'Run TidesDB as a storage engine inside MariaDB and MySQL-compatible servers — no application changes.',
+		href: landingHref(topNode('TideSQL')) ?? `/docs/${v}/tidesql/preface`,
+		icon: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>',
+	},
+	{
+		title: 'Kafka connector',
+		lang: 'Streams',
+		text: 'A TidesDB-backed state store for Apache Kafka Streams — durable, embedded state for your topologies.',
+		href: landingHref(topNode('Kafka connector')) ?? `/docs/${v}/kafka/reference`,
+		icon: '<circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M8.5 11 15 7M8.5 13l6.5 4"/>',
+	},
+];
+
+const quickLinks = [
+	{ label: 'Install & build', href: `/docs/${v}/administration/building` },
+	{ label: 'Benchmarks', href: '/blog' },
+	{ label: 'GitHub', href: GITHUB, external: true },
+	{ label: 'Discord', href: DISCORD, external: true },
+];
+---
+
+<div class="home not-content">
+	<section class="home-hero" style="padding-block:clamp(2.5rem,7vw,4.5rem) 0;">
+		<div class="home-kicker">Get started</div>
+		<h1 class="home-hero__title" style="font-size:clamp(2.2rem,6vw,3.5rem);max-width:18ch;">
+			Start with <em>TidesDB</em>.
+		</h1>
+		<p class="home-hero__sub">
+			One engine, many front doors. Pick where you're building — the C library, your language, your SQL
+			database, or your stream — and we'll point you at the right docs.
+		</p>
+	</section>
+
+	<section class="home-sec">
+		<div class="hub-cards">
+			{
+				paths.map((p) => (
+					<a class="hub-card" href={p.href}>
+						<span class="hub-card__top">
+							<svg class="hub-card__icon" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" set:html={p.icon} />
+							<span class="hub-card__tag">{p.lang}</span>
+						</span>
+						<span class="hub-card__title">{p.title}</span>
+						<span class="hub-card__text">{p.text}</span>
+						<span class="hub-card__go">
+							Read the docs
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+						</span>
+					</a>
+				))
+			}
+		</div>
+	</section>
+
+	<section class="home-sec" id="bindings">
+		<h2 class="home-sec__title">Language bindings</h2>
+		<p class="home-sec__intro">
+			Reach TidesDB from the language you already build in.
+		</p>
+		<div class="home-langs">
+			{
+				bindings.map((b: any) => (
+					<a class="home-lang" href={b.href}>
+						<span class="hub-lang__glyph">{b.glyph}</span>
+						{b.label}
+					</a>
+				))
+			}
+		</div>
+	</section>
+
+	<section class="home-sec">
+		<div class="home-kicker">Handy links</div>
+		<div class="hub-quick">
+			{
+				quickLinks.map((q) => (
+					<a class="home-link" href={q.href} {...(q.external ? { target: '_blank', rel: 'noopener' } : {})}>
+						{q.label}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+					</a>
+				))
+			}
+		</div>
+	</section>
+</div>
+
+<style>
+	.hub-cards {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 1rem;
+	}
+	.hub-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1.6rem;
+		border-radius: 16px;
+		border: 1px solid var(--hair, rgba(255, 255, 255, 0.1));
+		text-decoration: none !important;
+		border-bottom: 1px solid var(--hair, rgba(255, 255, 255, 0.1)) !important;
+		color: inherit !important;
+		transition: transform 0.2s ease, border-color 0.2s ease;
+	}
+	.hub-card:hover {
+		transform: translateY(-3px);
+		border-color: var(--blue-2, #6f8be8);
+	}
+	.hub-card__top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.hub-card__icon {
+		width: 26px;
+		height: 26px;
+		stroke: var(--blue-2, #6f8be8);
+		fill: none;
+	}
+	.hub-card__tag {
+		font-family: var(--sl-font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--sl-color-gray-3);
+	}
+	.hub-card__title {
+		font-size: 1.2rem;
+		font-weight: 700;
+		color: var(--sl-color-white);
+	}
+	.hub-card__text {
+		font-size: 0.92rem;
+		line-height: 1.6;
+		color: var(--sl-color-gray-3);
+		flex: 1;
+	}
+	.hub-card__go {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.88rem;
+		font-weight: 600;
+		color: var(--blue-2, #6f8be8);
+		margin-top: 0.25rem;
+	}
+	.hub-card__go svg {
+		width: 16px;
+		height: 16px;
+		transition: transform 0.2s ease;
+	}
+	.hub-card:hover .hub-card__go svg {
+		transform: translateX(3px);
+	}
+
+	.hub-lang__glyph {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 8px;
+		font-family: var(--sl-font-mono);
+		font-size: 0.75rem;
+		font-weight: 800;
+		color: #fff;
+		background: var(--blue, #193edc);
+		flex-shrink: 0;
+	}
+	.home-lang {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		text-decoration: none !important;
+		border-bottom: none !important;
+	}
+
+	.hub-quick {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.25rem 2rem;
+		margin-top: 1.25rem;
+	}
+
+	@media (max-width: 860px) {
+		.hub-cards {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

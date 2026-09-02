@@ -1,0 +1,73 @@
+---
+// Sidebar override. On a versioned docs route (/docs/<id>/...) we render the
+// version dropdown plus that version's tree only, built from the committed nav
+// manifest (src/config/nav/<id>.json). The tree mixes core manual parts,
+// integrations, and language bindings — the latter often link-outs until their
+// repos ship docs. Every other page keeps Starlight's default sidebar.
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro';
+import { activeVersionId } from '../config/versions.js';
+import VersionSwitcher from './VersionSwitcher.astro';
+
+const activeId = activeVersionId(Astro.url.pathname);
+
+const navModules = import.meta.glob('../config/nav/*.json', { eager: true });
+const navById: Record<string, any> = {};
+for (const mod of Object.values(navModules)) {
+	const nav = (mod as any).default;
+	navById[nav.id] = nav;
+}
+
+const nav = activeId ? navById[activeId] : null;
+const current = Astro.url.pathname.replace(/\/$/, '');
+
+// Map our nav tree onto Starlight SidebarEntry[] so SidebarSublist renders it
+// natively (styling, collapse, active state). Returns { entries, hasCurrent }.
+function mapNodes(nodes: any[]): { entries: any[]; hasCurrent: boolean } {
+	let hasCurrent = false;
+	const entries = nodes.map((node) => {
+		if (node.kind === 'page') {
+			const href = `/${node.slug}/`;
+			const isCurrent = href.replace(/\/$/, '') === current;
+			if (isCurrent) hasCurrent = true;
+			return { type: 'link', href, label: node.title, isCurrent, attrs: {}, badge: undefined };
+		}
+		if (node.kind === 'link') {
+			return {
+				type: 'link',
+				href: node.href,
+				label: node.label,
+				isCurrent: false,
+				attrs: { target: '_blank', rel: 'noopener' },
+				badge: { variant: 'default', text: 'GitHub' },
+			};
+		}
+		// group
+		const child = mapNodes(node.entries);
+		if (child.hasCurrent) hasCurrent = true;
+		return {
+			type: 'group',
+			label: node.label,
+			entries: child.entries,
+			collapsed: node.open ? false : !child.hasCurrent,
+			badge: undefined,
+		};
+	});
+	return { entries, hasCurrent };
+}
+
+const sublist = nav ? mapNodes(nav.tree).entries : [];
+---
+
+{
+	nav ? (
+		<>
+			<VersionSwitcher current={activeId as string} />
+			<SidebarSublist sublist={sublist} />
+		</>
+	) : (
+		<Default>
+			<slot />
+		</Default>
+	)
+}

@@ -1,0 +1,106 @@
+---
+// The version dropdown. Selecting a `current` version keeps you on the same
+// page in the other version when that page exists, otherwise lands on that
+// version's docs root. Selecting a `legacy` version (pre-restructured-manual)
+// routes to the graceful /docs/legacy/ notice instead of a broken tree.
+import { VERSIONS } from '../config/versions.js';
+
+interface Props {
+	/** Active version id from the URL, e.g. 'v10'. */
+	current: string;
+}
+const { current } = Astro.props;
+
+// Valid page paths per current version, so the client can fall back gracefully
+// when a page doesn't exist in the version being switched to. Walk the nav tree
+// collecting every internal page slug.
+const navModules = import.meta.glob('../config/nav/*.json', { eager: true });
+function collectPages(nodes: any[]): string[] {
+	const out: string[] = [];
+	for (const node of nodes) {
+		if (node.kind === 'page') out.push(`/${node.slug}/`);
+		else if (node.kind === 'group') out.push(...collectPages(node.entries));
+	}
+	return out;
+}
+const validPaths: Record<string, string[]> = {};
+for (const mod of Object.values(navModules)) {
+	const nav = (mod as any).default;
+	validPaths[nav.id] = collectPages(nav.tree);
+}
+---
+
+<div class="version-switcher">
+	<label for="dsv-select">Version</label>
+	<select id="dsv-select" data-active={current} aria-label="Documentation version">
+		{
+			VERSIONS.map((v) => (
+				<option value={v.id} data-status={v.status} selected={v.id === current}>
+					{v.label}
+					{v.status === 'legacy' ? ' (archived)' : ''}
+				</option>
+			))
+		}
+	</select>
+</div>
+
+<script type="application/json" id="dsv-paths" set:html={JSON.stringify(validPaths)} />
+
+<script>
+	const select = document.getElementById('dsv-select') as HTMLSelectElement | null;
+	const pathsEl = document.getElementById('dsv-paths');
+	if (select && pathsEl) {
+		const validPaths: Record<string, string[]> = JSON.parse(pathsEl.textContent || '{}');
+		const norm = (p: string) => (p.endsWith('/') ? p : p + '/');
+		select.addEventListener('change', () => {
+			const opt = select.options[select.selectedIndex];
+			const targetId = select.value;
+			if (opt.dataset.status === 'legacy') {
+				window.location.href = '/docs/legacy/';
+				return;
+			}
+			const active = select.dataset.active || '';
+			// The subpath after /docs/<active>/ — reused across versions.
+			const rest = norm(window.location.pathname)
+				.replace(new RegExp(`^/docs/${active}/`), '')
+				.replace(/\/$/, '');
+			const candidate = norm(`/docs/${targetId}/${rest}`.replace(/\/+/g, '/'));
+			const known = validPaths[targetId] || [];
+			window.location.href = known.includes(candidate)
+				? candidate
+				: `/docs/${targetId}/`;
+		});
+	}
+</script>
+
+<style>
+	.version-switcher {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-block-end: 1rem;
+		padding-block-end: 1rem;
+		border-bottom: 1px solid var(--sl-color-gray-6);
+	}
+	.version-switcher label {
+		font-size: var(--sl-text-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--sl-color-gray-3);
+	}
+	.version-switcher select {
+		flex: 1;
+		padding: 0.35rem 0.5rem;
+		font-size: var(--sl-text-sm);
+		font-weight: 600;
+		color: var(--sl-color-white);
+		background-color: var(--sl-color-gray-6);
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.375rem;
+		cursor: pointer;
+	}
+	.version-switcher select:hover {
+		border-color: var(--sl-color-accent);
+	}
+</style>

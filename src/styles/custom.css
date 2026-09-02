@@ -87,32 +87,53 @@ pre,
     width: 80px;
 }
 
+/* Nav: an opaque, theme-aware frosted bar by DEFAULT on every page, so content
+   scrolling underneath the sticky header is never seen through it. The
+   homepage is the only exception — there it's transparent at the very top so it
+   blends into the hero, turning frosted once scrolled (JS toggles .is-scrolled
+   in Head.astro). Foreground follows the theme so it stays legible on both. */
 header {
-	backdrop-filter: blur(10px);
-	background: rgba(10, 37, 64, 0.95) !important;
-	border-bottom: 1px solid rgba(61, 110, 255, 0.2);
-	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+	--nav-fg: rgba(255, 255, 255, 0.92);
+	--nav-fg-strong: #ffffff;
+	background: rgba(10, 37, 64, 0.82) !important;
+	backdrop-filter: blur(12px) saturate(1.6);
+	-webkit-backdrop-filter: blur(12px) saturate(1.6);
+	border-bottom: 1px solid rgba(61, 110, 255, 0.2) !important;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 	position: sticky;
 	top: 0;
 	z-index: 100;
+	transition: background 0.3s ease, backdrop-filter 0.3s ease,
+		border-color 0.3s ease, box-shadow 0.3s ease;
 }
-
 :root[data-theme='light'] header {
-	background: rgba(10, 37, 64, 0.95) !important;
-	border-bottom: 1px solid rgba(61, 110, 255, 0.2);
+	--nav-fg: rgba(10, 37, 64, 0.88);
+	--nav-fg-strong: #0a2540;
+	background: rgba(255, 255, 255, 0.85) !important;
+	border-bottom: 1px solid rgba(10, 37, 64, 0.1) !important;
+	box-shadow: 0 4px 20px rgba(10, 37, 64, 0.06);
 }
 
-/* Force white text in navigation for both themes */
+/* Homepage only: transparent and blended into the hero until scrolled. */
+html:has(.home) header:not(.is-scrolled) {
+	background: transparent !important;
+	border-bottom-color: transparent !important;
+	box-shadow: none;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+/* Nav foreground follows the theme (see --nav-fg above). */
 header a,
 header .site-title,
 header nav a {
-	color: rgba(255, 255, 255, 0.9) !important;
+	color: var(--nav-fg) !important;
 }
 
 header a:hover,
 header .site-title:hover,
 header nav a:hover {
-	color: #ffffff !important;
+	color: var(--nav-fg-strong) !important;
 }
 
 :root[data-theme='light'] .sidebar a,
@@ -163,17 +184,17 @@ header nav a:hover {
 	transform: translateY(-1px);
 }
 
-/* Social icons white */
+/* Social icons follow the nav foreground (theme-aware). */
 header svg,
 header .social-icons svg {
-	color: rgba(255, 255, 255, 0.9) !important;
-	fill: rgba(255, 255, 255, 0.9) !important;
+	color: var(--nav-fg) !important;
+	fill: var(--nav-fg) !important;
 }
 
 header svg:hover,
 header .social-icons svg:hover {
-	color: #ffffff !important;
-	fill: #ffffff !important;
+	color: var(--nav-fg-strong) !important;
+	fill: var(--nav-fg-strong) !important;
 }
 
 /* card styling */
@@ -664,9 +685,13 @@ input[type="select"]:focus, select:focus {
 	border-bottom: none;
 }
 
-/* Make logo white in header (header has dark background in both themes) */
+/* Logo is blue artwork: show it as-is over the light ground, invert to white
+   on the dark ground. */
 .site-title img {
 	filter: brightness(0) invert(1);
+}
+:root[data-theme='light'] .site-title img {
+	filter: none;
 }
 
 .social-icons a {

@@ -1,0 +1,245 @@
+---
+// Homepage — editorial / minimal. Standard HTML + inline SVG, theme-aware.
+// Hierarchy: TidesDB Corp (company) → TidesDB (primary product, the page) →
+// TideSQL (appears once, framed as built on TidesDB). Scoped under `.home`;
+// styles in src/styles/home.css.
+import { LATEST } from '../../config/versions.js';
+
+const DOCS = `/getting-started`;
+const GITHUB = 'https://github.com/tidesdb/tidesdb';
+const DISCORD = 'https://discord.gg/tWEmjR66cy';
+
+const arrow = '<path d="M5 12h14M13 6l6 6-6 6"/>';
+
+const languages = ['C', 'C++', 'Rust', 'Go', 'Python', 'Java', 'C#', 'TypeScript', 'Lua'];
+
+const metrics = [
+
+	{ num: 'Lower costs', label: 'Higher utilization, less hardware for a given workload.' },
+	{ num: 'High performance', label: 'High-speed reads and writes with no in-place updates' },
+	{ num: 'Low latency', label: 'Non-locking algorithms, multi-versioned data.' },
+	{ num: 'Platform-independent', label: '4+ Platforms supported, and format portable.' },
+];
+
+const features = [
+	{
+		title: 'LSM-tree, rethought',
+		text: 'A log-structured merge tree hybrid built from first principles and tuned for modern NVMe storage.',
+		icon: '<path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 12l10 5 10-5"/><path d="M2 16l10 5 10-5"/>',
+	},
+	{
+		title: 'Write & space efficient',
+		text: 'Key-value separation and adaptive compaction keep write amplification and disk footprint low.',
+		icon: '<path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/>',
+	},
+	{
+		title: 'ACID transactions',
+		text: 'Multi-version concurrency control with support for 5 isolation levels.',
+		icon: '<path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/>',
+	},
+	{
+		title: 'Lock-free concurrency',
+		text: 'A lock-free, hierarchical architecture designed to scale with the cores on your machine.',
+		icon: '<rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
+	},
+	{
+		title: 'Embeddable',
+		text: 'A single C library. No server to run, no daemon to babysit, no external dependencies.',
+		icon: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+	},
+	{
+		title: 'Column families',
+		text: 'Isolated keyspaces, each independently configured and compacted for its workload.',
+		icon: '<rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/>',
+	},
+];
+
+const bars = [
+	{ name: 'Write throughput', rocks: 64 },
+	{ name: 'Read throughput', rocks: 72 },
+	{ name: 'Space efficiency', rocks: 70 },
+];
+---
+
+{/* `not-content` opts out of Starlight's markdown flow-spacing (the auto
+   margin-top between siblings that was nudging the first box in each row up).
+   The homepage supplies all its own spacing via gaps and explicit margins. */}
+<div class="home not-content">
+	{/* Ambient tide. */}
+	<div class="wave-container">
+		<div class="wave wave-1"></div>
+		<div class="wave wave-2"></div>
+		<div class="wave wave-3"></div>
+	</div>
+	<div class="particles">
+		<div class="particle" style="left: 12%; animation-delay: 0s;"></div>
+		<div class="particle" style="left: 28%; animation-delay: 2.5s;"></div>
+		<div class="particle" style="left: 46%; animation-delay: 4s;"></div>
+		<div class="particle" style="left: 64%; animation-delay: 1s;"></div>
+		<div class="particle" style="left: 82%; animation-delay: 3.5s;"></div>
+	</div>
+
+	{/* ---------- HERO ---------- */}
+	<section class="home-hero">
+		<h1 class="home-hero__title" data-reveal>
+			Storage engineered from <em>first principles</em>.
+		</h1>
+		<p class="home-hero__sub" data-reveal style="--reveal-delay:0.14s">
+			<strong>TidesDB</strong> is a fast, embeddable, portable and multiplatform storage engine written in C —
+			beating industry standards, and open source.
+		</p>
+		<div class="home-hero__actions" data-reveal style="--reveal-delay:0.21s">
+			<a class="home-btn" href={DOCS}>
+				Get started
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" set:html={arrow} />
+			</a>
+			<a class="home-link" href={GITHUB} target="_blank" rel="noopener">
+				View on GitHub
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg>
+			</a>
+		</div>
+	</section>
+
+	{/* ---------- METRICS ---------- */}
+	<div class="home-metrics" data-reveal>
+		{
+			metrics.map((m) => (
+				<div class="home-metric">
+					<div style="font-size: 18px" class="home-metric__num">{m.num}</div>
+					<div class="home-metric__label">{m.label}</div>
+				</div>
+			))
+		}
+	</div>
+
+	{/* ---------- FEATURES ---------- */}
+	<section class="home-sec">
+		<div data-reveal>
+			<div class="home-kicker">Why TidesDB</div>
+			<h2 class="home-sec__title">Everything a modern storage engine should be</h2>
+			<p class="home-sec__intro">
+				Built on the latest storage research and benchmarked in the open — every release, every claim.
+			</p>
+		</div>
+		<div class="home-features" data-reveal>
+			{
+				features.map((f) => (
+					<div class="home-feature">
+						<svg class="home-feature__icon" viewBox="0 0 24 24" set:html={f.icon} />
+						<h3 class="home-feature__title">{f.title}</h3>
+						<p class="home-feature__text">{f.text}</p>
+					</div>
+				))
+			}
+		</div>
+	</section>
+
+	<hr class="home-rule" />
+
+	{/* ---------- PERFORMANCE ---------- */}
+	<section class="home-sec">
+		<div class="home-split">
+			<div data-reveal>
+				<div class="home-kicker">Performance</div>
+				<h2 class="home-sec__title">Benchmarked to the industry standard</h2>
+				<p class="home-sec__intro">
+					TidesDB surpasses the industry on write throughput,
+					read throughput, and space amplification — transparently, with every result published.
+				</p>
+				<p style="margin-top:1.75rem;">
+					<a class="home-link" href="/blog">Read the benchmarks <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" set:html={arrow} /></a>
+				</p>
+			</div>
+			<div class="home-bars" data-reveal style="--reveal-delay:0.1s" aria-hidden="true">
+				{
+					bars.map((b) => (
+						<div>
+							<div class="home-bar__top">
+								<span class="home-bar__name">{b.name}</span>
+								<span class="home-bar__win">TidesDB leads</span>
+							</div>
+							<div class="home-bar__track"><div class="home-bar__fill home-bar__fill--tide" style="--w:100%" /></div>
+							<div class="home-bar__track"><div class="home-bar__fill home-bar__fill--rocks" style={`--w:${b.rocks}%`} /></div>
+						</div>
+					))
+				}
+				<div class="home-bars__foot">
+					<i class="is-tide">TidesDB</i>
+					<i class="is-rocks">RocksDB</i>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="home-rule" />
+
+	{/* ---------- TIDESQL — built on TidesDB ---------- */}
+	<section class="home-sec">
+		<div class="home-split">
+			<div class="home-flow" data-reveal aria-hidden="true">
+				<div class="home-flow__node">
+					<div class="home-flow__name">Your application</div>
+					<div class="home-flow__desc">speaks SQL</div>
+				</div>
+				<div class="home-flow__node">
+					<div class="home-flow__name">MariaDB / MySQL</div>
+					<div class="home-flow__desc">server &amp; SQL layer</div>
+				</div>
+				<div class="home-flow__node home-flow__node--accent">
+					<div class="home-flow__name">TideSQL</div>
+					<div class="home-flow__desc">storage engine plugin</div>
+				</div>
+				<div class="home-flow__node home-flow__node--accent">
+					<div class="home-flow__name">TidesDB</div>
+					<div class="home-flow__desc">the engine, on disk</div>
+				</div>
+			</div>
+			<div data-reveal style="--reveal-delay:0.1s">
+				<div class="home-kicker">TideSQL — built on TidesDB</div>
+				<h2 class="home-sec__title">The same engine, behind your SQL</h2>
+				<p class="home-sec__intro">
+					TideSQL packages TidesDB as a storage engine for MariaDB and MySQL-compatible servers.
+					Your application keeps speaking SQL — TidesDB handles the bytes underneath, with the write
+					and space efficiency it's known for.
+				</p>
+			</div>
+		</div>
+	</section>
+
+	<hr class="home-rule" />
+
+
+
+	{/* ---------- FINAL ---------- */}
+	<section class="home-final" data-reveal>
+		<h2 class="home-final__title">Built in the open.</h2>
+		<p class="home-final__sub">
+			Star the repo, read the docs, and join a community building storage from first principles.
+		</p>
+		<div class="home-final__actions">
+			<a class="home-btn" href={GITHUB} target="_blank" rel="noopener">Star on GitHub</a>
+			<a class="home-link" href={DISCORD} target="_blank" rel="noopener">Join the Discord
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" set:html={arrow} /></a>
+		</div>
+	</section>
+</div>
+
+<script>
+	const items = document.querySelectorAll('.home [data-reveal]');
+	if (!('IntersectionObserver' in window) || items.length === 0) {
+		items.forEach((el) => el.classList.add('is-visible'));
+	} else {
+		const io = new IntersectionObserver(
+			(entries, obs) => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) {
+						entry.target.classList.add('is-visible');
+						obs.unobserve(entry.target);
+					}
+				}
+			},
+			{ rootMargin: '0px 0px -8% 0px', threshold: 0.12 }
+		);
+		items.forEach((el) => io.observe(el));
+	}
+</script>

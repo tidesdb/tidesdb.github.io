@@ -1,0 +1,34 @@
+{
+  "$comment": "TEMPLATE — copy this into a component repo as doc/manual.json and edit. This is the table of contents for one component (an FFI binding or an integration). The website reads it to build the sidebar and the reading order. Do NOT put the component's own version here. DO set `tidesdb` to the TidesDB version (major.minor.patch) this component supports — the site uses it to place the component under the right TidesDB major and to fill the compatibility table.",
+  "title": "TidesDB Python",
+  "tidesdb": "10.0.0",
+  "parts": [
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "dir": "01-getting-started",
+      "chapters": [
+        { "file": "install.md", "slug": "install", "title": "Installation" },
+        { "file": "quickstart.md", "slug": "quickstart", "title": "Quickstart" }
+      ]
+    },
+    {
+      "id": "guide",
+      "title": "Guide",
+      "dir": "02-guide",
+      "chapters": [
+        { "file": "transactions.md", "slug": "guide/transactions", "title": "Transactions" },
+        { "file": "iterators.md", "slug": "guide/iterators", "title": "Iterators" }
+      ]
+    },
+    {
+      "id": "reference",
+      "title": "API Reference",
+      "dir": "03-reference",
+      "chapters": [
+        { "file": "database.md", "slug": "reference/database", "title": "Database" },
+        { "file": "column-family.md", "slug": "reference/column-family", "title": "Column Family" }
+      ]
+    }
+  ]
+}

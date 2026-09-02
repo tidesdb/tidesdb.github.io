@@ -1,0 +1,81 @@
+---
+import Default from '@astrojs/starlight/components/Head.astro';
+import { gitMeta, resolveAuthor, ogImage, SITE } from '../utils/articles.js';
+
+// Starlight already emits <title>, canonical, description, og/twitter tags and
+// og:image (from each article's frontmatter). Here we add the SEO that is
+// specific to blog posts: article timestamps, author, and BlogPosting
+// structured data, derived from git history so nothing is maintained by hand.
+const { entry } = Astro.locals.starlightRoute;
+
+/** Build the article-only SEO payload, or null for non-article pages. */
+function articleSeo() {
+	if (!entry.id.startsWith('articles/')) return null;
+	const meta = gitMeta(entry.filePath);
+	const author = resolveAuthor(entry, meta.gitAuthor);
+	const url = `${SITE}/${entry.id}`;
+	const image = ogImage(entry);
+	const published = meta.created.toISOString();
+	const modified = meta.updated.toISOString();
+	return {
+		published,
+		modified,
+		author,
+		jsonLd: {
+			'@context': 'https://schema.org',
+			'@type': 'BlogPosting',
+			headline: entry.data.title,
+			description: entry.data.description,
+			url,
+			mainEntityOfPage: url,
+			datePublished: published,
+			dateModified: modified,
+			...(image ? { image } : {}),
+			author: {
+				'@type': 'Person',
+				name: author.name,
+				...(author.url ? { url: author.url } : {}),
+			},
+			publisher: {
+				'@type': 'Organization',
+				name: 'TidesDB',
+				url: SITE,
+				logo: { '@type': 'ImageObject', url: `${SITE}/tidesdb-logo-v8.svg` },
+			},
+		},
+	};
+}
+
+const seo = articleSeo();
+---
+
+<Default><slot /></Default>
+
+{/* Toggle the nav between transparent (top) and frosted (scrolled). */}
+<script is:inline>
+	(() => {
+		const onReady = () => {
+			const header = document.querySelector('header');
+			if (!header) return;
+			const sync = () => header.classList.toggle('is-scrolled', window.scrollY > 24);
+			sync();
+			window.addEventListener('scroll', sync, { passive: true });
+		};
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', onReady);
+		} else {
+			onReady();
+		}
+	})();
+</script>
+
+{
+	seo && (
+		<>
+			<meta property="article:author" content={seo.author.name} />
+			<meta property="article:published_time" content={seo.published} />
+			<meta property="article:modified_time" content={seo.modified} />
+			<script type="application/ld+json" is:inline set:html={JSON.stringify(seo.jsonLd)} />
+		</>
+	)
+}

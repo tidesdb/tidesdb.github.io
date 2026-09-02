@@ -1,78 +1,12 @@
 ---
-title: Fast, embeddable key-value storage
-description: A high-performance LSM-tree based key-value storage engine library written in C. Build databases or use directly as a standalone store.
+title: High-Performance Storage, Reimagined.
+description: TidesDB is a fast, embeddable LSM-tree storage engine in C — write & space efficient, ACID, faster than RocksDB, with FFI bindings for 9 languages. TideSQL brings it to MariaDB & MySQL.
 template: splash
-hero:
-  tagline: TidesDB is a high-performance key-value storage engine for modern applications.
-  actions:
-    - text: Get started
-      link: getting-started/what-is-tidesdb
-      icon: right-arrow
-      variant: primary
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import Landing from '../../components/home/Landing.astro';
 import Footer from '../../components/Footer.astro';
-import VersionBadge from '../../components/VersionBadge.astro';
 
-<div style="text-align: center; margin: 2rem 0;">
-	<VersionBadge />
-</div>
+<Landing />
 
-<div class="wave-container">
-	<div class="wave wave-1"></div>
-	<div class="wave wave-2"></div>
-	<div class="wave wave-3"></div>
-</div>
-
-<div class="particles">
-	<div class="particle" style="left: 10%; animation-delay: 0s;"></div>
-	<div class="particle" style="left: 20%; animation-delay: 2s;"></div>
-	<div class="particle" style="left: 30%; animation-delay: 4s;"></div>
-	<div class="particle" style="left: 40%; animation-delay: 1s;"></div>
-	<div class="particle" style="left: 50%; animation-delay: 3s;"></div>
-	<div class="particle" style="left: 60%; animation-delay: 5s;"></div>
-	<div class="particle" style="left: 70%; animation-delay: 2.5s;"></div>
-	<div class="particle" style="left: 80%; animation-delay: 4.5s;"></div>
-	<div class="particle" style="left: 90%; animation-delay: 1.5s;"></div>
-</div>
-
-<CardGrid stagger>
-	<Card title="ACID Transactions" icon="seti:lock" style="--card-index: 0">
-		The database implements ACID transactions with full MVCC supporting five isolation levels from read-uncommitted through serializable. 
-	</Card>
-	<Card title="LSM-Tree Architecture" icon="seti:db" style="--card-index: 2">
-		Log-structured merge-tree design optimized for write-heavy workloads with efficient read performance.
-	</Card>
-	<Card title="Near Linear Scalability" icon="seti:db" style="--card-index: 3">
-		The engine is designed for maximum scalability within the constraints of ACID guarantees.
-	</Card>
-	<Card title="Outperforms RocksDB" icon="up-arrow" style="--card-index: 4">
-		Outperforms leaders in the space such as RocksDB across almost all workloads by large margins.  See <a href="articles/what-i-learned-building-a-storage-engine-that-outperforms-rocksdb">this article</a> for details.
-	</Card>
-</CardGrid>
-
-<CardGrid stagger>
-	<Card title="Pluggable MariaDB Engine (TideSQL)" icon="open-book" style="--card-index: 6">
-		TidesDB can be used as a pluggable storage engine for MariaDB. <a href="reference/tidesql">Learn more</a>
-	</Card>
-	<Card title="Optional Object Storage Mode" icon="rocket" style="--card-index: 6">
-		Scale infinitely with multi-tier object storage integration.
-	</Card>
-	<Card title="Flexible Compression" icon="puzzle" style="--card-index: 3">
-		Support for Snappy, LZ4, and ZSTD compression algorithms. Configure per column family for optimal storage efficiency.
-	</Card>
-	<Card title="Space efficient" icon="random" style="--card-index: 4">
-		TidesDB is highly optimized for space efficiency comparing to leading engines like RocksDB.
-	</Card>
-	<Card title="Cross-Platform & Portable" icon="laptop" style="--card-index: 5">
-		Native support for 32-bit and 64-bit Linux, macOS, and Windows with platform abstraction layer for consistent behavior.  Storage files are portable across platforms and architectures.
-	</Card>
-	<Card title="Easy to use API" icon="open-book" style="--card-index: 6">
-		Clean, intuitive C API with consistent error handling.
-	</Card>
-</CardGrid>
-
-
-
-<Footer/>
+<Footer />
