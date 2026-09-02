@@ -1,0 +1,41 @@
+---
+// Graceful landing for versions that predate the restructured manual (< v10).
+// These lines have no Core/TideSQL/FFI bundle to show, so the version dropdown
+// sends readers here instead of into a broken tree.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { VERSIONS, LATEST } from '../../config/versions.js';
+
+const legacy = VERSIONS.filter((v) => v.status === 'legacy');
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Documentation for older versions',
+		description:
+			'Versions of TidesDB before 10.0.0 predate the restructured manual. Their reference lives with the source.',
+		tableOfContents: false,
+	}}
+>
+	<p>
+		The versioned manual — the Core reference, the TideSQL integration, and the
+		FFI bindings you select from the version dropdown — begins with
+		<strong>TidesDB {LATEST.label}</strong>. Releases before it predate this
+		restructured documentation, so there is no bundle to show here.
+	</p>
+	<p>For those versions, the reference lives alongside the source at the matching release tag:</p>
+	<ul>
+		{
+			legacy.map((v) => (
+				<li>
+					<a href={v.link} target="_blank" rel="noopener">
+						TidesDB {v.label} — source &amp; README on GitHub
+					</a>
+				</li>
+			))
+		}
+	</ul>
+	<p>
+		Looking for the current documentation? Head to the
+		<a href={`/docs/${LATEST.id}/preface`}>latest manual</a>.
+	</p>
+</StarlightPage>

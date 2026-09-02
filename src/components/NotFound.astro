@@ -1,0 +1,60 @@
+---
+// Body of the custom 404 (rendered by src/content/docs/404.mdx, which Starlight
+// serves as the 404 route → dist/404.html). Graphic is /404.gif.
+import { LATEST } from '../config/versions.js';
+const DOCS = `/docs/${LATEST.id}/preface`;
+---
+
+<div class="home not-content">
+	<section class="notfound">
+		<img class="notfound__img" src="/404.gif" alt="404 — page not found" width="360" height="360" />
+		<h1 class="notfound__title">This page drifted out to sea.</h1>
+		<p class="notfound__text">
+			The page you’re looking for doesn’t exist, moved, or was never charted. Let’s get you back on
+			course.
+		</p>
+		<div class="notfound__actions">
+			<a class="home-btn" href="/">Back home</a>
+			<a class="home-link" href={DOCS}>
+				Read the docs
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+			</a>
+		</div>
+	</section>
+</div>
+
+<style>
+	.notfound {
+		text-align: center;
+		max-width: 640px;
+		margin: clamp(1rem, 5vw, 3rem) auto;
+		padding-inline: 1.25rem;
+	}
+	.notfound__img {
+		width: min(320px, 70vw);
+		height: auto;
+		margin-inline: auto;
+	}
+	.notfound__title {
+		font-size: clamp(1.8rem, 4.5vw, 2.6rem);
+		font-weight: 800;
+		letter-spacing: -0.03em;
+		line-height: 1.1;
+		margin: 1rem 0 0.75rem;
+		color: var(--sl-color-white);
+	}
+	.notfound__text {
+		font-size: 1.05rem;
+		line-height: 1.6;
+		color: var(--sl-color-gray-3);
+		max-width: 46ch;
+		margin: 0 auto 2rem;
+	}
+	.notfound__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.25rem;
+		justify-content: center;
+		align-items: center;
+	}
+</style>

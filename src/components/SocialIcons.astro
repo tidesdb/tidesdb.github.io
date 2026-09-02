@@ -1,0 +1,68 @@
+---
+// Top-nav additions: a "Docs" dropdown (the docs entry point from anywhere on
+// the site), a "Blog" link, and a "Company" dropdown for the footer/company
+// pages. Then Starlight's default social icons. Lives in the header everywhere.
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+import NavDropdown from './NavDropdown.astro';
+import { LATEST } from '../config/versions.js';
+
+const v = LATEST.id;
+const docsLinks = [
+	{ label: 'Getting Started', href: '/getting-started/' },
+	{ label: 'TidesDB manual', href: `/docs/${v}/preface` },
+	{ label: 'TideSQL', href: `/docs/${v}/tidesql/preface` },
+	{ label: 'Language bindings', href: '/getting-started/#bindings' },
+	{ label: 'Kafka connector', href: `/docs/${v}/kafka/reference` },
+	{ label: 'Compatibility', href: `/docs/${v}/compatibility` },
+];
+const companyLinks = [
+	{ label: 'About TidesDB Corp.', href: '/company/about-tidesdb-corp' },
+	{ label: 'Licensing', href: '/licensing' },
+	{ label: 'Support', href: '/support' },
+	{ label: 'Partners', href: '/partners' },
+	{ label: 'Sponsors', href: '/sponsors' },
+];
+---
+
+<NavDropdown label="Docs" id="docs" links={docsLinks} />
+<a href="/blog" class="header-nav-link">Blog</a>
+<NavDropdown label="Company" id="company" links={companyLinks} />
+<Default><slot /></Default>
+
+<style>
+	.header-nav-link {
+		font-size: var(--sl-text-sm);
+		font-weight: 500;
+		white-space: nowrap;
+		border-bottom: none;
+		align-self: center;
+		padding-inline: 0.25rem;
+	}
+</style>
+
+<script>
+	const dropdowns = Array.from(document.querySelectorAll<HTMLElement>('.nav-dd'));
+	const closeAll = (except?: HTMLElement) => {
+		for (const dd of dropdowns) {
+			if (dd === except) continue;
+			dd.classList.remove('is-open');
+			dd.querySelector('.nav-dd__btn')?.setAttribute('aria-expanded', 'false');
+		}
+	};
+	for (const dd of dropdowns) {
+		const btn = dd.querySelector('.nav-dd__btn');
+		btn?.addEventListener('click', (e) => {
+			e.stopPropagation();
+			const open = dd.classList.toggle('is-open');
+			btn.setAttribute('aria-expanded', String(open));
+			if (open) closeAll(dd);
+		});
+	}
+	document.addEventListener('click', (e) => {
+		const t = e.target as Node;
+		if (!dropdowns.some((dd) => dd.contains(t))) closeAll();
+	});
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') closeAll();
+	});
+</script>

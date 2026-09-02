@@ -1,0 +1,168 @@
+---
+// Generated compatibility overview for a distribution: every component (core,
+// integrations and their per-server variants, language bindings), the TidesDB
+// version it supports, its own release, and where its documentation stands.
+//
+// This page is deliberately the honest one, and it is the only place that tells
+// the whole story: a component is documented on this site if and only if its
+// public repository publishes docs for this major (see scripts/sync-docs.mjs),
+// so the components that are NOT documented are exactly as informative as the
+// ones that are. It reports them rather than hiding them, and never lets a
+// component inherit a version it has not claimed.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { CURRENT_VERSIONS, distributionComponents } from '../../../config/versions.js';
+
+export function getStaticPaths() {
+	return CURRENT_VERSIONS.map((v: any) => ({ params: { version: v.id }, props: { version: v } }));
+}
+
+/** What sync recorded per component; `source` is how its docs were resolved. */
+interface ComponentRecord {
+	supports: string | null;
+	version: string | null;
+	source: 'tag' | 'branch' | 'undocumented' | 'mismatch' | 'missing';
+	ref: string | null;
+	repo: string | null;
+	landing: string | null;
+}
+
+const { version } = Astro.props;
+const rows = distributionComponents(version);
+
+// The components map is emitted into the committed nav manifest by sync.
+const navModules = import.meta.glob('../../../config/nav/*.json', { eager: true });
+let nav: any = null;
+for (const mod of Object.values(navModules)) {
+	const n = (mod as any).default;
+	if (n.id === version.id) nav = n;
+}
+const components: Record<string, ComponentRecord> = nav?.components ?? {};
+const syncedAt: string | null = nav?.syncedAt ?? null;
+
+function docStatus(rec: ComponentRecord | undefined) {
+	switch (rec?.source) {
+		case 'tag':
+		case 'branch':
+			return { label: 'Documented', href: rec.landing };
+		case 'undocumented':
+			return { label: 'Docs not published', href: rec.repo, muted: true };
+		case 'mismatch':
+			return { label: 'Docs for another release', href: rec.repo, muted: true };
+		default:
+			return { label: 'Not yet published', href: null, muted: true };
+	}
+}
+
+const documented = rows.filter((r: any) => {
+	const s = components[r.id]?.source;
+	return s === 'tag' || s === 'branch';
+});
+const unpinned = documented.filter((r: any) => components[r.id]?.source === 'branch').length;
+---
+
+<StarlightPage
+	frontmatter={{
+		title: `TidesDB ${version.label} — Compatibility`,
+		description: `Every component of the TidesDB ${version.label} distribution — TideSQL for MariaDB and MySQL, the Kafka connector, and each language binding — with the TidesDB version it supports and its documentation status.`,
+		tableOfContents: false,
+	}}
+>
+	<p>
+		A TidesDB major is a distribution. Each component keeps its own repository and release cadence,
+		and declares the TidesDB version it supports in its own docs. Everything below is filed under
+		<strong>TidesDB {version.label}</strong>.
+	</p>
+
+	<p>
+		A component is documented on this site when its repository publishes documentation for this
+		major — no sooner. Components listed as <em>docs not published</em> are working software with
+		their own repositories; they simply have not shipped a {version.label} manual yet, and will
+		appear here automatically when they do.
+	</p>
+
+	<table>
+		<thead>
+			<tr>
+				<th>Component</th>
+				<th>Type</th>
+				<th>Release</th>
+				<th>Supports TidesDB</th>
+				<th>Documentation</th>
+			</tr>
+		</thead>
+		<tbody>
+			{
+				rows.map((row: any) => {
+					const rec = components[row.id];
+					const status = docStatus(rec);
+					return (
+						<tr>
+							<td>{row.label}</td>
+							<td>{row.kind}</td>
+							<td>
+								{rec?.version ??
+									(rec?.source === 'missing' ? (
+										<span class="compat-muted">—</span>
+									) : (
+										<span class="compat-muted" title="Released on its own cadence — see the repository.">
+											see repo
+										</span>
+									))}
+							</td>
+							<td>
+								{rec?.supports ?? (
+									<span class="compat-muted" title="This component has not declared a supported TidesDB version.">
+										not declared
+									</span>
+								)}
+							</td>
+							<td>
+								{status.href ? (
+									<a href={status.href} class={status.muted ? 'compat-muted' : undefined}>
+										{status.label}
+									</a>
+								) : (
+									<span class="compat-muted">{status.label}</span>
+								)}
+								{rec?.source === 'branch' && (
+									<span class="compat-muted" title="Built from the repository's default branch, not a release tag.">
+										{' '}· unpinned
+									</span>
+								)}
+							</td>
+						</tr>
+					)
+				})
+			}
+		</tbody>
+	</table>
+
+	{
+		unpinned > 0 && (
+			<p class="compat-note">
+				<strong>{unpinned}</strong> of the {documented.length} documented component
+				{documented.length === 1 ? '' : 's'} above was built from its default branch rather than a
+				pinned release tag{syncedAt ? `, last synced on ${syncedAt}` : ''}. Those pages track work in
+				progress, so read them as a preview of the next release rather than a record of a shipped one.
+			</p>
+		)
+	}
+
+	<p>
+		Looking for the manual? Start with the <a href={`/docs/${version.id}/preface`}>TidesDB {version.label} core docs</a>.
+	</p>
+</StarlightPage>
+
+<style>
+	.compat-muted {
+		color: var(--sl-color-gray-3);
+		font-style: italic;
+	}
+
+	.compat-note {
+		border-left: 3px solid var(--sl-color-orange);
+		padding-left: 1rem;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+	}
+</style>

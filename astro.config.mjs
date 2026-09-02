@@ -1,19 +1,87 @@
 // @ts-check
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { LATEST } from './src/config/versions.js';
+
+// Landing chapter for the latest docs bundle (first entry in reading order).
+const LATEST_DOCS = `/docs/${LATEST.id}/preface`;
+const D = `/docs/${LATEST.id}`;
+
+// The pre-v10 site kept one flat page per topic under /reference/ and two
+// explainers under /getting-started/. The restructured manual replaced all of
+// them, so every one of those URLs is mapped to its nearest equivalent rather
+// than left to 404 — they are the site's oldest and best-linked pages.
+//
+// Per-component pages are resolved through the sync manifest rather than
+// hard-coded, because whether a component is documented HERE changes on its own
+// (see scripts/sync-docs.mjs). While one is unpublished its old URL lands on the
+// compatibility page — the on-site index that explains the situation and links
+// to the repo — and the moment its docs are published and synced, the same
+// redirect follows to the real chapter with no edit here.
+// Written by sync-docs, which `npm run build` and `npm run dev` both run first.
+// Tolerate its absence so a bare `astro build`/`astro preview` still loads: with
+// no manifest every component simply resolves to the compatibility page.
+/** @type {{ components: Record<string, { source?: string, landing?: string|null }> }} */
+let nav = { components: {} };
+try {
+	nav = JSON.parse(readFileSync(new URL(`./src/config/nav/${LATEST.id}.json`, import.meta.url), 'utf8'));
+} catch {
+	console.warn('[redirects] no nav manifest yet — run `npm run sync-docs`');
+}
+
+/**
+ * Where a component's docs live on this site, or the compatibility page.
+ * @param {string} id
+ */
+function componentDocs(id) {
+	const rec = nav.components?.[id];
+	const documented = rec?.source === 'tag' || rec?.source === 'branch';
+	return documented && rec.landing ? rec.landing : `${D}/compatibility`;
+}
+
+const LEGACY_REFERENCE = {
+	'/getting-started/what-is-tidesdb': `${D}/preface`,
+	'/getting-started/how-does-tidesdb-work': `${D}/internals/architecture`,
+	'/reference/c': `${D}/reference/database`,
+	'/reference/building': `${D}/administration/building`,
+	'/reference/tuning': `${D}/appendix/configuration`,
+	'/reference/admintool': `${D}/internals/testing-and-tools`,
+	'/reference/tidesql': componentDocs('tidesql-mariadb'),
+	'/reference/kafka': componentDocs('kafka'),
+	'/reference/cplusplus': componentDocs('cpp'),
+	'/reference/csharp': componentDocs('csharp'),
+	'/reference/go': componentDocs('go'),
+	'/reference/java': componentDocs('java'),
+	'/reference/lua': componentDocs('lua'),
+	'/reference/python': componentDocs('python'),
+	'/reference/rust': componentDocs('rust'),
+	'/reference/typescript': componentDocs('typescript'),
+};
 
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://tidesdb.com',
+	redirects: {
+		// Bare docs entry points land on the latest bundle's first chapter.
+		'/docs': LATEST_DOCS,
+		[`/docs/${LATEST.id}`]: LATEST_DOCS,
+		...LEGACY_REFERENCE,
+	},
 	integrations: [
 		starlight({
 			title: 'TidesDB',
 			description: 'Fast, embeddable LSM-tree based key-value storage engine library written in C. ACID transactions, great concurrency, cross-platform support.',
 			customCss: [
 				'./src/styles/custom.css',
+				'./src/styles/home.css',
 			  ],
 			components: {
 				PageTitle: './src/components/PageTitle.astro',
+				Head: './src/components/Head.astro',
+				SocialIcons: './src/components/SocialIcons.astro',
+				Sidebar: './src/components/Sidebar.astro',
+				Pagination: './src/components/Pagination.astro',
 			},
 			logo: {
 				light: './src/assets/tidesdb-logo-v8.svg',
@@ -84,13 +152,6 @@ export default defineConfig({
 					}
 				},
 				{
-					tag: 'link',
-					attrs: {
-						rel: 'canonical',
-						href: 'https://tidesdb.com'
-					}
-				},
-				{
 					tag: 'meta',
 					attrs: {
 						name: 'robots',
@@ -130,280 +191,20 @@ export default defineConfig({
 			],
 			sidebar: [
 				{
-					label: 'Getting started',
-					items: [
-						{ label: 'What is TidesDB?', slug: 'getting-started/what-is-tidesdb' },
-						{ label: 'How does TidesDB work?', slug: 'getting-started/how-does-tidesdb-work' },
-					],
+					label: 'Getting Started',
+					slug: 'getting-started',
 				},
 				{
-					label: 'Reference',
-					items: [
-						{ label: 'Building & Benchmarking', slug: 'reference/building' },
-						{ label: 'C API Reference', link: 'reference/c' },
-						{ label: 'C++ API Reference', slug: 'reference/cplusplus' },
-						{ label: 'C# API Reference', link: 'reference/csharp' },
-						{ label: 'GO API Reference', slug: 'reference/go' },
-						{ label: 'Python API Reference', slug: 'reference/python' },
-						{ label: 'Java API Reference', slug: 'reference/java' },
-						{ label: 'Rust API Reference', slug: 'reference/rust' },
-						{ label: 'TypeScript API Reference', slug: 'reference/typescript' },
-						{ label: 'Lua API Reference', slug: 'reference/lua' },
-						{ label: 'TideSQL Reference', slug: 'reference/tidesql' },
-						{ label: 'Kafka Reference', slug: 'reference/kafka' },
-						{ label: 'Admintool Reference', slug: 'reference/admintool' },
-						{ label: 'Tuning Reference', link: 'reference/tuning' },
-					],
+					// Versions are chosen from the dropdown inside the docs, not
+					// listed here. This just links into the latest bundle; the
+					// custom Sidebar override renders the per-version tree.
+					label: 'Documentation',
+					link: LATEST_DOCS,
 				},
+
 				{
-					label: 'Unified Manuals',
-					items: [
-						{
-							label: 'TidesDB 9 Unified Manual',
-							link: 'unified-manuals/TidesDB_9_Unified_Manual.pdf'
-						},
-					],
-				},
-				{
-					label: 'Articles',
-					items: [
-					
-						{
-				
-							label: 'HammerDB TPC-C TideSQL v4.6.1 & InnoDB Analysis in MariaDB v11.8.6',
-							link: 'articles/hammerdb-tpc-c-tidesql-v4-6-1-innodb-mariadb-v11-8-6'
-						},
-						{
-				
-							label: 'Retrieval-Augmented Generation on TideSQL - Hybrid full-text + vector search with TTL',
-							link: 'articles/retrieval-augmented-generation-on-tidesql-fts-vector-ttl'
-						},
-						{
-				
-							label: 'sysbench zipfian read-write Analysis on TidesDB v9.3.11/TideSQL v4.5.9, RocksDB (MyRocks), in MariaDB v11.8.6',
-							link: 'articles/sysbench-rw-tidesdb-v9-3-11-tidesql-v4-5-9-rocksdb-myrocks-in-mariadb-v11-8-6'
-						},
-						{
-				
-							label: 'TTL (Time to live) using TideSQL in MariaDB',
-							link: 'articles/ttl-time-to-live-using-tidesql-in-mariadb'
-						},
-						{
-				
-							label: 'Configuring TideSQL in MariaDB',
-							link: 'articles/configuring-tidesql-in-mariadb'
-						},
-						{
-				
-							label: 'Build Comparison TidesDB v9.3.6 & RocksDB v11.1.1',
-							link: 'articles/build-comparison-tidesdb-v9-3-6-rocksdb-v11-1-1'
-						},
-						{
-				
-							label: 'sysbench Analysis on TideSQL v4.5.6 & InnoDB in MariaDB v11.8.6',
-							link: 'articles/sysbench-analysis-on-tidesql-v4-5-6-innodb-in-mariadb-v11-8-6-small-buffer-cache'
-						},
-						{
-				
-							label: 'Keybench Analysis with TidesDB v9.3.6 and RocksDB v11.1.1',
-							link: 'articles/keybench-analysis-tidesdb-v9-3-6-rocksdb-v11-1-1'
-						},
-						{
-							label: 'TideSQL v4.5.5 & InnoDB Full-Text Search, Spatial, and Large Value Analysis in MariaDB v11.8.6',
-							link: 'articles/tidesql-v4-5-5-innodb-fts-spatial-and-large-value-analysis-in-mariadb-v11-8-6'
-						},
-						{
-							label: 'HammerDB TPC-C Analysis on TidesDB v9.3.3/TideSQL v4.5.4 and InnoDB in MariaDB v11.8.6',
-							link: 'articles/hammerdb-tpc-c-analysis-tidesdb-v9-3-3-tidesql-v4-5-4-innodb-mariadb-v11-8-6'
-						},
-						{
-							label: 'iibench Analysis on TideSQL v4.5.1 MyRocks, InnoDB in MariaDB v11.8.6',
-							link: 'articles/iibench-tidesql-v4-5-1-myrocks-innodb-mariadb-v11-8-6-analysis'
-						},
-						{
-							label: 'Consumer TPC-C Analysis on TideSQL v4.5.0, MyRocks and InnoDB in MariaDB v11.8.6 using HammerDB',
-							link: 'articles/consumer-tpc-c-analysis-tidesql-v4-5-0-myrocks-mariadb-v11-8-6'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v9.2.1 and RocksDB v11.1.1',
-							link: 'articles/benchmark-analysis-tidesdb-v9-2-1-rocksdb-v11-1-1'
-						},
-						{
-							label: 'Benchmark Analysis on TideSQL v4.3.0 in MariaDB v11.8.6 TPC-C with jemalloc and PGO',
-							link: 'articles/benchmark-analysis-tidesql-v4-3-0-mariadb-v11-8-6-tpc-c-pgo-jemalloc'
-						},
-						{
-							label: 'Profile-Guided Optimization (PGO) Build TPC-C Analysis for TideSQL in MariaDB v11.8.6',
-							link: 'articles/pgo-build-tpc-c-analysis-mariadb-v11-8-6-tidesql'
-						},
-						{
-							label: 'TPC-C Analysis with glibc, jemalloc, mimalloc, tcmalloc on TideSQL & InnoDB in MariaDB v11.8.6',
-							link: 'articles/tpcc-analysis-jemalloc-mimalloc-tcmalloc-tidesql-and-innodb-in-mariadb-v11-8-6'
-						},
-						{
-							label: 'MariaDB 11.8.6 with TidesDB(TideSQL v4.2.4) TPC-C Benchmark Analysis',
-							link: 'articles/mariadb-11-8-6-innodb-and-tidesql-v4-2-4-tpc-c-benchmark-analysis'
-						},
-						{
-							label: 'Deploying TideSQL on AWS Kubernetes with S3 Object Store (Cloud-Native MariaDB)',
-							link: 'articles/deploying-tidesql-on-kubernetes-with-s3-object-store-cloud-native-mariadb-aws'
-						},
-						{
-							label: 'Deploying TideSQL (TidesDB+MariaDB) on AWS EC2',
-							link: 'articles/deploying-tidesb-and-mariadb-on-ubuntu-ec2'
-						},
-						{
-							label: 'TPC-C Benchmark Analysis on TidesDB v9.0.2 in TideSQL v4.2.0 in MariaDB v11.8.6',
-							link: 'articles/tidesql-v4-2-0-tidesdb-v9-0-2-mariadb-11-8-6-tpcc-benchmark-analysis'
-						},
-						{
-							label: 'TideSQL v4.2.0 Full-Text Search, Vector Similarity, Spatial Queries, and Cloud-Native Capabilities',
-							link: 'articles/tidesql-v4-2-0-fts-vector-spatial-cloud-native-capabilities'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB 9 (TideSQL 4.1), MyRocks, InnoDB in MariaDB 11.8.6 TPC-C HammerDB',
-							link: 'articles/benchmark-analysis-tidesdb-9-rocksdb-innodb-mariadb-11-8-tpc-c-hammerdb'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB & RocksDB in MariaDB 11.8.6 TPC-C',
-							link: 'articles/tidesql-myrocks-mariadb-11-8-6-tpc-c-analysis'
-						},
-						{
-							label: 'TidesDB (TideSQL 4) & RocksDB in MariaDB 12.2.2 Sysbench Analysis',
-							link: 'articles/tidesql-myrocks-mariadb-12-2-2-sysbench-analysis'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.9.0 & RocksDB v11.0.3',
-							link: 'articles/benchmark-analysis-tidesdb-v8-9-0-rocksdb-v11-0-3'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.7.1 & RocksDB v11.0.3',
-							link: 'articles/benchmark-analysis-tidesdb-v8-7-1-rocksdb-11-0-3'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB (TideSQL v3.3.5) & InnoDB in MariaDB v12.2.2 & InnoDB in MySQL v9.5.0',
-							link: 'articles/benchmark-analysis-tidesql-v3-3-5-innodb-in-mariadb-v12-2-2-mysql-v9-5-0'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.6.0 & RocksDB v10.10.1',
-							link: 'articles/benchmark-analysis-tidesdb-v8-6-0-rocksdb-v10-10-1'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB (TideSQL v3.1.0) & InnoDB in MariaDB v12.2.2',
-							link: 'articles/benchmark-analysis-tidesql-v3-1-0-innodb-mariadb-12-2-2'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.5.0 & RocksDB v10.10.1',
-							link: 'articles/benchmark-analysis-tidesdb-v8-5-0-rocksdb-v10-10-1'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.4.0 & RocksDB v10.10.1',
-							link: 'articles/benchmark-analysis-tidesdb-v8-4-0-rocksdb-v10-10-1'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.3.2 & RocksDB v10.10.1',
-							link: 'articles/benchmark-analysis-tidesdb-v8-3-2-rocksdb-v10-10-1'
-						},
-						{
-							label: 'New Benchmark Environment',
-							link: 'articles/new-benchmark-environment'
-						},
-						{
-							label: 'Benchmark Analysis on TideSQL v3 & InnoDB within MariaDB v12.1.2',
-							link: 'articles/tidesql-3-innodb-mariadb-12-1-2'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.2.4 & RocksDB v10.10.1',
-							link: 'articles/benchmark-analysis-tidesdb-v8-2-4-rocksdb-v10-10-1'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.2.1 & RocksDB v10.10.1',
-							link: 'articles/benchmark-analysis-tidesdb-v8-2-1-rocksdb-v10-10-1'
-						},
-						{
-							label: 'Plugging into MariaDB',
-							link: 'articles/plugging-into-mariadb'
-						},
-						{
-							label: 'Large Amount of Column Families with RocksDB and TidesDB',
-							link: 'articles/rocksdb-tidesdb-large-amount-column-families'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v8.1.1, RocksDB v10.10.1, and LMDB v0.9.24',
-							link: 'articles/benchmark-analysis-tidesdb-v8-1-1-rocksdb-v10-10-1-lmdb-v0-9-24'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v1.1.0 & InnoDB in MariaDB 12.1',
-							link: 'articles/tidesql-v1-1-0-and-innodb-in-mariadb-12-1-benchmark-analysis'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB 8 (Optional LSM-B+)',
-							link: 'articles/tidesdb-8-optional-lsmb'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB (TideSQL v1.0.0) & InnoDB within MariaDB v12.1.2',
-							link: 'articles/benchmark-analysis-tidesql-v1-0-0-innodb-in-mariadb-v12-1-2'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v7.4.4 & RocksDB v10.9.1',
-							link: 'articles/benchmark-analysis-tidesdb-v7-4-4-rocksdb-v10-9-1'
-						},
-						{
-							label: 'Benchmark Analysis on TidesDB v7.4.3 & RocksDB v10.9.1',
-							link: 'articles/benchmark-analysis-tidesdb-v7-4-3-rocksdb-v10-9-1'
-						},
-						{
-							label: 'TidesDB vs InnoDB within MariaDB',
-							link: 'articles/tidesdb-vs-innodb-within-mariadb'
-						},
-						{
-							label: 'TidesDB Differences with glibc, mimalloc, tcmalloc',
-							link: 'articles/tidesdb-differences-with-glibc-mimalloc-tcmalloc'
-						},
-						{ 
-							label: 'Building Reliable and Safe Systems', 
-							link: 'articles/building-reliable-and-safe-systems' 
-						},
-						{ 
-							label: 'TidesDB for Kafka Streams - Drop-in RocksDB Replacement', 
-							link: 'articles/tidesdb-kafka-streams-plugin' 
-						},
-						{ 
-							label: 'TidesDB & RocksDB on NVMe and SSD', 
-							link: 'articles/tidesdb-and-rocksdb-on-nvme-and-ssd' 
-						},
-						{ 
-							label: 'Benchmark Analysis on TidesDB v7.4.0(mimalloc) & RocksDB v10.9.1 (jemalloc)', 
-							link: 'articles/benchmark-analysis-tidesdb-v7-4-0-mimalloc-rocksdb-v10-9-1-jemalloc' 
-						},
-						{ 
-							label: 'TideSQL - A Write and Space Optimized MySQL Fork', 
-							link: 'articles/tidesql-a-write-and-space-optimized-mysql-fork' 
-						},
-						{ 
-							label: 'TidesDB v7.3.1 vs RocksDB v10.9.1 Performance Benchmark', 
-							link: 'articles/tidesdb-7-3-1-vs-rocksdb-10-9-1-benchmark' 
-						},
-						{ label: 'TidesDB v7.3.0 & RocksDB v10.9.1 Benchmark Analysis', slug: 'articles/benchmark-analysis-tidesdb-v7-3-0-rocksdb-v10-9-1' },
-						{ label: 'From Building Houses to Storage Engines', slug: 'articles/from-building-houses-to-storage-engines' },
-						{ label: 'TidesDB v7.2.3 & RocksDB v10.9.1 Benchmark Analysis', slug: 'articles/benchmark-analysis-tidesdb-v7-2-3-rocksdb-v10-9-1' },
-						{ label: 'TidesDB 7.2.2 and RocksDB 10.9.1 Latency Analysis', slug: 'articles/tidesdb-722-rocksdb-1091-latency-analysis' },
-						{ label: 'Analysis of TidesDB 7.2.1 and RocksDB 10.9.1', slug: 'articles/analysis-tidesdb721-rocksdb1091' },
-						{ label: 'Administering TidesDB with Admintool', slug: 'articles/administering-tidesdb-with-admintool' },
-						{ label: 'TidesDB 7.1.1 vs RocksDB 10.9.1', slug: 'articles/benchmark-analysis-tidesdb-v7-1-1-rocksdb-10-9-1' },
-						{ label: 'Why We Benchmark on Modest Hardware?', slug: 'articles/why-bench-on-modest-hardware' },
-						{ label: 'TidesDB 7 vs RocksDB 10 Under Sync Mode', slug: 'articles/benchmark-analysis-tidesdb-v7-1-0-rocksdb-v10-7-5-full-sync' },
-						{ label: '1GB Value Observations TidesDB 7 & RocksDB 10', slug: 'articles/1gb-values-rocksdb10-tidesdb7' },
-						{ label: 'Comparative Analysis of TidesDB v7.0.7 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb-v7-0-7-rocksdb-v10-7-5' },
-						{ label: 'Using TidesDB with Java via JExtract', slug: 'articles/using-tidesdb-with-java-via-jextract' },
-						{ label: 'Death by a Thousand Cycles - Micro-Optimizations in TidesDB v7.0.4', slug: 'articles/tidesdb704-death-by-a-thousand-cycles' },
-						{ label: 'What I Learned Building a Storage Engine That Outperforms RocksDB', slug: 'articles/what-i-learned-building-a-storage-engine-that-outperforms-rocksdb' },
-						{ label: 'TidesDB 7 - RocksDB 10.7.5', slug: 'articles/benchmark-analysis-tidesdb7-rocksdb1075' },
-						{ label: 'Seek and Range Query Performance · TidesDB v6.1.0 vs RocksDB v10.7.5', slug: 'articles/benchmark-design-range-seek-tidesdb610-rocksdb1075' },
-						{ label: 'Design Decisions and Performance Analysis of TidesDB v6.0.1 & RocksDB v10.7.5', slug: 'articles/benchmark-design-analysis-tidesdb601-rocksdb1075' },
-						{ label: 'Comparative Analysis of TidesDB v6 & RocksDB v10.7.5', slug: 'articles/benchmark-analysis-tidesdb6-rocksdb1075' },
-						{ label: 'TidesDB 4 vs RocksDB 10 Performance Analysis', slug: 'articles/tidesdb4-vs-rocksdb10' },
-					],
+					label: 'Blog',
+					link: '/blog',
 				},
 				{
 					label: 'YouTube',
@@ -413,20 +214,21 @@ export default defineConfig({
 					label: 'GitHub', link: 'https://github.com/tidesdb',
 				},
 				{
-					label: 'Discord Community', link: 'https://discord.gg/tWEmjR66cy',
+					label: 'Discord', link: 'https://discord.gg/tWEmjR66cy',
 				},
 				{
 					label: 'Sponsors', link: 'https://tidesdb.com/sponsors'
 				},
 				{
-					label: 'Licensing', link: '/licensing'
-				},
-				{
 					label: 'Partners', link: '/partners'
 				},
 				{
-					label: 'Support', link: '/support'
-				}
+					label: 'Company',
+					items: [
+						{ label: 'About TidesDB Corp.', slug: 'company/about-tidesdb-corp' },
+						//{ label: 'How does TidesDB work?', slug: 'getting-started/how-does-tidesdb-work' },
+					],
+				},
 			],
 		}),
 	],

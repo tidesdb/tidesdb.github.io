@@ -9,3 +9,11 @@ pnpm-debug.log*
 .env
 .env.production
 .DS_Store
+
+# Everything sync-docs touches. Component documentation is pulled from the
+# component repos at build time (npm run build runs sync-docs first), so none of
+# it is committed here -- the component repo is the single source of truth for
+# its own docs, and this repo never holds a second, drifting copy.
+.docs-cache/
+src/content/docs/docs/
+src/config/nav/

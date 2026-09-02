@@ -1,0 +1,109 @@
+---
+// Pagination override. Starlight's default prev/next comes from the CONFIG
+// sidebar, where the docs are a single "Documentation" link followed by Blog —
+// so the manual's pages wrongly page into /blog. On versioned docs routes we
+// instead compute prev/next from the committed nav tree (reading order). Every
+// other page keeps the default.
+import Default from '@astrojs/starlight/components/Pagination.astro';
+import { activeVersionId } from '../config/versions.js';
+
+const activeId = activeVersionId(Astro.url.pathname);
+
+const navModules = import.meta.glob('../config/nav/*.json', { eager: true });
+const navById: Record<string, any> = {};
+for (const mod of Object.values(navModules)) {
+	const n = (mod as any).default;
+	navById[n.id] = n;
+}
+const nav = activeId ? navById[activeId] : null;
+
+// Flatten the tree to the ordered list of internal pages (external links skip).
+function flatten(nodes: any[]): { label: string; href: string }[] {
+	const out: { label: string; href: string }[] = [];
+	for (const n of nodes) {
+		if (n.kind === 'page') out.push({ label: n.title, href: `/${n.slug}/` });
+		else if (n.kind === 'group') out.push(...flatten(n.entries));
+	}
+	return out;
+}
+const pages = nav ? flatten(nav.tree) : [];
+const cur = Astro.url.pathname.replace(/\/$/, '');
+const idx = pages.findIndex((p) => p.href.replace(/\/$/, '') === cur);
+
+const custom = Boolean(activeId) && idx !== -1;
+const prev = custom && idx > 0 ? pages[idx - 1] : null;
+const next = custom && idx < pages.length - 1 ? pages[idx + 1] : null;
+---
+
+{
+	custom ? (
+		<div class="pagination-links print:hidden">
+			{prev && (
+				<a href={prev.href} rel="prev">
+					<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<path d="M19 12H5M12 19l-7-7 7-7" />
+					</svg>
+					<span>
+						Previous
+						<br />
+						<span class="link-title">{prev.label}</span>
+					</span>
+				</a>
+			)}
+			{next && (
+				<a href={next.href} rel="next">
+					<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<path d="M5 12h14M12 5l7 7-7 7" />
+					</svg>
+					<span>
+						Next
+						<br />
+						<span class="link-title">{next.label}</span>
+					</span>
+				</a>
+			)}
+		</div>
+	) : (
+		<Default>
+			<slot />
+		</Default>
+	)
+}
+
+<style>
+	.pagination-links {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+		gap: 1rem;
+	}
+	a {
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 0.5rem;
+		width: 100%;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.5rem;
+		padding: 1rem;
+		text-decoration: none;
+		color: var(--sl-color-gray-2);
+		box-shadow: var(--sl-shadow-md);
+		overflow-wrap: anywhere;
+	}
+	[rel='next'] {
+		justify-content: end;
+		text-align: end;
+		flex-direction: row-reverse;
+	}
+	a:hover {
+		border-color: var(--sl-color-gray-2);
+	}
+	.link-title {
+		color: var(--sl-color-white);
+		font-size: var(--sl-text-2xl);
+		line-height: var(--sl-line-height-headings);
+	}
+	svg {
+		flex-shrink: 0;
+	}
+</style>

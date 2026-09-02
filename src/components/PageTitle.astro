@@ -1,6 +1,10 @@
 ---
+// Splash pages (the homepage) provide their own hero and have no title row,
+// so the Print button must not render there.
+const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
 ---
 
+{ !isSplash && (
 <div class="page-title-row">
 	<h1 id="_top">{Astro.locals.starlightRoute.entry.data.title}</h1>
 	<button class="print-btn" id="print-page-btn" title="Print this page" aria-label="Print this page">
@@ -12,6 +16,7 @@
 		<span>Print</span>
 	</button>
 </div>
+) }
 
 <style>
 	.page-title-row {
