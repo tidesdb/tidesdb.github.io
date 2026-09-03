@@ -1,0 +1,149 @@
+keybench 0.1.1: 1 workload(s), engine=rocksdb seed=1 repeat=3
+  threads: 1,2,4,8,16
+[probe: system]
+  host           tdbs1
+  os             Linux 6.8.0-136-generic x86_64
+  cpu            13th Gen Intel(R) Core(TM) i9-13900
+  cpu_cores      24
+  cpu_affinity   on (8 cpus: 0,2,4,6,8,10,12,14)
+  ram            125.5 GiB
+  page_size      4096
+  data_fs(/data/bench) 1227.3 GiB free of 1251.3 GiB
+  data_dev       /dev/nvme1n1p1 on /data (xfs)
+  data_disk      solid state
+  data_disk_model Micron_7450_MTFDKCC1T9TFR
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 13.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.39)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=1  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         2679175   16.06 us   30.34 us   35.07 us    2.20 ms
+mput         1788801    6.05 us    8.90 us   34.05 us   22.13 ms
+get hit rate: 100.0% (median)
+throughput: 74465 /sec (1 op per unit)  (74003..74662 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=1  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           44912    1.07 ms    1.65 ms    1.94 ms    2.76 ms
+mput           30095  272.38 us  362.50 us  473.09 us  688.94 us
+get hit rate: 100.0% (median)
+workload units: 1250 wu/sec  (1247..1253 over 3 runs)
+primitive ops:  80006 ops/sec  (79796..80163 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=1  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           11163    4.36 ms    6.59 ms    6.78 ms    7.54 ms
+mput            7450    1.07 ms    1.34 ms    1.60 ms    1.69 ms
+get hit rate: 100.0% (median)
+workload units: 310 wu/sec  (307..312 over 3 runs)
+primitive ops:  79405 ops/sec  (78653..79828 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=2  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         3720025   24.70 us   47.36 us   54.53 us    2.97 ms
+mput         2478729    6.88 us   15.81 us   69.12 us  392.76 us
+get hit rate: 100.0% (median)
+throughput: 103311 /sec (1 op per unit)  (102123..103372 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=2  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           59680    1.70 ms    2.77 ms    3.00 ms    4.88 ms
+mput           40013  305.15 us  593.92 us  692.22 us    1.29 ms
+get hit rate: 100.0% (median)
+workload units: 1661 wu/sec  (1609..1671 over 3 runs)
+primitive ops:  106330 ops/sec  (102980..106918 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=2  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           14994    6.65 ms   10.68 ms   11.34 ms   12.29 ms
+mput            9910    1.20 ms    2.24 ms    2.54 ms    2.77 ms
+get hit rate: 100.0% (median)
+workload units: 415 wu/sec  (404..418 over 3 runs)
+primitive ops:  106243 ops/sec  (103487..107102 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=4  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         3331432   24.70 us   49.41 us   64.77 us    9.05 ms
+mput         2219379    7.78 us    2.97 ms    6.32 ms   14.23 ms
+get hit rate: 100.0% (median)
+throughput: 92510 /sec (1 op per unit)  (91409..95856 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=4  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           49789    3.42 ms   10.68 ms   15.79 ms   22.26 ms
+mput           33309  342.02 us   53.74 ms   74.97 ms  106.25 ms
+get hit rate: 100.0% (median)
+workload units: 1385 wu/sec  (1286..1432 over 3 runs)
+primitive ops:  88625 ops/sec  (82329..91626 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=4  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           12593   14.22 ms   39.06 ms   53.74 ms   62.30 ms
+mput            8378    1.37 ms  198.18 ms  250.61 ms  304.19 ms
+get hit rate: 100.0% (median)
+workload units: 349 wu/sec  (342..353 over 3 runs)
+primitive ops:  89435 ops/sec  (87665..90466 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=8  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         3731356   30.08 us   62.21 us   82.43 us    8.72 ms
+mput         2489079   16.77 us    3.62 ms    6.78 ms   13.80 ms
+get hit rate: 100.0% (median)
+throughput: 103672 /sec (1 op per unit)  (103295..110516 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=8  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           57335    4.62 ms   12.78 ms   18.74 ms   24.90 ms
+mput           38190  440.32 us  137.36 ms  164.63 ms  259.08 ms
+get hit rate: 100.0% (median)
+workload units: 1589 wu/sec  (1429..1601 over 3 runs)
+primitive ops:  101675 ops/sec  (91487..102463 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=8  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           14136   19.27 ms   51.64 ms   69.73 ms   78.66 ms
+mput            9379    1.73 ms  501.22 ms  700.45 ms  873.14 ms
+get hit rate: 100.0% (median)
+workload units: 389 wu/sec  (352..389 over 3 runs)
+primitive ops:  99459 ops/sec  (90076..99480 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=16  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         3205029   26.24 us   63.74 us  195.58 us    7.24 ms
+mput         2138153  164.86 us    5.80 ms    7.44 ms   15.92 ms
+get hit rate: 100.0% (median)
+throughput: 89047 /sec (1 op per unit)  (88239..89791 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=16  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           53734    6.85 ms   20.05 ms   26.61 ms   39.66 ms
+mput           35347    5.67 ms  274.73 ms  346.03 ms  481.33 ms
+get hit rate: 100.0% (median)
+workload units: 1474 wu/sec  (1406..1578 over 3 runs)
+primitive ops:  94322 ops/sec  (89962..101019 over 3 runs)
+
+=== batch ===
+engine=rocksdb 11.8.1  threads=16  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           13676   36.96 ms   80.22 ms   98.04 ms  108.61 ms
+mput            8969    7.11 ms     1.12 s     1.62 s     1.82 s
+get hit rate: 100.0% (median)
+workload units: 377 wu/sec  (325..394 over 3 runs)
+primitive ops:  96543 ops/sec  (83227..100880 over 3 runs)

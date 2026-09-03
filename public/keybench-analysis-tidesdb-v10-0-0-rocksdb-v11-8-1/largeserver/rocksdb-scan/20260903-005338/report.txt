@@ -1,0 +1,49 @@
+keybench 0.1.1: 1 workload(s), engine=rocksdb seed=1 repeat=3
+  threads: 1,2,4,8,16
+[probe: system]
+  host           tdbs1
+  os             Linux 6.8.0-136-generic x86_64
+  cpu            13th Gen Intel(R) Core(TM) i9-13900
+  cpu_cores      24
+  cpu_affinity   on (8 cpus: 0,2,4,6,8,10,12,14)
+  ram            125.5 GiB
+  page_size      4096
+  data_fs(/data/bench) 1227.3 GiB free of 1251.3 GiB
+  data_dev       /dev/nvme1n1p1 on /data (xfs)
+  data_disk      solid state
+  data_disk_model Micron_7450_MTFDKCC1T9TFR
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 13.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.39)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range          25961    2.31 ms    2.38 ms    2.74 ms    3.58 ms
+throughput: 433 /sec (1 op per unit)  (430..433 over 3 runs)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=2  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range          47573    2.54 ms    2.61 ms    2.93 ms    3.74 ms
+throughput: 793 /sec (1 op per unit)  (792..798 over 3 runs)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=4  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range          83126    2.90 ms    2.97 ms    3.03 ms    4.01 ms
+throughput: 1385 /sec (1 op per unit)  (1382..1387 over 3 runs)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=8  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range         127829    3.78 ms    3.92 ms    4.01 ms    4.48 ms
+throughput: 2130 /sec (1 op per unit)  (2130..2132 over 3 runs)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range         108368    7.90 ms   13.30 ms   15.66 ms   22.89 ms
+throughput: 1806 /sec (1 op per unit)  (1429..2105 over 3 runs)

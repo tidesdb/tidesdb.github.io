@@ -1,0 +1,49 @@
+keybench 0.1.1: 1 workload(s), engine=tidesdb seed=1 repeat=3
+  threads: 1,2,4,8,16
+[probe: system]
+  host           tdbs1
+  os             Linux 6.8.0-136-generic x86_64
+  cpu            13th Gen Intel(R) Core(TM) i9-13900
+  cpu_cores      24
+  cpu_affinity   on (8 cpus: 0,2,4,6,8,10,12,14)
+  ram            125.5 GiB
+  page_size      4096
+  data_fs(/data/bench) 1227.3 GiB free of 1251.3 GiB
+  data_dev       /dev/nvme1n1p1 on /data (xfs)
+  data_disk      solid state
+  data_disk_model Micron_7450_MTFDKCC1T9TFR
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 13.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.39)
+
+=== scan ===
+engine=tidesdb 10.0.0  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range          27795    2.07 ms    5.21 ms    9.11 ms   23.70 ms
+throughput: 463 /sec (1 op per unit)  (463..493 over 3 runs)
+
+=== scan ===
+engine=tidesdb 10.0.0  threads=2  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range          54750    2.15 ms    2.51 ms    8.98 ms   27.24 ms
+throughput: 912 /sec (1 op per unit)  (912..964 over 3 runs)
+
+=== scan ===
+engine=tidesdb 10.0.0  threads=4  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range          98755    2.41 ms    2.77 ms    8.59 ms   25.59 ms
+throughput: 1646 /sec (1 op per unit)  (1641..1659 over 3 runs)
+
+=== scan ===
+engine=tidesdb 10.0.0  threads=8  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range         159493    2.97 ms    3.46 ms    9.11 ms   28.72 ms
+throughput: 2658 /sec (1 op per unit)  (2633..2659 over 3 runs)
+
+=== scan ===
+engine=tidesdb 10.0.0  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range         184495    5.60 ms    8.59 ms    9.76 ms   17.33 ms
+throughput: 3074 /sec (1 op per unit)  (3040..3091 over 3 runs)

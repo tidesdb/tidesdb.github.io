@@ -1,0 +1,51 @@
+keybench 0.1.1: 1 workload(s), engine=tidesdb seed=1 repeat=3
+  threads: 1,16,64
+[probe: system]
+  host           agpmastersystem
+  os             Linux 6.2.0-39-generic x86_64
+  cpu            11th Gen Intel(R) Core(TM) i7-11700K @ 3.60GHz
+  cpu_cores      16
+  ram            46.8 GiB
+  page_size      4096
+  data_fs(/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/benchmark/benchdata) 65.5 GiB free of 158.9 GiB
+  data_dev       /dev/sdb3 on /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68 (ext4)
+  data_disk      solid state
+  data_disk_model WDC  WDS500G2B0A
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 12.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.37)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1617874    5.41 us   15.04 us   62.72 us     1.43 s
+get           539973    2.80 us   13.38 us   23.17 us  200.04 us
+del           901386    1.69 us    5.02 us   12.35 us  356.88 us
+range        1077464   26.75 us   54.02 us   86.53 us  321.53 ms
+get hit rate: 31.2% (median)
+workload units: 59926 wu/sec  (43513..65419 over 3 runs)
+primitive ops:  68944 ops/sec  (54102..74859 over 3 runs)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           946782   55.55 us   29.75 ms   49.55 ms  617.04 ms
+get           316135   30.59 us  152.58 us  407.55 us    5.04 ms
+del           443002    6.82 us   52.99 us  301.06 us    4.07 ms
+range         632725  209.92 us  782.34 us    1.34 ms  620.52 ms
+get hit rate: 32.0% (median)
+workload units: 35096 wu/sec  (32023..42015 over 3 runs)
+primitive ops:  38962 ops/sec  (35193..52414 over 3 runs)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1020689   35.07 us   51.64 ms  112.72 ms  726.94 ms
+get           340184   41.73 us  301.06 us   56.36 ms  941.41 ms
+del           486366    5.22 us   38.14 us  399.36 us   13.40 ms
+range         681537  197.63 us   70.78 ms  362.81 ms     1.77 s
+get hit rate: 32.2% (median)
+workload units: 37799 wu/sec  (35068..39165 over 3 runs)
+primitive ops:  42308 ops/sec  (41624..43268 over 3 runs)

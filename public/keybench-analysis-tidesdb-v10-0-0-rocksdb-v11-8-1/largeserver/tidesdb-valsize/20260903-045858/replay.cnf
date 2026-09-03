@@ -1,0 +1,21 @@
+keybench 0.1.1 replay file - reproduce with:  keybench --config /root/keybench/results/tidesdb-valsize/20260903-045858/replay.cnf
+
+[bench]
+backend = tidesdb
+threads = 1,2,4,8,16
+seed_threads = 8
+pin = 1
+secs = 60
+users  = 100000
+items  = 40960
+seed   = 1
+repeat = 3
+data_dir = /data/bench
+report_dir = /root/keybench/results/tidesdb-valsize
+workload = workloads/valsize.lua
+
+[rocksdb]
+compression = kNoCompression
+
+[tidesdb]
+compression = none

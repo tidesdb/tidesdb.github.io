@@ -1,0 +1,69 @@
+keybench 0.1.1: 1 workload(s), engine=rocksdb seed=1 repeat=3
+  threads: 1,2,4,8,16
+[probe: system]
+  host           tdbs1
+  os             Linux 6.8.0-136-generic x86_64
+  cpu            13th Gen Intel(R) Core(TM) i9-13900
+  cpu_cores      24
+  cpu_affinity   on (8 cpus: 0,2,4,6,8,10,12,14)
+  ram            125.5 GiB
+  page_size      4096
+  data_fs(/data/bench) 1227.3 GiB free of 1251.3 GiB
+  data_dev       /dev/nvme1n1p1 on /data (xfs)
+  data_disk      solid state
+  data_disk_model Micron_7450_MTFDKCC1T9TFR
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 13.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.39)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           499696    6.43 us   11.20 us   20.35 us  220.98 us
+get           830980   12.74 us   23.68 us   27.52 us    1.36 ms
+del           166111    2.48 us    5.98 us    8.38 us  157.88 us
+range         167294  224.26 us  257.02 us  272.38 us    7.67 ms
+get hit rate: 97.1% (median)
+throughput: 27734 /sec (1 op per unit)  (27695..27761 over 3 runs)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=2  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           767439    6.82 us   17.79 us    2.51 ms   12.34 ms
+get          1277827   15.42 us   27.78 us   35.07 us    8.53 ms
+del           255612    2.77 us   10.69 us  288.77 us   12.43 ms
+range         255442  244.74 us    1.03 ms    4.29 ms   12.21 ms
+get hit rate: 95.7% (median)
+throughput: 42603 /sec (1 op per unit)  (42032..42735 over 3 runs)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=4  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1135229    7.84 us  667.65 us    6.00 ms   14.96 ms
+get          1890222   19.07 us   33.02 us   47.87 us    9.03 ms
+del           378015    3.41 us   50.43 us    6.00 ms   13.05 ms
+range         378124  280.58 us  354.30 us    3.98 ms   12.34 ms
+get hit rate: 94.0% (median)
+throughput: 63022 /sec (1 op per unit)  (62646..63357 over 3 runs)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=8  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1357912   10.94 us    3.42 ms    6.52 ms   14.89 ms
+get          2260141   23.68 us   46.34 us   65.28 us    8.10 ms
+del           453015    5.41 us    3.42 ms    6.46 ms   14.45 ms
+range         452115  337.92 us  432.13 us    3.39 ms   10.40 ms
+get hit rate: 93.1% (median)
+throughput: 75378 /sec (1 op per unit)  (72867..80725 over 3 runs)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           888126  493.57 us    4.05 ms    6.46 ms   13.17 ms
+get          1479111   19.33 us   56.06 us  569.34 us    8.63 ms
+del           295828  489.47 us    4.05 ms    6.46 ms   13.19 ms
+range         295737  296.96 us  692.22 us    2.21 ms   10.31 ms
+get hit rate: 95.1% (median)
+throughput: 49311 /sec (1 op per unit)  (48443..49821 over 3 runs)

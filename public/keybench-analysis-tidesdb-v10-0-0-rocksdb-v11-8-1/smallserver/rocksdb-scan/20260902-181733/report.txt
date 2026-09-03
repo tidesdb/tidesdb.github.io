@@ -1,0 +1,37 @@
+keybench 0.1.1: 1 workload(s), engine=rocksdb seed=1 repeat=3
+  threads: 1,16,64
+[probe: system]
+  host           agpmastersystem
+  os             Linux 6.2.0-39-generic x86_64
+  cpu            11th Gen Intel(R) Core(TM) i7-11700K @ 3.60GHz
+  cpu_cores      16
+  cpu_affinity   off (16 cpus available: 0-15)
+  ram            46.8 GiB
+  page_size      4096
+  data_fs(/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/benchmark/benchdata) 62.4 GiB free of 158.9 GiB
+  data_dev       /dev/sdb3 on /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68 (ext4)
+  data_disk      solid state
+  data_disk_model WDC  WDS500G2B0A
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 12.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.37)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range          21557    2.77 ms    3.23 ms    3.75 ms    5.43 ms
+throughput: 359 /sec (1 op per unit)  (352..360 over 3 runs)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range         145493    6.32 ms   10.42 ms   24.25 ms   55.73 ms
+throughput: 2425 /sec (1 op per unit)  (2338..2502 over 3 runs)
+
+=== scan ===
+engine=rocksdb 11.8.1  threads=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+range         127081   28.70 ms   99.09 ms  152.04 ms  275.54 ms
+throughput: 2106 /sec (1 op per unit)  (2013..2230 over 3 runs)

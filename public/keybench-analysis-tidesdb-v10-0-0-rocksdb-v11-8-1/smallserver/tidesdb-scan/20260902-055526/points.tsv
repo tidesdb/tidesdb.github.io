@@ -1,0 +1,4 @@
+workload	engine	threads	sweep_param	sweep_value	op	count	p50_ns	p99_ns	p999_ns	max_ns	hit_rate	err_rate	wu_per_s	ops_per_s
+scan	tidesdb 10.0.0	1		1	range	26687	2244608	2801664	3391488	4321263	0.000	0.000	444.8	444.8
+scan	tidesdb 10.0.0	16		1	range	212496	4423680	7503872	20840448	62564086	0.000	0.000	3541.3	3541.3
+scan	tidesdb 10.0.0	64		1	range	200521	18743296	55836672	78118912	138050279	0.000	0.000	3332.7	3332.7

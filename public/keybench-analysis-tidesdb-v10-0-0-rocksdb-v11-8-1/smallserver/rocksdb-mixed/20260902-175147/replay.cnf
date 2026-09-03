@@ -1,0 +1,21 @@
+keybench 0.1.1 replay file - reproduce with:  keybench --config /home/agpmastersystem/keybench/results/rocksdb-mixed/20260902-175147/replay.cnf
+
+[bench]
+backend = rocksdb
+threads = 1,16,64
+seed_threads = 16
+seed_once = 1
+secs = 60
+users  = 100000
+items  = 2621440
+seed   = 1
+repeat = 3
+data_dir = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/benchmark/benchdata
+report_dir = /home/agpmastersystem/keybench/results/rocksdb-mixed
+workload = workloads/mixed.lua
+
+[rocksdb]
+compression = kNoCompression
+
+[tidesdb]
+compression = none
