@@ -24,9 +24,9 @@ head:
 
 Back to engine analysis after a development-heavy stretch. Today I go over data
 from extensive keybench
-analysis comparing latest releases <a href="https://github.com/tidesdb/tidesdb/releases/tag/v10.0.0">TidesDB v10.0.0</a> with <a href="https://github.com/facebook/rocksdb/releases/tag/v11.8.1">RocksDB v11.8.1</a> on a small and large server.
+analysis comparing latest releases <a target="_blank" href="https://github.com/tidesdb/tidesdb/releases/tag/v10.0.0">TidesDB v10.0.0</a> with <a target="_blank" href="https://github.com/facebook/rocksdb/releases/tag/v11.8.1">RocksDB v11.8.1</a> on a small and large server.
 
-Should you be unaware <a href="https://github.com/guycipher/keybench">keybench</a> is a scriptable performance tool for sorted key value stores. You write
+Should you be unaware <a target="_blank" href="https://github.com/guycipher/keybench">keybench</a> is a scriptable performance tool for sorted key value stores. You write
 the workload in Lua, it drives the same script against every engine, times each
 operation, and reports throughput and a latency distribution per operation kind.
 The harness spawns the worker threads and never holds a lock around an engine
@@ -545,7 +545,7 @@ for 98% of everything the engine writes. The compaction win is large and real an
 it does not carry all the way through to total bytes written. A factor of two to
 four, not a factor of eight.
 
-RocksDB has the same idea in <a href="https://github.com/facebook/rocksdb/wiki/BlobDB">BlobDB</a>
+RocksDB has the same idea in <a target="_blank" href="https://github.com/facebook/rocksdb/wiki/BlobDB">BlobDB</a>
 and ships it off. Its wiki describes it as key value separation from the WiscKey
 paper, storing large values in dedicated blob files with only small pointers in the
 LSM tree, so that RocksDB avoids "copying the values over and over again during
