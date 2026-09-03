@@ -371,8 +371,7 @@ writers, the queue of sealed memtables awaiting flush governed by
 `memtable_l0_queue_stall_threshold`, the write-ahead log's staging ring, and the
 depth of overlapping runs in L1. It simply did not reach them on this workload.
 
-The reason it did not comes from where a separated value is written. Per the TidesDB
-internals documentation a value is separated at commit rather than at flush, with
+The reason it did not comes from where a separated value is written. A value is separated at commit rather than at flush, with
 the committing transaction appending the bytes to the value log and the write-ahead
 log record carrying only an id of a few bytes. A large value therefore reaches the
 device once, rather than once in the log and again in the sstable a flush builds.
