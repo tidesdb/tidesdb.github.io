@@ -20,7 +20,7 @@ head:
 
 *by <a target="_blank" href="https://alexpadula.com">Alex Gaetano Padula</a>*
 
-*published on September 3nd, 2026*
+*published on September 3rd, 2026*
 
 Back to engine analysis after a development-heavy stretch. Today I go over data
 from extensive keybench
