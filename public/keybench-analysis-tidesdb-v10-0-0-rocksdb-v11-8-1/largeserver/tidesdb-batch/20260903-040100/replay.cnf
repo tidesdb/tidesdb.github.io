@@ -1,0 +1,21 @@
+keybench 0.1.1 replay file - reproduce with:  keybench --config /root/keybench/results/tidesdb-batch/20260903-040100/replay.cnf
+
+[bench]
+backend = tidesdb
+threads = 1,2,4,8,16
+seed_threads = 8
+pin = 1
+secs = 60
+users  = 100000
+items  = 2621440
+seed   = 1
+repeat = 3
+data_dir = /data/bench
+report_dir = /root/keybench/results/tidesdb-batch
+workload = workloads/batch.lua
+
+[rocksdb]
+compression = kNoCompression
+
+[tidesdb]
+compression = none

@@ -1,0 +1,48 @@
+keybench 0.1.1: 1 workload(s), engine=tidesdb seed=1 repeat=3
+  threads: 1,16,64
+[probe: system]
+  host           agpmastersystem
+  os             Linux 6.2.0-39-generic x86_64
+  cpu            11th Gen Intel(R) Core(TM) i7-11700K @ 3.60GHz
+  cpu_cores      16
+  ram            46.8 GiB
+  page_size      4096
+  data_fs(/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/benchmark/benchdata) 65.5 GiB free of 158.9 GiB
+  data_dev       /dev/sdb3 on /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68 (ext4)
+  data_disk      solid state
+  data_disk_model WDC  WDS500G2B0A
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 12.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.37)
+
+=== mixed ===
+engine=tidesdb 10.0.0  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           573538    5.60 us   16.19 us   66.05 us  430.51 ms
+get           953688    7.01 us   17.02 us   23.17 us  521.89 us
+del           191180    2.74 us    7.65 us   15.94 us  293.89 us
+range         191728  179.20 us  259.07 us  337.92 us  486.00 ms
+get hit rate: 95.3% (median)
+throughput: 31835 /sec (1 op per unit)  (20971..34287 over 3 runs)
+
+=== mixed ===
+engine=tidesdb 10.0.0  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           585004   86.53 us   29.75 ms   46.40 ms     1.66 s
+get           975964   26.75 us  117.25 us  460.80 us  216.03 ms
+del           194983    6.94 us   39.68 us  152.58 us    1.76 ms
+range         195507  577.54 us    2.51 ms    3.65 ms  782.89 ms
+get hit rate: 81.6% (median)
+throughput: 32521 /sec (1 op per unit)  (32121..118413 over 3 runs)
+
+=== mixed ===
+engine=tidesdb 10.0.0  threads=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1150662   45.82 us   49.02 ms  156.24 ms     1.14 s
+get          1917717   39.68 us  154.62 us  602.11 us  572.16 ms
+del           383004    6.82 us   37.12 us  250.88 us    3.15 ms
+range         384321  618.50 us    2.74 ms    4.18 ms     1.32 s
+get hit rate: 79.3% (median)
+throughput: 63857 /sec (1 op per unit)  (63072..64535 over 3 runs)

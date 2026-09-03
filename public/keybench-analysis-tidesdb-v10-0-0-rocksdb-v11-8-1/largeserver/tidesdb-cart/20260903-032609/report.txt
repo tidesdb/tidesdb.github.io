@@ -1,0 +1,74 @@
+keybench 0.1.1: 1 workload(s), engine=tidesdb seed=1 repeat=3
+  threads: 1,2,4,8,16
+[probe: system]
+  host           tdbs1
+  os             Linux 6.8.0-136-generic x86_64
+  cpu            13th Gen Intel(R) Core(TM) i9-13900
+  cpu_cores      24
+  cpu_affinity   on (8 cpus: 0,2,4,6,8,10,12,14)
+  ram            125.5 GiB
+  page_size      4096
+  data_fs(/data/bench) 1227.3 GiB free of 1251.3 GiB
+  data_dev       /dev/nvme1n1p1 on /data (xfs)
+  data_disk      solid state
+  data_disk_model Micron_7450_MTFDKCC1T9TFR
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 13.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.39)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1465598    5.02 us   13.89 us    2.87 ms  159.93 ms
+get           489554    2.10 us    9.28 us   25.47 us   41.17 ms
+del          1122628    2.01 us   10.69 us   18.56 us   12.00 ms
+range         976351   21.63 us   39.68 us    1.63 ms   49.02 ms
+get hit rate: 30.7% (median)
+workload units: 54296 wu/sec  (50354..55722 over 3 runs)
+primitive ops:  67568 ops/sec  (62657..69347 over 3 runs)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=2  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          2295935    4.96 us   48.38 us    3.72 ms  158.71 ms
+get           765217    2.77 us   15.04 us   40.70 us   40.57 ms
+del          1771815     988 ns   19.84 us  643.07 us   13.69 ms
+range        1527948   25.73 us   63.74 us    1.94 ms   48.07 ms
+get hit rate: 31.1% (median)
+workload units: 84982 wu/sec  (84926..86798 over 3 runs)
+primitive ops:  106014 ops/sec  (105936..108283 over 3 runs)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=4  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          3200614    6.05 us  317.44 us    5.80 ms  307.03 ms
+get          1067774    4.02 us   20.86 us  128.51 us   42.78 ms
+del          2485799    1.10 us   18.82 us  485.38 us   16.01 ms
+range        2133636   32.38 us  116.22 us    1.78 ms  304.56 ms
+get hit rate: 31.3% (median)
+workload units: 118544 wu/sec  (116613..119499 over 3 runs)
+primitive ops:  148120 ops/sec  (145698..149310 over 3 runs)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=8  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          4166586    8.38 us  659.46 us    6.26 ms  308.47 ms
+get          1390514    8.38 us   42.24 us  216.06 us   85.10 ms
+del          3252940    1.45 us   19.58 us  309.25 us   17.20 ms
+range        2778729   57.09 us  207.87 us    2.09 ms  308.51 ms
+get hit rate: 31.6% (median)
+workload units: 154351 wu/sec  (153539..155902 over 3 runs)
+primitive ops:  193139 ops/sec  (192124..195100 over 3 runs)
+
+=== cart ===
+engine=tidesdb 10.0.0  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          4298885    7.39 us    3.69 ms    8.85 ms  314.65 ms
+get          1434938   14.91 us   65.28 us  485.38 us   41.02 ms
+del          3365141    1.34 us   15.04 us  292.86 us   19.93 ms
+range        2869886   56.06 us  477.18 us    2.77 ms  312.97 ms
+get hit rate: 31.5% (median)
+workload units: 159325 wu/sec  (153874..160206 over 3 runs)
+primitive ops:  199456 ops/sec  (192579..200565 over 3 runs)

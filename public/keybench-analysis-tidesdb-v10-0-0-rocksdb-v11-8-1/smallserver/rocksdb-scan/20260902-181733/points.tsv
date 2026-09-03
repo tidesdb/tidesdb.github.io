@@ -1,0 +1,4 @@
+workload	engine	threads	sweep_param	sweep_value	op	count	p50_ns	p99_ns	p999_ns	max_ns	hit_rate	err_rate	wu_per_s	ops_per_s
+scan	rocksdb 11.8.1	1		1	range	21557	2768896	3227648	3751936	5427368	0.000	0.000	359.3	359.3
+scan	rocksdb 11.8.1	16		1	range	145493	6324224	10420224	24248320	55733392	0.000	0.000	2424.7	2424.7
+scan	rocksdb 11.8.1	64		1	range	127081	28704768	99090432	152043520	275544095	0.000	0.000	2106.2	2106.2

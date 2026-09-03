@@ -1,0 +1,49 @@
+keybench 0.1.1: 1 workload(s), engine=rocksdb seed=1 repeat=3
+  threads: 1,16,64
+[probe: system]
+  host           agpmastersystem
+  os             Linux 6.2.0-39-generic x86_64
+  cpu            11th Gen Intel(R) Core(TM) i7-11700K @ 3.60GHz
+  cpu_cores      16
+  cpu_affinity   off (16 cpus available: 0-15)
+  ram            46.8 GiB
+  page_size      4096
+  data_fs(/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/benchmark/benchdata) 62.4 GiB free of 158.9 GiB
+  data_dev       /dev/sdb3 on /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68 (ext4)
+  data_disk      solid state
+  data_disk_model WDC  WDS500G2B0A
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 12.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.37)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           283769   10.05 us   20.86 us   80.38 us     1.38 s
+get           471486   37.12 us   69.12 us  104.96 us    1.87 ms
+del            94364    4.83 us   11.84 us   22.14 us  412.21 ms
+range          94521  305.15 us  419.84 us  643.07 us   68.33 ms
+get hit rate: 96.0% (median)
+throughput: 15736 /sec (1 op per unit)  (13908..19018 over 3 runs)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=16  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           252778   27.78 us   15.66 ms   21.36 ms     2.71 s
+get           422135  122.37 us  700.42 us    1.76 ms     1.19 s
+del            84511   17.28 us   15.40 ms   20.58 ms     2.71 s
+range          84616  864.26 us    4.23 ms  717.23 ms     2.76 s
+get hit rate: 92.5% (median)
+throughput: 14062 /sec (1 op per unit)  (13181..23334 over 3 runs)
+
+=== mixed ===
+engine=rocksdb 11.8.1  threads=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           291716    1.53 ms   91.75 ms  434.11 ms     4.20 s
+get           486117  166.91 us  905.22 us   69.73 ms     1.28 s
+del            96954    1.52 ms   89.65 ms  463.47 ms     4.20 s
+range          97553    1.00 ms   33.42 ms  700.45 ms     2.32 s
+get hit rate: 90.9% (median)
+throughput: 16129 /sec (1 op per unit)  (10287..16959 over 3 runs)

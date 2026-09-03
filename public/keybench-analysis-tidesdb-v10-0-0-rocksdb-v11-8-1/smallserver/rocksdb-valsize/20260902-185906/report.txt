@@ -1,0 +1,139 @@
+keybench 0.1.1: 1 workload(s), engine=rocksdb seed=1 repeat=3
+  threads: 1,16,64
+[probe: system]
+  host           agpmastersystem
+  os             Linux 6.2.0-39-generic x86_64
+  cpu            11th Gen Intel(R) Core(TM) i7-11700K @ 3.60GHz
+  cpu_cores      16
+  cpu_affinity   off (16 cpus available: 0-15)
+  ram            46.8 GiB
+  page_size      4096
+  data_fs(/media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/benchmark/benchdata) 62.6 GiB free of 158.9 GiB
+  data_dev       /dev/sdb3 on /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68 (ext4)
+  data_disk      solid state
+  data_disk_model WDC  WDS500G2B0A
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 12.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.37)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=1  valuebytes=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1037282    3.31 us    8.77 us   12.74 us    4.81 ms
+get          1727837    1.50 us    4.38 us    7.46 us   89.11 us
+del           346486    3.22 us    7.65 us   10.69 us    4.45 ms
+range         345900  103.94 us  317.44 us  362.50 us    3.51 ms
+get hit rate: 74.9% (median)
+throughput: 57624 /sec (1 op per unit)  (57363..75107 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=16  valuebytes=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          7432915   13.63 us  156.67 us  485.38 us   26.64 ms
+get         12388136    2.45 us    8.38 us   13.25 us   17.45 ms
+del          2476474   13.25 us  156.67 us  485.38 us   13.60 ms
+range        2476964  211.97 us  741.38 us  888.83 us   21.35 ms
+get hit rate: 75.0% (median)
+throughput: 412893 /sec (1 op per unit)  (401903..420831 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=64  valuebytes=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          4638371  501.76 us    1.32 ms    1.81 ms    8.85 ms
+get          7724933    3.06 us   12.10 us   47.36 us    1.51 ms
+del          1547153  501.76 us    1.32 ms    1.81 ms    8.62 ms
+range        1544700  207.87 us  700.42 us  921.60 us    6.64 ms
+get hit rate: 75.0% (median)
+throughput: 257557 /sec (1 op per unit)  (254070..260339 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=1  valuebytes=4096  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put           450166    8.51 us   16.77 us   55.55 us   24.23 ms
+get           748873    5.47 us   19.84 us   24.96 us    1.85 ms
+del           149945    3.76 us    9.02 us   14.53 us    1.04 ms
+range         150277  280.58 us  481.28 us  569.34 us   26.23 ms
+get hit rate: 74.9% (median)
+throughput: 24987 /sec (1 op per unit)  (24850..25351 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=16  valuebytes=4096  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1147170   34.56 us  872.45 us    4.05 ms     1.38 s
+get          1911957   14.02 us   75.26 us  166.91 us   10.79 ms
+del           382623   25.47 us  864.26 us    4.08 ms     1.38 s
+range         382136    1.12 ms    2.61 ms    5.28 ms   81.64 ms
+get hit rate: 75.0% (median)
+throughput: 63728 /sec (1 op per unit)  (61963..69181 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=64  valuebytes=4096  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put          1054221    1.55 ms    4.18 ms  246.42 ms     1.05 s
+get          1755712   14.66 us   88.58 us  741.38 us    5.53 ms
+del           351537    1.55 ms    4.15 ms  242.22 ms     1.05 s
+range         352468    1.06 ms    2.64 ms    5.67 ms   76.16 ms
+get hit rate: 75.0% (median)
+throughput: 58547 /sec (1 op per unit)  (57909..59753 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=1  valuebytes=65536  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put            23416   76.29 us    7.83 ms   22.41 ms     2.99 s
+get            39035  199.68 us    1.07 ms    1.70 ms    2.38 ms
+del             7957    6.56 us    7.50 ms   27.66 ms     1.94 s
+range           7873    2.34 ms    8.59 ms   12.26 ms   13.12 ms
+get hit rate: 86.3% (median)
+throughput: 1305 /sec (1 op per unit)  (1274..1334 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=16  valuebytes=65536  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put            20549  610.30 us  459.28 ms     2.60 s     3.06 s
+get            34143  987.14 us    2.51 ms    5.73 ms   16.62 ms
+del             6907  362.50 us  450.89 ms     2.63 s     3.06 s
+range           6820   12.91 ms   20.32 ms   27.92 ms  575.50 ms
+get hit rate: 80.4% (median)
+throughput: 1136 /sec (1 op per unit)  (1099..1185 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=64  valuebytes=65536  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put            20923   27.39 ms     1.97 s     2.67 s     2.67 s
+get            35332  897.02 us    3.03 ms   10.68 ms   20.54 ms
+del             7050    1.38 ms  116.92 ms     1.99 s     2.65 s
+range           7092   11.99 ms   26.87 ms   38.54 ms  682.72 ms
+get hit rate: 78.3% (median)
+throughput: 1154 /sec (1 op per unit)  (1144..1185 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=1  valuebytes=262144  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put             5322  259.07 us   41.68 ms  817.89 ms     2.48 s
+get             8951  741.38 us    4.36 ms    5.41 ms    6.69 ms
+del             1851    9.02 us   42.21 ms  287.31 ms     3.47 s
+range           1816    6.26 ms   20.84 ms   23.20 ms   23.83 ms
+get hit rate: 95.6% (median)
+throughput: 297 /sec (1 op per unit)  (250..330 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=16  valuebytes=262144  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put             5540    3.00 ms     1.70 s     2.73 s     2.78 s
+get             9349    4.75 ms   14.48 ms   25.30 ms   34.76 ms
+del             1855    1.27 ms     1.64 s     2.77 s     2.78 s
+range           1849   46.40 ms   73.92 ms   88.60 ms   96.73 ms
+get hit rate: 92.4% (median)
+throughput: 304 /sec (1 op per unit)  (238..315 over 3 runs)
+
+=== valsize ===
+engine=rocksdb 11.8.1  threads=64  valuebytes=262144  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+put             4610   96.99 ms     6.41 s     6.81 s     7.37 s
+get             7719    4.75 ms   33.16 ms   60.56 ms  998.49 ms
+del             1535   12.91 ms     2.26 s     2.87 s     2.88 s
+range           1536   59.51 ms  187.70 ms  233.83 ms  838.27 ms
+get hit rate: 90.5% (median)
+throughput: 235 /sec (1 op per unit)  (219..304 over 3 runs)

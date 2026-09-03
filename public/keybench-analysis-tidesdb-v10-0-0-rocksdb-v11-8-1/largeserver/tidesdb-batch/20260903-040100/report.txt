@@ -1,0 +1,149 @@
+keybench 0.1.1: 1 workload(s), engine=tidesdb seed=1 repeat=3
+  threads: 1,2,4,8,16
+[probe: system]
+  host           tdbs1
+  os             Linux 6.8.0-136-generic x86_64
+  cpu            13th Gen Intel(R) Core(TM) i9-13900
+  cpu_cores      24
+  cpu_affinity   on (8 cpus: 0,2,4,6,8,10,12,14)
+  ram            125.5 GiB
+  page_size      4096
+  data_fs(/data/bench) 1227.3 GiB free of 1251.3 GiB
+  data_dev       /dev/nvme1n1p1 on /data (xfs)
+  data_disk      solid state
+  data_disk_model Micron_7450_MTFDKCC1T9TFR
+[probe: build]
+  keybench       0.1.1
+  compiler       gcc 13.3.0
+  std            C 201112 (optimized)
+  allocator      jemalloc (glibc 2.39)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=1  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         4225156    6.24 us    9.66 us   15.42 us   80.76 ms
+mput         2818665    5.47 us   15.55 us  110.08 us  313.12 ms
+get hit rate: 100.0% (median)
+throughput: 117315 /sec (1 op per unit)  (115955..117713 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=1  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           79639  382.98 us  452.61 us  618.50 us  308.90 ms
+mput           53410  232.45 us    4.01 ms   31.06 ms  151.78 ms
+get hit rate: 100.0% (median)
+workload units: 2217 wu/sec  (2182..2227 over 3 runs)
+primitive ops:  141917 ops/sec  (139680..142539 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=1  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           19618    1.55 ms    1.83 ms   70.78 ms   84.23 ms
+mput           13040  946.18 us   14.09 ms   92.80 ms  305.11 ms
+get hit rate: 100.0% (median)
+workload units: 544 wu/sec  (543..550 over 3 runs)
+primitive ops:  139337 ops/sec  (139018..140791 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=2  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         5346476    6.82 us   20.35 us   43.78 us  151.67 ms
+mput         3563948    5.09 us   34.05 us    3.52 ms  314.17 ms
+get hit rate: 100.0% (median)
+throughput: 148505 /sec (1 op per unit)  (148024..151477 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=2  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           93509  423.94 us    3.39 ms    7.44 ms  305.72 ms
+mput           62699  276.48 us    8.16 ms   70.78 ms  311.03 ms
+get hit rate: 100.0% (median)
+workload units: 2602 wu/sec  (2591..2608 over 3 runs)
+primitive ops:  166546 ops/sec  (165823..166903 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=2  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           23211    1.74 ms    8.72 ms   78.12 ms  315.94 ms
+mput           15334    1.30 ms   22.15 ms   88.60 ms  313.96 ms
+get hit rate: 100.0% (median)
+workload units: 642 wu/sec  (636..651 over 3 runs)
+primitive ops:  164444 ops/sec  (162832..166584 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=4  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget         7064797    8.38 us   28.54 us  313.34 us  310.78 ms
+mput         4708792    6.05 us  232.45 us    4.95 ms  315.03 ms
+get hit rate: 100.0% (median)
+throughput: 196205 /sec (1 op per unit)  (187365..197521 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=4  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget          115954  552.96 us    4.05 ms   10.03 ms  309.33 ms
+mput           77509  839.68 us   12.52 ms   88.60 ms  321.26 ms
+get hit rate: 100.0% (median)
+workload units: 3224 wu/sec  (2964..3291 over 3 runs)
+primitive ops:  206348 ops/sec  (189678..210639 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=4  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           28401    2.24 ms   10.55 ms   82.31 ms  319.28 ms
+mput           18899    5.87 ms   47.97 ms  107.48 ms  322.97 ms
+get hit rate: 100.0% (median)
+workload units: 788 wu/sec  (718..796 over 3 runs)
+primitive ops:  201725 ops/sec  (183746..203808 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=8  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget        10040521   11.07 us   37.12 us  296.96 us  644.23 ms
+mput         6694466    7.90 us  569.34 us    5.80 ms  647.76 ms
+get hit rate: 100.0% (median)
+throughput: 278880 /sec (1 op per unit)  (276240..284830 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=8  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget          157325  839.68 us    4.82 ms   11.21 ms  642.96 ms
+mput          104952    1.89 ms   13.70 ms   88.60 ms  649.37 ms
+get hit rate: 100.0% (median)
+workload units: 4357 wu/sec  (4273..4532 over 3 runs)
+primitive ops:  278860 ops/sec  (273458..290057 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=8  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           39329    3.42 ms   12.78 ms   83.36 ms  653.46 ms
+mput           26307   10.03 ms   33.16 ms  139.46 ms  660.38 ms
+get hit rate: 100.0% (median)
+workload units: 1094 wu/sec  (1089..1113 over 3 runs)
+primitive ops:  279944 ops/sec  (278904..284867 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=16  batch=1  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget        10460090   11.07 us   59.65 us  497.66 us  317.85 ms
+mput         6971475    7.01 us    2.54 ms    7.50 ms  329.72 ms
+get hit rate: 100.0% (median)
+throughput: 290504 /sec (1 op per unit)  (283086..294004 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=16  batch=64  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget          143570  831.49 us    4.01 ms    6.91 ms  317.21 ms
+mput           95808    7.18 ms   30.54 ms   54.79 ms  336.12 ms
+get hit rate: 100.0% (median)
+workload units: 3989 wu/sec  (3954..4123 over 3 runs)
+primitive ops:  255292 ops/sec  (253048..263846 over 3 runs)
+
+=== batch ===
+engine=tidesdb 10.0.0  threads=16  batch=256  (median of 3 runs)
+op             count        p50        p99      p99.9        max
+mget           35814    3.78 ms   10.55 ms   15.79 ms  321.66 ms
+mput           23908   31.59 ms   82.31 ms  187.70 ms  385.60 ms
+get hit rate: 100.0% (median)
+workload units: 995 wu/sec  (993..1038 over 3 runs)
+primitive ops:  254683 ops/sec  (254305..265745 over 3 runs)
