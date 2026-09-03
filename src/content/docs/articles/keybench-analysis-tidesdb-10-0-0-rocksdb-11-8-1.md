@@ -111,7 +111,7 @@ and it is kept separate from the defaults result for that reason.
 |---|---|---|
 | CPU | i7-11700K, 16 cores | i9-13900, 24 cores, 8 P plus 16 E, SMT off |
 | cores the run could use | all 16 | 8, the isolated P-cores |
-| RAM | 46.8 GiB | 125.5 GiB, no ECC |
+| RAM | 46.8 GiB DDR4 | 125.5 GiB DDR5, no ECC |
 | storage | SATA SSD, ext4, shared with the OS | NVMe Micron 7450, xfs, separate from the OS disk |
 | threads swept | 1, 16, 64 | 1, 2, 4, 8, 16 |
 | CPU placement | left to the scheduler | 8 P-cores, isolated and pinned |
@@ -125,6 +125,23 @@ large server has more cores but the benchmark was confined to eight of them, the
 isolated P-cores, while the small server had all sixteen of its own. So the larger
 machine ran the sweep on half the cores. That matters at 16 threads, which fits
 inside the small server's cores and oversubscribes the large server's two to one.
+
+The large server's benchmark disk is worth a note of its own, since storage is
+where most of the difference between these two machines lives. It is a single
+Micron 7450 with no RAID of any kind, hardware or software, so nothing sits between
+the engine and the device. It is not the OS disk, which is a separate Samsung
+drive, so background system IO does not land on the drive being measured. It runs
+xfs mounted noatime and nodiratime with the IO scheduler set to none, and it was
+formatted to 4096 byte sectors, which the drive reports as its best performing LBA
+format and which matches the page size both engines write in. The link negotiated
+PCIe Gen4 x4 at full width. Health at run time was 1% used, no media errors, no
+thermal throttle events, at 35 C.
+
+Measured with fio and O_DIRECT before the run, that device does 6230 MB/s
+sequential read, 321,267 random 4K read IOPS at QD64 across four jobs, and 7,467
+4K write plus fsync IOPS at QD1 with 135 us fsync latency. The small server's SATA
+SSD is roughly an order of magnitude behind on every one of those, and it also
+holds the operating system.
 
 The workloads, the dataset sizes and the engine configuration are identical on
 both. Same 2621440 items for mixed, scan and batch, same 556570 users for cart,
@@ -663,8 +680,8 @@ The large server is not simply faster hardware. It is a host configured to remov
 variance. It boots with `transparent_hugepage=never`, `intel_idle.max_cstate=1`
 and `processor.max_cstate=1`, `isolcpus=0-15` with `nohz_full` and `rcu_nocbs`
 over the same range, and `nosmt`. The governor is performance with turbo on. The
-benchmark disk is a separate NVMe device from the OS disk, mounted noatime with
-the IO scheduler set to none. Between the two machines that removes scheduler
+benchmark disk is the un-RAIDed NVMe described earlier, separate from the OS disk.
+Between the two machines that removes scheduler
 migration, deep C-state transitions, transparent huge page stalls, timer ticks and
 RCU callbacks on the benchmark cores, SMT contention, and OS IO landing on the same
 device as the benchmark.
