@@ -40,7 +40,7 @@ bundled workloads store a repeated byte that LZ4 shrinks by about 58x, which wou
 make a nominally 10 GiB dataset land at 180 MB on disk. Everything else is whatever
 the library ships with. Where those defaults differ in kind, and the important one
 is that TidesDB separates large values by default while RocksDB's BlobDB is off,
-that difference is part of what is being measured rather than a variable to be
+that difference is part of what is being measured, not a variable to be
 controlled away.
 
 There is one deliberate exception, run precisely because that difference is the
@@ -82,7 +82,7 @@ do what you would expect.
 **Before the numbers**
 
 Every one of these results is shaped by how the runs were configured, so this
-comes first rather than in a footnote.
+comes first, not as a footnote.
 
 Both arms on both machines are the median of three runs. That matters more than it
 sounds. RocksDB was first measured at one run per cell, and rerunning it with three
@@ -90,7 +90,7 @@ repeats against the identical binary moved its numbers down in most cells, becau
 the single runs had been slightly lucky. A benchmark that reports one arm more
 carefully than the other is not comparing engines, it is comparing sample sizes.
 
-The runs are bounded by time rather than by work. Each cell runs 60 seconds, so
+The runs are bounded by time, not by work. Each cell runs 60 seconds, so
 the faster engine performs more operations in that window. That is fine for
 throughput and it muddies latency. On the small server mixed workload TidesDB
 issued about twice the puts and twice the deletes RocksDB did and hollowed out the
@@ -151,7 +151,7 @@ threads gave 565 wu/s unpinned against 4500 pinned. The large server runs
 therefore pin worker t to the t-th CPU of the set the process inherited. Anyone
 benchmarking on an isolated CPU host should check for this before believing a
 scaling curve. `cat /sys/devices/system/cpu/isolated` answers it, and an empty
-result means pinning is optional rather than mandatory.
+result means pinning is optional, not mandatory.
 
 One caveat carries into the results. `--pin` places keybench's own worker and seed
 threads, and it does not place the engines' internal flush and compaction threads,
@@ -183,11 +183,13 @@ cell on both engines is the median of three runs of 60 seconds.
 **How seeding works, and why it is worth reporting**
 
 Before any cell is timed the store has to be filled, and keybench treats that as a
-first class phase rather than as setup to be hidden. A workload's `load` function
+first class phase, not as setup to be hidden. A workload's `load` function
 runs on every worker thread at once, each thread filling the slice of the keyspace
 it owns, grouping writes into batches so a large seed commits as one engine write
 rather than one write per key. The seed is sampled once a second like the timed
-phase, so its ingest rate is reported rather than inferred.
+phase, so the ingest rate below is the average of those samples and not a total
+divided by a duration. The difference matters because the curve is not a straight
+line, as the figure shows.
 
 The two machines chose differently here. The small server seeds once per engine and
 reuses that store across the whole sweep, which trades a fresh dataset per cell for
@@ -274,8 +276,9 @@ samples at the top of each thread sweep, and the two machines look nothing alike
 ![Throughput over time, small server](/keybench-analysis-tidesdb-v10-0-0-rocksdb-v11-8-1/smallserver/comparison/timeline_throughput.png)
 
 On the small server the RocksDB line falls to zero and stays there for seconds at a
-stretch, repeatedly, on batch, cart and mixed. That is the write stall from the
-previous section drawn directly rather than inferred from a percentile. Its scan and
+stretch, repeatedly, on batch, cart and mixed. Those flat sections at zero are the
+write stall from the previous section, seen from the outside as throughput instead
+of from RocksDB's own counters. Its scan and
 valsize lines, which are read heavy, stay level. TidesDB is noisy on the write heavy
 workloads too but does not floor out.
 
@@ -294,7 +297,7 @@ decay across the minute, TidesDB from 130k to 95k and RocksDB from 65k to 50k.
 
 Neither machine reaches a true steady state in 60 seconds. A longer run would tell
 a different and probably less flattering story for both engines, and that is a gap
-in this article rather than a property of the engines.
+in this article, not a property of the engines.
 
 **Scaling**
 
@@ -303,7 +306,7 @@ in this article rather than a property of the engines.
 On the small server neither engine scales well on write heavy work. From 1 to 64
 threads mixed improves 2.01x for TidesDB and 1.03x for RocksDB, and cart gets worse
 for both, 0.63x and 0.83x. Cart is the workload with hot user skew, so that is
-contention on hot keys rather than an I/O limit.
+contention on hot keys and not an I/O limit.
 
 The large server, with isolated pinned cores, is healthier. Cart runs 59,992 to
 82,088 wu/s on RocksDB and 54,296 to 154,351 on TidesDB from 1 to 8 threads. Both
@@ -317,14 +320,14 @@ been separated.
 ![Batch amortization, small server](/keybench-analysis-tidesdb-v10-0-0-rocksdb-v11-8-1/smallserver/comparison/sweep_batch.png)
 
 The small server batch ratios reach 77x, which is the largest number in this
-article and the one most worth understanding rather than quoting. It is a real
+article and the one most worth understanding before quoting. It is a real
 RocksDB behaviour with a mechanism you can follow from the workload down.
 
 The batch workload calls `kv.mput` with 64 or 256 key value pairs per call. Values
 are 4096 bytes and keys are 14, so a 256 key call hands the engine about 1.05 MB in
 one shot, and keybench's RocksDB backend maps that onto a single `rocksdb_write` of
-a write batch rather than onto 256 separate puts. That is the right mapping, and it
-means the engine sees a small number of very large atomic writes instead of a
+a write batch, not onto 256 separate puts. The mapping is correct, and it means
+the engine sees a small number of very large atomic writes instead of a
 stream of small ones.
 
 RocksDB's defaults are not sized for that, and its defaults are the subject here.
@@ -459,7 +462,7 @@ for the throughput gap, since closing the configuration difference leaves TidesD
 ahead everywhere in this sweep. The second is that the mirror experiment, TidesDB
 with `keep_values_inline=1`, is not worth running. Holding 4 KB values inline in a
 4 KB btree node collapses the fanout unless `btree_klog_block_size` is raised to
-match, so it is two coupled changes rather than one flag, it is not a configuration
+match, so it is two coupled changes and not one flag, it is not a configuration
 anybody is advised to run, and this arm already answers the question from the other
 side.
 
@@ -488,7 +491,7 @@ correspondingly more to do. TidesDB's relative advantage grows a little rather t
 shrinking, which makes this the one measure where the faster machine is kinder to
 TidesDB.
 
-For TidesDB this can be checked rather than taken on trust. On the small server
+For TidesDB this can be checked instead of taken on trust. On the small server
 mixed run the engine reports 52.23 GB across its write-ahead log, value log,
 flushes and compactions against 52.28 GB counted by the kernel, agreeing to 0.1%.
 RocksDB exposes no equivalent counter, so `/proc/self/io` is the only common basis,
@@ -499,7 +502,7 @@ most writes are superseded in the memtable and never reach storage, and TidesDB
 computes to 0.11x there. That is arithmetically correct and tells you about the
 workload rather than the engine.
 
-One note on why user bytes rather than operations belong in the denominator. Divide
+One note on why user bytes belong in the denominator and operations do not. Divide
 by operations and the shared 10 GiB seed is charged against the timed operations
 alone, and since RocksDB performs about 6.5x fewer of those it absorbs that fixed
 cost far more heavily. The ratio then reads about twice as favourable to TidesDB as
@@ -546,8 +549,7 @@ RocksDB has the same idea in <a href="https://github.com/facebook/rocksdb/wiki/B
 and ships it off. Its wiki describes it as key value separation from the WiscKey
 paper, storing large values in dedicated blob files with only small pointers in the
 LSM tree, so that RocksDB avoids "copying the values over and over again during
-compaction". That is the same objective as TidesDB's value log, reached by a
-different route, and `min_blob_size` plays the part `value_separation_threshold`
+compaction". Same objective as TidesDB's value log, reached by a different route, and `min_blob_size` plays the part `value_separation_threshold`
 plays here. One difference in kind is that BlobDB is enabled per column family
 while TidesDB's threshold is database level, since its value log is a single shared
 structure.
@@ -556,7 +558,7 @@ The relevant fact is that `enable_blob_files` defaults to false, while TidesDB
 separates at 1024 bytes with nothing set. So a large share of the write path result
 is key value separation on against off.
 
-That is the intended comparison rather than a confound in it. The question being
+That is the intended comparison, not a confound in it. The question being
 answered is what you get from the two libraries as they install, and one of them
 separates large values without being asked.
 
@@ -569,7 +571,7 @@ The value log is the cost side of separation and it should be reported. Sampled
 through the small server mixed run, `db_vlog_bytes` ranges from 10.34 GB to 43.32
 GB with a mean of 23.94 GB, while the bytes live sstables can still reach hold at a
 mean of 11.31 GB. Dead bytes stay low at a mean of 0.19 GB, so reclamation is
-working rather than falling behind, and the log grows, retires segments and falls
+working and not falling behind, and the log grows, retires segments and falls
 back. The store holds roughly twice its live data on average and peaks higher.
 
 If you are sizing a disk for TidesDB, size it for the peak and not for the dataset.
@@ -600,10 +602,10 @@ RocksDB's 252,778, so it is absorbing 2.3x the write load. A separate work
 bounded run, where both engines execute an identical number of operations from the
 same seed, inverts it. Put p99.9 comes out at 11.86 ms for RocksDB and 1.06 ms for
 TidesDB. That run is not in the archives below, so take it as a pointer to the
-right experiment rather than as a result you can check here. So TidesDB's put
+right experiment and not as a result you can check here. So TidesDB's put
 path degrades under its own higher throughput rather than
 being slower at the same load. Time bounded runs cannot separate those, which is a
-limitation of this article's method rather than of either engine.
+limitation of this article's method and not of either engine.
 
 **Memory**
 
@@ -630,7 +632,7 @@ a result.
 
 Per operation TidesDB uses less memory than RocksDB on cart and considerably less
 on valsize, and about 1.5x more on mixed and scan. The raw peaks are mostly a
-consequence of doing more work rather than of being hungrier per unit of it. What
+consequence of doing more work, not of being hungrier per unit of it. What
 the raw numbers do tell you is what to provision, since a process that reaches
 2.2 GB needs 2.2 GB whatever the reason. Both are bounded rather than growing,
 stepping up and plateauing within a run, so neither is leaking.
@@ -638,7 +640,7 @@ stepping up and plateauing within a run, so neither is leaking.
 **Variance, and a result that reverses**
 
 Both engines ran three times per cell on both machines, so this can be compared
-rather than asserted. It is where the two machines disagree most, and where the
+instead of asserted. It is where the two machines disagree most, and where the
 small server misled me.
 
 On the small server TidesDB is the tighter of the two on the typical cell, median
@@ -674,8 +676,7 @@ being environmental but does not identify which variable mattered, and does not
 prove the engine has no latent sensitivity that a noisier machine provokes. Those
 are different claims and only the first is supported here.
 
-It is worth being clear that the pinning difference between the two runs is not a
-designed contrast. `cat /sys/devices/system/cpu/isolated` returns nothing on the
+The pinning difference between the two runs is not a designed contrast. `cat /sys/devices/system/cpu/isolated` returns nothing on the
 small server, so the scheduler balances threads there by itself and pinning would
 only remove migration noise. It returns `0-15` on the large server, where an
 unpinned sweep is fiction. Each host used the setting it required, which is correct
