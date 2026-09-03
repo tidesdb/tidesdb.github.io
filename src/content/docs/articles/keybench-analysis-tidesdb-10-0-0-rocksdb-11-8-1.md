@@ -111,7 +111,7 @@ and it is kept separate from the defaults result for that reason.
 |---|---|---|
 | CPU | i7-11700K, 16 cores | i9-13900, 24 cores, 8 P plus 16 E, SMT off |
 | cores the run could use | all 16 | 8, the isolated P-cores |
-| RAM | 46.8 GiB | 125.5 GiB, no ECC |
+| RAM | 46.8 GiB DDR4 | 125.5 GiB DDR5, no ECC |
 | storage | SATA SSD, ext4, shared with the OS | NVMe Micron 7450, xfs, separate from the OS disk |
 | threads swept | 1, 16, 64 | 1, 2, 4, 8, 16 |
 | CPU placement | left to the scheduler | 8 P-cores, isolated and pinned |
