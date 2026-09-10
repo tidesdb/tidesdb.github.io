@@ -1,0 +1,6 @@
+tidesdb	oltp_write_only	1	2011.38	12457.20	0.42
+tidesdb	oltp_write_only	8	11376.80	75558.44	0.74
+tidesdb	oltp_write_only	16	17203.18	120879.29	10.27
+tidesdb	oltp_read_write	1	253.18	5309.18	12.75
+tidesdb	oltp_read_write	8	2016.61	41160.19	12.08
+tidesdb	oltp_read_write	16	3286.05	68011.46	12.98
