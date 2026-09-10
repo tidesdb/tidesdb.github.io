@@ -5,16 +5,22 @@
 import Default from '@astrojs/starlight/components/SocialIcons.astro';
 import NavDropdown from './NavDropdown.astro';
 import { LATEST } from '../config/versions.js';
+import { componentHref } from '../utils/nav.js';
 
 const v = LATEST.id;
+
+// Per-component entries resolve through the sync manifest: a component moves
+// between an on-site chapter and its GitHub repo as it publishes docs, and its
+// pages move when its manual is restructured. Anything that has nowhere to
+// point yet (no repository) drops out of the menu rather than 404ing.
 const docsLinks = [
 	{ label: 'Getting Started', href: '/getting-started/' },
 	{ label: 'TidesDB manual', href: `/docs/${v}/preface` },
-	{ label: 'TideSQL', href: `/docs/${v}/tidesql/preface` },
+	{ label: 'TideSQL', href: componentHref(v, 'tidesql-mariadb') },
 	{ label: 'Language bindings', href: '/getting-started/#bindings' },
-	{ label: 'Kafka connector', href: `/docs/${v}/kafka/reference` },
+	{ label: 'Kafka connector', href: componentHref(v, 'kafka') },
 	{ label: 'Compatibility', href: `/docs/${v}/compatibility` },
-];
+].filter((link) => link.href);
 const companyLinks = [
 	{ label: 'About TidesDB Corp.', href: '/company/about-tidesdb-corp' },
 	{ label: 'Licensing', href: '/licensing' },

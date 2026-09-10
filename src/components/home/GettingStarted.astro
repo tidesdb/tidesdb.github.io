@@ -4,31 +4,13 @@
 // routes each to the right versioned docs. Links are derived from the committed
 // nav manifest so they stay correct as component docs are restructured.
 import { LATEST } from '../../config/versions.js';
+import { componentHref, landingHref, navFor } from '../../utils/nav.js';
 
 const v = LATEST.id;
 const GITHUB = 'https://github.com/tidesdb/tidesdb';
 const DISCORD = 'https://discord.gg/tWEmjR66cy';
 
-// Load the active version's nav tree to resolve component landing pages.
-const navModules = import.meta.glob('../../config/nav/*.json', { eager: true });
-let nav: any = null;
-for (const mod of Object.values(navModules)) {
-	const n = (mod as any).default;
-	if (n.id === v) nav = n;
-}
-
-function landingHref(node: any): string | null {
-	if (!node) return null;
-	if (node.kind === 'page') return `/${node.slug}/`;
-	if (node.kind === 'link') return node.href;
-	if (node.kind === 'group') {
-		for (const e of node.entries) {
-			const h = landingHref(e);
-			if (h) return h;
-		}
-	}
-	return null;
-}
+const nav = navFor(v);
 const topNode = (label: string) => nav?.tree.find((n: any) => n.label === label) ?? null;
 
 const glyphs: Record<string, string> = {
@@ -61,14 +43,14 @@ const paths = [
 		title: 'TideSQL',
 		lang: 'SQL',
 		text: 'Run TidesDB as a storage engine inside MariaDB and MySQL-compatible servers — no application changes.',
-		href: landingHref(topNode('TideSQL')) ?? `/docs/${v}/tidesql/preface`,
+		href: componentHref(v, 'tidesql-mariadb'),
 		icon: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>',
 	},
 	{
 		title: 'Kafka connector',
 		lang: 'Streams',
 		text: 'A TidesDB-backed state store for Apache Kafka Streams — durable, embedded state for your topologies.',
-		href: landingHref(topNode('Kafka connector')) ?? `/docs/${v}/kafka/reference`,
+		href: componentHref(v, 'kafka'),
 		icon: '<circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M8.5 11 15 7M8.5 13l6.5 4"/>',
 	},
 ];

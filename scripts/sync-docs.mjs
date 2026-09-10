@@ -72,11 +72,49 @@ function ensureSlug(md, fullSlug) {
 	return md.replace(block, newBlock);
 }
 
+/** Every chapter a manifest declares, as [chapterSlug, fullSlug] pairs. */
+function chaptersOf(manifest, base) {
+	const pairs = [];
+	for (const part of manifest.parts ?? []) {
+		for (const chapter of part.chapters ?? []) pairs.push([chapter.slug, `${base}/${chapter.slug}`]);
+	}
+	return pairs;
+}
+
+/**
+ * Rewrite a chapter's cross-references into site paths.
+ *
+ * Each component's manual is written to stand alone inside its own repository,
+ * so it links to its siblings from that repo's root: `[compaction](/internals/
+ * compaction)`. Mounted here every one of those needs the namespace it was
+ * mounted under, or it lands at the site root and 404s — which is exactly what
+ * happened to all 55 cross-references the first time these manuals went up.
+ *
+ * Resolution is the component's own chapters first, then core's, because a
+ * component manual legitimately links into the engine manual: TideSQL's
+ * `/internals/architecture` is core's chapter, not one of TideSQL's three.
+ * Anything matching neither is left exactly as written and reported — it is a
+ * broken link in the source repo, and silently rewriting it would hide that.
+ */
+function rewriteCrossRefs(md, own, core, unresolved) {
+	return md.replace(/\]\((\/[^)\s#]*)([^)]*)\)/g, (match, path, rest) => {
+		const key = path.replace(/^\/+|\/+$/g, '');
+		// Leave asset paths (/logo.svg, /img/x.png) alone — they are served as-is.
+		if (/\.[a-z0-9]+$/i.test(key)) return match;
+		const target = own.get(key) ?? core.get(key);
+		if (!target) {
+			unresolved.add(path);
+			return match;
+		}
+		return `](/${target}/${rest})`;
+	});
+}
+
 /**
  * Write one component's chapters into docs/<versionId>/<namespace>/ and return
  * its nav groups (one per manual part). `namespace` is '' for core.
  */
-function writeChapters(read, manifest, versionId, namespace) {
+function writeChapters(read, manifest, versionId, namespace, own, core, unresolved) {
 	const base = namespace ? `docs/${versionId}/${namespace}` : `docs/${versionId}`;
 	const outDir = namespace ? join(CONTENT_ROOT, versionId, namespace) : join(CONTENT_ROOT, versionId);
 
@@ -90,7 +128,8 @@ function writeChapters(read, manifest, versionId, namespace) {
 			const fullSlug = `${base}/${chapter.slug}`;
 			const dest = join(outDir, `${chapter.slug}.md`);
 			mkdirSync(dirname(dest), { recursive: true });
-			writeFileSync(dest, ensureSlug(read(rel), fullSlug));
+			const md = rewriteCrossRefs(read(rel), own, core, unresolved);
+			writeFileSync(dest, ensureSlug(md, fullSlug));
 			pageCount++;
 			entries.push({ kind: 'page', title: chapter.title, slug: fullSlug });
 		}
@@ -167,11 +206,22 @@ function slotsFor(version) {
 }
 
 /**
+ * Will this component's chapters be rendered under `major`? Mirrors the checks
+ * renderSlot makes, hoisted so every component's chapter list can be collected
+ * before any file is written — cross-references need the full picture.
+ */
+function willRender(slot, probe, major) {
+	if (probe.status !== 'documented') return false;
+	if (slot.role === 'core') return true;
+	return majorOf(probe.manifest.tidesdb ?? null) === major;
+}
+
+/**
  * Render one probed slot: its nav node (null when there is nothing to link to)
  * and the record the compatibility page reads. Core is exempt from the major
  * check — it defines the major rather than declaring support for one.
  */
-function renderSlot(slot, probe, version, major) {
+function renderSlot(slot, probe, version, major, links) {
 	const { component, namespace, role } = slot;
 	const label = component.label ?? 'TidesDB';
 	const linkNode = () => ({ kind: 'link', label, href: probe.repoUrl });
@@ -223,7 +273,15 @@ function renderSlot(slot, probe, version, major) {
 
 	console.log(`    ${namespace || 'core'} ← ${probe.provenance.describe}`);
 	const read = openReader(probe.repo, probe.ref, { immutable: probe.provenance.kind === 'tag' });
-	const { groups, pageCount } = writeChapters(read, probe.manifest, version.id, namespace);
+	const { groups, pageCount } = writeChapters(
+		read,
+		probe.manifest,
+		version.id,
+		namespace,
+		links.own,
+		links.core,
+		links.unresolved
+	);
 	const record = {
 		...base,
 		// Core IS the distribution, so it reports the major itself.
@@ -242,16 +300,48 @@ async function syncVersion(version) {
 	// failure leaves the previously synced (and committed) docs intact.
 	const probes = await Promise.all(slots.map((s) => probeComponent(s.component)));
 
+	// Collect every chapter every component will publish BEFORE writing a byte:
+	// a manual's cross-references resolve against its own chapter list and core's,
+	// so both have to be known up front.
+	const chapterMaps = new Map();
+	for (const [i, slot] of slots.entries()) {
+		const base = slot.namespace ? `docs/${version.id}/${slot.namespace}` : `docs/${version.id}`;
+		chapterMaps.set(
+			slot.id,
+			new Map(willRender(slot, probes[i], major) ? chaptersOf(probes[i].manifest, base) : [])
+		);
+	}
+	const coreMap = chapterMaps.get('core') ?? new Map();
+
 	const outDir = join(CONTENT_ROOT, version.id);
 	rmSync(outDir, { recursive: true, force: true });
 	mkdirSync(outDir, { recursive: true });
 
 	const rendered = new Map();
+	const unresolved = new Map();
 	let pages = 0;
 	for (const [i, slot] of slots.entries()) {
-		const result = renderSlot(slot, probes[i], version, major);
+		const refs = new Set();
+		const result = renderSlot(slot, probes[i], version, major, {
+			own: chapterMaps.get(slot.id),
+			core: coreMap,
+			unresolved: refs,
+		});
+		if (refs.size) unresolved.set(slot.namespace || 'core', refs);
 		pages += result.pageCount;
 		rendered.set(slot.id, result);
+	}
+
+	// A path matching no chapter is left exactly as written, so it is NOT
+	// necessarily broken: a manual written against the old flat site still links
+	// to /reference/<x>, which the legacy redirects in astro.config.mjs resolve.
+	// It is reported because depending on a redirect meant for inbound traffic is
+	// fragile — the fix is a manual-relative link in the repo that owns the page.
+	for (const [where, refs] of unresolved) {
+		console.warn(
+			`  ! ${where}: ${refs.size} link(s) match no chapter, left as written ` +
+				`(fine if the site redirects them): ${[...refs].sort().join(', ')}`
+		);
 	}
 
 	const tree = [];

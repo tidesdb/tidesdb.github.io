@@ -65,7 +65,7 @@ export const VERSIONS = [
 				variants: [
 					// The primary target: expanded when TideSQL opens, so the common
 					// case stays one click.
-					{ id: 'mariadb', label: 'MariaDB', repo: 'tidesql', tag: null, tidesdb: '10.0.0', open: true },
+					{ id: 'mariadb', label: 'MariaDB', repo: 'tidesql', tag: 'v5.0.0', tidesdb: '10.0.0', open: true },
 					// Listed before it exists on purpose: the compatibility page shows
 					// it as announced, and the day tidesdb/tidesql-mysql is pushed with
 					// a doc/ directory it appears in the sidebar on the next sync.
