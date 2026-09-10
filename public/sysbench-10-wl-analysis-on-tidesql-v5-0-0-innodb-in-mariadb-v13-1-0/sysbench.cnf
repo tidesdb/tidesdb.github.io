@@ -1,0 +1,34 @@
+[mysqld]
+
+basedir                  = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/build-mariadb
+datadir                  = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/sysbench-bench/data
+tmpdir                   = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/sysbench-bench/tmp
+socket                   = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/sysbench-bench/m.sock
+pid-file                 = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/sysbench-bench/mariadb.pid
+log-error                = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/sysbench-bench/mariadb.err
+lc-messages-dir          = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/build-mariadb/sql/share
+port                     = 3306
+
+plugin-dir               = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/build-mariadb/all_plugins
+plugin-load-add          = ha_tidesdb.so
+plugin-maturity          = unknown
+skip-log-bin
+transaction-isolation    = REPEATABLE-READ
+max-connections          = 512
+back-log                 = 512
+thread-cache-size        = 512
+table-open-cache         = 8000
+table-definition-cache   = 4000
+skip-name-resolve
+innodb-flush-log-at-trx-commit   = 2        # relaxed, pairs with TidesDB sync_mode=NONE
+innodb-doublewrite               = 1        # page-tear protection, orthogonal to commit, TidesDB does this by default
+innodb-compression-default       = OFF
+tidesdb-memtable-sync-mode           = NONE     
+tidesdb-log-level                    = ERROR    
+tidesdb-log-to-file                  = 0
+tidesdb-default-compression                  = NONE  
+tidesdb-default-isolation-level              = REPEATABLE_READ
+
+[client]
+port                     = 3306
+socket                   = /media/agpmastersystem/c794105c-0cd9-4be9-8369-ee6d6e707d68/home/development/sysbench-bench/m.sock
