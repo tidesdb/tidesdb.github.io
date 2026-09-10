@@ -24,11 +24,34 @@ head:
 
 Today <a target="_blank" href="https://github.com/tidesdb/tidesql/releases/tag/v5.0.0">TideSQL v5.0.0</a> is out, an optional storage engine for MariaDB server 11.4 and onward that you install either through MariaDB's Foundry or through our own installer. To mark the release I ran it against InnoDB under sysbench on MariaDB v13.1.0, mostly at each engine's shipped defaults.
 
-Before I jump into the benchmark let me give you an overview of what TideSQL is and what it offers and then explain what MariaDB Foundry is. TideSQL is a storage engine plugin for MariaDB, built on the TidesDB library and reached through the ordinary ENGINE=TidesDB clause, so moving a table onto it is a one-line change and everything above it stays standard SQL. It is fully transactional through the library's multi-version concurrency control, with the SQL isolation levels mapped onto the engine and durability tunable per commit from no fsync through a timed flush to a full sync on every commit. Being log-structured it favors write throughput and lets background compaction keep read cost bounded, which is where it pulls ahead on inserts, updates and deletes. Around that it carries a wide surface, primary and secondary indexes, foreign keys, auto-increment, virtual and stored generated columns and JSON, per-row data-at-rest encryption, compression, TTL expiration, online DDL, partitioning, savepoints, XA, and online backup through a consistent checkpoint. It indexes beyond the ordinary too, with BM25 full-text search, approximate nearest-neighbor vector search, and spatial indexes. And it is a first-class participant in both MariaDB replication and Galera clustering, with engine-level write-set certification and cross-node conflict resolution rather than a generic pass-through. You can read more on TideSQL <a target="_blank" href="https://github.com/tidesdb/tidesql/tree/master/doc">here</a>.
+Before I jump into the benchmark let me give you an overview of what TideSQL is and what it offers and then explain what MariaDB Foundry is. TideSQL is a storage engine plugin for MariaDB, built on the TidesDB library and reached through the ordinary `ENGINE=TidesDB` clause, so moving a table onto it is a one-line change and everything above it stays standard SQL. It is fully transactional through the library's multi-version concurrency control, with the SQL isolation levels mapped onto the engine and durability tunable per commit from no fsync through a timed flush to a full sync on every commit. Being log-structured it favors write throughput and lets background compaction keep read cost bounded, which is where it pulls ahead on inserts, updates and deletes. Around that it carries a wide surface, primary and secondary indexes, foreign keys, auto-increment, virtual and stored generated columns and JSON, per-row data-at-rest encryption, compression, TTL expiration, online DDL, partitioning, savepoints, XA, and online backup through a consistent checkpoint. It indexes beyond the ordinary too, with BM25 full-text search, approximate nearest-neighbor vector search, and spatial indexes. And it is a first-class participant in both MariaDB replication and Galera clustering, with engine-level write-set certification and cross-node conflict resolution rather than a generic pass-through. You can read more on TideSQL <a target="_blank" href="https://github.com/tidesdb/tidesql/tree/master/doc">here</a>.
 
 Now, Foundry is MariaDB's own tool for building and packaging plugins. Where the install.sh builder we ship clones and compiles a whole MariaDB server from source with TideSQL linked in, Foundry works the other way around, building the plugin out-of-tree against an already installed MariaDB and turning it into the standard tar.gz, rpm and deb packages a user installs with their package manager. That helps TideSQL in a few ways. It makes the engine accessible to anyone already running a stock MariaDB, who can add TideSQL as a package instead of rebuilding the server. It is also the path MariaDB's own continuous integration uses to build and test the plugin, so every change is exercised against real MariaDB releases across the platforms and architectures Foundry covers, which is how version-specific and architecture-specific behavior surfaces early rather than in the field. And for development it gives contributors the same fast out-of-tree build the CI runs, against a released server, so what passes locally is what passes upstream.
 
 You can download MariaDB <a target="_blank" href="https://mariadb.org/download/?t=repo-config">here</a> through the foundation's website, mind you 11.4 is recommended at this time, otherwise use the TideSQL installer.
+
+If you would rather not touch your host at all, the MariaDB team put together a small Docker scaffold that brings up MariaDB 11.4 with TideSQL already installed and enabled. You can grab it <a href="/tidesql-500-arrives-in-mariadb/mariadb-plugin-tidesdb.tgz">here</a> <small>(sha256: 4d5260c3919351a446edc011c9837b3b3eac71283001baacf9c2b675e3c3a387)</small>, unpack it and start it with Docker Compose.
+
+```
+tar xf mariadb-plugin-tidesdb.tgz
+cd mariadb-plugin-tidesdb
+docker compose up -d --build
+```
+
+Under the hood it pulls the official mariadb:11.4 image, installs the mariadb-plugin-tidesdb package on top of it, allows the beta plugin to load on a stable server, and keeps the engine's data on its own volume so it survives a restart. The root password comes from the .env file sitting next to the compose file, which ships as root-password, so change it before you expose the port anywhere.
+
+Once it is up the engine is already there, and you use it through the ordinary `ENGINE=TidesDB` clause.
+
+```
+docker compose exec mariadb mariadb -uroot -proot-password
+
+SHOW ENGINES;                  -- TidesDB should read YES
+CREATE TABLE t (id INT PRIMARY KEY, v VARCHAR(32)) ENGINE=TidesDB;
+INSERT INTO t VALUES (1, 'hello'), (2, 'world');
+SELECT * FROM t;
+```
+
+That is the whole of it, and from there every table you mark `ENGINE=TidesDB` runs on the engine.
 
 The numbers come from one machine.
 
@@ -82,7 +105,7 @@ Reads are where the LSM pays its one structural cost, a transient hit when compa
 
 A few disclaimers. This is one result from a small server, at each engine's defaults, with the full-durability and 4G runs varying one axis each. It tops out at 16 threads, and each point is a single 20 second run.
 
-More to come on TideSQL, so keep an eye out, thank you for reading.
+More on TideSQL coming soon. Stay tuned, give it a try, and thanks for reading!
 
 -- 
 

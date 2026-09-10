@@ -1,0 +1,18 @@
+---
+services:
+  mariadb:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: mariadb
+    restart: "unless-stopped"
+    environment:
+      MARIADB_ROOT_PASSWORD: ${ENV_MARIADB_ROOT_PASSWORD}
+    volumes:
+      - ./database:/var/lib/mysql
+      - tidesdb_data:/var/lib/tidesdb_data
+    ports:
+      - 127.0.0.1:3306:3306
+
+volumes:
+  tidesdb_data:
