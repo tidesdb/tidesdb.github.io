@@ -1,0 +1,105 @@
+---
+// The site nav as a flat, grouped list, for the mobile menu.
+//
+// Starlight's header hides its right-hand group below 50rem, taking the whole
+// Docs/Blog/Company nav with it, so on a phone this is the ONLY way to reach
+// anything outside the current page's sidebar. It renders in two places, each
+// of which decides when to show it:
+//
+//   Sidebar.astro   — at the top of the mobile menu, on pages that have a
+//                     sidebar (so the hamburger already exists)
+//   SiteTitle.astro — behind its own disclosure, on splash pages, which have no
+//                     sidebar and therefore no hamburger at all
+//
+// Links come from config/site-nav.js, shared with the desktop dropdowns.
+import { siteNavSections } from '../config/site-nav.js';
+
+const sections = siteNavSections();
+const current = Astro.url.pathname.replace(/\/$/, '');
+---
+
+<nav class="msn" aria-label="Site">
+	{
+		sections.map((section) =>
+			section.links ? (
+				<div class="msn__group">
+					<p class="msn__heading">{section.label}</p>
+					<ul class="msn__list">
+						{section.links.map((link) => (
+							<li>
+								<a
+									href={link.href}
+									class="msn__link"
+									aria-current={link.href.replace(/\/$/, '') === current ? 'page' : undefined}
+								>
+									{link.label}
+								</a>
+							</li>
+						))}
+					</ul>
+				</div>
+			) : (
+				<div class="msn__group">
+					<a
+						href={section.href}
+						class="msn__link msn__link--solo"
+						aria-current={section.href.replace(/\/$/, '') === current ? 'page' : undefined}
+					>
+						{section.label}
+					</a>
+				</div>
+			)
+		)
+	}
+</nav>
+
+<style>
+	.msn {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+	.msn__group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+	.msn__heading {
+		margin: 0;
+		font-size: var(--sl-text-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--sl-color-gray-3);
+	}
+	.msn__list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.msn__link {
+		display: block;
+		padding: 0.5rem 0.5rem;
+		margin-inline: -0.5rem;
+		border-radius: 7px;
+		font-size: var(--sl-text-sm);
+		font-weight: 500;
+		color: var(--sl-color-white) !important;
+		text-decoration: none !important;
+		border-bottom: none !important;
+	}
+	.msn__link--solo {
+		font-size: var(--sl-text-base);
+	}
+	.msn__link:hover,
+	.msn__link:focus-visible {
+		background: var(--sl-color-gray-6);
+		outline: none;
+	}
+	.msn__link[aria-current='page'] {
+		background: var(--sl-color-gray-6);
+		color: var(--sl-color-white) !important;
+	}
+</style>

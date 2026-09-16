@@ -7,6 +7,7 @@
 import Default from '@astrojs/starlight/components/Sidebar.astro';
 import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro';
 import { activeVersionId } from '../config/versions.js';
+import MobileSiteNav from './MobileSiteNav.astro';
 import VersionSwitcher from './VersionSwitcher.astro';
 
 const activeId = activeVersionId(Astro.url.pathname);
@@ -59,6 +60,16 @@ function mapNodes(nodes: any[]): { entries: any[]; hasCurrent: boolean } {
 const sublist = nav ? mapNodes(nav.tree).entries : [];
 ---
 
+{/*
+	The sidebar is what Starlight renders inside the mobile menu, so this is where
+	the site nav goes on every page that has a hamburger. It is hidden from 50rem
+	up, where the header's own Docs/Blog/Company dropdowns come back — see
+	SiteTitle.astro for the splash pages, which have no sidebar to put it in.
+*/}
+<div class="mobile-site-nav">
+	<MobileSiteNav />
+</div>
+
 {
 	nav ? (
 		<>
@@ -71,3 +82,16 @@ const sublist = nav ? mapNodes(nav.tree).entries : [];
 		</Default>
 	)
 }
+
+<style>
+	.mobile-site-nav {
+		padding-bottom: 1rem;
+		margin-bottom: 1rem;
+		border-bottom: 1px solid var(--sl-color-hairline-light);
+	}
+	@media (min-width: 50rem) {
+		.mobile-site-nav {
+			display: none;
+		}
+	}
+</style>

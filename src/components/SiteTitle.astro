@@ -1,0 +1,141 @@
+---
+// Site title, plus the mobile nav for SPLASH pages only.
+//
+// Splash-template pages (the homepage, /getting-started, /404) render no
+// sidebar, so Starlight gives them no mobile menu button — and the header's
+// right-hand group, which holds the whole Docs/Blog/Company nav, is hidden
+// below 50rem. The result was a phone-sized homepage with no way to reach any
+// other page at all. This adds the one menu those pages were missing.
+//
+// Pages that DO have a sidebar already have a hamburger, and get the same nav
+// inside it from Sidebar.astro — so there is never a second menu button
+// competing with Starlight's. The split is made in CSS off the `data-has-sidebar`
+// attribute Starlight stamps on <html>, so it needs no route data and cannot
+// disagree with what Starlight actually rendered.
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+import MobileSiteNav from './MobileSiteNav.astro';
+---
+
+<Default><slot /></Default>
+
+<details class="splash-nav">
+	<summary class="splash-nav__btn" aria-label="Menu">
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+			<path d="M3 6h18M3 12h18M3 18h18"></path>
+		</svg>
+	</summary>
+	<div class="splash-nav__panel">
+		<MobileSiteNav />
+	</div>
+</details>
+
+<style>
+	/* Hidden by default: shown only on a narrow viewport, and only where
+	   Starlight rendered no sidebar (and therefore no menu button of its own). */
+	.splash-nav {
+		display: none;
+	}
+
+	@media (max-width: 49.9375rem) {
+		/* Sit exactly where Starlight puts its own menu button on pages that have
+		   one — fixed to the inline end of the header — rather than in the flow
+		   beside the logo, which overlapped it whenever the logo was wide. */
+		:global(html:not([data-has-sidebar])) .splash-nav {
+			display: block;
+			position: fixed;
+			top: calc((var(--sl-nav-height) - var(--sl-menu-button-size)) / 2);
+			inset-inline-end: var(--sl-nav-pad-x);
+			z-index: var(--sl-z-index-navbar);
+		}
+
+		/* Reserve that slot so the search button shifts out from under it. This is
+		   the same reservation PageFrame makes via [data-has-sidebar]; splash pages
+		   never got it, because Starlight puts no button there.
+		   `header.header` matters: PageFrame's <header> and Header.astro's inner
+		   <div> BOTH carry the class, so an unscoped `.header` pads the two of them
+		   and doubles the gap. Only the outer one is a <header> element. */
+		:global(html:not([data-has-sidebar]) header.header) {
+			padding-inline-end: calc(
+				var(--sl-nav-gap) + var(--sl-nav-pad-x) + var(--sl-menu-button-size)
+			);
+		}
+	}
+
+	/* Follows the nav's own foreground tokens (set on `header` in custom.css)
+	   rather than Starlight's default filled white disc, which reads as a bright
+	   blob on this site's dark frosted bar. --nav-fg already flips per theme, so
+	   one set of declarations is correct in both — and it matches the Docs /
+	   Company dropdown triggers sitting beside it at wider widths.
+	   custom.css gives Starlight's own menu button the same treatment. */
+	.splash-nav__btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: var(--sl-menu-button-size);
+		height: var(--sl-menu-button-size);
+		padding: 0.35rem;
+		border: 1px solid transparent;
+		border-radius: 9px;
+		background: transparent;
+		color: var(--nav-fg, var(--sl-color-white));
+		cursor: pointer;
+		list-style: none;
+		transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+	}
+	.splash-nav__btn::-webkit-details-marker {
+		display: none;
+	}
+	.splash-nav__btn svg {
+		width: 100%;
+		height: 100%;
+	}
+	.splash-nav__btn:hover {
+		color: var(--nav-fg-strong, var(--sl-color-white));
+	}
+	.splash-nav[open] .splash-nav__btn {
+		background: rgba(127, 127, 127, 0.18);
+		background: color-mix(in srgb, currentColor 14%, transparent);
+		border-color: rgba(127, 127, 127, 0.3);
+		border-color: color-mix(in srgb, currentColor 28%, transparent);
+		color: var(--nav-fg-strong, var(--sl-color-white));
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.splash-nav__btn {
+			transition: none;
+		}
+	}
+
+	/* Fixed, not absolute: the button is fixed to the header's inline end, so an
+	   absolutely-positioned panel would hang off that 2rem button rather than
+	   spanning the viewport. Full-bleed under the header, like Starlight's own
+	   mobile menu pane. */
+	.splash-nav__panel {
+		position: fixed;
+		inset-inline: 0;
+		top: var(--sl-nav-height);
+		max-height: calc(100vh - var(--sl-nav-height));
+		overflow-y: auto;
+		padding: 1rem var(--sl-nav-pad-x, 1rem) 1.5rem;
+		background: var(--sl-color-bg-nav);
+		border-bottom: 1px solid var(--sl-color-gray-6);
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+		z-index: var(--sl-z-index-menu);
+	}
+</style>
+
+<script>
+	// Close on outside click or Escape, matching the desktop dropdowns. The panel
+	// is a <details>, so navigating to a link resets it on the next page load.
+	const nav = document.querySelector<HTMLDetailsElement>('.splash-nav');
+	if (nav) {
+		document.addEventListener('click', (e) => {
+			if (nav.open && !nav.contains(e.target as Node)) nav.open = false;
+		});
+		document.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape' && nav.open) {
+				nav.open = false;
+				nav.querySelector<HTMLElement>('.splash-nav__btn')?.focus();
+			}
+		});
+	}
+</script>
