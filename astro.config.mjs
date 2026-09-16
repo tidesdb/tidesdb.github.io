@@ -80,6 +80,7 @@ export default defineConfig({
 				PageTitle: './src/components/PageTitle.astro',
 				Head: './src/components/Head.astro',
 				SocialIcons: './src/components/SocialIcons.astro',
+				SiteTitle: './src/components/SiteTitle.astro',
 				Sidebar: './src/components/Sidebar.astro',
 				Pagination: './src/components/Pagination.astro',
 			},

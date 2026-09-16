@@ -114,6 +114,30 @@ header {
 	box-shadow: 0 4px 20px rgba(10, 37, 64, 0.06);
 }
 
+/* Starlight's mobile menu button ships as a filled white disc with a drop
+   shadow, which on this nav is a bright blob floating on the dark frosted bar.
+   Restyle it to follow --nav-fg like every other nav control, so it matches the
+   Docs/Company triggers and the splash-page menu button in SiteTitle.astro
+   (which carries the same treatment for pages that have no sidebar). */
+starlight-menu-button button {
+	border-radius: 9px !important;
+	background-color: transparent !important;
+	color: var(--nav-fg, #fff) !important;
+	box-shadow: none !important;
+	border: 1px solid transparent !important;
+	transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+starlight-menu-button button:hover {
+	color: var(--nav-fg-strong, #fff) !important;
+}
+starlight-menu-button[aria-expanded='true'] button {
+	background-color: rgba(127, 127, 127, 0.18) !important;
+	background-color: color-mix(in srgb, currentColor 14%, transparent) !important;
+	border-color: rgba(127, 127, 127, 0.3) !important;
+	border-color: color-mix(in srgb, currentColor 28%, transparent) !important;
+	color: var(--nav-fg-strong, #fff) !important;
+}
+
 /* Homepage only: transparent and blended into the hero until scrolled. */
 html:has(.home) header:not(.is-scrolled) {
 	background: transparent !important;

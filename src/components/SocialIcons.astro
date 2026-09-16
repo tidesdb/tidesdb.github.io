@@ -2,37 +2,28 @@
 // Top-nav additions: a "Docs" dropdown (the docs entry point from anywhere on
 // the site), a "Blog" link, and a "Company" dropdown for the footer/company
 // pages. Then Starlight's default social icons. Lives in the header everywhere.
+//
+// NOTE: Starlight wraps this in `.sl-hidden md:sl-flex`, so everything here is
+// invisible below 50rem. The same links are rendered for mobile by
+// MobileSiteNav.astro, from the shared list in config/site-nav.js.
 import Default from '@astrojs/starlight/components/SocialIcons.astro';
 import NavDropdown from './NavDropdown.astro';
-import { LATEST } from '../config/versions.js';
-import { componentHref } from '../utils/nav.js';
+import { siteNavSections } from '../config/site-nav.js';
 
-const v = LATEST.id;
-
-// Per-component entries resolve through the sync manifest: a component moves
-// between an on-site chapter and its GitHub repo as it publishes docs, and its
-// pages move when its manual is restructured. Anything that has nowhere to
-// point yet (no repository) drops out of the menu rather than 404ing.
-const docsLinks = [
-	{ label: 'Getting Started', href: '/getting-started/' },
-	{ label: 'TidesDB manual', href: `/docs/${v}/preface` },
-	{ label: 'TideSQL', href: componentHref(v, 'tidesql-mariadb') },
-	{ label: 'Language bindings', href: '/getting-started/#bindings' },
-	{ label: 'Kafka connector', href: componentHref(v, 'kafka') },
-	{ label: 'Compatibility', href: `/docs/${v}/compatibility` },
-].filter((link) => link.href);
-const companyLinks = [
-	{ label: 'About TidesDB Corp.', href: '/company/about-tidesdb-corp' },
-	{ label: 'Licensing', href: '/licensing' },
-	{ label: 'Support', href: '/support' },
-	{ label: 'Partners', href: '/partners' },
-	{ label: 'Sponsors', href: '/sponsors' },
-];
+const sections = siteNavSections();
 ---
 
-<NavDropdown label="Docs" id="docs" links={docsLinks} />
-<a href="/blog" class="header-nav-link">Blog</a>
-<NavDropdown label="Company" id="company" links={companyLinks} />
+{
+	sections.map((section) =>
+		section.links ? (
+			<NavDropdown label={section.label} id={section.id} links={section.links} />
+		) : (
+			<a href={section.href} class="header-nav-link">
+				{section.label}
+			</a>
+		)
+	)
+}
 <Default><slot /></Default>
 
 <style>
