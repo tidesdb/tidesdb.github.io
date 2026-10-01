@@ -40,14 +40,18 @@ const GH = 'https://github.com/tidesdb';
 export const VERSIONS = [
 	{
 		id: 'v10',
-		label: '10.0.0',
+		// The LINE, not one release: core tracks 10.x, so pinning a three-part
+		// number here would go stale the moment 10.1.0 shipped. The exact release
+		// published is shown per component on the compatibility page.
+		label: '10.x',
 		status: 'current',
 		latest: true,
 
-		// The C storage engine manual — the spine of the distribution. Pinned to
-		// the release tag, so these pages are exactly the v10.0.0 manual and a
-		// re-sync on any machine reproduces them byte for byte.
-		core: { repo: 'tidesdb', tag: 'v10.0.0' },
+		// The C storage engine manual — the spine of the distribution. Tracks the
+		// 10.x release line, so a patch or minor release (10.1.0, 10.2.3) is
+		// published here on the next build with no change to this file. A new
+		// major never arrives this way: v11 is a new distribution, added below.
+		core: { repo: 'tidesdb', track: '10' },
 
 		// Integrations: TideSQL (the SQL storage engine) and the Kafka connector.
 		//
@@ -65,11 +69,11 @@ export const VERSIONS = [
 				variants: [
 					// The primary target: expanded when TideSQL opens, so the common
 					// case stays one click.
-					{ id: 'mariadb', label: 'MariaDB', repo: 'tidesql', tag: 'v5.0.0', tidesdb: '10.0.0', open: true },
+					{ id: 'mariadb', label: 'MariaDB', repo: 'tidesql', track: '5', tidesdb: '10.0.0', open: true },
 					// Listed before it exists on purpose: the compatibility page shows
 					// it as announced, and the day tidesdb/tidesql-mysql is pushed with
 					// a doc/ directory it appears in the sidebar on the next sync.
-					{ id: 'mysql', label: 'MySQL', repo: 'tidesql-mysql', tag: null },
+					{ id: 'mysql', label: 'MySQL', repo: 'tidesql-mysql', track: '5' },
 				],
 			},
 			{ id: 'kafka', label: 'Kafka connector', repo: 'tidesdb-kafka', tag: null, tidesdb: '9' },
