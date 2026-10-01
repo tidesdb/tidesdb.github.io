@@ -272,6 +272,9 @@ function renderSlot(slot, probe, version, major, links) {
 	}
 
 	console.log(`    ${namespace || 'core'} ← ${probe.provenance.describe}`);
+	// The release actually published, from the tag that was read ('v10.1.0' →
+	// '10.1.0'). A branch tip names no release.
+	const release = probe.provenance.kind === 'tag' ? probe.ref.replace(/^v/, '') : null;
 	const read = openReader(probe.repo, probe.ref, { immutable: probe.provenance.kind === 'tag' });
 	const { groups, pageCount } = writeChapters(
 		read,
@@ -284,9 +287,14 @@ function renderSlot(slot, probe, version, major, links) {
 	);
 	const record = {
 		...base,
-		// Core IS the distribution, so it reports the major itself.
-		supports: role === 'core' ? (version.core.version ?? version.label) : declared,
-		version: probe.manifest.version ?? (role === 'core' ? version.label : null),
+		// Whether this release was followed (newest in its line) or frozen by an
+		// explicit tag — the compatibility page distinguishes the two.
+		tracked: probe.provenance.tracked ?? false,
+		// Core IS the distribution, so it reports its own release rather than a
+		// declared one. Prefer the resolved tag over the distribution's label,
+		// which names the line ('10.x') and not the release that got published.
+		supports: role === 'core' ? (release ?? version.label) : declared,
+		version: probe.manifest.version ?? release ?? (role === 'core' ? version.label : null),
 		source: probe.provenance.kind,
 	};
 	return { groups, pageCount, record, label };
@@ -422,11 +430,14 @@ async function syncVersion(version) {
 		) + '\n'
 	);
 
-	const tally = (kind) => Object.values(components).filter((c) => c.source === kind).length;
+	const all = Object.values(components);
+	const tally = (kind) => all.filter((c) => c.source === kind).length;
+	const tracked = all.filter((c) => c.tracked).length;
 	console.log(
 		`  ${version.id} (${version.label}): ${pages} pages from ${tally('tag') + tally('branch')} ` +
 			`published component(s); ${tally('undocumented') + tally('mismatch')} link-out(s), ` +
-			`${tally('missing')} not yet published, ${tally('tag')} pinned to a tag`
+			`${tally('missing')} not yet published, ${tracked} tracking a release line, ` +
+			`${tally('tag') - tracked} frozen to a tag, ${tally('branch')} unpinned`
 	);
 }
 

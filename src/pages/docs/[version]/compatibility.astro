@@ -21,6 +21,8 @@ interface ComponentRecord {
 	supports: string | null;
 	version: string | null;
 	source: 'tag' | 'branch' | 'undocumented' | 'mismatch' | 'missing';
+	/** true when `source` is a release followed as the newest in its line. */
+	tracked?: boolean;
 	ref: string | null;
 	repo: string | null;
 	landing: string | null;
@@ -108,6 +110,11 @@ const unpinned = documented.filter((r: any) => components[r.id]?.source === 'bra
 											see repo
 										</span>
 									))}
+								{rec?.tracked && (
+									<span class="compat-muted" title="Follows the newest release in this line; a patch or minor release appears here automatically.">
+										{' '}· tracked
+									</span>
+								)}
 							</td>
 							<td>
 								{rec?.supports ?? (
