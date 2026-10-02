@@ -1,0 +1,2115 @@
+HammerDB CLI v6.0
+Copyright © HammerDB Ltd hosted by tpc.org 2019-2026
+Type "help" for a list of commands
+Initialized Jobs on-disk database /root/sqlanalysis/run3000/hdbtmp/hammer.DB using existing tables (46,727,168 bytes)
+Database set to MariaDB
+Benchmark set to TPC-C for MariaDB
+Value localhost for connection:maria_host is the same as existing value localhost, no change made
+Value 3306 for connection:maria_port is the same as existing value 3306, no change made
+Value /tmp/mariadb.sock for connection:maria_socket is the same as existing value /tmp/mariadb.sock, no change made
+Value hammer for tpcc:maria_user is the same as existing value hammer, no change made
+Value hammer for tpcc:maria_pass is the same as existing value hammer, no change made
+Value tpcc for tpcc:maria_dbase is the same as existing value tpcc, no change made
+Value timed for tpcc:maria_driver is the same as existing value timed, no change made
+Value 10 for tpcc:maria_rampup is the same as existing value 10, no change made
+Value 20 for tpcc:maria_duration is the same as existing value 20, no change made
+Value true for tpcc:maria_allwarehouse is the same as existing value true, no change made
+Value true for tpcc:maria_timeprofile is the same as existing value true, no change made
+Value false for tpcc:maria_keyandthink is the same as existing value false, no change made
+Value false for tpcc:maria_raiseerror is the same as existing value false, no change made
+Value false for tpcc:maria_purge is the same as existing value false, no change made
+Value 1200 for commandline:keepalive_margin is the same as existing value 1200, no change made
+Value 1200 for timeprofile:xt_gather_timeout is the same as existing value 1200, no change made
+Transaction Counter refresh rate set to 1
+Transaction Counter timestamps set to 1
+Script loaded, Type "print script" to view
+Vuser 1 created MONITOR - WAIT IDLE
+Vuser 2 created - WAIT IDLE
+Vuser 3 created - WAIT IDLE
+Vuser 4 created - WAIT IDLE
+Vuser 5 created - WAIT IDLE
+Vuser 6 created - WAIT IDLE
+Vuser 7 created - WAIT IDLE
+Vuser 8 created - WAIT IDLE
+Vuser 9 created - WAIT IDLE
+Vuser 10 created - WAIT IDLE
+Vuser 11 created - WAIT IDLE
+Vuser 12 created - WAIT IDLE
+Vuser 13 created - WAIT IDLE
+Vuser 14 created - WAIT IDLE
+Vuser 15 created - WAIT IDLE
+Vuser 16 created - WAIT IDLE
+Vuser 17 created - WAIT IDLE
+Vuser 18 created - WAIT IDLE
+Vuser 19 created - WAIT IDLE
+Vuser 20 created - WAIT IDLE
+Vuser 21 created - WAIT IDLE
+Vuser 22 created - WAIT IDLE
+Vuser 23 created - WAIT IDLE
+Vuser 24 created - WAIT IDLE
+Vuser 25 created - WAIT IDLE
+Vuser 26 created - WAIT IDLE
+Vuser 27 created - WAIT IDLE
+Vuser 28 created - WAIT IDLE
+Vuser 29 created - WAIT IDLE
+Vuser 30 created - WAIT IDLE
+Vuser 31 created - WAIT IDLE
+Vuser 32 created - WAIT IDLE
+Vuser 33 created - WAIT IDLE
+Logging activated to /root/sqlanalysis/run3000/hdbtmp/hammerdb.log
+33 Virtual Users Created with Monitor VU
+Transaction Counter Started
+Transaction Counter thread running with threadid:tid0x7fff5ffff6c0
+Vuser 1:RUNNING
+Vuser 1:Initializing xtprof time profiler
+Vuser 1:Ssl_cipher 
+Vuser 1:DBVersion:11.4.13
+Vuser 1:Beginning rampup time of 10 minutes
+0 MariaDB tpm
+Vuser 2:RUNNING
+Vuser 2:Initializing xtprof time profiler
+Vuser 2:Ssl_cipher 
+Vuser 2:Assigned 94 WIDs = 1 33 65 97 129 161 193 225 257 289 321 353 385 417 449 481 513 545 577 609 641 673 705 737 769 801 833 865 897 929 961 993 1025 1057 1089 1121 1153 1185 1217 1249 1281 1313 1345 1377 1409 1441 1473 1505 1537 1569 1601 1633 1665 1697 1729 1761 1793 1825 1857 1889 1921 1953 1985 2017 2049 2081 2113 2145 2177 2209 2241 2273 2305 2337 2369 2401 2433 2465 2497 2529 2561 2593 2625 2657 2689 2721 2753 2785 2817 2849 2881 2913 2945 2977 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 2:Processing 10000000 transactions with output suppressed...
+Vuser 3:RUNNING
+Vuser 3:Initializing xtprof time profiler
+Vuser 3:Ssl_cipher 
+Vuser 3:Assigned 94 WIDs = 2 34 66 98 130 162 194 226 258 290 322 354 386 418 450 482 514 546 578 610 642 674 706 738 770 802 834 866 898 930 962 994 1026 1058 1090 1122 1154 1186 1218 1250 1282 1314 1346 1378 1410 1442 1474 1506 1538 1570 1602 1634 1666 1698 1730 1762 1794 1826 1858 1890 1922 1954 1986 2018 2050 2082 2114 2146 2178 2210 2242 2274 2306 2338 2370 2402 2434 2466 2498 2530 2562 2594 2626 2658 2690 2722 2754 2786 2818 2850 2882 2914 2946 2978 based on VU count 32, Warehouses = 94 out of 3000
+1980 MariaDB tpm
+Vuser 3:Processing 10000000 transactions with output suppressed...
+Vuser 4:RUNNING
+Vuser 4:Initializing xtprof time profiler
+Vuser 4:Ssl_cipher 
+Vuser 4:Assigned 94 WIDs = 3 35 67 99 131 163 195 227 259 291 323 355 387 419 451 483 515 547 579 611 643 675 707 739 771 803 835 867 899 931 963 995 1027 1059 1091 1123 1155 1187 1219 1251 1283 1315 1347 1379 1411 1443 1475 1507 1539 1571 1603 1635 1667 1699 1731 1763 1795 1827 1859 1891 1923 1955 1987 2019 2051 2083 2115 2147 2179 2211 2243 2275 2307 2339 2371 2403 2435 2467 2499 2531 2563 2595 2627 2659 2691 2723 2755 2787 2819 2851 2883 2915 2947 2979 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 4:Processing 10000000 transactions with output suppressed...
+Vuser 5:RUNNING
+Vuser 5:Initializing xtprof time profiler
+Vuser 5:Ssl_cipher 
+Vuser 5:Assigned 94 WIDs = 4 36 68 100 132 164 196 228 260 292 324 356 388 420 452 484 516 548 580 612 644 676 708 740 772 804 836 868 900 932 964 996 1028 1060 1092 1124 1156 1188 1220 1252 1284 1316 1348 1380 1412 1444 1476 1508 1540 1572 1604 1636 1668 1700 1732 1764 1796 1828 1860 1892 1924 1956 1988 2020 2052 2084 2116 2148 2180 2212 2244 2276 2308 2340 2372 2404 2436 2468 2500 2532 2564 2596 2628 2660 2692 2724 2756 2788 2820 2852 2884 2916 2948 2980 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 5:Processing 10000000 transactions with output suppressed...
+17820 MariaDB tpm
+Vuser 6:RUNNING
+Vuser 6:Initializing xtprof time profiler
+Vuser 6:Ssl_cipher 
+Vuser 6:Assigned 94 WIDs = 5 37 69 101 133 165 197 229 261 293 325 357 389 421 453 485 517 549 581 613 645 677 709 741 773 805 837 869 901 933 965 997 1029 1061 1093 1125 1157 1189 1221 1253 1285 1317 1349 1381 1413 1445 1477 1509 1541 1573 1605 1637 1669 1701 1733 1765 1797 1829 1861 1893 1925 1957 1989 2021 2053 2085 2117 2149 2181 2213 2245 2277 2309 2341 2373 2405 2437 2469 2501 2533 2565 2597 2629 2661 2693 2725 2757 2789 2821 2853 2885 2917 2949 2981 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 6:Processing 10000000 transactions with output suppressed...
+Vuser 7:RUNNING
+Vuser 7:Initializing xtprof time profiler
+Vuser 7:Ssl_cipher 
+Vuser 7:Assigned 94 WIDs = 6 38 70 102 134 166 198 230 262 294 326 358 390 422 454 486 518 550 582 614 646 678 710 742 774 806 838 870 902 934 966 998 1030 1062 1094 1126 1158 1190 1222 1254 1286 1318 1350 1382 1414 1446 1478 1510 1542 1574 1606 1638 1670 1702 1734 1766 1798 1830 1862 1894 1926 1958 1990 2022 2054 2086 2118 2150 2182 2214 2246 2278 2310 2342 2374 2406 2438 2470 2502 2534 2566 2598 2630 2662 2694 2726 2758 2790 2822 2854 2886 2918 2950 2982 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 7:Processing 10000000 transactions with output suppressed...
+37020 MariaDB tpm
+Vuser 8:RUNNING
+Vuser 8:Initializing xtprof time profiler
+Vuser 8:Ssl_cipher 
+Vuser 8:Assigned 94 WIDs = 7 39 71 103 135 167 199 231 263 295 327 359 391 423 455 487 519 551 583 615 647 679 711 743 775 807 839 871 903 935 967 999 1031 1063 1095 1127 1159 1191 1223 1255 1287 1319 1351 1383 1415 1447 1479 1511 1543 1575 1607 1639 1671 1703 1735 1767 1799 1831 1863 1895 1927 1959 1991 2023 2055 2087 2119 2151 2183 2215 2247 2279 2311 2343 2375 2407 2439 2471 2503 2535 2567 2599 2631 2663 2695 2727 2759 2791 2823 2855 2887 2919 2951 2983 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 8:Processing 10000000 transactions with output suppressed...
+Vuser 9:RUNNING
+Vuser 9:Initializing xtprof time profiler
+Vuser 9:Ssl_cipher 
+Vuser 9:Assigned 94 WIDs = 8 40 72 104 136 168 200 232 264 296 328 360 392 424 456 488 520 552 584 616 648 680 712 744 776 808 840 872 904 936 968 1000 1032 1064 1096 1128 1160 1192 1224 1256 1288 1320 1352 1384 1416 1448 1480 1512 1544 1576 1608 1640 1672 1704 1736 1768 1800 1832 1864 1896 1928 1960 1992 2024 2056 2088 2120 2152 2184 2216 2248 2280 2312 2344 2376 2408 2440 2472 2504 2536 2568 2600 2632 2664 2696 2728 2760 2792 2824 2856 2888 2920 2952 2984 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 9:Processing 10000000 transactions with output suppressed...
+55620 MariaDB tpm
+Vuser 10:RUNNING
+Vuser 10:Initializing xtprof time profiler
+Vuser 10:Ssl_cipher 
+Vuser 10:Assigned 94 WIDs = 9 41 73 105 137 169 201 233 265 297 329 361 393 425 457 489 521 553 585 617 649 681 713 745 777 809 841 873 905 937 969 1001 1033 1065 1097 1129 1161 1193 1225 1257 1289 1321 1353 1385 1417 1449 1481 1513 1545 1577 1609 1641 1673 1705 1737 1769 1801 1833 1865 1897 1929 1961 1993 2025 2057 2089 2121 2153 2185 2217 2249 2281 2313 2345 2377 2409 2441 2473 2505 2537 2569 2601 2633 2665 2697 2729 2761 2793 2825 2857 2889 2921 2953 2985 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 10:Processing 10000000 transactions with output suppressed...
+Vuser 11:RUNNING
+Vuser 11:Initializing xtprof time profiler
+Vuser 11:Ssl_cipher 
+Vuser 11:Assigned 94 WIDs = 10 42 74 106 138 170 202 234 266 298 330 362 394 426 458 490 522 554 586 618 650 682 714 746 778 810 842 874 906 938 970 1002 1034 1066 1098 1130 1162 1194 1226 1258 1290 1322 1354 1386 1418 1450 1482 1514 1546 1578 1610 1642 1674 1706 1738 1770 1802 1834 1866 1898 1930 1962 1994 2026 2058 2090 2122 2154 2186 2218 2250 2282 2314 2346 2378 2410 2442 2474 2506 2538 2570 2602 2634 2666 2698 2730 2762 2794 2826 2858 2890 2922 2954 2986 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 11:Processing 10000000 transactions with output suppressed...
+70140 MariaDB tpm
+Vuser 12:RUNNING
+Vuser 12:Initializing xtprof time profiler
+Vuser 12:Ssl_cipher 
+Vuser 12:Assigned 94 WIDs = 11 43 75 107 139 171 203 235 267 299 331 363 395 427 459 491 523 555 587 619 651 683 715 747 779 811 843 875 907 939 971 1003 1035 1067 1099 1131 1163 1195 1227 1259 1291 1323 1355 1387 1419 1451 1483 1515 1547 1579 1611 1643 1675 1707 1739 1771 1803 1835 1867 1899 1931 1963 1995 2027 2059 2091 2123 2155 2187 2219 2251 2283 2315 2347 2379 2411 2443 2475 2507 2539 2571 2603 2635 2667 2699 2731 2763 2795 2827 2859 2891 2923 2955 2987 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 12:Processing 10000000 transactions with output suppressed...
+Vuser 13:RUNNING
+Vuser 13:Initializing xtprof time profiler
+Vuser 13:Ssl_cipher 
+Vuser 13:Assigned 94 WIDs = 12 44 76 108 140 172 204 236 268 300 332 364 396 428 460 492 524 556 588 620 652 684 716 748 780 812 844 876 908 940 972 1004 1036 1068 1100 1132 1164 1196 1228 1260 1292 1324 1356 1388 1420 1452 1484 1516 1548 1580 1612 1644 1676 1708 1740 1772 1804 1836 1868 1900 1932 1964 1996 2028 2060 2092 2124 2156 2188 2220 2252 2284 2316 2348 2380 2412 2444 2476 2508 2540 2572 2604 2636 2668 2700 2732 2764 2796 2828 2860 2892 2924 2956 2988 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 13:Processing 10000000 transactions with output suppressed...
+90060 MariaDB tpm
+Vuser 14:RUNNING
+Vuser 14:Initializing xtprof time profiler
+Vuser 14:Ssl_cipher 
+Vuser 14:Assigned 94 WIDs = 13 45 77 109 141 173 205 237 269 301 333 365 397 429 461 493 525 557 589 621 653 685 717 749 781 813 845 877 909 941 973 1005 1037 1069 1101 1133 1165 1197 1229 1261 1293 1325 1357 1389 1421 1453 1485 1517 1549 1581 1613 1645 1677 1709 1741 1773 1805 1837 1869 1901 1933 1965 1997 2029 2061 2093 2125 2157 2189 2221 2253 2285 2317 2349 2381 2413 2445 2477 2509 2541 2573 2605 2637 2669 2701 2733 2765 2797 2829 2861 2893 2925 2957 2989 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 14:Processing 10000000 transactions with output suppressed...
+Vuser 15:RUNNING
+Vuser 15:Initializing xtprof time profiler
+Vuser 15:Ssl_cipher 
+Vuser 15:Assigned 94 WIDs = 14 46 78 110 142 174 206 238 270 302 334 366 398 430 462 494 526 558 590 622 654 686 718 750 782 814 846 878 910 942 974 1006 1038 1070 1102 1134 1166 1198 1230 1262 1294 1326 1358 1390 1422 1454 1486 1518 1550 1582 1614 1646 1678 1710 1742 1774 1806 1838 1870 1902 1934 1966 1998 2030 2062 2094 2126 2158 2190 2222 2254 2286 2318 2350 2382 2414 2446 2478 2510 2542 2574 2606 2638 2670 2702 2734 2766 2798 2830 2862 2894 2926 2958 2990 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 15:Processing 10000000 transactions with output suppressed...
+119400 MariaDB tpm
+Vuser 16:RUNNING
+Vuser 16:Initializing xtprof time profiler
+Vuser 16:Ssl_cipher 
+Vuser 16:Assigned 94 WIDs = 15 47 79 111 143 175 207 239 271 303 335 367 399 431 463 495 527 559 591 623 655 687 719 751 783 815 847 879 911 943 975 1007 1039 1071 1103 1135 1167 1199 1231 1263 1295 1327 1359 1391 1423 1455 1487 1519 1551 1583 1615 1647 1679 1711 1743 1775 1807 1839 1871 1903 1935 1967 1999 2031 2063 2095 2127 2159 2191 2223 2255 2287 2319 2351 2383 2415 2447 2479 2511 2543 2575 2607 2639 2671 2703 2735 2767 2799 2831 2863 2895 2927 2959 2991 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 16:Processing 10000000 transactions with output suppressed...
+Vuser 17:RUNNING
+Vuser 17:Initializing xtprof time profiler
+Vuser 17:Ssl_cipher 
+Vuser 17:Assigned 94 WIDs = 16 48 80 112 144 176 208 240 272 304 336 368 400 432 464 496 528 560 592 624 656 688 720 752 784 816 848 880 912 944 976 1008 1040 1072 1104 1136 1168 1200 1232 1264 1296 1328 1360 1392 1424 1456 1488 1520 1552 1584 1616 1648 1680 1712 1744 1776 1808 1840 1872 1904 1936 1968 2000 2032 2064 2096 2128 2160 2192 2224 2256 2288 2320 2352 2384 2416 2448 2480 2512 2544 2576 2608 2640 2672 2704 2736 2768 2800 2832 2864 2896 2928 2960 2992 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 17:Processing 10000000 transactions with output suppressed...
+143580 MariaDB tpm
+Vuser 18:RUNNING
+Vuser 18:Initializing xtprof time profiler
+Vuser 18:Ssl_cipher 
+Vuser 18:Assigned 94 WIDs = 17 49 81 113 145 177 209 241 273 305 337 369 401 433 465 497 529 561 593 625 657 689 721 753 785 817 849 881 913 945 977 1009 1041 1073 1105 1137 1169 1201 1233 1265 1297 1329 1361 1393 1425 1457 1489 1521 1553 1585 1617 1649 1681 1713 1745 1777 1809 1841 1873 1905 1937 1969 2001 2033 2065 2097 2129 2161 2193 2225 2257 2289 2321 2353 2385 2417 2449 2481 2513 2545 2577 2609 2641 2673 2705 2737 2769 2801 2833 2865 2897 2929 2961 2993 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 18:Processing 10000000 transactions with output suppressed...
+Vuser 19:RUNNING
+Vuser 19:Initializing xtprof time profiler
+Vuser 19:Ssl_cipher 
+Vuser 19:Assigned 94 WIDs = 18 50 82 114 146 178 210 242 274 306 338 370 402 434 466 498 530 562 594 626 658 690 722 754 786 818 850 882 914 946 978 1010 1042 1074 1106 1138 1170 1202 1234 1266 1298 1330 1362 1394 1426 1458 1490 1522 1554 1586 1618 1650 1682 1714 1746 1778 1810 1842 1874 1906 1938 1970 2002 2034 2066 2098 2130 2162 2194 2226 2258 2290 2322 2354 2386 2418 2450 2482 2514 2546 2578 2610 2642 2674 2706 2738 2770 2802 2834 2866 2898 2930 2962 2994 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 19:Processing 10000000 transactions with output suppressed...
+163620 MariaDB tpm
+Vuser 20:RUNNING
+Vuser 20:Initializing xtprof time profiler
+Vuser 20:Ssl_cipher 
+Vuser 20:Assigned 94 WIDs = 19 51 83 115 147 179 211 243 275 307 339 371 403 435 467 499 531 563 595 627 659 691 723 755 787 819 851 883 915 947 979 1011 1043 1075 1107 1139 1171 1203 1235 1267 1299 1331 1363 1395 1427 1459 1491 1523 1555 1587 1619 1651 1683 1715 1747 1779 1811 1843 1875 1907 1939 1971 2003 2035 2067 2099 2131 2163 2195 2227 2259 2291 2323 2355 2387 2419 2451 2483 2515 2547 2579 2611 2643 2675 2707 2739 2771 2803 2835 2867 2899 2931 2963 2995 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 20:Processing 10000000 transactions with output suppressed...
+Vuser 21:RUNNING
+Vuser 21:Initializing xtprof time profiler
+Vuser 21:Ssl_cipher 
+Vuser 21:Assigned 94 WIDs = 20 52 84 116 148 180 212 244 276 308 340 372 404 436 468 500 532 564 596 628 660 692 724 756 788 820 852 884 916 948 980 1012 1044 1076 1108 1140 1172 1204 1236 1268 1300 1332 1364 1396 1428 1460 1492 1524 1556 1588 1620 1652 1684 1716 1748 1780 1812 1844 1876 1908 1940 1972 2004 2036 2068 2100 2132 2164 2196 2228 2260 2292 2324 2356 2388 2420 2452 2484 2516 2548 2580 2612 2644 2676 2708 2740 2772 2804 2836 2868 2900 2932 2964 2996 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 21:Processing 10000000 transactions with output suppressed...
+176460 MariaDB tpm
+Vuser 22:RUNNING
+Vuser 22:Initializing xtprof time profiler
+Vuser 22:Ssl_cipher 
+Vuser 22:Assigned 94 WIDs = 21 53 85 117 149 181 213 245 277 309 341 373 405 437 469 501 533 565 597 629 661 693 725 757 789 821 853 885 917 949 981 1013 1045 1077 1109 1141 1173 1205 1237 1269 1301 1333 1365 1397 1429 1461 1493 1525 1557 1589 1621 1653 1685 1717 1749 1781 1813 1845 1877 1909 1941 1973 2005 2037 2069 2101 2133 2165 2197 2229 2261 2293 2325 2357 2389 2421 2453 2485 2517 2549 2581 2613 2645 2677 2709 2741 2773 2805 2837 2869 2901 2933 2965 2997 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 22:Processing 10000000 transactions with output suppressed...
+Vuser 23:RUNNING
+Vuser 23:Initializing xtprof time profiler
+Vuser 23:Ssl_cipher 
+Vuser 23:Assigned 94 WIDs = 22 54 86 118 150 182 214 246 278 310 342 374 406 438 470 502 534 566 598 630 662 694 726 758 790 822 854 886 918 950 982 1014 1046 1078 1110 1142 1174 1206 1238 1270 1302 1334 1366 1398 1430 1462 1494 1526 1558 1590 1622 1654 1686 1718 1750 1782 1814 1846 1878 1910 1942 1974 2006 2038 2070 2102 2134 2166 2198 2230 2262 2294 2326 2358 2390 2422 2454 2486 2518 2550 2582 2614 2646 2678 2710 2742 2774 2806 2838 2870 2902 2934 2966 2998 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 23:Processing 10000000 transactions with output suppressed...
+212760 MariaDB tpm
+Vuser 24:RUNNING
+Vuser 24:Initializing xtprof time profiler
+Vuser 24:Ssl_cipher 
+Vuser 24:Assigned 94 WIDs = 23 55 87 119 151 183 215 247 279 311 343 375 407 439 471 503 535 567 599 631 663 695 727 759 791 823 855 887 919 951 983 1015 1047 1079 1111 1143 1175 1207 1239 1271 1303 1335 1367 1399 1431 1463 1495 1527 1559 1591 1623 1655 1687 1719 1751 1783 1815 1847 1879 1911 1943 1975 2007 2039 2071 2103 2135 2167 2199 2231 2263 2295 2327 2359 2391 2423 2455 2487 2519 2551 2583 2615 2647 2679 2711 2743 2775 2807 2839 2871 2903 2935 2967 2999 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 24:Processing 10000000 transactions with output suppressed...
+Vuser 25:RUNNING
+Vuser 25:Initializing xtprof time profiler
+Vuser 25:Ssl_cipher 
+Vuser 25:Assigned 94 WIDs = 24 56 88 120 152 184 216 248 280 312 344 376 408 440 472 504 536 568 600 632 664 696 728 760 792 824 856 888 920 952 984 1016 1048 1080 1112 1144 1176 1208 1240 1272 1304 1336 1368 1400 1432 1464 1496 1528 1560 1592 1624 1656 1688 1720 1752 1784 1816 1848 1880 1912 1944 1976 2008 2040 2072 2104 2136 2168 2200 2232 2264 2296 2328 2360 2392 2424 2456 2488 2520 2552 2584 2616 2648 2680 2712 2744 2776 2808 2840 2872 2904 2936 2968 3000 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 25:Processing 10000000 transactions with output suppressed...
+236100 MariaDB tpm
+Vuser 26:RUNNING
+Vuser 26:Initializing xtprof time profiler
+Vuser 26:Ssl_cipher 
+Vuser 26:Assigned 94 WIDs = 25 57 89 121 153 185 217 249 281 313 345 377 409 441 473 505 537 569 601 633 665 697 729 761 793 825 857 889 921 953 985 1017 1049 1081 1113 1145 1177 1209 1241 1273 1305 1337 1369 1401 1433 1465 1497 1529 1561 1593 1625 1657 1689 1721 1753 1785 1817 1849 1881 1913 1945 1977 2009 2041 2073 2105 2137 2169 2201 2233 2265 2297 2329 2361 2393 2425 2457 2489 2521 2553 2585 2617 2649 2681 2713 2745 2777 2809 2841 2873 2905 2937 2969 1 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 26:Processing 10000000 transactions with output suppressed...
+Vuser 27:RUNNING
+Vuser 27:Initializing xtprof time profiler
+Vuser 27:Ssl_cipher 
+Vuser 27:Assigned 94 WIDs = 26 58 90 122 154 186 218 250 282 314 346 378 410 442 474 506 538 570 602 634 666 698 730 762 794 826 858 890 922 954 986 1018 1050 1082 1114 1146 1178 1210 1242 1274 1306 1338 1370 1402 1434 1466 1498 1530 1562 1594 1626 1658 1690 1722 1754 1786 1818 1850 1882 1914 1946 1978 2010 2042 2074 2106 2138 2170 2202 2234 2266 2298 2330 2362 2394 2426 2458 2490 2522 2554 2586 2618 2650 2682 2714 2746 2778 2810 2842 2874 2906 2938 2970 2 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 27:Processing 10000000 transactions with output suppressed...
+252660 MariaDB tpm
+Vuser 28:RUNNING
+Vuser 28:Initializing xtprof time profiler
+Vuser 28:Ssl_cipher 
+Vuser 28:Assigned 94 WIDs = 27 59 91 123 155 187 219 251 283 315 347 379 411 443 475 507 539 571 603 635 667 699 731 763 795 827 859 891 923 955 987 1019 1051 1083 1115 1147 1179 1211 1243 1275 1307 1339 1371 1403 1435 1467 1499 1531 1563 1595 1627 1659 1691 1723 1755 1787 1819 1851 1883 1915 1947 1979 2011 2043 2075 2107 2139 2171 2203 2235 2267 2299 2331 2363 2395 2427 2459 2491 2523 2555 2587 2619 2651 2683 2715 2747 2779 2811 2843 2875 2907 2939 2971 3 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 28:Processing 10000000 transactions with output suppressed...
+Vuser 29:RUNNING
+Vuser 29:Initializing xtprof time profiler
+Vuser 29:Ssl_cipher 
+Vuser 29:Assigned 94 WIDs = 28 60 92 124 156 188 220 252 284 316 348 380 412 444 476 508 540 572 604 636 668 700 732 764 796 828 860 892 924 956 988 1020 1052 1084 1116 1148 1180 1212 1244 1276 1308 1340 1372 1404 1436 1468 1500 1532 1564 1596 1628 1660 1692 1724 1756 1788 1820 1852 1884 1916 1948 1980 2012 2044 2076 2108 2140 2172 2204 2236 2268 2300 2332 2364 2396 2428 2460 2492 2524 2556 2588 2620 2652 2684 2716 2748 2780 2812 2844 2876 2908 2940 2972 4 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 29:Processing 10000000 transactions with output suppressed...
+267120 MariaDB tpm
+Vuser 30:RUNNING
+Vuser 30:Initializing xtprof time profiler
+Vuser 30:Ssl_cipher 
+Vuser 30:Assigned 94 WIDs = 29 61 93 125 157 189 221 253 285 317 349 381 413 445 477 509 541 573 605 637 669 701 733 765 797 829 861 893 925 957 989 1021 1053 1085 1117 1149 1181 1213 1245 1277 1309 1341 1373 1405 1437 1469 1501 1533 1565 1597 1629 1661 1693 1725 1757 1789 1821 1853 1885 1917 1949 1981 2013 2045 2077 2109 2141 2173 2205 2237 2269 2301 2333 2365 2397 2429 2461 2493 2525 2557 2589 2621 2653 2685 2717 2749 2781 2813 2845 2877 2909 2941 2973 5 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 30:Processing 10000000 transactions with output suppressed...
+Vuser 31:RUNNING
+Vuser 31:Initializing xtprof time profiler
+Vuser 31:Ssl_cipher 
+Vuser 31:Assigned 94 WIDs = 30 62 94 126 158 190 222 254 286 318 350 382 414 446 478 510 542 574 606 638 670 702 734 766 798 830 862 894 926 958 990 1022 1054 1086 1118 1150 1182 1214 1246 1278 1310 1342 1374 1406 1438 1470 1502 1534 1566 1598 1630 1662 1694 1726 1758 1790 1822 1854 1886 1918 1950 1982 2014 2046 2078 2110 2142 2174 2206 2238 2270 2302 2334 2366 2398 2430 2462 2494 2526 2558 2590 2622 2654 2686 2718 2750 2782 2814 2846 2878 2910 2942 2974 6 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 31:Processing 10000000 transactions with output suppressed...
+284220 MariaDB tpm
+Vuser 32:RUNNING
+Vuser 32:Initializing xtprof time profiler
+Vuser 32:Ssl_cipher 
+Vuser 32:Assigned 94 WIDs = 31 63 95 127 159 191 223 255 287 319 351 383 415 447 479 511 543 575 607 639 671 703 735 767 799 831 863 895 927 959 991 1023 1055 1087 1119 1151 1183 1215 1247 1279 1311 1343 1375 1407 1439 1471 1503 1535 1567 1599 1631 1663 1695 1727 1759 1791 1823 1855 1887 1919 1951 1983 2015 2047 2079 2111 2143 2175 2207 2239 2271 2303 2335 2367 2399 2431 2463 2495 2527 2559 2591 2623 2655 2687 2719 2751 2783 2815 2847 2879 2911 2943 2975 7 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 32:Processing 10000000 transactions with output suppressed...
+Vuser 33:RUNNING
+Vuser 33:Initializing xtprof time profiler
+Vuser 33:Ssl_cipher 
+Vuser 33:Assigned 94 WIDs = 32 64 96 128 160 192 224 256 288 320 352 384 416 448 480 512 544 576 608 640 672 704 736 768 800 832 864 896 928 960 992 1024 1056 1088 1120 1152 1184 1216 1248 1280 1312 1344 1376 1408 1440 1472 1504 1536 1568 1600 1632 1664 1696 1728 1760 1792 1824 1856 1888 1920 1952 1984 2016 2048 2080 2112 2144 2176 2208 2240 2272 2304 2336 2368 2400 2432 2464 2496 2528 2560 2592 2624 2656 2688 2720 2752 2784 2816 2848 2880 2912 2944 2976 8 based on VU count 32, Warehouses = 94 out of 3000
+Vuser 33:Processing 10000000 transactions with output suppressed...
+288000 MariaDB tpm
+306300 MariaDB tpm
+300660 MariaDB tpm
+316380 MariaDB tpm
+332340 MariaDB tpm
+342780 MariaDB tpm
+337740 MariaDB tpm
+325440 MariaDB tpm
+325920 MariaDB tpm
+339060 MariaDB tpm
+341820 MariaDB tpm
+344460 MariaDB tpm
+347400 MariaDB tpm
+354420 MariaDB tpm
+363840 MariaDB tpm
+366540 MariaDB tpm
+376680 MariaDB tpm
+368640 MariaDB tpm
+375060 MariaDB tpm
+386700 MariaDB tpm
+397140 MariaDB tpm
+387480 MariaDB tpm
+395580 MariaDB tpm
+396360 MariaDB tpm
+396360 MariaDB tpm
+414060 MariaDB tpm
+409620 MariaDB tpm
+415980 MariaDB tpm
+414900 MariaDB tpm
+420540 MariaDB tpm
+417540 MariaDB tpm
+423720 MariaDB tpm
+429720 MariaDB tpm
+431940 MariaDB tpm
+434160 MariaDB tpm
+432600 MariaDB tpm
+433380 MariaDB tpm
+435060 MariaDB tpm
+439200 MariaDB tpm
+433980 MariaDB tpm
+433620 MariaDB tpm
+450720 MariaDB tpm
+448500 MariaDB tpm
+444120 MariaDB tpm
+Vuser 1:Rampup 1 minutes complete ...
+452460 MariaDB tpm
+445680 MariaDB tpm
+500880 MariaDB tpm
+453720 MariaDB tpm
+460740 MariaDB tpm
+461280 MariaDB tpm
+461940 MariaDB tpm
+504960 MariaDB tpm
+501540 MariaDB tpm
+483840 MariaDB tpm
+477000 MariaDB tpm
+505260 MariaDB tpm
+391860 MariaDB tpm
+350040 MariaDB tpm
+371760 MariaDB tpm
+453420 MariaDB tpm
+444000 MariaDB tpm
+450600 MariaDB tpm
+457440 MariaDB tpm
+451860 MariaDB tpm
+448440 MariaDB tpm
+451560 MariaDB tpm
+466680 MariaDB tpm
+448620 MariaDB tpm
+449700 MariaDB tpm
+465600 MariaDB tpm
+451440 MariaDB tpm
+453720 MariaDB tpm
+463560 MariaDB tpm
+447060 MariaDB tpm
+446220 MariaDB tpm
+457800 MariaDB tpm
+449220 MariaDB tpm
+449400 MariaDB tpm
+453540 MariaDB tpm
+450540 MariaDB tpm
+448380 MariaDB tpm
+456000 MariaDB tpm
+316500 MariaDB tpm
+376440 MariaDB tpm
+370260 MariaDB tpm
+373920 MariaDB tpm
+350340 MariaDB tpm
+347760 MariaDB tpm
+334500 MariaDB tpm
+344760 MariaDB tpm
+474120 MariaDB tpm
+469620 MariaDB tpm
+465060 MariaDB tpm
+477780 MariaDB tpm
+464460 MariaDB tpm
+462000 MariaDB tpm
+475560 MariaDB tpm
+454320 MariaDB tpm
+461160 MariaDB tpm
+466740 MariaDB tpm
+471540 MariaDB tpm
+316320 MariaDB tpm
+455940 MariaDB tpm
+461700 MariaDB tpm
+Vuser 1:Rampup 2 minutes complete ...
+448380 MariaDB tpm
+366840 MariaDB tpm
+460920 MariaDB tpm
+449220 MariaDB tpm
+479640 MariaDB tpm
+459780 MariaDB tpm
+468300 MariaDB tpm
+463140 MariaDB tpm
+459480 MariaDB tpm
+461400 MariaDB tpm
+473760 MariaDB tpm
+387660 MariaDB tpm
+451560 MariaDB tpm
+462960 MariaDB tpm
+460860 MariaDB tpm
+462540 MariaDB tpm
+462660 MariaDB tpm
+298980 MariaDB tpm
+453240 MariaDB tpm
+459780 MariaDB tpm
+297480 MariaDB tpm
+473580 MariaDB tpm
+462840 MariaDB tpm
+463980 MariaDB tpm
+459540 MariaDB tpm
+454140 MariaDB tpm
+454380 MariaDB tpm
+463500 MariaDB tpm
+458940 MariaDB tpm
+454440 MariaDB tpm
+445320 MariaDB tpm
+450180 MariaDB tpm
+446160 MariaDB tpm
+454200 MariaDB tpm
+446040 MariaDB tpm
+324420 MariaDB tpm
+460980 MariaDB tpm
+457080 MariaDB tpm
+386340 MariaDB tpm
+336420 MariaDB tpm
+366480 MariaDB tpm
+457260 MariaDB tpm
+451920 MariaDB tpm
+447780 MariaDB tpm
+447540 MariaDB tpm
+443040 MariaDB tpm
+453720 MariaDB tpm
+450120 MariaDB tpm
+342780 MariaDB tpm
+390840 MariaDB tpm
+352920 MariaDB tpm
+357300 MariaDB tpm
+459660 MariaDB tpm
+275580 MariaDB tpm
+451680 MariaDB tpm
+455940 MariaDB tpm
+456360 MariaDB tpm
+451440 MariaDB tpm
+314460 MariaDB tpm
+360180 MariaDB tpm
+Vuser 1:Rampup 3 minutes complete ...
+431520 MariaDB tpm
+444540 MariaDB tpm
+435900 MariaDB tpm
+442440 MariaDB tpm
+447960 MariaDB tpm
+451380 MariaDB tpm
+440880 MariaDB tpm
+442260 MariaDB tpm
+451320 MariaDB tpm
+442860 MariaDB tpm
+293940 MariaDB tpm
+332520 MariaDB tpm
+441420 MariaDB tpm
+449880 MariaDB tpm
+447240 MariaDB tpm
+297720 MariaDB tpm
+368400 MariaDB tpm
+428220 MariaDB tpm
+346260 MariaDB tpm
+394500 MariaDB tpm
+394500 MariaDB tpm
+402240 MariaDB tpm
+354120 MariaDB tpm
+280560 MariaDB tpm
+310680 MariaDB tpm
+316200 MariaDB tpm
+345600 MariaDB tpm
+405480 MariaDB tpm
+284340 MariaDB tpm
+318900 MariaDB tpm
+447240 MariaDB tpm
+452400 MariaDB tpm
+449880 MariaDB tpm
+441060 MariaDB tpm
+446340 MariaDB tpm
+441660 MariaDB tpm
+209280 MariaDB tpm
+347640 MariaDB tpm
+393660 MariaDB tpm
+324060 MariaDB tpm
+464880 MariaDB tpm
+431100 MariaDB tpm
+440940 MariaDB tpm
+441240 MariaDB tpm
+439800 MariaDB tpm
+450240 MariaDB tpm
+452400 MariaDB tpm
+366840 MariaDB tpm
+263220 MariaDB tpm
+450600 MariaDB tpm
+435960 MariaDB tpm
+371880 MariaDB tpm
+443160 MariaDB tpm
+330600 MariaDB tpm
+355140 MariaDB tpm
+280260 MariaDB tpm
+313680 MariaDB tpm
+310140 MariaDB tpm
+391920 MariaDB tpm
+Vuser 1:Rampup 4 minutes complete ...
+350460 MariaDB tpm
+298380 MariaDB tpm
+431460 MariaDB tpm
+448200 MariaDB tpm
+442260 MariaDB tpm
+435960 MariaDB tpm
+442020 MariaDB tpm
+450540 MariaDB tpm
+438840 MariaDB tpm
+435480 MariaDB tpm
+445500 MariaDB tpm
+441060 MariaDB tpm
+444540 MariaDB tpm
+446160 MariaDB tpm
+441480 MariaDB tpm
+438840 MariaDB tpm
+444420 MariaDB tpm
+429780 MariaDB tpm
+432120 MariaDB tpm
+432060 MariaDB tpm
+433380 MariaDB tpm
+429240 MariaDB tpm
+422940 MariaDB tpm
+398940 MariaDB tpm
+290040 MariaDB tpm
+272580 MariaDB tpm
+293820 MariaDB tpm
+384180 MariaDB tpm
+347820 MariaDB tpm
+427320 MariaDB tpm
+408600 MariaDB tpm
+357420 MariaDB tpm
+312960 MariaDB tpm
+165600 MariaDB tpm
+421860 MariaDB tpm
+347220 MariaDB tpm
+290280 MariaDB tpm
+241680 MariaDB tpm
+422280 MariaDB tpm
+296160 MariaDB tpm
+300000 MariaDB tpm
+284580 MariaDB tpm
+387180 MariaDB tpm
+412740 MariaDB tpm
+293340 MariaDB tpm
+300960 MariaDB tpm
+450120 MariaDB tpm
+431580 MariaDB tpm
+429360 MariaDB tpm
+412740 MariaDB tpm
+440100 MariaDB tpm
+196080 MariaDB tpm
+325140 MariaDB tpm
+397020 MariaDB tpm
+298440 MariaDB tpm
+289200 MariaDB tpm
+330540 MariaDB tpm
+422280 MariaDB tpm
+212220 MariaDB tpm
+Vuser 1:Rampup 5 minutes complete ...
+324300 MariaDB tpm
+394320 MariaDB tpm
+348000 MariaDB tpm
+307800 MariaDB tpm
+307920 MariaDB tpm
+375360 MariaDB tpm
+358980 MariaDB tpm
+347040 MariaDB tpm
+212460 MariaDB tpm
+420660 MariaDB tpm
+188040 MariaDB tpm
+279780 MariaDB tpm
+434100 MariaDB tpm
+294180 MariaDB tpm
+295740 MariaDB tpm
+341100 MariaDB tpm
+445620 MariaDB tpm
+142140 MariaDB tpm
+336840 MariaDB tpm
+424020 MariaDB tpm
+303780 MariaDB tpm
+318180 MariaDB tpm
+451440 MariaDB tpm
+450420 MariaDB tpm
+439620 MariaDB tpm
+438900 MariaDB tpm
+447960 MariaDB tpm
+186840 MariaDB tpm
+398640 MariaDB tpm
+314520 MariaDB tpm
+293640 MariaDB tpm
+305940 MariaDB tpm
+454740 MariaDB tpm
+407460 MariaDB tpm
+442080 MariaDB tpm
+305160 MariaDB tpm
+453840 MariaDB tpm
+450720 MariaDB tpm
+195720 MariaDB tpm
+452640 MariaDB tpm
+450900 MariaDB tpm
+448920 MariaDB tpm
+296820 MariaDB tpm
+307920 MariaDB tpm
+316500 MariaDB tpm
+322740 MariaDB tpm
+448020 MariaDB tpm
+392880 MariaDB tpm
+287160 MariaDB tpm
+308340 MariaDB tpm
+451860 MariaDB tpm
+447120 MariaDB tpm
+437100 MariaDB tpm
+438600 MariaDB tpm
+198960 MariaDB tpm
+425160 MariaDB tpm
+318480 MariaDB tpm
+346260 MariaDB tpm
+447420 MariaDB tpm
+Vuser 1:Rampup 6 minutes complete ...
+437280 MariaDB tpm
+291420 MariaDB tpm
+327180 MariaDB tpm
+349500 MariaDB tpm
+442020 MariaDB tpm
+453480 MariaDB tpm
+447180 MariaDB tpm
+440580 MariaDB tpm
+445500 MariaDB tpm
+439320 MariaDB tpm
+443160 MariaDB tpm
+439020 MariaDB tpm
+443280 MariaDB tpm
+452220 MariaDB tpm
+261420 MariaDB tpm
+414720 MariaDB tpm
+374040 MariaDB tpm
+450540 MariaDB tpm
+440520 MariaDB tpm
+451620 MariaDB tpm
+443460 MariaDB tpm
+449340 MariaDB tpm
+443580 MariaDB tpm
+434760 MariaDB tpm
+372900 MariaDB tpm
+398340 MariaDB tpm
+450780 MariaDB tpm
+456240 MariaDB tpm
+450900 MariaDB tpm
+436140 MariaDB tpm
+445260 MariaDB tpm
+442680 MariaDB tpm
+437580 MariaDB tpm
+442860 MariaDB tpm
+257160 MariaDB tpm
+374580 MariaDB tpm
+383940 MariaDB tpm
+336360 MariaDB tpm
+320040 MariaDB tpm
+328320 MariaDB tpm
+418260 MariaDB tpm
+362820 MariaDB tpm
+327660 MariaDB tpm
+333840 MariaDB tpm
+347640 MariaDB tpm
+420540 MariaDB tpm
+332880 MariaDB tpm
+342120 MariaDB tpm
+246000 MariaDB tpm
+405780 MariaDB tpm
+347460 MariaDB tpm
+351900 MariaDB tpm
+332520 MariaDB tpm
+383160 MariaDB tpm
+390780 MariaDB tpm
+243420 MariaDB tpm
+448440 MariaDB tpm
+439200 MariaDB tpm
+233880 MariaDB tpm
+444300 MariaDB tpm
+Vuser 1:Rampup 7 minutes complete ...
+224400 MariaDB tpm
+346080 MariaDB tpm
+445920 MariaDB tpm
+436380 MariaDB tpm
+302340 MariaDB tpm
+454980 MariaDB tpm
+451740 MariaDB tpm
+446580 MariaDB tpm
+435840 MariaDB tpm
+434640 MariaDB tpm
+370680 MariaDB tpm
+299880 MariaDB tpm
+325140 MariaDB tpm
+449160 MariaDB tpm
+443940 MariaDB tpm
+452760 MariaDB tpm
+451020 MariaDB tpm
+442200 MariaDB tpm
+442980 MariaDB tpm
+441060 MariaDB tpm
+440640 MariaDB tpm
+442980 MariaDB tpm
+271560 MariaDB tpm
+334980 MariaDB tpm
+359100 MariaDB tpm
+386820 MariaDB tpm
+319500 MariaDB tpm
+449700 MariaDB tpm
+441660 MariaDB tpm
+270780 MariaDB tpm
+342720 MariaDB tpm
+338640 MariaDB tpm
+420000 MariaDB tpm
+347460 MariaDB tpm
+344460 MariaDB tpm
+334140 MariaDB tpm
+330600 MariaDB tpm
+400080 MariaDB tpm
+332520 MariaDB tpm
+336780 MariaDB tpm
+453180 MariaDB tpm
+449100 MariaDB tpm
+450060 MariaDB tpm
+451140 MariaDB tpm
+451800 MariaDB tpm
+452040 MariaDB tpm
+374460 MariaDB tpm
+300840 MariaDB tpm
+334260 MariaDB tpm
+340980 MariaDB tpm
+441000 MariaDB tpm
+443880 MariaDB tpm
+448440 MariaDB tpm
+431160 MariaDB tpm
+439800 MariaDB tpm
+269880 MariaDB tpm
+447240 MariaDB tpm
+447780 MariaDB tpm
+447180 MariaDB tpm
+445440 MariaDB tpm
+Vuser 1:Rampup 8 minutes complete ...
+247140 MariaDB tpm
+347220 MariaDB tpm
+405900 MariaDB tpm
+276900 MariaDB tpm
+282240 MariaDB tpm
+332580 MariaDB tpm
+424800 MariaDB tpm
+358740 MariaDB tpm
+229620 MariaDB tpm
+450300 MariaDB tpm
+439140 MariaDB tpm
+433080 MariaDB tpm
+443160 MariaDB tpm
+218040 MariaDB tpm
+361920 MariaDB tpm
+423900 MariaDB tpm
+353220 MariaDB tpm
+352980 MariaDB tpm
+398760 MariaDB tpm
+295380 MariaDB tpm
+451860 MariaDB tpm
+227400 MariaDB tpm
+447780 MariaDB tpm
+448020 MariaDB tpm
+449340 MariaDB tpm
+446520 MariaDB tpm
+239220 MariaDB tpm
+424680 MariaDB tpm
+360300 MariaDB tpm
+323220 MariaDB tpm
+343380 MariaDB tpm
+346920 MariaDB tpm
+441840 MariaDB tpm
+449760 MariaDB tpm
+449580 MariaDB tpm
+455520 MariaDB tpm
+449040 MariaDB tpm
+451560 MariaDB tpm
+442380 MariaDB tpm
+298740 MariaDB tpm
+453780 MariaDB tpm
+364200 MariaDB tpm
+271800 MariaDB tpm
+331320 MariaDB tpm
+339060 MariaDB tpm
+440400 MariaDB tpm
+449640 MariaDB tpm
+441600 MariaDB tpm
+435300 MariaDB tpm
+433500 MariaDB tpm
+438900 MariaDB tpm
+285540 MariaDB tpm
+344040 MariaDB tpm
+419400 MariaDB tpm
+328620 MariaDB tpm
+337200 MariaDB tpm
+338100 MariaDB tpm
+373380 MariaDB tpm
+432060 MariaDB tpm
+Vuser 1:Rampup 9 minutes complete ...
+345480 MariaDB tpm
+328020 MariaDB tpm
+441360 MariaDB tpm
+444900 MariaDB tpm
+439140 MariaDB tpm
+451620 MariaDB tpm
+453780 MariaDB tpm
+450480 MariaDB tpm
+444360 MariaDB tpm
+439140 MariaDB tpm
+443880 MariaDB tpm
+448620 MariaDB tpm
+285660 MariaDB tpm
+345300 MariaDB tpm
+399420 MariaDB tpm
+216240 MariaDB tpm
+340080 MariaDB tpm
+447360 MariaDB tpm
+442500 MariaDB tpm
+435660 MariaDB tpm
+443100 MariaDB tpm
+431700 MariaDB tpm
+428580 MariaDB tpm
+449880 MariaDB tpm
+444180 MariaDB tpm
+450960 MariaDB tpm
+442260 MariaDB tpm
+436320 MariaDB tpm
+447660 MariaDB tpm
+448200 MariaDB tpm
+366480 MariaDB tpm
+261180 MariaDB tpm
+299640 MariaDB tpm
+309420 MariaDB tpm
+389520 MariaDB tpm
+361620 MariaDB tpm
+332640 MariaDB tpm
+322740 MariaDB tpm
+303420 MariaDB tpm
+436920 MariaDB tpm
+449280 MariaDB tpm
+449100 MariaDB tpm
+442080 MariaDB tpm
+440820 MariaDB tpm
+220080 MariaDB tpm
+376500 MariaDB tpm
+397020 MariaDB tpm
+445620 MariaDB tpm
+444000 MariaDB tpm
+438300 MariaDB tpm
+442980 MariaDB tpm
+438780 MariaDB tpm
+431760 MariaDB tpm
+209880 MariaDB tpm
+287340 MariaDB tpm
+445740 MariaDB tpm
+350820 MariaDB tpm
+314880 MariaDB tpm
+280680 MariaDB tpm
+261660 MariaDB tpm
+Vuser 1:Rampup 10 minutes complete ...
+Vuser 1:Rampup complete, Taking start Transaction Count.
+Vuser 1:Timing test period of 20 in minutes
+434760 MariaDB tpm
+308280 MariaDB tpm
+302460 MariaDB tpm
+320580 MariaDB tpm
+360720 MariaDB tpm
+387000 MariaDB tpm
+455040 MariaDB tpm
+447900 MariaDB tpm
+446640 MariaDB tpm
+446640 MariaDB tpm
+438600 MariaDB tpm
+223200 MariaDB tpm
+376620 MariaDB tpm
+353460 MariaDB tpm
+302520 MariaDB tpm
+334320 MariaDB tpm
+440400 MariaDB tpm
+449940 MariaDB tpm
+229980 MariaDB tpm
+403380 MariaDB tpm
+305520 MariaDB tpm
+309300 MariaDB tpm
+292860 MariaDB tpm
+451380 MariaDB tpm
+441840 MariaDB tpm
+441600 MariaDB tpm
+438720 MariaDB tpm
+444960 MariaDB tpm
+445200 MariaDB tpm
+425340 MariaDB tpm
+441360 MariaDB tpm
+450840 MariaDB tpm
+451080 MariaDB tpm
+427320 MariaDB tpm
+441600 MariaDB tpm
+441600 MariaDB tpm
+436200 MariaDB tpm
+447240 MariaDB tpm
+446340 MariaDB tpm
+428400 MariaDB tpm
+439920 MariaDB tpm
+437940 MariaDB tpm
+440640 MariaDB tpm
+448560 MariaDB tpm
+439020 MariaDB tpm
+438480 MariaDB tpm
+440580 MariaDB tpm
+431580 MariaDB tpm
+445260 MariaDB tpm
+250260 MariaDB tpm
+290100 MariaDB tpm
+372240 MariaDB tpm
+343380 MariaDB tpm
+292860 MariaDB tpm
+283440 MariaDB tpm
+350880 MariaDB tpm
+379140 MariaDB tpm
+295800 MariaDB tpm
+278760 MariaDB tpm
+311520 MariaDB tpm
+Vuser 1:1 ...,
+403680 MariaDB tpm
+291300 MariaDB tpm
+286080 MariaDB tpm
+296280 MariaDB tpm
+427560 MariaDB tpm
+299820 MariaDB tpm
+278640 MariaDB tpm
+286020 MariaDB tpm
+449220 MariaDB tpm
+440340 MariaDB tpm
+277260 MariaDB tpm
+295980 MariaDB tpm
+323040 MariaDB tpm
+439860 MariaDB tpm
+447300 MariaDB tpm
+339120 MariaDB tpm
+375480 MariaDB tpm
+294300 MariaDB tpm
+443460 MariaDB tpm
+437880 MariaDB tpm
+453900 MariaDB tpm
+201780 MariaDB tpm
+284220 MariaDB tpm
+453360 MariaDB tpm
+435420 MariaDB tpm
+448560 MariaDB tpm
+429840 MariaDB tpm
+447840 MariaDB tpm
+442620 MariaDB tpm
+433560 MariaDB tpm
+275580 MariaDB tpm
+246000 MariaDB tpm
+396900 MariaDB tpm
+278940 MariaDB tpm
+224880 MariaDB tpm
+366960 MariaDB tpm
+323280 MariaDB tpm
+303420 MariaDB tpm
+290880 MariaDB tpm
+392940 MariaDB tpm
+330300 MariaDB tpm
+294000 MariaDB tpm
+293640 MariaDB tpm
+403620 MariaDB tpm
+427200 MariaDB tpm
+379140 MariaDB tpm
+315240 MariaDB tpm
+446220 MariaDB tpm
+439560 MariaDB tpm
+261660 MariaDB tpm
+333000 MariaDB tpm
+408180 MariaDB tpm
+325680 MariaDB tpm
+449340 MariaDB tpm
+440340 MariaDB tpm
+447060 MariaDB tpm
+445080 MariaDB tpm
+202680 MariaDB tpm
+396480 MariaDB tpm
+Vuser 1:2 ...,
+450540 MariaDB tpm
+439080 MariaDB tpm
+262560 MariaDB tpm
+301620 MariaDB tpm
+348960 MariaDB tpm
+391080 MariaDB tpm
+444240 MariaDB tpm
+450600 MariaDB tpm
+452280 MariaDB tpm
+448380 MariaDB tpm
+406080 MariaDB tpm
+265680 MariaDB tpm
+272040 MariaDB tpm
+327360 MariaDB tpm
+386160 MariaDB tpm
+294720 MariaDB tpm
+280320 MariaDB tpm
+367980 MariaDB tpm
+361200 MariaDB tpm
+294240 MariaDB tpm
+327360 MariaDB tpm
+370500 MariaDB tpm
+355920 MariaDB tpm
+290400 MariaDB tpm
+315180 MariaDB tpm
+416220 MariaDB tpm
+335220 MariaDB tpm
+322440 MariaDB tpm
+441060 MariaDB tpm
+445800 MariaDB tpm
+449520 MariaDB tpm
+450060 MariaDB tpm
+446100 MariaDB tpm
+453540 MariaDB tpm
+448500 MariaDB tpm
+451920 MariaDB tpm
+452220 MariaDB tpm
+440700 MariaDB tpm
+444720 MariaDB tpm
+444000 MariaDB tpm
+405180 MariaDB tpm
+242640 MariaDB tpm
+451320 MariaDB tpm
+245580 MariaDB tpm
+438720 MariaDB tpm
+207660 MariaDB tpm
+251760 MariaDB tpm
+429540 MariaDB tpm
+305880 MariaDB tpm
+299940 MariaDB tpm
+302880 MariaDB tpm
+423840 MariaDB tpm
+313440 MariaDB tpm
+277440 MariaDB tpm
+330540 MariaDB tpm
+377100 MariaDB tpm
+265080 MariaDB tpm
+439200 MariaDB tpm
+446400 MariaDB tpm
+211560 MariaDB tpm
+Vuser 1:3 ...,
+429840 MariaDB tpm
+289620 MariaDB tpm
+299700 MariaDB tpm
+449280 MariaDB tpm
+326880 MariaDB tpm
+436500 MariaDB tpm
+323580 MariaDB tpm
+313380 MariaDB tpm
+369120 MariaDB tpm
+369960 MariaDB tpm
+296940 MariaDB tpm
+285540 MariaDB tpm
+261780 MariaDB tpm
+391380 MariaDB tpm
+255480 MariaDB tpm
+449040 MariaDB tpm
+446100 MariaDB tpm
+468180 MariaDB tpm
+448680 MariaDB tpm
+437160 MariaDB tpm
+273060 MariaDB tpm
+451680 MariaDB tpm
+452040 MariaDB tpm
+448140 MariaDB tpm
+206460 MariaDB tpm
+436920 MariaDB tpm
+292860 MariaDB tpm
+278400 MariaDB tpm
+331020 MariaDB tpm
+381060 MariaDB tpm
+301020 MariaDB tpm
+302460 MariaDB tpm
+407640 MariaDB tpm
+317340 MariaDB tpm
+301440 MariaDB tpm
+448380 MariaDB tpm
+447120 MariaDB tpm
+439740 MariaDB tpm
+260340 MariaDB tpm
+410700 MariaDB tpm
+315600 MariaDB tpm
+449880 MariaDB tpm
+183300 MariaDB tpm
+364080 MariaDB tpm
+453360 MariaDB tpm
+441420 MariaDB tpm
+299220 MariaDB tpm
+315960 MariaDB tpm
+439260 MariaDB tpm
+448620 MariaDB tpm
+448020 MariaDB tpm
+261300 MariaDB tpm
+359580 MariaDB tpm
+287640 MariaDB tpm
+319440 MariaDB tpm
+434220 MariaDB tpm
+281160 MariaDB tpm
+288360 MariaDB tpm
+436980 MariaDB tpm
+Vuser 1:4 ...,
+452700 MariaDB tpm
+225900 MariaDB tpm
+429300 MariaDB tpm
+292740 MariaDB tpm
+294540 MariaDB tpm
+341880 MariaDB tpm
+383400 MariaDB tpm
+324720 MariaDB tpm
+323100 MariaDB tpm
+450840 MariaDB tpm
+445440 MariaDB tpm
+447720 MariaDB tpm
+449100 MariaDB tpm
+448380 MariaDB tpm
+449220 MariaDB tpm
+439860 MariaDB tpm
+433800 MariaDB tpm
+440340 MariaDB tpm
+443040 MariaDB tpm
+437700 MariaDB tpm
+440100 MariaDB tpm
+435540 MariaDB tpm
+451140 MariaDB tpm
+443340 MariaDB tpm
+174420 MariaDB tpm
+295500 MariaDB tpm
+404400 MariaDB tpm
+282780 MariaDB tpm
+289740 MariaDB tpm
+375780 MariaDB tpm
+352320 MariaDB tpm
+296820 MariaDB tpm
+296940 MariaDB tpm
+426600 MariaDB tpm
+328500 MariaDB tpm
+304740 MariaDB tpm
+447300 MariaDB tpm
+300420 MariaDB tpm
+356460 MariaDB tpm
+267420 MariaDB tpm
+257940 MariaDB tpm
+428640 MariaDB tpm
+280740 MariaDB tpm
+291000 MariaDB tpm
+441540 MariaDB tpm
+448560 MariaDB tpm
+291420 MariaDB tpm
+322200 MariaDB tpm
+433620 MariaDB tpm
+301020 MariaDB tpm
+450180 MariaDB tpm
+444360 MariaDB tpm
+455580 MariaDB tpm
+195000 MariaDB tpm
+411120 MariaDB tpm
+305100 MariaDB tpm
+287100 MariaDB tpm
+452820 MariaDB tpm
+451260 MariaDB tpm
+443940 MariaDB tpm
+Vuser 1:5 ...,
+441960 MariaDB tpm
+443880 MariaDB tpm
+445200 MariaDB tpm
+446700 MariaDB tpm
+441240 MariaDB tpm
+448740 MariaDB tpm
+437280 MariaDB tpm
+395220 MariaDB tpm
+408480 MariaDB tpm
+232920 MariaDB tpm
+240600 MariaDB tpm
+423660 MariaDB tpm
+274620 MariaDB tpm
+266400 MariaDB tpm
+383640 MariaDB tpm
+311040 MariaDB tpm
+258600 MariaDB tpm
+293220 MariaDB tpm
+385620 MariaDB tpm
+279780 MariaDB tpm
+300780 MariaDB tpm
+406560 MariaDB tpm
+317160 MariaDB tpm
+456900 MariaDB tpm
+450240 MariaDB tpm
+453720 MariaDB tpm
+435720 MariaDB tpm
+235080 MariaDB tpm
+257400 MariaDB tpm
+447900 MariaDB tpm
+440460 MariaDB tpm
+310440 MariaDB tpm
+431340 MariaDB tpm
+302640 MariaDB tpm
+294900 MariaDB tpm
+402960 MariaDB tpm
+329520 MariaDB tpm
+451140 MariaDB tpm
+452040 MariaDB tpm
+453120 MariaDB tpm
+446580 MariaDB tpm
+411420 MariaDB tpm
+210720 MariaDB tpm
+292260 MariaDB tpm
+447900 MariaDB tpm
+439680 MariaDB tpm
+445980 MariaDB tpm
+440580 MariaDB tpm
+252660 MariaDB tpm
+413400 MariaDB tpm
+266580 MariaDB tpm
+257580 MariaDB tpm
+353040 MariaDB tpm
+330840 MariaDB tpm
+272160 MariaDB tpm
+277200 MariaDB tpm
+423120 MariaDB tpm
+276300 MariaDB tpm
+293100 MariaDB tpm
+Vuser 1:6 ...,
+349440 MariaDB tpm
+390000 MariaDB tpm
+331320 MariaDB tpm
+292560 MariaDB tpm
+416700 MariaDB tpm
+263040 MariaDB tpm
+282720 MariaDB tpm
+392340 MariaDB tpm
+453660 MariaDB tpm
+454980 MariaDB tpm
+447540 MariaDB tpm
+436920 MariaDB tpm
+448560 MariaDB tpm
+445740 MariaDB tpm
+450840 MariaDB tpm
+287400 MariaDB tpm
+369420 MariaDB tpm
+274200 MariaDB tpm
+281160 MariaDB tpm
+423480 MariaDB tpm
+311760 MariaDB tpm
+286200 MariaDB tpm
+411180 MariaDB tpm
+335340 MariaDB tpm
+323760 MariaDB tpm
+291060 MariaDB tpm
+457740 MariaDB tpm
+451440 MariaDB tpm
+453420 MariaDB tpm
+368700 MariaDB tpm
+421380 MariaDB tpm
+268380 MariaDB tpm
+288000 MariaDB tpm
+355680 MariaDB tpm
+346680 MariaDB tpm
+269100 MariaDB tpm
+360600 MariaDB tpm
+442260 MariaDB tpm
+302820 MariaDB tpm
+440040 MariaDB tpm
+287520 MariaDB tpm
+439740 MariaDB tpm
+258180 MariaDB tpm
+327840 MariaDB tpm
+447540 MariaDB tpm
+448380 MariaDB tpm
+436620 MariaDB tpm
+278760 MariaDB tpm
+428760 MariaDB tpm
+94800 MariaDB tpm
+352980 MariaDB tpm
+404760 MariaDB tpm
+215220 MariaDB tpm
+454440 MariaDB tpm
+453480 MariaDB tpm
+449460 MariaDB tpm
+450000 MariaDB tpm
+453420 MariaDB tpm
+453420 MariaDB tpm
+Vuser 1:7 ...,
+299880 MariaDB tpm
+348540 MariaDB tpm
+282000 MariaDB tpm
+298680 MariaDB tpm
+449340 MariaDB tpm
+194400 MariaDB tpm
+319260 MariaDB tpm
+405000 MariaDB tpm
+261480 MariaDB tpm
+291240 MariaDB tpm
+431340 MariaDB tpm
+312840 MariaDB tpm
+314160 MariaDB tpm
+449340 MariaDB tpm
+421140 MariaDB tpm
+308760 MariaDB tpm
+327060 MariaDB tpm
+453900 MariaDB tpm
+455460 MariaDB tpm
+450840 MariaDB tpm
+202260 MariaDB tpm
+429240 MariaDB tpm
+289620 MariaDB tpm
+247380 MariaDB tpm
+432060 MariaDB tpm
+299340 MariaDB tpm
+295620 MariaDB tpm
+426540 MariaDB tpm
+309660 MariaDB tpm
+340260 MariaDB tpm
+424380 MariaDB tpm
+339240 MariaDB tpm
+460200 MariaDB tpm
+463860 MariaDB tpm
+449280 MariaDB tpm
+454860 MariaDB tpm
+451560 MariaDB tpm
+446520 MariaDB tpm
+446160 MariaDB tpm
+445680 MariaDB tpm
+444180 MariaDB tpm
+452940 MariaDB tpm
+455100 MariaDB tpm
+407280 MariaDB tpm
+219180 MariaDB tpm
+236040 MariaDB tpm
+423600 MariaDB tpm
+436980 MariaDB tpm
+265560 MariaDB tpm
+253260 MariaDB tpm
+387180 MariaDB tpm
+305220 MariaDB tpm
+290100 MariaDB tpm
+342960 MariaDB tpm
+392640 MariaDB tpm
+284460 MariaDB tpm
+265740 MariaDB tpm
+421920 MariaDB tpm
+433740 MariaDB tpm
+447900 MariaDB tpm
+Vuser 1:8 ...,
+445860 MariaDB tpm
+449220 MariaDB tpm
+385380 MariaDB tpm
+242100 MariaDB tpm
+226200 MariaDB tpm
+437880 MariaDB tpm
+252780 MariaDB tpm
+305040 MariaDB tpm
+398280 MariaDB tpm
+343560 MariaDB tpm
+312300 MariaDB tpm
+325500 MariaDB tpm
+350940 MariaDB tpm
+451860 MariaDB tpm
+248760 MariaDB tpm
+336600 MariaDB tpm
+385860 MariaDB tpm
+291900 MariaDB tpm
+296400 MariaDB tpm
+443640 MariaDB tpm
+448080 MariaDB tpm
+450900 MariaDB tpm
+448140 MariaDB tpm
+446100 MariaDB tpm
+442380 MariaDB tpm
+445440 MariaDB tpm
+443460 MariaDB tpm
+444660 MariaDB tpm
+447780 MariaDB tpm
+446220 MariaDB tpm
+447840 MariaDB tpm
+441540 MariaDB tpm
+437220 MariaDB tpm
+439200 MariaDB tpm
+295740 MariaDB tpm
+316140 MariaDB tpm
+234120 MariaDB tpm
+333900 MariaDB tpm
+368700 MariaDB tpm
+278280 MariaDB tpm
+274980 MariaDB tpm
+425520 MariaDB tpm
+276720 MariaDB tpm
+267540 MariaDB tpm
+355620 MariaDB tpm
+329760 MariaDB tpm
+272400 MariaDB tpm
+447000 MariaDB tpm
+297780 MariaDB tpm
+409080 MariaDB tpm
+299640 MariaDB tpm
+281640 MariaDB tpm
+334380 MariaDB tpm
+352560 MariaDB tpm
+273060 MariaDB tpm
+444780 MariaDB tpm
+450360 MariaDB tpm
+444420 MariaDB tpm
+202980 MariaDB tpm
+Vuser 1:9 ...,
+434640 MariaDB tpm
+281700 MariaDB tpm
+275400 MariaDB tpm
+394380 MariaDB tpm
+430620 MariaDB tpm
+276720 MariaDB tpm
+286500 MariaDB tpm
+440760 MariaDB tpm
+235500 MariaDB tpm
+292320 MariaDB tpm
+435000 MariaDB tpm
+290340 MariaDB tpm
+241080 MariaDB tpm
+232980 MariaDB tpm
+270660 MariaDB tpm
+448800 MariaDB tpm
+220800 MariaDB tpm
+447300 MariaDB tpm
+343500 MariaDB tpm
+437400 MariaDB tpm
+268200 MariaDB tpm
+338520 MariaDB tpm
+432300 MariaDB tpm
+333360 MariaDB tpm
+448260 MariaDB tpm
+453180 MariaDB tpm
+276000 MariaDB tpm
+364380 MariaDB tpm
+329580 MariaDB tpm
+314940 MariaDB tpm
+436380 MariaDB tpm
+328620 MariaDB tpm
+453300 MariaDB tpm
+453000 MariaDB tpm
+447240 MariaDB tpm
+454020 MariaDB tpm
+452100 MariaDB tpm
+393420 MariaDB tpm
+292680 MariaDB tpm
+273540 MariaDB tpm
+445860 MariaDB tpm
+442500 MariaDB tpm
+252060 MariaDB tpm
+432540 MariaDB tpm
+273900 MariaDB tpm
+289560 MariaDB tpm
+369780 MariaDB tpm
+428640 MariaDB tpm
+341820 MariaDB tpm
+447120 MariaDB tpm
+443640 MariaDB tpm
+457440 MariaDB tpm
+434700 MariaDB tpm
+260820 MariaDB tpm
+263940 MariaDB tpm
+452520 MariaDB tpm
+450960 MariaDB tpm
+446640 MariaDB tpm
+446220 MariaDB tpm
+352920 MariaDB tpm
+Vuser 1:10 ...,
+315060 MariaDB tpm
+274080 MariaDB tpm
+317700 MariaDB tpm
+371820 MariaDB tpm
+254040 MariaDB tpm
+257520 MariaDB tpm
+430800 MariaDB tpm
+269820 MariaDB tpm
+308760 MariaDB tpm
+405660 MariaDB tpm
+344400 MariaDB tpm
+311460 MariaDB tpm
+308940 MariaDB tpm
+238680 MariaDB tpm
+447060 MariaDB tpm
+447660 MariaDB tpm
+441660 MariaDB tpm
+452580 MariaDB tpm
+454020 MariaDB tpm
+206220 MariaDB tpm
+293580 MariaDB tpm
+420900 MariaDB tpm
+279540 MariaDB tpm
+308820 MariaDB tpm
+428760 MariaDB tpm
+320340 MariaDB tpm
+448080 MariaDB tpm
+448440 MariaDB tpm
+307380 MariaDB tpm
+437640 MariaDB tpm
+271800 MariaDB tpm
+279780 MariaDB tpm
+426060 MariaDB tpm
+329760 MariaDB tpm
+274800 MariaDB tpm
+451860 MariaDB tpm
+445860 MariaDB tpm
+231540 MariaDB tpm
+397080 MariaDB tpm
+319140 MariaDB tpm
+319140 MariaDB tpm
+356520 MariaDB tpm
+381900 MariaDB tpm
+313860 MariaDB tpm
+329940 MariaDB tpm
+409440 MariaDB tpm
+299940 MariaDB tpm
+298680 MariaDB tpm
+434400 MariaDB tpm
+321480 MariaDB tpm
+311340 MariaDB tpm
+400200 MariaDB tpm
+297060 MariaDB tpm
+283260 MariaDB tpm
+453540 MariaDB tpm
+441660 MariaDB tpm
+442320 MariaDB tpm
+445500 MariaDB tpm
+452280 MariaDB tpm
+431520 MariaDB tpm
+Vuser 1:11 ...,
+446520 MariaDB tpm
+444480 MariaDB tpm
+445560 MariaDB tpm
+452400 MariaDB tpm
+436980 MariaDB tpm
+395760 MariaDB tpm
+258720 MariaDB tpm
+231900 MariaDB tpm
+401160 MariaDB tpm
+291060 MariaDB tpm
+261120 MariaDB tpm
+360060 MariaDB tpm
+342000 MariaDB tpm
+267420 MariaDB tpm
+292980 MariaDB tpm
+427440 MariaDB tpm
+268380 MariaDB tpm
+293700 MariaDB tpm
+449580 MariaDB tpm
+338640 MariaDB tpm
+347640 MariaDB tpm
+454980 MariaDB tpm
+449460 MariaDB tpm
+450420 MariaDB tpm
+446160 MariaDB tpm
+448440 MariaDB tpm
+345900 MariaDB tpm
+258780 MariaDB tpm
+299940 MariaDB tpm
+380640 MariaDB tpm
+427920 MariaDB tpm
+291300 MariaDB tpm
+300000 MariaDB tpm
+372300 MariaDB tpm
+305340 MariaDB tpm
+239340 MariaDB tpm
+421080 MariaDB tpm
+281700 MariaDB tpm
+447420 MariaDB tpm
+445740 MariaDB tpm
+160560 MariaDB tpm
+434040 MariaDB tpm
+261540 MariaDB tpm
+282420 MariaDB tpm
+422220 MariaDB tpm
+306120 MariaDB tpm
+305220 MariaDB tpm
+377400 MariaDB tpm
+436200 MariaDB tpm
+318660 MariaDB tpm
+298500 MariaDB tpm
+430920 MariaDB tpm
+301860 MariaDB tpm
+303540 MariaDB tpm
+433260 MariaDB tpm
+255660 MariaDB tpm
+296280 MariaDB tpm
+455040 MariaDB tpm
+271200 MariaDB tpm
+Vuser 1:12 ...,
+448200 MariaDB tpm
+272340 MariaDB tpm
+360060 MariaDB tpm
+191280 MariaDB tpm
+447240 MariaDB tpm
+252480 MariaDB tpm
+376740 MariaDB tpm
+314460 MariaDB tpm
+325320 MariaDB tpm
+417840 MariaDB tpm
+349920 MariaDB tpm
+199320 MariaDB tpm
+449340 MariaDB tpm
+242700 MariaDB tpm
+446220 MariaDB tpm
+449400 MariaDB tpm
+306900 MariaDB tpm
+291300 MariaDB tpm
+363000 MariaDB tpm
+459240 MariaDB tpm
+219960 MariaDB tpm
+320520 MariaDB tpm
+408360 MariaDB tpm
+315900 MariaDB tpm
+453360 MariaDB tpm
+449580 MariaDB tpm
+350340 MariaDB tpm
+324300 MariaDB tpm
+297120 MariaDB tpm
+403680 MariaDB tpm
+330420 MariaDB tpm
+309120 MariaDB tpm
+383220 MariaDB tpm
+286440 MariaDB tpm
+211440 MariaDB tpm
+412800 MariaDB tpm
+185760 MariaDB tpm
+390600 MariaDB tpm
+450480 MariaDB tpm
+405600 MariaDB tpm
+308040 MariaDB tpm
+459840 MariaDB tpm
+455280 MariaDB tpm
+188520 MariaDB tpm
+449880 MariaDB tpm
+442260 MariaDB tpm
+386160 MariaDB tpm
+417120 MariaDB tpm
+241500 MariaDB tpm
+427440 MariaDB tpm
+310740 MariaDB tpm
+446280 MariaDB tpm
+446100 MariaDB tpm
+216960 MariaDB tpm
+427380 MariaDB tpm
+298440 MariaDB tpm
+313980 MariaDB tpm
+444120 MariaDB tpm
+444240 MariaDB tpm
+Vuser 1:13 ...,
+448800 MariaDB tpm
+450480 MariaDB tpm
+450720 MariaDB tpm
+440760 MariaDB tpm
+443580 MariaDB tpm
+432240 MariaDB tpm
+297120 MariaDB tpm
+340140 MariaDB tpm
+232020 MariaDB tpm
+332760 MariaDB tpm
+340680 MariaDB tpm
+258600 MariaDB tpm
+301740 MariaDB tpm
+377340 MariaDB tpm
+297060 MariaDB tpm
+387600 MariaDB tpm
+353040 MariaDB tpm
+283920 MariaDB tpm
+320820 MariaDB tpm
+407760 MariaDB tpm
+318360 MariaDB tpm
+277560 MariaDB tpm
+450720 MariaDB tpm
+444180 MariaDB tpm
+452460 MariaDB tpm
+446760 MariaDB tpm
+448500 MariaDB tpm
+445740 MariaDB tpm
+451380 MariaDB tpm
+445080 MariaDB tpm
+440940 MariaDB tpm
+445440 MariaDB tpm
+437460 MariaDB tpm
+444420 MariaDB tpm
+449460 MariaDB tpm
+439200 MariaDB tpm
+172800 MariaDB tpm
+291840 MariaDB tpm
+366060 MariaDB tpm
+244140 MariaDB tpm
+248340 MariaDB tpm
+437940 MariaDB tpm
+218940 MariaDB tpm
+222000 MariaDB tpm
+403020 MariaDB tpm
+260940 MariaDB tpm
+206460 MariaDB tpm
+431040 MariaDB tpm
+288540 MariaDB tpm
+271200 MariaDB tpm
+343560 MariaDB tpm
+367500 MariaDB tpm
+276660 MariaDB tpm
+264180 MariaDB tpm
+408180 MariaDB tpm
+277860 MariaDB tpm
+269340 MariaDB tpm
+343440 MariaDB tpm
+361980 MariaDB tpm
+283920 MariaDB tpm
+Vuser 1:14 ...,
+286440 MariaDB tpm
+447300 MariaDB tpm
+231300 MariaDB tpm
+442800 MariaDB tpm
+234480 MariaDB tpm
+261120 MariaDB tpm
+448200 MariaDB tpm
+435600 MariaDB tpm
+439320 MariaDB tpm
+443160 MariaDB tpm
+444780 MariaDB tpm
+443820 MariaDB tpm
+225540 MariaDB tpm
+410520 MariaDB tpm
+230640 MariaDB tpm
+257640 MariaDB tpm
+416220 MariaDB tpm
+261540 MariaDB tpm
+253380 MariaDB tpm
+427020 MariaDB tpm
+270060 MariaDB tpm
+239100 MariaDB tpm
+424140 MariaDB tpm
+309720 MariaDB tpm
+306000 MariaDB tpm
+374700 MariaDB tpm
+361800 MariaDB tpm
+294300 MariaDB tpm
+347280 MariaDB tpm
+391440 MariaDB tpm
+289200 MariaDB tpm
+311340 MariaDB tpm
+409920 MariaDB tpm
+288840 MariaDB tpm
+311880 MariaDB tpm
+439320 MariaDB tpm
+251040 MariaDB tpm
+338700 MariaDB tpm
+401640 MariaDB tpm
+301860 MariaDB tpm
+225840 MariaDB tpm
+318300 MariaDB tpm
+433620 MariaDB tpm
+323520 MariaDB tpm
+322560 MariaDB tpm
+444060 MariaDB tpm
+453960 MariaDB tpm
+448500 MariaDB tpm
+433440 MariaDB tpm
+438000 MariaDB tpm
+166740 MariaDB tpm
+448860 MariaDB tpm
+443280 MariaDB tpm
+447180 MariaDB tpm
+453240 MariaDB tpm
+440700 MariaDB tpm
+443160 MariaDB tpm
+441600 MariaDB tpm
+304620 MariaDB tpm
+330120 MariaDB tpm
+Vuser 1:15 ...,
+244320 MariaDB tpm
+352380 MariaDB tpm
+434760 MariaDB tpm
+265860 MariaDB tpm
+301260 MariaDB tpm
+445260 MariaDB tpm
+442020 MariaDB tpm
+439200 MariaDB tpm
+443520 MariaDB tpm
+447360 MariaDB tpm
+440520 MariaDB tpm
+438180 MariaDB tpm
+444120 MariaDB tpm
+440460 MariaDB tpm
+440400 MariaDB tpm
+440340 MariaDB tpm
+442080 MariaDB tpm
+440100 MariaDB tpm
+448380 MariaDB tpm
+441300 MariaDB tpm
+196740 MariaDB tpm
+291900 MariaDB tpm
+430920 MariaDB tpm
+267840 MariaDB tpm
+282240 MariaDB tpm
+419760 MariaDB tpm
+303000 MariaDB tpm
+297960 MariaDB tpm
+356400 MariaDB tpm
+326520 MariaDB tpm
+282300 MariaDB tpm
+438900 MariaDB tpm
+318540 MariaDB tpm
+368580 MariaDB tpm
+291900 MariaDB tpm
+269940 MariaDB tpm
+437220 MariaDB tpm
+258180 MariaDB tpm
+267720 MariaDB tpm
+386040 MariaDB tpm
+311640 MariaDB tpm
+283500 MariaDB tpm
+347520 MariaDB tpm
+378120 MariaDB tpm
+280800 MariaDB tpm
+283560 MariaDB tpm
+430620 MariaDB tpm
+255420 MariaDB tpm
+283500 MariaDB tpm
+389640 MariaDB tpm
+318360 MariaDB tpm
+441600 MariaDB tpm
+441900 MariaDB tpm
+452280 MariaDB tpm
+205500 MariaDB tpm
+436560 MariaDB tpm
+267720 MariaDB tpm
+265320 MariaDB tpm
+426120 MariaDB tpm
+273120 MariaDB tpm
+Vuser 1:16 ...,
+280560 MariaDB tpm
+398820 MariaDB tpm
+309780 MariaDB tpm
+297540 MariaDB tpm
+387900 MariaDB tpm
+79980 MariaDB tpm
+431760 MariaDB tpm
+307740 MariaDB tpm
+302100 MariaDB tpm
+448680 MariaDB tpm
+449640 MariaDB tpm
+438960 MariaDB tpm
+451500 MariaDB tpm
+428340 MariaDB tpm
+215700 MariaDB tpm
+283020 MariaDB tpm
+434460 MariaDB tpm
+282120 MariaDB tpm
+303900 MariaDB tpm
+445080 MariaDB tpm
+438960 MariaDB tpm
+437040 MariaDB tpm
+446460 MariaDB tpm
+300900 MariaDB tpm
+310500 MariaDB tpm
+256680 MariaDB tpm
+306240 MariaDB tpm
+426540 MariaDB tpm
+279180 MariaDB tpm
+176940 MariaDB tpm
+445380 MariaDB tpm
+442500 MariaDB tpm
+437940 MariaDB tpm
+440280 MariaDB tpm
+435780 MariaDB tpm
+441240 MariaDB tpm
+447660 MariaDB tpm
+441000 MariaDB tpm
+435600 MariaDB tpm
+442140 MariaDB tpm
+443820 MariaDB tpm
+433920 MariaDB tpm
+289080 MariaDB tpm
+342060 MariaDB tpm
+446160 MariaDB tpm
+444420 MariaDB tpm
+438060 MariaDB tpm
+166920 MariaDB tpm
+348840 MariaDB tpm
+336900 MariaDB tpm
+438360 MariaDB tpm
+446280 MariaDB tpm
+423360 MariaDB tpm
+442080 MariaDB tpm
+438240 MariaDB tpm
+317040 MariaDB tpm
+274080 MariaDB tpm
+268200 MariaDB tpm
+363540 MariaDB tpm
+Vuser 1:17 ...,
+335460 MariaDB tpm
+273600 MariaDB tpm
+279720 MariaDB tpm
+399120 MariaDB tpm
+260460 MariaDB tpm
+291780 MariaDB tpm
+440040 MariaDB tpm
+213480 MariaDB tpm
+392700 MariaDB tpm
+314820 MariaDB tpm
+323280 MariaDB tpm
+307620 MariaDB tpm
+416640 MariaDB tpm
+298440 MariaDB tpm
+235440 MariaDB tpm
+409440 MariaDB tpm
+290100 MariaDB tpm
+298500 MariaDB tpm
+411300 MariaDB tpm
+312240 MariaDB tpm
+313020 MariaDB tpm
+442740 MariaDB tpm
+429660 MariaDB tpm
+261120 MariaDB tpm
+445560 MariaDB tpm
+436380 MariaDB tpm
+439140 MariaDB tpm
+438420 MariaDB tpm
+273000 MariaDB tpm
+436920 MariaDB tpm
+438240 MariaDB tpm
+429780 MariaDB tpm
+442140 MariaDB tpm
+437820 MariaDB tpm
+438660 MariaDB tpm
+198300 MariaDB tpm
+408060 MariaDB tpm
+236160 MariaDB tpm
+243000 MariaDB tpm
+409080 MariaDB tpm
+256740 MariaDB tpm
+259800 MariaDB tpm
+418260 MariaDB tpm
+267840 MariaDB tpm
+280260 MariaDB tpm
+374220 MariaDB tpm
+319800 MariaDB tpm
+439560 MariaDB tpm
+441420 MariaDB tpm
+433800 MariaDB tpm
+229200 MariaDB tpm
+248580 MariaDB tpm
+425820 MariaDB tpm
+248520 MariaDB tpm
+276060 MariaDB tpm
+374400 MariaDB tpm
+319680 MariaDB tpm
+287880 MariaDB tpm
+314940 MariaDB tpm
+400920 MariaDB tpm
+Vuser 1:18 ...,
+444120 MariaDB tpm
+435900 MariaDB tpm
+438600 MariaDB tpm
+432780 MariaDB tpm
+435300 MariaDB tpm
+338160 MariaDB tpm
+267240 MariaDB tpm
+273120 MariaDB tpm
+378600 MariaDB tpm
+367740 MariaDB tpm
+275220 MariaDB tpm
+260520 MariaDB tpm
+169080 MariaDB tpm
+312780 MariaDB tpm
+392160 MariaDB tpm
+205560 MariaDB tpm
+312000 MariaDB tpm
+381600 MariaDB tpm
+277080 MariaDB tpm
+286260 MariaDB tpm
+437460 MariaDB tpm
+413880 MariaDB tpm
+442140 MariaDB tpm
+192600 MariaDB tpm
+431280 MariaDB tpm
+434580 MariaDB tpm
+431940 MariaDB tpm
+433740 MariaDB tpm
+321360 MariaDB tpm
+295620 MariaDB tpm
+265440 MariaDB tpm
+342660 MariaDB tpm
+353100 MariaDB tpm
+284160 MariaDB tpm
+338040 MariaDB tpm
+425400 MariaDB tpm
+430860 MariaDB tpm
+441600 MariaDB tpm
+437040 MariaDB tpm
+434220 MariaDB tpm
+432660 MariaDB tpm
+422760 MariaDB tpm
+434520 MariaDB tpm
+245940 MariaDB tpm
+348480 MariaDB tpm
+277320 MariaDB tpm
+301620 MariaDB tpm
+406320 MariaDB tpm
+313020 MariaDB tpm
+277500 MariaDB tpm
+394980 MariaDB tpm
+280380 MariaDB tpm
+280320 MariaDB tpm
+438240 MariaDB tpm
+418440 MariaDB tpm
+434160 MariaDB tpm
+431940 MariaDB tpm
+435000 MariaDB tpm
+438540 MariaDB tpm
+417720 MariaDB tpm
+Vuser 1:19 ...,
+436200 MariaDB tpm
+433740 MariaDB tpm
+431760 MariaDB tpm
+430680 MariaDB tpm
+421380 MariaDB tpm
+431040 MariaDB tpm
+431160 MariaDB tpm
+428940 MariaDB tpm
+432780 MariaDB tpm
+437160 MariaDB tpm
+425400 MariaDB tpm
+211800 MariaDB tpm
+365820 MariaDB tpm
+312180 MariaDB tpm
+252960 MariaDB tpm
+324600 MariaDB tpm
+361500 MariaDB tpm
+295740 MariaDB tpm
+292140 MariaDB tpm
+432540 MariaDB tpm
+397920 MariaDB tpm
+420300 MariaDB tpm
+273960 MariaDB tpm
+279060 MariaDB tpm
+372240 MariaDB tpm
+320760 MariaDB tpm
+268380 MariaDB tpm
+291240 MariaDB tpm
+394500 MariaDB tpm
+300420 MariaDB tpm
+294480 MariaDB tpm
+409620 MariaDB tpm
+293580 MariaDB tpm
+426060 MariaDB tpm
+438000 MariaDB tpm
+424980 MariaDB tpm
+428760 MariaDB tpm
+431340 MariaDB tpm
+235200 MariaDB tpm
+406740 MariaDB tpm
+256260 MariaDB tpm
+262440 MariaDB tpm
+379080 MariaDB tpm
+294900 MariaDB tpm
+270780 MariaDB tpm
+333000 MariaDB tpm
+326880 MariaDB tpm
+305880 MariaDB tpm
+298380 MariaDB tpm
+386700 MariaDB tpm
+271260 MariaDB tpm
+262740 MariaDB tpm
+409620 MariaDB tpm
+265620 MariaDB tpm
+259260 MariaDB tpm
+387420 MariaDB tpm
+292200 MariaDB tpm
+432420 MariaDB tpm
+426600 MariaDB tpm
+Vuser 1:20 ...,
+Vuser 1:Test complete, Taking end Transaction Count.
+Vuser 1:32 Active Virtual Users configured
+Vuser 1:TEST RESULT : System achieved 154879 NOPM from 359635 MariaDB TPM
+Vuser 1:Gathering timing data from Active Virtual Users...
+Vuser 20:FINISHED SUCCESS
+Vuser 8:FINISHED SUCCESS
+Vuser 19:FINISHED SUCCESS
+Vuser 22:FINISHED SUCCESS
+Vuser 25:FINISHED SUCCESS
+Vuser 4:FINISHED SUCCESS
+Vuser 27:FINISHED SUCCESS
+Vuser 23:FINISHED SUCCESS
+403260 MariaDB tpm
+Vuser 32:FINISHED SUCCESS
+Vuser 28:FINISHED SUCCESS
+Vuser 6:FINISHED SUCCESS
+Vuser 2:FINISHED SUCCESS
+213480 MariaDB tpm
+Vuser 5:FINISHED SUCCESS
+Vuser 11:FINISHED SUCCESS
+Vuser 24:FINISHED SUCCESS
+Vuser 29:FINISHED SUCCESS
+Vuser 3:FINISHED SUCCESS
+Vuser 31:FINISHED SUCCESS
+312180 MariaDB tpm
+Vuser 9:FINISHED SUCCESS
+Vuser 26:FINISHED SUCCESS
+Vuser 17:FINISHED SUCCESS
+Vuser 33:FINISHED SUCCESS
+Vuser 16:FINISHED SUCCESS
+Vuser 15:FINISHED SUCCESS
+Vuser 10:FINISHED SUCCESS
+Vuser 14:FINISHED SUCCESS
+Vuser 21:FINISHED SUCCESS
+Vuser 13:FINISHED SUCCESS
+187980 MariaDB tpm
+Vuser 18:FINISHED SUCCESS
+Vuser 12:FINISHED SUCCESS
+Vuser 7:FINISHED SUCCESS
+Vuser 30:FINISHED SUCCESS
+Vuser 1:Calculating timings...
+Vuser 1:Writing timing data to /root/sqlanalysis/run3000/hdbtmp/hdbxtprofile.log
+12480 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+Vuser 1:FINISHED SUCCESS
+ALL VIRTUAL USERS COMPLETE
+Transaction Counter thread running with threadid:tid0x7fff5ffff6c0
+Stopping Transaction Counter
+vudestroy success
+BENCH_JOBID 6ABF6820229A03E213733363

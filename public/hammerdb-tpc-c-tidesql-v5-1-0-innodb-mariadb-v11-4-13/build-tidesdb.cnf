@@ -1,0 +1,81 @@
+[mysqld]
+
+basedir   = /data/mariadb
+datadir   = /data/mariadb/data
+pid-file  = /data/mariadb/data/mariadb.pid
+user      = root
+
+skip-networking=0
+bind-address=127.0.0.1
+socket=/tmp/mariadb.sock
+ssl=0
+port=3306
+
+skip_log_bin=1
+server_id=1
+max_connections=100000
+thread_pool_max_threads=1024
+thread_handling=pool-of-threads
+thread_pool_size=24
+table_open_cache=2000
+table_open_cache_instances=16
+back_log=1500
+max_prepared_stmt_count=128000
+character_set_server=latin1
+collation_server=latin1_swedish_ci
+transaction_isolation=REPEATABLE-READ
+join_buffer_size=32K
+sort_buffer_size=32K
+performance_schema=OFF
+event_scheduler=OFF
+log_error=mariadb.err
+
+plugin_maturity = beta
+plugin-load-add = ha_tidesdb.so
+default_storage_engine = TidesDB
+tidesdb_data_home_dir = /data/mariadb/tidesdb_data
+
+tidesdb_log_level = NONE
+tidesdb_log_to_file = OFF
+
+tidesdb_memtable_sync_mode = NONE
+
+
+tidesdb_block_cache_size = 32G
+
+tidesdb_memtable_write_buffer_size = 8G
+
+
+tidesdb_max_open_sstables = 65536
+
+
+tidesdb_flush_threads = 4
+tidesdb_compaction_threads = 4
+
+tidesdb_memtable_l0_queue_stall_threshold = 30
+
+
+tidesdb_default_l1_file_count_trigger = 8
+
+
+tidesdb_default_compression = NONE
+
+tidesdb_default_bloom_filter = ON
+tidesdb_default_bloom_fpr = 100
+
+tidesdb_value_separation_threshold = 1024
+
+[client]
+socket=/tmp/mariadb.sock
+port=3306
+
+[mysqldump]
+quick
+max_allowed_packet=64M
+
+[mysqld_safe]
+malloc-lib=/lib/x86_64-linux-gnu/libjemalloc.so.2
+
+[mysqld]
+
+transaction_isolation=READ-COMMITTED

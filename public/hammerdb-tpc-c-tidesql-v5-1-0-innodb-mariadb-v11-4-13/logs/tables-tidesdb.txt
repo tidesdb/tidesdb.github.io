@@ -1,0 +1,9 @@
+customer	TidesDB
+district	TidesDB
+history	TidesDB
+item	TidesDB
+new_order	TidesDB
+orders	TidesDB
+order_line	TidesDB
+stock	TidesDB
+warehouse	TidesDB

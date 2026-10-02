@@ -1,0 +1,144 @@
+---
+// Share links for an article, rendered after the content by the MarkdownContent
+// override, which only reaches for it on /articles/ routes.
+//
+// They sit at the end rather than under the title because the title area already
+// carries the cover image, byline and date. A share row up there became a second
+// block of metadata competing with the one below the cover.
+//
+// The share targets are plain links with query parameters, so they work with
+// JavaScript off and need no third-party script. Only "Copy link" needs script,
+// and it degrades to a visible URL via the title attribute if the clipboard API
+// is unavailable (it needs a secure context, so it is absent over plain http).
+interface Props {
+	/** Article title, used as the prefilled share text. */
+	title: string;
+	/** Absolute canonical URL of the article. */
+	url: string;
+}
+
+const { title, url } = Astro.props;
+
+const u = encodeURIComponent(url);
+const t = encodeURIComponent(title);
+
+// Where engineering and database writing actually gets shared. Kept to text
+// labels rather than brand marks, which keeps the row quiet next to the title
+// and avoids carrying five logo paths around.
+const targets = [
+	{ label: 'X', href: `https://x.com/intent/tweet?text=${t}&url=${u}` },
+	{ label: 'LinkedIn', href: `https://www.linkedin.com/sharing/share-offsite/?url=${u}` },
+	{ label: 'Hacker News', href: `https://news.ycombinator.com/submitlink?u=${u}&t=${t}` },
+	{ label: 'Reddit', href: `https://www.reddit.com/submit?url=${u}&title=${t}` },
+	{ label: 'Bluesky', href: `https://bsky.app/intent/compose?text=${t}%20${u}` },
+];
+---
+
+<div class="article-meta">
+	<div class="article-meta__share">
+		<span class="article-meta__label">Share this article</span>
+		{
+			targets.map((target) => (
+				<a
+					class="article-meta__link"
+					href={target.href}
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					{target.label}
+				</a>
+			))
+		}
+		<button class="article-meta__link article-meta__copy" data-url={url} title={url}>
+			Copy link
+		</button>
+	</div>
+</div>
+
+<style>
+	.article-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.5rem 1rem;
+		margin-top: 2.5rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--sl-color-hairline-light);
+		font-size: 0.8rem;
+		color: var(--sl-color-gray-3);
+	}
+
+	.article-meta__share {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.3rem 0.65rem;
+	}
+
+	.article-meta__label {
+		white-space: nowrap;
+	}
+
+	/* Buttons and links share one look so "Copy link" sits in the row as a peer
+	   rather than as a form control. */
+	.article-meta__link {
+		padding: 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		color: var(--sl-color-gray-2) !important;
+		text-decoration: none !important;
+		border-bottom: 1px solid transparent !important;
+		white-space: nowrap;
+		cursor: pointer;
+		transition: color 0.15s ease, border-color 0.15s ease;
+	}
+
+	.article-meta__link:hover,
+	.article-meta__link:focus-visible {
+		color: var(--sl-color-white) !important;
+		border-bottom-color: var(--sl-color-accent) !important;
+		outline: none;
+	}
+
+	.article-meta__copy[data-copied] {
+		color: var(--sl-color-accent-high) !important;
+		border-bottom-color: transparent !important;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.article-meta__link {
+			transition: none;
+		}
+	}
+
+	@media print {
+		.article-meta {
+			display: none;
+		}
+	}
+</style>
+
+<script>
+	const copy = document.querySelector<HTMLButtonElement>('.article-meta__copy');
+	if (copy) {
+		const original = copy.textContent;
+		copy.addEventListener('click', async () => {
+			const url = copy.dataset.url;
+			if (!url) return;
+			try {
+				await navigator.clipboard.writeText(url);
+				copy.textContent = 'Copied';
+			} catch {
+				// No clipboard access (insecure context, or the user denied it).
+				// Select nothing and say so rather than pretending it worked.
+				copy.textContent = 'Press Ctrl+C';
+			}
+			copy.dataset.copied = '';
+			setTimeout(() => {
+				copy.textContent = original;
+				delete copy.dataset.copied;
+			}, 2000);
+		});
+	}
+</script>

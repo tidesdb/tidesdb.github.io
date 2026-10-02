@@ -834,6 +834,48 @@ canvas {
 	display: block;
 }
 
+/* Image credit: a link inside .article-image credits whoever made the artwork.
+   Overlaid as a watermark in the corner instead of sitting under the image as
+   body text. z-index 2 clears the ::before gradient (z-index 1), which would
+   otherwise cover it; the translucent pill keeps it legible over a light image,
+   where plain white text would not be. */
+.article-image a {
+	position: absolute;
+	right: 0.875rem;
+	bottom: 0.875rem;
+	z-index: 2;
+	max-width: calc(100% - 1.75rem);
+	padding: 0.3rem 0.65rem;
+	border-radius: 999px;
+	border-bottom: none !important;
+	background: rgba(10, 37, 64, 0.4);
+	backdrop-filter: blur(6px) saturate(1.4);
+	-webkit-backdrop-filter: blur(6px) saturate(1.4);
+	color: rgba(255, 255, 255, 0.8) !important;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	line-height: 1.2;
+	letter-spacing: 0.01em;
+	text-decoration: none !important;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	transition: background 0.2s ease, color 0.2s ease;
+}
+
+.article-image a:hover,
+.article-image a:focus-visible {
+	background: rgba(10, 37, 64, 0.65);
+	color: #ffffff !important;
+	outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.article-image a {
+		transition: none;
+	}
+}
+
 
 .small-article-image {
 	width: 228px;

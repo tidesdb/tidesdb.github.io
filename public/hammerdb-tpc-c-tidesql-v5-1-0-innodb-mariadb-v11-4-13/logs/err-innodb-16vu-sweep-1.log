@@ -1,0 +1,99 @@
+261001 21:56:11 mysqld_safe Starting mariadbd daemon with databases from /data/mariadb/data
+2026-10-01 21:56:12 0 [Note] Starting MariaDB 11.4.13-MariaDB-log source revision 170b1d70737be6f134448f51713cdc1ae215b420 server_uid sDIDdI02w3b2acl7Rds2iN62O2Q= as process 1339123
+2026-10-01 21:56:12 0 [Warning] Plugin 'TidesDB' is of maturity level beta while the server is stable
+2026-10-01 21:56:12 0 [Note] [TIDESDB] Loaded 35 default stop words
+2026-10-01 21:56:12 0 [Note] [TIDESDB] TidesDB opened at /data/mariadb/tidesdb_data
+2026-10-01 21:56:12 0 [Note] InnoDB: Compressed tables use zlib 1.3
+2026-10-01 21:56:12 0 [Note] InnoDB: Number of transaction pools: 1
+2026-10-01 21:56:12 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2026-10-01 21:56:12 0 [Note] InnoDB: innodb_buffer_pool_size_max=8388612m, innodb_buffer_pool_size=256m
+2026-10-01 21:56:12 0 [Note] InnoDB: Initialized memory pressure event listener
+2026-10-01 21:56:12 0 [Note] InnoDB: Completed initialization of buffer pool
+2026-10-01 21:56:12 0 [Note] InnoDB: File system buffers for log disabled (block size=4096 bytes)
+2026-10-01 21:56:12 0 [Note] InnoDB: End of log at LSN=45093
+2026-10-01 21:56:12 0 [Note] InnoDB: Resizing redo log from 96.000MiB to 48.000MiB; LSN=45093
+2026-10-01 21:56:12 0 [Note] InnoDB: File system buffers for log disabled (block size=4096 bytes)
+2026-10-01 21:56:12 0 [Note] InnoDB: Opened 3 undo tablespaces
+2026-10-01 21:56:12 0 [Note] InnoDB: 128 rollback segments in 3 undo tablespaces are active.
+2026-10-01 21:56:12 0 [Note] InnoDB: Setting file './ibtmp1' size to 12.000MiB. Physically writing the file full; Please wait ...
+2026-10-01 21:56:12 0 [Note] InnoDB: File './ibtmp1' size is now 12.000MiB.
+2026-10-01 21:56:12 0 [Note] InnoDB: log sequence number 45093; transaction id 14
+2026-10-01 21:56:12 0 [Note] InnoDB: Loading buffer pool(s) from /data/mariadb/data/ib_buffer_pool
+2026-10-01 21:56:12 0 [Note] Plugin 'FEEDBACK' is disabled.
+2026-10-01 21:56:12 0 [Note] Plugin 'wsrep-provider' is disabled.
+2026-10-01 21:56:12 0 [Note] InnoDB: Buffer pool(s) load completed at 261001 21:56:12
+2026-10-01 21:56:16 0 [Note] Server socket created on IP: '127.0.0.1', port: '3306'.
+2026-10-01 21:56:16 0 [Note] mariadbd: Event Scheduler: Loaded 0 events
+2026-10-01 21:56:16 0 [Note] /data/mariadb/bin/mariadbd: ready for connections.
+Version: '11.4.13-MariaDB-log'  socket: '/tmp/mariadb.sock'  port: 3306  Source distribution
+2026-10-01 21:56:16 0 [Note] /data/mariadb/bin/mariadbd (initiated by: root[root] @ localhost []): Normal shutdown
+2026-10-01 21:56:17 0 [Note] InnoDB: FTS optimize thread exiting.
+2026-10-01 21:56:17 0 [Note] InnoDB: Starting shutdown...
+2026-10-01 21:56:17 0 [Note] InnoDB: Dumping buffer pool(s) to /data/mariadb/data/ib_buffer_pool
+2026-10-01 21:56:17 0 [Note] InnoDB: Buffer pool(s) dump completed at 261001 21:56:17
+2026-10-01 21:56:17 0 [Note] InnoDB: Removed temporary tablespace data file: "./ibtmp1"
+2026-10-01 21:56:17 0 [Note] Shutdown completed; log sequence number 45466; transaction id 15
+2026-10-01 21:56:17 0 [Note] [TIDESDB] TidesDB closed
+2026-10-01 21:56:17 0 [Note] /data/mariadb/bin/mariadbd: Shutdown complete
+261001 21:56:17 mysqld_safe mysqld from pid file /data/mariadb/data/mariadb.pid ended
+261002 04:41:12 mysqld_safe Starting mariadbd daemon with databases from /data/mariadb/data
+2026-10-02  4:41:12 0 [Note] Starting MariaDB 11.4.13-MariaDB source revision 170b1d70737be6f134448f51713cdc1ae215b420 server_uid sDIDdI02w3b2acl7Rds2iN62O2Q= as process 1620552
+2026-10-02  4:41:12 0 [Note] InnoDB: Compressed tables use zlib 1.3
+2026-10-02  4:41:12 0 [Note] InnoDB: Number of transaction pools: 1
+2026-10-02  4:41:12 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2026-10-02  4:41:12 0 [Note] InnoDB: innodb_buffer_pool_size_max=8388612m, innodb_buffer_pool_size=65536m
+2026-10-02  4:41:13 0 [Note] InnoDB: Initialized memory pressure event listener
+2026-10-02  4:41:13 0 [Note] InnoDB: Completed initialization of buffer pool
+2026-10-02  4:41:13 0 [Note] InnoDB: File system buffers for log disabled (block size=4096 bytes)
+2026-10-02  4:41:13 0 [Note] InnoDB: End of log at LSN=45466
+2026-10-02  4:41:13 0 [Note] InnoDB: Resizing redo log from 48.000MiB to 32.000GiB; LSN=45466
+2026-10-02  4:41:13 0 [Note] InnoDB: File system buffers for log disabled (block size=4096 bytes)
+2026-10-02  4:41:13 0 [Note] InnoDB: Reinitializing innodb_undo_tablespaces= 0 from 3
+2026-10-02  4:41:13 0 [Note] InnoDB: 128 rollback segments are active.
+2026-10-02  4:41:13 0 [Note] InnoDB: Setting file './ibtmp1' size to 12.000MiB. Physically writing the file full; Please wait ...
+2026-10-02  4:41:13 0 [Note] InnoDB: File './ibtmp1' size is now 12.000MiB.
+2026-10-02  4:41:13 0 [Note] InnoDB: log sequence number 45466; transaction id 15
+2026-10-02  4:41:13 0 [Note] Plugin 'FEEDBACK' is disabled.
+2026-10-02  4:41:13 0 [Note] Plugin 'wsrep-provider' is disabled.
+2026-10-02  4:41:13 0 [Warning] 'innodb-buffer-pool-instances' was removed. It does nothing now and exists only for compatibility with old my.cnf files.
+2026-10-02  4:41:13 0 [Warning] 'innodb-page-cleaners' was removed. It does nothing now and exists only for compatibility with old my.cnf files.
+2026-10-02  4:41:13 0 [Note] Server socket created on IP: '127.0.0.1', port: '3306'.
+2026-10-02  4:41:13 0 [Note] mariadbd: Event Scheduler: Loaded 0 events
+2026-10-02  4:41:13 0 [Note] /data/mariadb/bin/mariadbd: ready for connections.
+Version: '11.4.13-MariaDB'  socket: '/tmp/mariadb.sock'  port: 3306  Source distribution
+2026-10-02  6:09:41 0 [Note] /data/mariadb/bin/mariadbd (initiated by: root[root] @ localhost []): Normal shutdown
+2026-10-02  6:09:41 0 [Note] InnoDB: FTS optimize thread exiting.
+2026-10-02  6:09:41 0 [Note] InnoDB: Starting shutdown...
+2026-10-02  6:09:44 0 [Note] InnoDB: Removed temporary tablespace data file: "./ibtmp1"
+2026-10-02  6:09:44 0 [Note] Shutdown completed; log sequence number 297111066127; transaction id 2588552
+2026-10-02  6:09:44 0 [Note] /data/mariadb/bin/mariadbd: Shutdown complete
+261002 06:09:44 mysqld_safe mysqld from pid file /data/mariadb/data/mariadb.pid ended
+261002 06:52:09 mysqld_safe Starting mariadbd daemon with databases from /data/mariadb/data
+2026-10-02  6:52:09 0 [Note] Starting MariaDB 11.4.13-MariaDB source revision 170b1d70737be6f134448f51713cdc1ae215b420 server_uid sDIDdI02w3b2acl7Rds2iN62O2Q= as process 1653762
+2026-10-02  6:52:09 0 [Note] InnoDB: Compressed tables use zlib 1.3
+2026-10-02  6:52:09 0 [Note] InnoDB: Number of transaction pools: 1
+2026-10-02  6:52:09 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2026-10-02  6:52:09 0 [Note] InnoDB: innodb_buffer_pool_size_max=8388612m, innodb_buffer_pool_size=65536m
+2026-10-02  6:52:10 0 [Note] InnoDB: Initialized memory pressure event listener
+2026-10-02  6:52:10 0 [Note] InnoDB: Completed initialization of buffer pool
+2026-10-02  6:52:10 0 [Note] InnoDB: File system buffers for log disabled (block size=4096 bytes)
+2026-10-02  6:52:10 0 [Note] InnoDB: End of log at LSN=297111066127
+2026-10-02  6:52:10 0 [Note] InnoDB: 128 rollback segments are active.
+2026-10-02  6:52:10 0 [Note] InnoDB: Setting file './ibtmp1' size to 12.000MiB. Physically writing the file full; Please wait ...
+2026-10-02  6:52:10 0 [Note] InnoDB: File './ibtmp1' size is now 12.000MiB.
+2026-10-02  6:52:10 0 [Note] InnoDB: log sequence number 297111066127; transaction id 2588551
+2026-10-02  6:52:10 0 [Note] Plugin 'FEEDBACK' is disabled.
+2026-10-02  6:52:10 0 [Note] Plugin 'wsrep-provider' is disabled.
+2026-10-02  6:52:10 0 [Warning] 'innodb-buffer-pool-instances' was removed. It does nothing now and exists only for compatibility with old my.cnf files.
+2026-10-02  6:52:10 0 [Warning] 'innodb-page-cleaners' was removed. It does nothing now and exists only for compatibility with old my.cnf files.
+2026-10-02  6:52:10 0 [Note] Server socket created on IP: '127.0.0.1', port: '3306'.
+2026-10-02  6:52:10 0 [Note] mariadbd: Event Scheduler: Loaded 0 events
+2026-10-02  6:52:10 0 [Note] /data/mariadb/bin/mariadbd: ready for connections.
+Version: '11.4.13-MariaDB'  socket: '/tmp/mariadb.sock'  port: 3306  Source distribution
+2026-10-02  7:22:22 0 [Note] /data/mariadb/bin/mariadbd (initiated by: root[root] @ localhost []): Normal shutdown
+2026-10-02  7:22:22 0 [Note] InnoDB: FTS optimize thread exiting.
+2026-10-02  7:22:22 0 [Note] InnoDB: Starting shutdown...
+2026-10-02  7:22:46 0 [Note] InnoDB: Removed temporary tablespace data file: "./ibtmp1"
+2026-10-02  7:22:46 0 [Note] Shutdown completed; log sequence number 330730011955; transaction id 12079456
+2026-10-02  7:22:46 0 [Note] /data/mariadb/bin/mariadbd: Shutdown complete
+261002 07:22:46 mysqld_safe mysqld from pid file /data/mariadb/data/mariadb.pid ended

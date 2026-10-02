@@ -1,0 +1,245 @@
+*************************** 1. row ***************************
+  Type: TIDESDB
+  Name: 
+Status: ================== TidesDB Engine Status ==================
+Data directory: /data/mariadb/tidesdb_data
+Column families: 41
+Global sequence: 13782496
+Min snapshot sequence: 18446744073709551615
+Active transactions: 0
+
+=+=+= Memory =+=+=
+Memtable bytes: 8296327376
+Transaction memory bytes: 0
+
+=+=+= Storage =+=+=
+Total SSTables: 1309
+Open SSTable handles: 1309
+Total data size: 256192968734 bytes
+Immutable memtables: 0
+
+=+=+= Background =+=+=
+Flush pending: 0
+Compaction pending: 0
+Currently flushing: NO
+WAL generation: 57
+Next CF index: 961
+
+=+=+= Write Amplification =+=+=
+User bytes written: 30173950933
+Flush bytes written: 24137479067 (191 sstables)
+Compaction bytes written: 192715252620 (44 sstables)
+Compaction bytes read: 206017063784
+Vlog bytes written: 0
+Total WA ratio: 7.19x
+
+=+=+= Value Log =+=+=
+File size: 16 bytes
+Indexed values: 0
+Used bytes: 0
+Stored bytes: 0
+Live bytes: 0
+Dead bytes: 16
+Segments: 2 (drainable 0, retired 0)
+Reclaim: 0 calls, 0 passes
+
+=+=+= Write Stalls =+=+=
+Writes throttled: 0
+Writes blocked: 0
+Stall time: 0 us
+Admission ceiling hits: 0
+
+=+=+= Block Cache =+=+=
+Enabled: YES
+Entries: 3712027
+Size: 34355710656 bytes
+Hits: 2495621976
+Misses: 105271650
+Hit rate: 96.0%
+Partitions: 128
+
+=+=+= IO Device Writes =+=+=
+sstable: 65525854 writes, 216852721719 bytes, avg 5.6 us, max 20099 us
+wal: 6994590 writes, 32017403506 bytes, avg 9.1 us, max 10148 us
+vlog: 0 writes, 0 bytes, avg 0.0 us, max 0 us
+
+=+=+= Write Stalls By Reason =+=+=
+wal_append: 10096038 stalls, 193809286 us total, 17244 us max
+rotate_lock: 5 stalls, 0 us total, 0 us max
+rotate_work: 5 stalls, 43 us total, 11 us max
+admission: 0 stalls, 0 us total, 0 us max
+manifest_commit: 50 stalls, 2054 us total, 419 us max
+
+=+=+= Key Log Encoding =+=+=
+Chains: 1, logical 284489137945 bytes, stored 256192968734 bytes, 1.11x
+
+=+=+= Value Log Encoding =+=+=
+Chains: 0, logical 0 bytes, stored 0 bytes, 0.00x
+
+=+=+= Tombstones =+=+=
+Total tombstones: 0
+Tombstone ratio: 0.00%
+Worst SSTable density: 0.00% at level 0
+
+=+=+= Column Families =+=+=
+tpcc__customer: 2 levels, 94022417 keys (779601 unflushed), 55200906893 bytes, read amp 7.00
+  avg key 13, avg value 566, btree height 4.0/4 over 13362712 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[6/7641667/0/4542585798] L2[21/86380750/0/50658321095]
+  WAL 2966381952 bytes, 0 compactions
+tpcc__customer__idx_c_w_id: 2 levels, 90000000 keys (0 unflushed), 4087780969 bytes, read amp 2.00
+  avg key 54, avg value 1, btree height 3.4/4 over 2053560 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[1/3619250/0/164384981] L2[39/86380750/0/3923395988]
+  WAL 0 bytes, 0 compactions
+tpcc__district: 2 levels, 30000 keys (30000 unflushed), 3376821 bytes, read amp 1.00
+  avg key 9, avg value 97, btree height 3.0/3 over 1056 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[1/30000/0/3376821]
+  WAL 1098710486 bytes, 5 compactions
+tpcc__history: 2 levels, 94165423 keys (805310 unflushed), 6174512558 bytes, read amp 7.00
+  avg key 9, avg value 53, btree height 3.8/4 over 2319636 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[6/7788923/0/507909662] L2[16/86376500/0/5666602896]
+  WAL 328085011 bytes, 0 compactions
+tpcc__item: 1 levels, 100000 keys (0 unflushed), 8851769 bytes, read amp 1.00
+  avg key 5, avg value 76, btree height 3.0/3 over 2923 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[1/100000/0/8851769]
+  WAL 0 bytes, 0 compactions
+tpcc__new_order: 2 levels, 26958031 keys (1600743 unflushed), 830676840 bytes, read amp 1.00
+  avg key 13, avg value 18, btree height 3.0/3 over 466699 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[42/26958031/0/830676840]
+  WAL 266860404 bytes, 2 compactions
+tpcc__orders: 2 levels, 94963291 keys (1600743 unflushed), 4821852340 bytes, read amp 2.00
+  avg key 13, avg value 38, btree height 3.2/4 over 2092269 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[1/1660207/0/86437389] L2[56/93303084/0/4735414951]
+  WAL 544549742 bytes, 1 compactions
+tpcc__orders__idx_o_w_id: 2 levels, 94128251 keys (798113 unflushed), 2737858301 bytes, read amp 7.00
+  avg key 29, avg value 1, btree height 3.3/4 over 1601759 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[6/6472851/0/201695878] L2[44/87655400/0/2536162423]
+  WAL 172422740 bytes, 0 compactions
+tpcc__order_line_P_p0: 2 levels, 32802268 keys (607497 unflushed), 2636701703 bytes, read amp 5.00
+  avg key 17, avg value 66, btree height 2.8/4 over 980214 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[4/2481871/0/200828568] L2[43/30320397/0/2435873135]
+  WAL 324952225 bytes, 1 compactions
+tpcc__order_line_P_p1: 2 levels, 32395141 keys (470912 unflushed), 2602382426 bytes, read amp 7.00
+  avg key 17, avg value 66, btree height 3.0/3 over 967869 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[6/2399945/0/194214637] L2[32/29995196/0/2408167789]
+  WAL 250680330 bytes, 0 compactions
+tpcc__order_line_P_p2: 2 levels, 31563737 keys (598181 unflushed), 2541672028 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.0/3 over 944661 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[31/31563737/0/2541672028]
+  WAL 327174795 bytes, 1 compactions
+tpcc__order_line_P_p3: 2 levels, 31211827 keys (467393 unflushed), 2511744506 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.0/4 over 933943 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[30/31211827/0/2511744506]
+  WAL 253346515 bytes, 1 compactions
+tpcc__order_line_P_p4: 2 levels, 31881455 keys (605866 unflushed), 2566008046 bytes, read amp 2.00
+  avg key 17, avg value 67, btree height 3.0/4 over 953776 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[1/625159/0/50596915] L2[37/31256296/0/2515411131]
+  WAL 326219235 bytes, 1 compactions
+tpcc__order_line_P_p5: 2 levels, 32407723 keys (475242 unflushed), 2603464118 bytes, read amp 6.00
+  avg key 17, avg value 66, btree height 3.0/3 over 968259 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[5/2405792/0/194753798] L2[33/30001931/0/2408710320]
+  WAL 252143065 bytes, 0 compactions
+tpcc__order_line_P_p6: 2 levels, 32841023 keys (592552 unflushed), 2639756959 bytes, read amp 5.00
+  avg key 17, avg value 66, btree height 3.0/3 over 981315 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[4/2514887/0/203495368] L2[27/30326136/0/2436261591]
+  WAL 326806190 bytes, 1 compactions
+tpcc__order_line_P_p7: 2 levels, 32437017 keys (464892 unflushed), 2605770640 bytes, read amp 6.00
+  avg key 17, avg value 66, btree height 3.0/3 over 969118 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[5/2427289/0/196475224] L2[35/30009728/0/2409295416]
+  WAL 253088695 bytes, 0 compactions
+tpcc__order_line_P_p8: 2 levels, 31582035 keys (605589 unflushed), 2543190449 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.1/4 over 945219 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[33/31582035/0/2543190449]
+  WAL 330162630 bytes, 1 compactions
+tpcc__order_line_P_p9: 2 levels, 31915783 keys (461433 unflushed), 2565662616 bytes, read amp 4.00
+  avg key 17, avg value 66, btree height 3.0/4 over 954119 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[3/1435187/0/116199631] L2[32/30480596/0/2449462985]
+  WAL 249446785 bytes, 1 compactions
+tpcc__order_line_P_p10: 2 levels, 32841779 keys (600743 unflushed), 2639991751 bytes, read amp 5.00
+  avg key 17, avg value 66, btree height 3.0/3 over 981388 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[4/2534321/0/205157413] L2[31/30307458/0/2434834338]
+  WAL 329165955 bytes, 1 compactions
+tpcc__order_line_P_p11: 2 levels, 31669112 keys (468622 unflushed), 2546648945 bytes, read amp 3.00
+  avg key 17, avg value 67, btree height 3.0/4 over 947023 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[2/952908/0/77151966] L2[29/30716204/0/2469496979]
+  WAL 248972730 bytes, 1 compactions
+tpcc__order_line_P_p12: 2 levels, 32520365 keys (590892 unflushed), 2615163980 bytes, read amp 4.00
+  avg key 17, avg value 66, btree height 3.0/4 over 972126 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[3/1887598/0/152732178] L2[32/30632767/0/2462431802]
+  WAL 327694420 bytes, 1 compactions
+tpcc__order_line_P_p13: 2 levels, 31906448 keys (463053 unflushed), 2564902610 bytes, read amp 4.00
+  avg key 17, avg value 66, btree height 3.1/4 over 953849 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[3/1430947/0/115841454] L2[32/30475501/0/2449061156]
+  WAL 249301085 bytes, 1 compactions
+tpcc__order_line_P_p14: 2 levels, 32493613 keys (598556 unflushed), 2612969380 bytes, read amp 4.00
+  avg key 17, avg value 66, btree height 3.1/4 over 971329 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[3/1873574/0/151583394] L2[36/30620039/0/2461385986]
+  WAL 325369280 bytes, 1 compactions
+tpcc__order_line_P_p15: 2 levels, 31177299 keys (470622 unflushed), 2508832787 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 2.8/4 over 932915 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[45/31177299/0/2508832787]
+  WAL 248430650 bytes, 1 compactions
+tpcc__order_line_P_p16: 2 levels, 31593228 keys (613216 unflushed), 2544083560 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.0/4 over 945523 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[26/31593228/0/2544083560]
+  WAL 333094605 bytes, 1 compactions
+tpcc__order_line_P_p17: 2 levels, 32377877 keys (465380 unflushed), 2601026798 bytes, read amp 6.00
+  avg key 17, avg value 66, btree height 3.0/3 over 967368 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[5/2377280/0/192456112] L2[30/30000597/0/2408570686]
+  WAL 248772785 bytes, 0 compactions
+tpcc__order_line_P_p18: 2 levels, 31871968 keys (604439 unflushed), 2565188998 bytes, read amp 2.00
+  avg key 17, avg value 67, btree height 3.0/3 over 953470 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[1/617953/0/50004776] L2[31/31254015/0/2515184222]
+  WAL 324765850 bytes, 1 compactions
+tpcc__order_line_P_p19: 2 levels, 31174061 keys (468488 unflushed), 2508591243 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.0/3 over 932798 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[32/31174061/0/2508591243]
+  WAL 248537110 bytes, 1 compactions
+tpcc__order_line_P_p20: 2 levels, 31579932 keys (614387 unflushed), 2543060130 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.0/3 over 945157 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[32/31579932/0/2543060130]
+  WAL 331834985 bytes, 1 compactions
+tpcc__order_line_P_p21: 2 levels, 31676506 keys (458854 unflushed), 2547274798 bytes, read amp 3.00
+  avg key 17, avg value 67, btree height 3.1/4 over 947252 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[2/958869/0/77629293] L2[31/30717637/0/2469645505]
+  WAL 249481275 bytes, 1 compactions
+tpcc__order_line_P_p22: 2 levels, 32487643 keys (599900 unflushed), 2612480387 bytes, read amp 4.00
+  avg key 17, avg value 66, btree height 3.0/4 over 971143 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[3/1874863/0/151716756] L2[28/30612780/0/2460763631]
+  WAL 324973005 bytes, 1 compactions
+tpcc__order_line_P_p23: 2 levels, 31664624 keys (467039 unflushed), 2546498972 bytes, read amp 3.00
+  avg key 17, avg value 67, btree height 2.9/4 over 946953 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[2/961218/0/77823854] L2[34/30703406/0/2468675118]
+  WAL 251632015 bytes, 1 compactions
+tpcc__order_line_P_p24: 2 levels, 31556621 keys (600156 unflushed), 2541021864 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.0/4 over 944439 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[33/31556621/0/2541021864]
+  WAL 325133475 bytes, 1 compactions
+tpcc__order_line_P_p25: 2 levels, 31419014 keys (457831 unflushed), 2527351395 bytes, read amp 2.00
+  avg key 17, avg value 67, btree height 3.1/4 over 939823 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[1/476729/0/38595079] L2[31/30942285/0/2488756316]
+  WAL 247014560 bytes, 1 compactions
+tpcc__order_line_P_p26: 2 levels, 31562111 keys (602094 unflushed), 2541534882 bytes, read amp 1.00
+  avg key 17, avg value 67, btree height 3.0/3 over 944602 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[25/31562111/0/2541534882]
+  WAL 327318925 bytes, 1 compactions
+tpcc__order_line_P_p27: 2 levels, 31661820 keys (462443 unflushed), 2546120667 bytes, read amp 3.00
+  avg key 17, avg value 67, btree height 3.1/4 over 946828 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[2/953372/0/77183712] L2[33/30708448/0/2468936955]
+  WAL 248718865 bytes, 1 compactions
+tpcc__order_line_P_p28: 2 levels, 32523661 keys (598932 unflushed), 2615618517 bytes, read amp 4.00
+  avg key 17, avg value 66, btree height 3.0/4 over 972289 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[3/1897254/0/153552646] L2[38/30626407/0/2462065871]
+  WAL 330300895 bytes, 1 compactions
+tpcc__order_line_P_p29: 2 levels, 31900474 keys (449497 unflushed), 2564336111 bytes, read amp 4.00
+  avg key 17, avg value 66, btree height 3.0/4 over 953649 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[3/1425584/0/115406257] L2[38/30474890/0/2448929854]
+  WAL 246375870 bytes, 1 compactions
+tpcc__stock: 3 levels, 308118370 keys (7858707 unflushed), 105217791821 bytes, read amp 2.00
+  avg key 9, avg value 324, btree height 4.0/4 over 27146884 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[11/8118370/0/2788391806] L3[11/300000000/0/102429400015]
+  WAL 16691170979 bytes, 5 compactions
+tpcc__warehouse: 2 levels, 3000 keys (3000 unflushed), 308866 bytes, read amp 1.00
+  avg key 5, avg value 88, btree height 2.0/2 over 98 nodes, tombstone ratio 0.00%
+  levels [sstables/keys/tombstones/bytes]: L1[0/0/0/0] L2[1/3000/0/308866]
+  WAL 487843107 bytes, 5 compactions
+

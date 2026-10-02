@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 import { gitMeta, resolveAuthor, ogImage, fmtDate, SITE } from '../utils/articles.js';
+import { readingMinutes } from '../utils/reading-time.js';
 
 const articles = (await getCollection('docs'))
 	.filter((entry) => entry.id.startsWith('articles/'))
@@ -13,6 +14,7 @@ const articles = (await getCollection('docs'))
 			description: entry.data.description,
 			image: ogImage(entry),
 			author: resolveAuthor(entry, meta.gitAuthor),
+			minutes: readingMinutes(entry.body ?? ''),
 			created: meta.created,
 			updated: meta.updated,
 		};
@@ -101,6 +103,7 @@ const head = [
 							<div class="blog-card-meta">
 								<time datetime={a.created.toISOString()}>{fmtDate(a.created)}</time>
 								{a.author.name && <span class="blog-card-author">by {a.author.name}</span>}
+								<span class="blog-card-time">{a.minutes} min read</span>
 							</div>
 							<h2>{a.title}</h2>
 							<p>{a.description}</p>
@@ -219,6 +222,12 @@ const head = [
 		align-items: baseline;
 		gap: 0.5rem;
 		font-size: 0.8rem;
+	}
+
+	.blog-card-time {
+		margin-inline-start: auto;
+		white-space: nowrap;
+		opacity: 0.85;
 	}
 
 	.blog-card-meta time {

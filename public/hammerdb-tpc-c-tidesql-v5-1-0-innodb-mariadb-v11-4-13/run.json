@@ -1,0 +1,28 @@
+{
+ "mariadb_version": "11.4.13",
+ "tidesdb_version": "10.1.0",
+ "tidesql_version": "5.1.0",
+ "hammerdb_version": "6.0",
+ "warehouses": 3000,
+ "build_vu": 24,
+ "partition": true,
+ "vu_list": [
+  4,
+  8,
+  16,
+  32,
+  64,
+  128
+ ],
+ "rampup_min": 10,
+ "duration_min": 20,
+ "peak_iters": 3,
+ "isolation": "REPEATABLE READ",
+ "durability": "non-durable (commit to OS, doublewrite on, binlog off)",
+ "use_all_warehouses": true,
+ "sample_interval_s": 1,
+ "memory": "64G engine budget each, cgroup MemoryMax=96G, caches dropped before each run",
+ "state": "database restored from a golden copy before every run",
+ "host": "i9-13900 (8P+16E, 24 threads), 125 GB RAM, NVMe; HammerDB on the same host",
+ "cpus": "0,2,4,6,8,10,12,14,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31"
+}
