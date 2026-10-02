@@ -83,6 +83,7 @@ export default defineConfig({
 				SiteTitle: './src/components/SiteTitle.astro',
 				Sidebar: './src/components/Sidebar.astro',
 				Pagination: './src/components/Pagination.astro',
+				MarkdownContent: './src/components/MarkdownContent.astro',
 			},
 			logo: {
 				light: './src/assets/tidesdb-logo-v8.svg',

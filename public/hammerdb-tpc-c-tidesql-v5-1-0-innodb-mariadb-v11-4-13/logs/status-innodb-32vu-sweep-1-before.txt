@@ -1,0 +1,69 @@
+*************************** 1. row ***************************
+  Type: InnoDB
+  Name: 
+Status: 
+=====================================
+2026-10-02 07:59:16 0x7fffe49766c0 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 1 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 0 srv_active, 1 srv_idle
+srv_master_thread log flush and writes: 1
+----------
+SEMAPHORES
+----------
+------------
+TRANSACTIONS
+------------
+Trx id counter 2588552
+Purge done for trx's n:o < 0 undo n:o < 0 state: running
+History list length 0
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION (0x7fffe3c821c0), not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+--------
+FILE I/O
+--------
+Pending flushes (fsync): 0
+158 OS file reads, 0 OS file writes, 1 OS fsyncs
+0.00 reads/s, 30694 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s
+---
+LOG
+---
+Log sequence number 297111066127
+Log flushed up to   297111066127
+Pages flushed up to 297111066127
+Last checkpoint at  297111066111
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 68853694464
+Dictionary memory allocated 424840888
+Buffer pool size   4153344
+Free buffers       4153066
+Database pages     278
+Old database pages 0
+Modified db pages  0
+Percent of dirty pages(LRU & free pages): 0.000
+Max dirty pages percent: 1.000
+Pending reads 0
+Pending writes: LRU 0, flush list 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 147, created 131, written 0
+146.85 reads/s, 130.87 creates/s, 0.00 writes/s
+Buffer pool hit rate 20 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 278, unzip_LRU len: 0
+I/O sum[0]:cur[4], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 read views open inside InnoDB
+state: sleeping
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+

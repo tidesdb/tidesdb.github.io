@@ -1,0 +1,3318 @@
+HammerDB CLI v6.0
+Copyright © HammerDB Ltd hosted by tpc.org 2019-2026
+Type "help" for a list of commands
+Initialized Jobs on-disk database /root/sqlanalysis/run3000/hdbtmp/hammer.DB using existing tables (22,441,984 bytes)
+Database set to MariaDB
+Benchmark set to TPC-C for MariaDB
+Value localhost for connection:maria_host is the same as existing value localhost, no change made
+Value 3306 for connection:maria_port is the same as existing value 3306, no change made
+Value /tmp/mariadb.sock for connection:maria_socket is the same as existing value /tmp/mariadb.sock, no change made
+Value hammer for tpcc:maria_user is the same as existing value hammer, no change made
+Value hammer for tpcc:maria_pass is the same as existing value hammer, no change made
+Value tpcc for tpcc:maria_dbase is the same as existing value tpcc, no change made
+Value timed for tpcc:maria_driver is the same as existing value timed, no change made
+Value 10 for tpcc:maria_rampup is the same as existing value 10, no change made
+Value 20 for tpcc:maria_duration is the same as existing value 20, no change made
+Value true for tpcc:maria_allwarehouse is the same as existing value true, no change made
+Value true for tpcc:maria_timeprofile is the same as existing value true, no change made
+Value false for tpcc:maria_keyandthink is the same as existing value false, no change made
+Value false for tpcc:maria_raiseerror is the same as existing value false, no change made
+Value false for tpcc:maria_purge is the same as existing value false, no change made
+Value 1200 for commandline:keepalive_margin is the same as existing value 1200, no change made
+Value 1200 for timeprofile:xt_gather_timeout is the same as existing value 1200, no change made
+Transaction Counter refresh rate set to 1
+Transaction Counter timestamps set to 1
+Script loaded, Type "print script" to view
+Vuser 1 created MONITOR - WAIT IDLE
+Vuser 2 created - WAIT IDLE
+Vuser 3 created - WAIT IDLE
+Vuser 4 created - WAIT IDLE
+Vuser 5 created - WAIT IDLE
+Vuser 6 created - WAIT IDLE
+Vuser 7 created - WAIT IDLE
+Vuser 8 created - WAIT IDLE
+Vuser 9 created - WAIT IDLE
+Vuser 10 created - WAIT IDLE
+Vuser 11 created - WAIT IDLE
+Vuser 12 created - WAIT IDLE
+Vuser 13 created - WAIT IDLE
+Vuser 14 created - WAIT IDLE
+Vuser 15 created - WAIT IDLE
+Vuser 16 created - WAIT IDLE
+Vuser 17 created - WAIT IDLE
+Vuser 18 created - WAIT IDLE
+Vuser 19 created - WAIT IDLE
+Vuser 20 created - WAIT IDLE
+Vuser 21 created - WAIT IDLE
+Vuser 22 created - WAIT IDLE
+Vuser 23 created - WAIT IDLE
+Vuser 24 created - WAIT IDLE
+Vuser 25 created - WAIT IDLE
+Vuser 26 created - WAIT IDLE
+Vuser 27 created - WAIT IDLE
+Vuser 28 created - WAIT IDLE
+Vuser 29 created - WAIT IDLE
+Vuser 30 created - WAIT IDLE
+Vuser 31 created - WAIT IDLE
+Vuser 32 created - WAIT IDLE
+Vuser 33 created - WAIT IDLE
+Vuser 34 created - WAIT IDLE
+Vuser 35 created - WAIT IDLE
+Vuser 36 created - WAIT IDLE
+Vuser 37 created - WAIT IDLE
+Vuser 38 created - WAIT IDLE
+Vuser 39 created - WAIT IDLE
+Vuser 40 created - WAIT IDLE
+Vuser 41 created - WAIT IDLE
+Vuser 42 created - WAIT IDLE
+Vuser 43 created - WAIT IDLE
+Vuser 44 created - WAIT IDLE
+Vuser 45 created - WAIT IDLE
+Vuser 46 created - WAIT IDLE
+Vuser 47 created - WAIT IDLE
+Vuser 48 created - WAIT IDLE
+Vuser 49 created - WAIT IDLE
+Vuser 50 created - WAIT IDLE
+Vuser 51 created - WAIT IDLE
+Vuser 52 created - WAIT IDLE
+Vuser 53 created - WAIT IDLE
+Vuser 54 created - WAIT IDLE
+Vuser 55 created - WAIT IDLE
+Vuser 56 created - WAIT IDLE
+Vuser 57 created - WAIT IDLE
+Vuser 58 created - WAIT IDLE
+Vuser 59 created - WAIT IDLE
+Vuser 60 created - WAIT IDLE
+Vuser 61 created - WAIT IDLE
+Vuser 62 created - WAIT IDLE
+Vuser 63 created - WAIT IDLE
+Vuser 64 created - WAIT IDLE
+Vuser 65 created - WAIT IDLE
+Vuser 66 created - WAIT IDLE
+Vuser 67 created - WAIT IDLE
+Vuser 68 created - WAIT IDLE
+Vuser 69 created - WAIT IDLE
+Vuser 70 created - WAIT IDLE
+Vuser 71 created - WAIT IDLE
+Vuser 72 created - WAIT IDLE
+Vuser 73 created - WAIT IDLE
+Vuser 74 created - WAIT IDLE
+Vuser 75 created - WAIT IDLE
+Vuser 76 created - WAIT IDLE
+Vuser 77 created - WAIT IDLE
+Vuser 78 created - WAIT IDLE
+Vuser 79 created - WAIT IDLE
+Vuser 80 created - WAIT IDLE
+Vuser 81 created - WAIT IDLE
+Vuser 82 created - WAIT IDLE
+Vuser 83 created - WAIT IDLE
+Vuser 84 created - WAIT IDLE
+Vuser 85 created - WAIT IDLE
+Vuser 86 created - WAIT IDLE
+Vuser 87 created - WAIT IDLE
+Vuser 88 created - WAIT IDLE
+Vuser 89 created - WAIT IDLE
+Vuser 90 created - WAIT IDLE
+Vuser 91 created - WAIT IDLE
+Vuser 92 created - WAIT IDLE
+Vuser 93 created - WAIT IDLE
+Vuser 94 created - WAIT IDLE
+Vuser 95 created - WAIT IDLE
+Vuser 96 created - WAIT IDLE
+Vuser 97 created - WAIT IDLE
+Vuser 98 created - WAIT IDLE
+Vuser 99 created - WAIT IDLE
+Vuser 100 created - WAIT IDLE
+Vuser 101 created - WAIT IDLE
+Vuser 102 created - WAIT IDLE
+Vuser 103 created - WAIT IDLE
+Vuser 104 created - WAIT IDLE
+Vuser 105 created - WAIT IDLE
+Vuser 106 created - WAIT IDLE
+Vuser 107 created - WAIT IDLE
+Vuser 108 created - WAIT IDLE
+Vuser 109 created - WAIT IDLE
+Vuser 110 created - WAIT IDLE
+Vuser 111 created - WAIT IDLE
+Vuser 112 created - WAIT IDLE
+Vuser 113 created - WAIT IDLE
+Vuser 114 created - WAIT IDLE
+Vuser 115 created - WAIT IDLE
+Vuser 116 created - WAIT IDLE
+Vuser 117 created - WAIT IDLE
+Vuser 118 created - WAIT IDLE
+Vuser 119 created - WAIT IDLE
+Vuser 120 created - WAIT IDLE
+Vuser 121 created - WAIT IDLE
+Vuser 122 created - WAIT IDLE
+Vuser 123 created - WAIT IDLE
+Vuser 124 created - WAIT IDLE
+Vuser 125 created - WAIT IDLE
+Vuser 126 created - WAIT IDLE
+Vuser 127 created - WAIT IDLE
+Vuser 128 created - WAIT IDLE
+Vuser 129 created - WAIT IDLE
+Logging activated to /root/sqlanalysis/run3000/hdbtmp/hammerdb.log
+129 Virtual Users Created with Monitor VU
+Transaction Counter Started
+Transaction Counter thread running with threadid:tid0x7ffdbd7fa6c0
+Vuser 1:RUNNING
+Vuser 1:Initializing xtprof time profiler
+Vuser 1:Ssl_cipher 
+Vuser 1:DBVersion:11.4.13
+Vuser 1:Beginning rampup time of 10 minutes
+0 MariaDB tpm
+Vuser 2:RUNNING
+Vuser 2:Initializing xtprof time profiler
+Vuser 2:Ssl_cipher 
+Vuser 2:Assigned 24 WIDs = 1 129 257 385 513 641 769 897 1025 1153 1281 1409 1537 1665 1793 1921 2049 2177 2305 2433 2561 2689 2817 2945 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 2:Processing 10000000 transactions with output suppressed...
+Vuser 3:RUNNING
+Vuser 3:Initializing xtprof time profiler
+Vuser 3:Ssl_cipher 
+Vuser 3:Assigned 24 WIDs = 2 130 258 386 514 642 770 898 1026 1154 1282 1410 1538 1666 1794 1922 2050 2178 2306 2434 2562 2690 2818 2946 based on VU count 128, Warehouses = 24 out of 3000
+780 MariaDB tpm
+Vuser 3:Processing 10000000 transactions with output suppressed...
+Vuser 4:RUNNING
+Vuser 4:Initializing xtprof time profiler
+Vuser 4:Ssl_cipher 
+Vuser 4:Assigned 24 WIDs = 3 131 259 387 515 643 771 899 1027 1155 1283 1411 1539 1667 1795 1923 2051 2179 2307 2435 2563 2691 2819 2947 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 4:Processing 10000000 transactions with output suppressed...
+Vuser 5:RUNNING
+Vuser 5:Initializing xtprof time profiler
+Vuser 5:Ssl_cipher 
+Vuser 5:Assigned 24 WIDs = 4 132 260 388 516 644 772 900 1028 1156 1284 1412 1540 1668 1796 1924 2052 2180 2308 2436 2564 2692 2820 2948 based on VU count 128, Warehouses = 24 out of 3000
+28800 MariaDB tpm
+Vuser 5:Processing 10000000 transactions with output suppressed...
+Vuser 6:RUNNING
+Vuser 6:Initializing xtprof time profiler
+Vuser 6:Ssl_cipher 
+Vuser 6:Assigned 24 WIDs = 5 133 261 389 517 645 773 901 1029 1157 1285 1413 1541 1669 1797 1925 2053 2181 2309 2437 2565 2693 2821 2949 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 6:Processing 10000000 transactions with output suppressed...
+Vuser 7:RUNNING
+Vuser 7:Initializing xtprof time profiler
+Vuser 7:Ssl_cipher 
+Vuser 7:Assigned 24 WIDs = 6 134 262 390 518 646 774 902 1030 1158 1286 1414 1542 1670 1798 1926 2054 2182 2310 2438 2566 2694 2822 2950 based on VU count 128, Warehouses = 24 out of 3000
+72240 MariaDB tpm
+Vuser 7:Processing 10000000 transactions with output suppressed...
+Vuser 8:RUNNING
+Vuser 8:Initializing xtprof time profiler
+Vuser 8:Ssl_cipher 
+Vuser 8:Assigned 24 WIDs = 7 135 263 391 519 647 775 903 1031 1159 1287 1415 1543 1671 1799 1927 2055 2183 2311 2439 2567 2695 2823 2951 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 8:Processing 10000000 transactions with output suppressed...
+Vuser 9:RUNNING
+Vuser 9:Initializing xtprof time profiler
+Vuser 9:Ssl_cipher 
+Vuser 9:Assigned 24 WIDs = 8 136 264 392 520 648 776 904 1032 1160 1288 1416 1544 1672 1800 1928 2056 2184 2312 2440 2568 2696 2824 2952 based on VU count 128, Warehouses = 24 out of 3000
+116220 MariaDB tpm
+Vuser 9:Processing 10000000 transactions with output suppressed...
+Vuser 10:RUNNING
+Vuser 10:Initializing xtprof time profiler
+Vuser 10:Ssl_cipher 
+Vuser 10:Assigned 24 WIDs = 9 137 265 393 521 649 777 905 1033 1161 1289 1417 1545 1673 1801 1929 2057 2185 2313 2441 2569 2697 2825 2953 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 10:Processing 10000000 transactions with output suppressed...
+Vuser 11:RUNNING
+Vuser 11:Initializing xtprof time profiler
+Vuser 11:Ssl_cipher 
+Vuser 11:Assigned 24 WIDs = 10 138 266 394 522 650 778 906 1034 1162 1290 1418 1546 1674 1802 1930 2058 2186 2314 2442 2570 2698 2826 2954 based on VU count 128, Warehouses = 24 out of 3000
+166140 MariaDB tpm
+Vuser 11:Processing 10000000 transactions with output suppressed...
+Vuser 12:RUNNING
+Vuser 12:Initializing xtprof time profiler
+Vuser 12:Ssl_cipher 
+Vuser 12:Assigned 24 WIDs = 11 139 267 395 523 651 779 907 1035 1163 1291 1419 1547 1675 1803 1931 2059 2187 2315 2443 2571 2699 2827 2955 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 12:Processing 10000000 transactions with output suppressed...
+Vuser 13:RUNNING
+Vuser 13:Initializing xtprof time profiler
+Vuser 13:Ssl_cipher 
+Vuser 13:Assigned 24 WIDs = 12 140 268 396 524 652 780 908 1036 1164 1292 1420 1548 1676 1804 1932 2060 2188 2316 2444 2572 2700 2828 2956 based on VU count 128, Warehouses = 24 out of 3000
+212640 MariaDB tpm
+Vuser 13:Processing 10000000 transactions with output suppressed...
+Vuser 14:RUNNING
+Vuser 14:Initializing xtprof time profiler
+Vuser 14:Ssl_cipher 
+Vuser 14:Assigned 24 WIDs = 13 141 269 397 525 653 781 909 1037 1165 1293 1421 1549 1677 1805 1933 2061 2189 2317 2445 2573 2701 2829 2957 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 14:Processing 10000000 transactions with output suppressed...
+Vuser 15:RUNNING
+Vuser 15:Initializing xtprof time profiler
+Vuser 15:Ssl_cipher 
+Vuser 15:Assigned 24 WIDs = 14 142 270 398 526 654 782 910 1038 1166 1294 1422 1550 1678 1806 1934 2062 2190 2318 2446 2574 2702 2830 2958 based on VU count 128, Warehouses = 24 out of 3000
+255180 MariaDB tpm
+Vuser 15:Processing 10000000 transactions with output suppressed...
+Vuser 16:RUNNING
+Vuser 16:Initializing xtprof time profiler
+Vuser 16:Ssl_cipher 
+Vuser 16:Assigned 24 WIDs = 15 143 271 399 527 655 783 911 1039 1167 1295 1423 1551 1679 1807 1935 2063 2191 2319 2447 2575 2703 2831 2959 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 16:Processing 10000000 transactions with output suppressed...
+Vuser 17:RUNNING
+Vuser 17:Initializing xtprof time profiler
+Vuser 17:Ssl_cipher 
+Vuser 17:Assigned 24 WIDs = 16 144 272 400 528 656 784 912 1040 1168 1296 1424 1552 1680 1808 1936 2064 2192 2320 2448 2576 2704 2832 2960 based on VU count 128, Warehouses = 24 out of 3000
+305220 MariaDB tpm
+Vuser 17:Processing 10000000 transactions with output suppressed...
+Vuser 18:RUNNING
+Vuser 18:Initializing xtprof time profiler
+Vuser 18:Ssl_cipher 
+Vuser 18:Assigned 24 WIDs = 17 145 273 401 529 657 785 913 1041 1169 1297 1425 1553 1681 1809 1937 2065 2193 2321 2449 2577 2705 2833 2961 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 18:Processing 10000000 transactions with output suppressed...
+Vuser 19:RUNNING
+Vuser 19:Initializing xtprof time profiler
+Vuser 19:Ssl_cipher 
+Vuser 19:Assigned 24 WIDs = 18 146 274 402 530 658 786 914 1042 1170 1298 1426 1554 1682 1810 1938 2066 2194 2322 2450 2578 2706 2834 2962 based on VU count 128, Warehouses = 24 out of 3000
+341880 MariaDB tpm
+Vuser 19:Processing 10000000 transactions with output suppressed...
+Vuser 20:RUNNING
+Vuser 20:Initializing xtprof time profiler
+Vuser 20:Ssl_cipher 
+Vuser 20:Assigned 24 WIDs = 19 147 275 403 531 659 787 915 1043 1171 1299 1427 1555 1683 1811 1939 2067 2195 2323 2451 2579 2707 2835 2963 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 20:Processing 10000000 transactions with output suppressed...
+Vuser 21:RUNNING
+Vuser 21:Initializing xtprof time profiler
+Vuser 21:Ssl_cipher 
+Vuser 21:Assigned 24 WIDs = 20 148 276 404 532 660 788 916 1044 1172 1300 1428 1556 1684 1812 1940 2068 2196 2324 2452 2580 2708 2836 2964 based on VU count 128, Warehouses = 24 out of 3000
+352200 MariaDB tpm
+Vuser 21:Processing 10000000 transactions with output suppressed...
+Vuser 22:RUNNING
+Vuser 22:Initializing xtprof time profiler
+Vuser 22:Ssl_cipher 
+Vuser 22:Assigned 24 WIDs = 21 149 277 405 533 661 789 917 1045 1173 1301 1429 1557 1685 1813 1941 2069 2197 2325 2453 2581 2709 2837 2965 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 22:Processing 10000000 transactions with output suppressed...
+Vuser 23:RUNNING
+Vuser 23:Initializing xtprof time profiler
+Vuser 23:Ssl_cipher 
+Vuser 23:Assigned 24 WIDs = 22 150 278 406 534 662 790 918 1046 1174 1302 1430 1558 1686 1814 1942 2070 2198 2326 2454 2582 2710 2838 2966 based on VU count 128, Warehouses = 24 out of 3000
+348300 MariaDB tpm
+Vuser 23:Processing 10000000 transactions with output suppressed...
+Vuser 24:RUNNING
+Vuser 24:Initializing xtprof time profiler
+Vuser 24:Ssl_cipher 
+Vuser 24:Assigned 24 WIDs = 23 151 279 407 535 663 791 919 1047 1175 1303 1431 1559 1687 1815 1943 2071 2199 2327 2455 2583 2711 2839 2967 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 24:Processing 10000000 transactions with output suppressed...
+Vuser 25:RUNNING
+Vuser 25:Initializing xtprof time profiler
+Vuser 25:Ssl_cipher 
+Vuser 25:Assigned 24 WIDs = 24 152 280 408 536 664 792 920 1048 1176 1304 1432 1560 1688 1816 1944 2072 2200 2328 2456 2584 2712 2840 2968 based on VU count 128, Warehouses = 24 out of 3000
+364980 MariaDB tpm
+Vuser 25:Processing 10000000 transactions with output suppressed...
+Vuser 26:RUNNING
+Vuser 26:Initializing xtprof time profiler
+Vuser 26:Ssl_cipher 
+Vuser 26:Assigned 24 WIDs = 25 153 281 409 537 665 793 921 1049 1177 1305 1433 1561 1689 1817 1945 2073 2201 2329 2457 2585 2713 2841 2969 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 26:Processing 10000000 transactions with output suppressed...
+Vuser 27:RUNNING
+Vuser 27:Initializing xtprof time profiler
+Vuser 27:Ssl_cipher 
+Vuser 27:Assigned 24 WIDs = 26 154 282 410 538 666 794 922 1050 1178 1306 1434 1562 1690 1818 1946 2074 2202 2330 2458 2586 2714 2842 2970 based on VU count 128, Warehouses = 24 out of 3000
+377880 MariaDB tpm
+Vuser 27:Processing 10000000 transactions with output suppressed...
+Vuser 28:RUNNING
+Vuser 28:Initializing xtprof time profiler
+Vuser 28:Ssl_cipher 
+Vuser 28:Assigned 24 WIDs = 27 155 283 411 539 667 795 923 1051 1179 1307 1435 1563 1691 1819 1947 2075 2203 2331 2459 2587 2715 2843 2971 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 28:Processing 10000000 transactions with output suppressed...
+Vuser 29:RUNNING
+Vuser 29:Initializing xtprof time profiler
+Vuser 29:Ssl_cipher 
+Vuser 29:Assigned 24 WIDs = 28 156 284 412 540 668 796 924 1052 1180 1308 1436 1564 1692 1820 1948 2076 2204 2332 2460 2588 2716 2844 2972 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 29:Processing 10000000 transactions with output suppressed...
+386280 MariaDB tpm
+Vuser 30:RUNNING
+Vuser 30:Initializing xtprof time profiler
+Vuser 30:Ssl_cipher 
+Vuser 30:Assigned 24 WIDs = 29 157 285 413 541 669 797 925 1053 1181 1309 1437 1565 1693 1821 1949 2077 2205 2333 2461 2589 2717 2845 2973 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 30:Processing 10000000 transactions with output suppressed...
+Vuser 31:RUNNING
+Vuser 31:Initializing xtprof time profiler
+Vuser 31:Ssl_cipher 
+Vuser 31:Assigned 24 WIDs = 30 158 286 414 542 670 798 926 1054 1182 1310 1438 1566 1694 1822 1950 2078 2206 2334 2462 2590 2718 2846 2974 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 31:Processing 10000000 transactions with output suppressed...
+393180 MariaDB tpm
+Vuser 32:RUNNING
+Vuser 32:Initializing xtprof time profiler
+Vuser 32:Ssl_cipher 
+Vuser 32:Assigned 24 WIDs = 31 159 287 415 543 671 799 927 1055 1183 1311 1439 1567 1695 1823 1951 2079 2207 2335 2463 2591 2719 2847 2975 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 32:Processing 10000000 transactions with output suppressed...
+Vuser 33:RUNNING
+Vuser 33:Initializing xtprof time profiler
+Vuser 33:Ssl_cipher 
+Vuser 33:Assigned 24 WIDs = 32 160 288 416 544 672 800 928 1056 1184 1312 1440 1568 1696 1824 1952 2080 2208 2336 2464 2592 2720 2848 2976 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 33:Processing 10000000 transactions with output suppressed...
+409980 MariaDB tpm
+Vuser 34:RUNNING
+Vuser 34:Initializing xtprof time profiler
+Vuser 34:Ssl_cipher 
+Vuser 34:Assigned 24 WIDs = 33 161 289 417 545 673 801 929 1057 1185 1313 1441 1569 1697 1825 1953 2081 2209 2337 2465 2593 2721 2849 2977 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 34:Processing 10000000 transactions with output suppressed...
+Vuser 35:RUNNING
+Vuser 35:Initializing xtprof time profiler
+Vuser 35:Ssl_cipher 
+Vuser 35:Assigned 24 WIDs = 34 162 290 418 546 674 802 930 1058 1186 1314 1442 1570 1698 1826 1954 2082 2210 2338 2466 2594 2722 2850 2978 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 35:Processing 10000000 transactions with output suppressed...
+409800 MariaDB tpm
+Vuser 36:RUNNING
+Vuser 36:Initializing xtprof time profiler
+Vuser 36:Ssl_cipher 
+Vuser 36:Assigned 24 WIDs = 35 163 291 419 547 675 803 931 1059 1187 1315 1443 1571 1699 1827 1955 2083 2211 2339 2467 2595 2723 2851 2979 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 36:Processing 10000000 transactions with output suppressed...
+Vuser 37:RUNNING
+Vuser 37:Initializing xtprof time profiler
+Vuser 37:Ssl_cipher 
+Vuser 37:Assigned 24 WIDs = 36 164 292 420 548 676 804 932 1060 1188 1316 1444 1572 1700 1828 1956 2084 2212 2340 2468 2596 2724 2852 2980 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 37:Processing 10000000 transactions with output suppressed...
+421560 MariaDB tpm
+Vuser 38:RUNNING
+Vuser 38:Initializing xtprof time profiler
+Vuser 38:Ssl_cipher 
+Vuser 38:Assigned 24 WIDs = 37 165 293 421 549 677 805 933 1061 1189 1317 1445 1573 1701 1829 1957 2085 2213 2341 2469 2597 2725 2853 2981 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 38:Processing 10000000 transactions with output suppressed...
+Vuser 39:RUNNING
+Vuser 39:Initializing xtprof time profiler
+Vuser 39:Ssl_cipher 
+Vuser 39:Assigned 24 WIDs = 38 166 294 422 550 678 806 934 1062 1190 1318 1446 1574 1702 1830 1958 2086 2214 2342 2470 2598 2726 2854 2982 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 39:Processing 10000000 transactions with output suppressed...
+410340 MariaDB tpm
+Vuser 40:RUNNING
+Vuser 40:Initializing xtprof time profiler
+Vuser 40:Ssl_cipher 
+Vuser 40:Assigned 24 WIDs = 39 167 295 423 551 679 807 935 1063 1191 1319 1447 1575 1703 1831 1959 2087 2215 2343 2471 2599 2727 2855 2983 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 40:Processing 10000000 transactions with output suppressed...
+Vuser 41:RUNNING
+Vuser 41:Initializing xtprof time profiler
+Vuser 41:Ssl_cipher 
+Vuser 41:Assigned 24 WIDs = 40 168 296 424 552 680 808 936 1064 1192 1320 1448 1576 1704 1832 1960 2088 2216 2344 2472 2600 2728 2856 2984 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 41:Processing 10000000 transactions with output suppressed...
+417540 MariaDB tpm
+Vuser 42:RUNNING
+Vuser 42:Initializing xtprof time profiler
+Vuser 42:Ssl_cipher 
+Vuser 42:Assigned 24 WIDs = 41 169 297 425 553 681 809 937 1065 1193 1321 1449 1577 1705 1833 1961 2089 2217 2345 2473 2601 2729 2857 2985 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 42:Processing 10000000 transactions with output suppressed...
+Vuser 43:RUNNING
+Vuser 43:Initializing xtprof time profiler
+Vuser 43:Ssl_cipher 
+Vuser 43:Assigned 24 WIDs = 42 170 298 426 554 682 810 938 1066 1194 1322 1450 1578 1706 1834 1962 2090 2218 2346 2474 2602 2730 2858 2986 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 43:Processing 10000000 transactions with output suppressed...
+418980 MariaDB tpm
+Vuser 44:RUNNING
+Vuser 44:Initializing xtprof time profiler
+Vuser 44:Ssl_cipher 
+Vuser 44:Assigned 24 WIDs = 43 171 299 427 555 683 811 939 1067 1195 1323 1451 1579 1707 1835 1963 2091 2219 2347 2475 2603 2731 2859 2987 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 44:Processing 10000000 transactions with output suppressed...
+Vuser 45:RUNNING
+Vuser 45:Initializing xtprof time profiler
+Vuser 45:Ssl_cipher 
+Vuser 45:Assigned 24 WIDs = 44 172 300 428 556 684 812 940 1068 1196 1324 1452 1580 1708 1836 1964 2092 2220 2348 2476 2604 2732 2860 2988 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 45:Processing 10000000 transactions with output suppressed...
+420240 MariaDB tpm
+Vuser 46:RUNNING
+Vuser 46:Initializing xtprof time profiler
+Vuser 46:Ssl_cipher 
+Vuser 46:Assigned 24 WIDs = 45 173 301 429 557 685 813 941 1069 1197 1325 1453 1581 1709 1837 1965 2093 2221 2349 2477 2605 2733 2861 2989 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 46:Processing 10000000 transactions with output suppressed...
+Vuser 47:RUNNING
+Vuser 47:Initializing xtprof time profiler
+Vuser 47:Ssl_cipher 
+Vuser 47:Assigned 24 WIDs = 46 174 302 430 558 686 814 942 1070 1198 1326 1454 1582 1710 1838 1966 2094 2222 2350 2478 2606 2734 2862 2990 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 47:Processing 10000000 transactions with output suppressed...
+418860 MariaDB tpm
+Vuser 48:RUNNING
+Vuser 48:Initializing xtprof time profiler
+Vuser 48:Ssl_cipher 
+Vuser 48:Assigned 24 WIDs = 47 175 303 431 559 687 815 943 1071 1199 1327 1455 1583 1711 1839 1967 2095 2223 2351 2479 2607 2735 2863 2991 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 48:Processing 10000000 transactions with output suppressed...
+Vuser 49:RUNNING
+Vuser 49:Initializing xtprof time profiler
+Vuser 49:Ssl_cipher 
+Vuser 49:Assigned 24 WIDs = 48 176 304 432 560 688 816 944 1072 1200 1328 1456 1584 1712 1840 1968 2096 2224 2352 2480 2608 2736 2864 2992 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 49:Processing 10000000 transactions with output suppressed...
+417960 MariaDB tpm
+Vuser 50:RUNNING
+Vuser 50:Initializing xtprof time profiler
+Vuser 50:Ssl_cipher 
+Vuser 50:Assigned 24 WIDs = 49 177 305 433 561 689 817 945 1073 1201 1329 1457 1585 1713 1841 1969 2097 2225 2353 2481 2609 2737 2865 2993 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 50:Processing 10000000 transactions with output suppressed...
+Vuser 51:RUNNING
+Vuser 51:Initializing xtprof time profiler
+Vuser 51:Ssl_cipher 
+Vuser 51:Assigned 24 WIDs = 50 178 306 434 562 690 818 946 1074 1202 1330 1458 1586 1714 1842 1970 2098 2226 2354 2482 2610 2738 2866 2994 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 51:Processing 10000000 transactions with output suppressed...
+409680 MariaDB tpm
+Vuser 52:RUNNING
+Vuser 52:Initializing xtprof time profiler
+Vuser 52:Ssl_cipher 
+Vuser 52:Assigned 24 WIDs = 51 179 307 435 563 691 819 947 1075 1203 1331 1459 1587 1715 1843 1971 2099 2227 2355 2483 2611 2739 2867 2995 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 52:Processing 10000000 transactions with output suppressed...
+Vuser 53:RUNNING
+Vuser 53:Initializing xtprof time profiler
+Vuser 53:Ssl_cipher 
+Vuser 53:Assigned 24 WIDs = 52 180 308 436 564 692 820 948 1076 1204 1332 1460 1588 1716 1844 1972 2100 2228 2356 2484 2612 2740 2868 2996 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 53:Processing 10000000 transactions with output suppressed...
+425580 MariaDB tpm
+Vuser 54:RUNNING
+Vuser 54:Initializing xtprof time profiler
+Vuser 54:Ssl_cipher 
+Vuser 54:Assigned 24 WIDs = 53 181 309 437 565 693 821 949 1077 1205 1333 1461 1589 1717 1845 1973 2101 2229 2357 2485 2613 2741 2869 2997 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 54:Processing 10000000 transactions with output suppressed...
+Vuser 55:RUNNING
+Vuser 55:Initializing xtprof time profiler
+Vuser 55:Ssl_cipher 
+Vuser 55:Assigned 24 WIDs = 54 182 310 438 566 694 822 950 1078 1206 1334 1462 1590 1718 1846 1974 2102 2230 2358 2486 2614 2742 2870 2998 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 55:Processing 10000000 transactions with output suppressed...
+414660 MariaDB tpm
+Vuser 56:RUNNING
+Vuser 56:Initializing xtprof time profiler
+Vuser 56:Ssl_cipher 
+Vuser 56:Assigned 24 WIDs = 55 183 311 439 567 695 823 951 1079 1207 1335 1463 1591 1719 1847 1975 2103 2231 2359 2487 2615 2743 2871 2999 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 56:Processing 10000000 transactions with output suppressed...
+Vuser 57:RUNNING
+Vuser 57:Initializing xtprof time profiler
+Vuser 57:Ssl_cipher 
+Vuser 57:Assigned 24 WIDs = 56 184 312 440 568 696 824 952 1080 1208 1336 1464 1592 1720 1848 1976 2104 2232 2360 2488 2616 2744 2872 3000 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 57:Processing 10000000 transactions with output suppressed...
+431040 MariaDB tpm
+Vuser 58:RUNNING
+Vuser 58:Initializing xtprof time profiler
+Vuser 58:Ssl_cipher 
+Vuser 58:Assigned 24 WIDs = 57 185 313 441 569 697 825 953 1081 1209 1337 1465 1593 1721 1849 1977 2105 2233 2361 2489 2617 2745 2873 1 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 58:Processing 10000000 transactions with output suppressed...
+Vuser 59:RUNNING
+Vuser 59:Initializing xtprof time profiler
+Vuser 59:Ssl_cipher 
+Vuser 59:Assigned 24 WIDs = 58 186 314 442 570 698 826 954 1082 1210 1338 1466 1594 1722 1850 1978 2106 2234 2362 2490 2618 2746 2874 2 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 59:Processing 10000000 transactions with output suppressed...
+401040 MariaDB tpm
+Vuser 60:RUNNING
+Vuser 60:Initializing xtprof time profiler
+Vuser 60:Ssl_cipher 
+Vuser 60:Assigned 24 WIDs = 59 187 315 443 571 699 827 955 1083 1211 1339 1467 1595 1723 1851 1979 2107 2235 2363 2491 2619 2747 2875 3 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 60:Processing 10000000 transactions with output suppressed...
+Vuser 61:RUNNING
+Vuser 61:Initializing xtprof time profiler
+Vuser 61:Ssl_cipher 
+Vuser 61:Assigned 24 WIDs = 60 188 316 444 572 700 828 956 1084 1212 1340 1468 1596 1724 1852 1980 2108 2236 2364 2492 2620 2748 2876 4 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 61:Processing 10000000 transactions with output suppressed...
+409800 MariaDB tpm
+Vuser 62:RUNNING
+Vuser 62:Initializing xtprof time profiler
+Vuser 62:Ssl_cipher 
+Vuser 62:Assigned 24 WIDs = 61 189 317 445 573 701 829 957 1085 1213 1341 1469 1597 1725 1853 1981 2109 2237 2365 2493 2621 2749 2877 5 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 62:Processing 10000000 transactions with output suppressed...
+Vuser 63:RUNNING
+Vuser 63:Initializing xtprof time profiler
+Vuser 63:Ssl_cipher 
+Vuser 63:Assigned 24 WIDs = 62 190 318 446 574 702 830 958 1086 1214 1342 1470 1598 1726 1854 1982 2110 2238 2366 2494 2622 2750 2878 6 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 63:Processing 10000000 transactions with output suppressed...
+415800 MariaDB tpm
+Vuser 64:RUNNING
+Vuser 64:Initializing xtprof time profiler
+Vuser 64:Ssl_cipher 
+Vuser 64:Assigned 24 WIDs = 63 191 319 447 575 703 831 959 1087 1215 1343 1471 1599 1727 1855 1983 2111 2239 2367 2495 2623 2751 2879 7 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 64:Processing 10000000 transactions with output suppressed...
+Vuser 65:RUNNING
+Vuser 65:Initializing xtprof time profiler
+Vuser 65:Ssl_cipher 
+Vuser 65:Assigned 24 WIDs = 64 192 320 448 576 704 832 960 1088 1216 1344 1472 1600 1728 1856 1984 2112 2240 2368 2496 2624 2752 2880 8 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 65:Processing 10000000 transactions with output suppressed...
+431640 MariaDB tpm
+Vuser 66:RUNNING
+Vuser 66:Initializing xtprof time profiler
+Vuser 66:Ssl_cipher 
+Vuser 66:Assigned 24 WIDs = 65 193 321 449 577 705 833 961 1089 1217 1345 1473 1601 1729 1857 1985 2113 2241 2369 2497 2625 2753 2881 9 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 66:Processing 10000000 transactions with output suppressed...
+Vuser 67:RUNNING
+Vuser 67:Initializing xtprof time profiler
+Vuser 67:Ssl_cipher 
+Vuser 67:Assigned 24 WIDs = 66 194 322 450 578 706 834 962 1090 1218 1346 1474 1602 1730 1858 1986 2114 2242 2370 2498 2626 2754 2882 10 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 67:Processing 10000000 transactions with output suppressed...
+413640 MariaDB tpm
+Vuser 68:RUNNING
+Vuser 68:Initializing xtprof time profiler
+Vuser 68:Ssl_cipher 
+Vuser 68:Assigned 24 WIDs = 67 195 323 451 579 707 835 963 1091 1219 1347 1475 1603 1731 1859 1987 2115 2243 2371 2499 2627 2755 2883 11 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 68:Processing 10000000 transactions with output suppressed...
+Vuser 69:RUNNING
+Vuser 69:Initializing xtprof time profiler
+Vuser 69:Ssl_cipher 
+Vuser 69:Assigned 24 WIDs = 68 196 324 452 580 708 836 964 1092 1220 1348 1476 1604 1732 1860 1988 2116 2244 2372 2500 2628 2756 2884 12 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 69:Processing 10000000 transactions with output suppressed...
+414360 MariaDB tpm
+Vuser 70:RUNNING
+Vuser 70:Initializing xtprof time profiler
+Vuser 70:Ssl_cipher 
+Vuser 70:Assigned 24 WIDs = 69 197 325 453 581 709 837 965 1093 1221 1349 1477 1605 1733 1861 1989 2117 2245 2373 2501 2629 2757 2885 13 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 70:Processing 10000000 transactions with output suppressed...
+Vuser 71:RUNNING
+Vuser 71:Initializing xtprof time profiler
+Vuser 71:Ssl_cipher 
+Vuser 71:Assigned 24 WIDs = 70 198 326 454 582 710 838 966 1094 1222 1350 1478 1606 1734 1862 1990 2118 2246 2374 2502 2630 2758 2886 14 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 71:Processing 10000000 transactions with output suppressed...
+417420 MariaDB tpm
+Vuser 72:RUNNING
+Vuser 72:Initializing xtprof time profiler
+Vuser 72:Ssl_cipher 
+Vuser 72:Assigned 24 WIDs = 71 199 327 455 583 711 839 967 1095 1223 1351 1479 1607 1735 1863 1991 2119 2247 2375 2503 2631 2759 2887 15 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 72:Processing 10000000 transactions with output suppressed...
+Vuser 73:RUNNING
+Vuser 73:Initializing xtprof time profiler
+Vuser 73:Ssl_cipher 
+Vuser 73:Assigned 24 WIDs = 72 200 328 456 584 712 840 968 1096 1224 1352 1480 1608 1736 1864 1992 2120 2248 2376 2504 2632 2760 2888 16 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 73:Processing 10000000 transactions with output suppressed...
+414780 MariaDB tpm
+Vuser 74:RUNNING
+Vuser 74:Initializing xtprof time profiler
+Vuser 74:Ssl_cipher 
+Vuser 74:Assigned 24 WIDs = 73 201 329 457 585 713 841 969 1097 1225 1353 1481 1609 1737 1865 1993 2121 2249 2377 2505 2633 2761 2889 17 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 74:Processing 10000000 transactions with output suppressed...
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 75:RUNNING
+Vuser 75:Initializing xtprof time profiler
+Vuser 75:Ssl_cipher 
+Vuser 75:Assigned 24 WIDs = 74 202 330 458 586 714 842 970 1098 1226 1354 1482 1610 1738 1866 1994 2122 2250 2378 2506 2634 2762 2890 18 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 75:Processing 10000000 transactions with output suppressed...
+423960 MariaDB tpm
+Vuser 76:RUNNING
+Vuser 76:Initializing xtprof time profiler
+Vuser 76:Ssl_cipher 
+Vuser 76:Assigned 24 WIDs = 75 203 331 459 587 715 843 971 1099 1227 1355 1483 1611 1739 1867 1995 2123 2251 2379 2507 2635 2763 2891 19 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 76:Processing 10000000 transactions with output suppressed...
+Vuser 77:RUNNING
+Vuser 77:Initializing xtprof time profiler
+Vuser 77:Ssl_cipher 
+Vuser 77:Assigned 24 WIDs = 76 204 332 460 588 716 844 972 1100 1228 1356 1484 1612 1740 1868 1996 2124 2252 2380 2508 2636 2764 2892 20 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 77:Processing 10000000 transactions with output suppressed...
+407460 MariaDB tpm
+Vuser 78:RUNNING
+Vuser 78:Initializing xtprof time profiler
+Vuser 78:Ssl_cipher 
+Vuser 78:Assigned 24 WIDs = 77 205 333 461 589 717 845 973 1101 1229 1357 1485 1613 1741 1869 1997 2125 2253 2381 2509 2637 2765 2893 21 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 78:Processing 10000000 transactions with output suppressed...
+Vuser 79:RUNNING
+Vuser 79:Initializing xtprof time profiler
+Vuser 79:Ssl_cipher 
+Vuser 79:Assigned 24 WIDs = 78 206 334 462 590 718 846 974 1102 1230 1358 1486 1614 1742 1870 1998 2126 2254 2382 2510 2638 2766 2894 22 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 79:Processing 10000000 transactions with output suppressed...
+409740 MariaDB tpm
+Vuser 80:RUNNING
+Vuser 80:Initializing xtprof time profiler
+Vuser 80:Ssl_cipher 
+Vuser 80:Assigned 24 WIDs = 79 207 335 463 591 719 847 975 1103 1231 1359 1487 1615 1743 1871 1999 2127 2255 2383 2511 2639 2767 2895 23 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 80:Processing 10000000 transactions with output suppressed...
+Vuser 81:RUNNING
+Vuser 81:Initializing xtprof time profiler
+Vuser 81:Ssl_cipher 
+Vuser 81:Assigned 24 WIDs = 80 208 336 464 592 720 848 976 1104 1232 1360 1488 1616 1744 1872 2000 2128 2256 2384 2512 2640 2768 2896 24 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 81:Processing 10000000 transactions with output suppressed...
+420120 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 25:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 82:RUNNING
+Vuser 82:Initializing xtprof time profiler
+Vuser 82:Ssl_cipher 
+Vuser 82:Assigned 24 WIDs = 81 209 337 465 593 721 849 977 1105 1233 1361 1489 1617 1745 1873 2001 2129 2257 2385 2513 2641 2769 2897 25 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 82:Processing 10000000 transactions with output suppressed...
+Vuser 78:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 83:RUNNING
+Vuser 83:Initializing xtprof time profiler
+Vuser 83:Ssl_cipher 
+Vuser 83:Assigned 24 WIDs = 82 210 338 466 594 722 850 978 1106 1234 1362 1490 1618 1746 1874 2002 2130 2258 2386 2514 2642 2770 2898 26 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 83:Processing 10000000 transactions with output suppressed...
+416280 MariaDB tpm
+Vuser 84:RUNNING
+Vuser 84:Initializing xtprof time profiler
+Vuser 84:Ssl_cipher 
+Vuser 84:Assigned 24 WIDs = 83 211 339 467 595 723 851 979 1107 1235 1363 1491 1619 1747 1875 2003 2131 2259 2387 2515 2643 2771 2899 27 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 84:Processing 10000000 transactions with output suppressed...
+Vuser 85:RUNNING
+Vuser 85:Initializing xtprof time profiler
+Vuser 85:Ssl_cipher 
+Vuser 85:Assigned 24 WIDs = 84 212 340 468 596 724 852 980 1108 1236 1364 1492 1620 1748 1876 2004 2132 2260 2388 2516 2644 2772 2900 28 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 85:Processing 10000000 transactions with output suppressed...
+408840 MariaDB tpm
+Vuser 86:RUNNING
+Vuser 86:Initializing xtprof time profiler
+Vuser 86:Ssl_cipher 
+Vuser 86:Assigned 24 WIDs = 85 213 341 469 597 725 853 981 1109 1237 1365 1493 1621 1749 1877 2005 2133 2261 2389 2517 2645 2773 2901 29 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 86:Processing 10000000 transactions with output suppressed...
+Vuser 81:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 87:RUNNING
+Vuser 87:Initializing xtprof time profiler
+Vuser 87:Ssl_cipher 
+Vuser 87:Assigned 24 WIDs = 86 214 342 470 598 726 854 982 1110 1238 1366 1494 1622 1750 1878 2006 2134 2262 2390 2518 2646 2774 2902 30 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 87:Processing 10000000 transactions with output suppressed...
+418440 MariaDB tpm
+Vuser 88:RUNNING
+Vuser 88:Initializing xtprof time profiler
+Vuser 88:Ssl_cipher 
+Vuser 88:Assigned 24 WIDs = 87 215 343 471 599 727 855 983 1111 1239 1367 1495 1623 1751 1879 2007 2135 2263 2391 2519 2647 2775 2903 31 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 88:Processing 10000000 transactions with output suppressed...
+Vuser 89:RUNNING
+Vuser 89:Initializing xtprof time profiler
+Vuser 89:Ssl_cipher 
+Vuser 89:Assigned 24 WIDs = 88 216 344 472 600 728 856 984 1112 1240 1368 1496 1624 1752 1880 2008 2136 2264 2392 2520 2648 2776 2904 32 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 89:Processing 10000000 transactions with output suppressed...
+Vuser 85:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+415260 MariaDB tpm
+Vuser 90:RUNNING
+Vuser 90:Initializing xtprof time profiler
+Vuser 90:Ssl_cipher 
+Vuser 90:Assigned 24 WIDs = 89 217 345 473 601 729 857 985 1113 1241 1369 1497 1625 1753 1881 2009 2137 2265 2393 2521 2649 2777 2905 33 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 90:Processing 10000000 transactions with output suppressed...
+Vuser 91:RUNNING
+Vuser 91:Initializing xtprof time profiler
+Vuser 91:Ssl_cipher 
+Vuser 91:Assigned 24 WIDs = 90 218 346 474 602 730 858 986 1114 1242 1370 1498 1626 1754 1882 2010 2138 2266 2394 2522 2650 2778 2906 34 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 91:Processing 10000000 transactions with output suppressed...
+413400 MariaDB tpm
+Vuser 92:RUNNING
+Vuser 92:Initializing xtprof time profiler
+Vuser 92:Ssl_cipher 
+Vuser 92:Assigned 24 WIDs = 91 219 347 475 603 731 859 987 1115 1243 1371 1499 1627 1755 1883 2011 2139 2267 2395 2523 2651 2779 2907 35 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 92:Processing 10000000 transactions with output suppressed...
+Vuser 93:RUNNING
+Vuser 93:Initializing xtprof time profiler
+Vuser 93:Ssl_cipher 
+Vuser 93:Assigned 24 WIDs = 92 220 348 476 604 732 860 988 1116 1244 1372 1500 1628 1756 1884 2012 2140 2268 2396 2524 2652 2780 2908 36 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 93:Processing 10000000 transactions with output suppressed...
+415800 MariaDB tpm
+Vuser 94:RUNNING
+Vuser 94:Initializing xtprof time profiler
+Vuser 94:Ssl_cipher 
+Vuser 94:Assigned 24 WIDs = 93 221 349 477 605 733 861 989 1117 1245 1373 1501 1629 1757 1885 2013 2141 2269 2397 2525 2653 2781 2909 37 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 94:Processing 10000000 transactions with output suppressed...
+Vuser 95:RUNNING
+Vuser 95:Initializing xtprof time profiler
+Vuser 95:Ssl_cipher 
+Vuser 95:Assigned 24 WIDs = 94 222 350 478 606 734 862 990 1118 1246 1374 1502 1630 1758 1886 2014 2142 2270 2398 2526 2654 2782 2910 38 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 95:Processing 10000000 transactions with output suppressed...
+420000 MariaDB tpm
+Vuser 96:RUNNING
+Vuser 96:Initializing xtprof time profiler
+Vuser 96:Ssl_cipher 
+Vuser 96:Assigned 24 WIDs = 95 223 351 479 607 735 863 991 1119 1247 1375 1503 1631 1759 1887 2015 2143 2271 2399 2527 2655 2783 2911 39 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 96:Processing 10000000 transactions with output suppressed...
+Vuser 97:RUNNING
+Vuser 97:Initializing xtprof time profiler
+Vuser 97:Ssl_cipher 
+Vuser 97:Assigned 24 WIDs = 96 224 352 480 608 736 864 992 1120 1248 1376 1504 1632 1760 1888 2016 2144 2272 2400 2528 2656 2784 2912 40 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 97:Processing 10000000 transactions with output suppressed...
+410040 MariaDB tpm
+Vuser 85:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 98:RUNNING
+Vuser 98:Initializing xtprof time profiler
+Vuser 98:Ssl_cipher 
+Vuser 98:Assigned 24 WIDs = 97 225 353 481 609 737 865 993 1121 1249 1377 1505 1633 1761 1889 2017 2145 2273 2401 2529 2657 2785 2913 41 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 98:Processing 10000000 transactions with output suppressed...
+Vuser 99:RUNNING
+Vuser 99:Initializing xtprof time profiler
+Vuser 99:Ssl_cipher 
+Vuser 99:Assigned 24 WIDs = 98 226 354 482 610 738 866 994 1122 1250 1378 1506 1634 1762 1890 2018 2146 2274 2402 2530 2658 2786 2914 42 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 99:Processing 10000000 transactions with output suppressed...
+417360 MariaDB tpm
+Vuser 100:RUNNING
+Vuser 100:Initializing xtprof time profiler
+Vuser 100:Ssl_cipher 
+Vuser 100:Assigned 24 WIDs = 99 227 355 483 611 739 867 995 1123 1251 1379 1507 1635 1763 1891 2019 2147 2275 2403 2531 2659 2787 2915 43 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 100:Processing 10000000 transactions with output suppressed...
+Vuser 101:RUNNING
+Vuser 101:Initializing xtprof time profiler
+Vuser 101:Ssl_cipher 
+Vuser 101:Assigned 24 WIDs = 100 228 356 484 612 740 868 996 1124 1252 1380 1508 1636 1764 1892 2020 2148 2276 2404 2532 2660 2788 2916 44 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 101:Processing 10000000 transactions with output suppressed...
+421380 MariaDB tpm
+Vuser 102:RUNNING
+Vuser 102:Initializing xtprof time profiler
+Vuser 102:Ssl_cipher 
+Vuser 102:Assigned 24 WIDs = 101 229 357 485 613 741 869 997 1125 1253 1381 1509 1637 1765 1893 2021 2149 2277 2405 2533 2661 2789 2917 45 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 102:Processing 10000000 transactions with output suppressed...
+Vuser 103:RUNNING
+Vuser 103:Initializing xtprof time profiler
+Vuser 103:Ssl_cipher 
+Vuser 103:Assigned 24 WIDs = 102 230 358 486 614 742 870 998 1126 1254 1382 1510 1638 1766 1894 2022 2150 2278 2406 2534 2662 2790 2918 46 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 103:Processing 10000000 transactions with output suppressed...
+415140 MariaDB tpm
+Vuser 104:RUNNING
+Vuser 104:Initializing xtprof time profiler
+Vuser 104:Ssl_cipher 
+Vuser 104:Assigned 24 WIDs = 103 231 359 487 615 743 871 999 1127 1255 1383 1511 1639 1767 1895 2023 2151 2279 2407 2535 2663 2791 2919 47 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 104:Processing 10000000 transactions with output suppressed...
+Vuser 105:RUNNING
+Vuser 105:Initializing xtprof time profiler
+Vuser 105:Ssl_cipher 
+Vuser 105:Assigned 24 WIDs = 104 232 360 488 616 744 872 1000 1128 1256 1384 1512 1640 1768 1896 2024 2152 2280 2408 2536 2664 2792 2920 48 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 105:Processing 10000000 transactions with output suppressed...
+418440 MariaDB tpm
+Vuser 106:RUNNING
+Vuser 106:Initializing xtprof time profiler
+Vuser 106:Ssl_cipher 
+Vuser 106:Assigned 24 WIDs = 105 233 361 489 617 745 873 1001 1129 1257 1385 1513 1641 1769 1897 2025 2153 2281 2409 2537 2665 2793 2921 49 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 106:Processing 10000000 transactions with output suppressed...
+Vuser 107:RUNNING
+Vuser 107:Initializing xtprof time profiler
+Vuser 107:Ssl_cipher 
+Vuser 107:Assigned 24 WIDs = 106 234 362 490 618 746 874 1002 1130 1258 1386 1514 1642 1770 1898 2026 2154 2282 2410 2538 2666 2794 2922 50 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 107:Processing 10000000 transactions with output suppressed...
+415020 MariaDB tpm
+Vuser 108:RUNNING
+Vuser 108:Initializing xtprof time profiler
+Vuser 108:Ssl_cipher 
+Vuser 108:Assigned 24 WIDs = 107 235 363 491 619 747 875 1003 1131 1259 1387 1515 1643 1771 1899 2027 2155 2283 2411 2539 2667 2795 2923 51 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 108:Processing 10000000 transactions with output suppressed...
+Vuser 109:RUNNING
+Vuser 109:Initializing xtprof time profiler
+Vuser 109:Ssl_cipher 
+Vuser 109:Assigned 24 WIDs = 108 236 364 492 620 748 876 1004 1132 1260 1388 1516 1644 1772 1900 2028 2156 2284 2412 2540 2668 2796 2924 52 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 109:Processing 10000000 transactions with output suppressed...
+428760 MariaDB tpm
+Vuser 110:RUNNING
+Vuser 110:Initializing xtprof time profiler
+Vuser 110:Ssl_cipher 
+Vuser 110:Assigned 24 WIDs = 109 237 365 493 621 749 877 1005 1133 1261 1389 1517 1645 1773 1901 2029 2157 2285 2413 2541 2669 2797 2925 53 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 110:Processing 10000000 transactions with output suppressed...
+Vuser 111:RUNNING
+Vuser 111:Initializing xtprof time profiler
+Vuser 111:Ssl_cipher 
+Vuser 111:Assigned 24 WIDs = 110 238 366 494 622 750 878 1006 1134 1262 1390 1518 1646 1774 1902 2030 2158 2286 2414 2542 2670 2798 2926 54 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 111:Processing 10000000 transactions with output suppressed...
+415680 MariaDB tpm
+Vuser 112:RUNNING
+Vuser 112:Initializing xtprof time profiler
+Vuser 112:Ssl_cipher 
+Vuser 112:Assigned 24 WIDs = 111 239 367 495 623 751 879 1007 1135 1263 1391 1519 1647 1775 1903 2031 2159 2287 2415 2543 2671 2799 2927 55 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 112:Processing 10000000 transactions with output suppressed...
+Vuser 113:RUNNING
+Vuser 113:Initializing xtprof time profiler
+Vuser 113:Ssl_cipher 
+Vuser 113:Assigned 24 WIDs = 112 240 368 496 624 752 880 1008 1136 1264 1392 1520 1648 1776 1904 2032 2160 2288 2416 2544 2672 2800 2928 56 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 113:Processing 10000000 transactions with output suppressed...
+420240 MariaDB tpm
+Vuser 114:RUNNING
+Vuser 114:Initializing xtprof time profiler
+Vuser 114:Ssl_cipher 
+Vuser 114:Assigned 24 WIDs = 113 241 369 497 625 753 881 1009 1137 1265 1393 1521 1649 1777 1905 2033 2161 2289 2417 2545 2673 2801 2929 57 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 114:Processing 10000000 transactions with output suppressed...
+Vuser 115:RUNNING
+Vuser 115:Initializing xtprof time profiler
+Vuser 115:Ssl_cipher 
+Vuser 115:Assigned 24 WIDs = 114 242 370 498 626 754 882 1010 1138 1266 1394 1522 1650 1778 1906 2034 2162 2290 2418 2546 2674 2802 2930 58 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 115:Processing 10000000 transactions with output suppressed...
+411780 MariaDB tpm
+Vuser 116:RUNNING
+Vuser 116:Initializing xtprof time profiler
+Vuser 116:Ssl_cipher 
+Vuser 116:Assigned 24 WIDs = 115 243 371 499 627 755 883 1011 1139 1267 1395 1523 1651 1779 1907 2035 2163 2291 2419 2547 2675 2803 2931 59 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 116:Processing 10000000 transactions with output suppressed...
+Vuser 117:RUNNING
+Vuser 117:Initializing xtprof time profiler
+Vuser 117:Ssl_cipher 
+Vuser 117:Assigned 24 WIDs = 116 244 372 500 628 756 884 1012 1140 1268 1396 1524 1652 1780 1908 2036 2164 2292 2420 2548 2676 2804 2932 60 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 117:Processing 10000000 transactions with output suppressed...
+417660 MariaDB tpm
+Vuser 118:RUNNING
+Vuser 118:Initializing xtprof time profiler
+Vuser 118:Ssl_cipher 
+Vuser 118:Assigned 24 WIDs = 117 245 373 501 629 757 885 1013 1141 1269 1397 1525 1653 1781 1909 2037 2165 2293 2421 2549 2677 2805 2933 61 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 118:Processing 10000000 transactions with output suppressed...
+Vuser 119:RUNNING
+Vuser 119:Initializing xtprof time profiler
+Vuser 119:Ssl_cipher 
+Vuser 119:Assigned 24 WIDs = 118 246 374 502 630 758 886 1014 1142 1270 1398 1526 1654 1782 1910 2038 2166 2294 2422 2550 2678 2806 2934 62 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 119:Processing 10000000 transactions with output suppressed...
+415320 MariaDB tpm
+Vuser 120:RUNNING
+Vuser 120:Initializing xtprof time profiler
+Vuser 120:Ssl_cipher 
+Vuser 120:Assigned 24 WIDs = 119 247 375 503 631 759 887 1015 1143 1271 1399 1527 1655 1783 1911 2039 2167 2295 2423 2551 2679 2807 2935 63 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 120:Processing 10000000 transactions with output suppressed...
+Vuser 1:Rampup 1 minutes complete ...
+Vuser 121:RUNNING
+Vuser 121:Initializing xtprof time profiler
+Vuser 121:Ssl_cipher 
+Vuser 121:Assigned 24 WIDs = 120 248 376 504 632 760 888 1016 1144 1272 1400 1528 1656 1784 1912 2040 2168 2296 2424 2552 2680 2808 2936 64 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 121:Processing 10000000 transactions with output suppressed...
+Vuser 58:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423780 MariaDB tpm
+Vuser 122:RUNNING
+Vuser 122:Initializing xtprof time profiler
+Vuser 122:Ssl_cipher 
+Vuser 122:Assigned 24 WIDs = 121 249 377 505 633 761 889 1017 1145 1273 1401 1529 1657 1785 1913 2041 2169 2297 2425 2553 2681 2809 2937 65 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 122:Processing 10000000 transactions with output suppressed...
+Vuser 123:RUNNING
+Vuser 123:Initializing xtprof time profiler
+Vuser 123:Ssl_cipher 
+Vuser 123:Assigned 24 WIDs = 122 250 378 506 634 762 890 1018 1146 1274 1402 1530 1658 1786 1914 2042 2170 2298 2426 2554 2682 2810 2938 66 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 123:Processing 10000000 transactions with output suppressed...
+427680 MariaDB tpm
+Vuser 124:RUNNING
+Vuser 124:Initializing xtprof time profiler
+Vuser 124:Ssl_cipher 
+Vuser 124:Assigned 24 WIDs = 123 251 379 507 635 763 891 1019 1147 1275 1403 1531 1659 1787 1915 2043 2171 2299 2427 2555 2683 2811 2939 67 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 124:Processing 10000000 transactions with output suppressed...
+Vuser 125:RUNNING
+Vuser 125:Initializing xtprof time profiler
+Vuser 125:Ssl_cipher 
+Vuser 125:Assigned 24 WIDs = 124 252 380 508 636 764 892 1020 1148 1276 1404 1532 1660 1788 1916 2044 2172 2300 2428 2556 2684 2812 2940 68 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 125:Processing 10000000 transactions with output suppressed...
+436500 MariaDB tpm
+Vuser 126:RUNNING
+Vuser 126:Initializing xtprof time profiler
+Vuser 126:Ssl_cipher 
+Vuser 126:Assigned 24 WIDs = 125 253 381 509 637 765 893 1021 1149 1277 1405 1533 1661 1789 1917 2045 2173 2301 2429 2557 2685 2813 2941 69 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 126:Processing 10000000 transactions with output suppressed...
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 127:RUNNING
+Vuser 127:Initializing xtprof time profiler
+Vuser 127:Ssl_cipher 
+Vuser 127:Assigned 24 WIDs = 126 254 382 510 638 766 894 1022 1150 1278 1406 1534 1662 1790 1918 2046 2174 2302 2430 2558 2686 2814 2942 70 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 127:Processing 10000000 transactions with output suppressed...
+424860 MariaDB tpm
+Vuser 128:RUNNING
+Vuser 128:Initializing xtprof time profiler
+Vuser 128:Ssl_cipher 
+Vuser 128:Assigned 24 WIDs = 127 255 383 511 639 767 895 1023 1151 1279 1407 1535 1663 1791 1919 2047 2175 2303 2431 2559 2687 2815 2943 71 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 128:Processing 10000000 transactions with output suppressed...
+Vuser 129:RUNNING
+Vuser 129:Initializing xtprof time profiler
+Vuser 129:Ssl_cipher 
+Vuser 129:Assigned 24 WIDs = 128 256 384 512 640 768 896 1024 1152 1280 1408 1536 1664 1792 1920 2048 2176 2304 2432 2560 2688 2816 2944 72 based on VU count 128, Warehouses = 24 out of 3000
+Vuser 129:Processing 10000000 transactions with output suppressed...
+424680 MariaDB tpm
+404340 MariaDB tpm
+428040 MariaDB tpm
+421920 MariaDB tpm
+426840 MariaDB tpm
+433020 MariaDB tpm
+428640 MariaDB tpm
+434640 MariaDB tpm
+Vuser 120:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429600 MariaDB tpm
+438900 MariaDB tpm
+433560 MariaDB tpm
+435720 MariaDB tpm
+437760 MariaDB tpm
+436860 MariaDB tpm
+Vuser 119:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435360 MariaDB tpm
+435600 MariaDB tpm
+439800 MariaDB tpm
+437280 MariaDB tpm
+444180 MariaDB tpm
+446400 MariaDB tpm
+432360 MariaDB tpm
+442800 MariaDB tpm
+445140 MariaDB tpm
+442020 MariaDB tpm
+447420 MariaDB tpm
+Vuser 68:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 67:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+446880 MariaDB tpm
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 46:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+443280 MariaDB tpm
+447780 MariaDB tpm
+439800 MariaDB tpm
+Vuser 115:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 123:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+434520 MariaDB tpm
+Vuser 76:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+441780 MariaDB tpm
+439980 MariaDB tpm
+Vuser 61:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424560 MariaDB tpm
+444300 MariaDB tpm
+447900 MariaDB tpm
+443100 MariaDB tpm
+438180 MariaDB tpm
+441720 MariaDB tpm
+432000 MariaDB tpm
+438480 MariaDB tpm
+441840 MariaDB tpm
+444180 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+438780 MariaDB tpm
+443640 MariaDB tpm
+Vuser 17:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 69:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+436740 MariaDB tpm
+440580 MariaDB tpm
+436200 MariaDB tpm
+437100 MariaDB tpm
+440700 MariaDB tpm
+443820 MariaDB tpm
+447420 MariaDB tpm
+441300 MariaDB tpm
+438540 MariaDB tpm
+439800 MariaDB tpm
+439740 MariaDB tpm
+Vuser 23:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435540 MariaDB tpm
+Vuser 1:Rampup 2 minutes complete ...
+Vuser 15:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+438840 MariaDB tpm
+438840 MariaDB tpm
+439380 MariaDB tpm
+435900 MariaDB tpm
+438000 MariaDB tpm
+439620 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+439860 MariaDB tpm
+424860 MariaDB tpm
+440700 MariaDB tpm
+441300 MariaDB tpm
+Vuser 86:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+437640 MariaDB tpm
+435360 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+434580 MariaDB tpm
+436860 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+439800 MariaDB tpm
+437280 MariaDB tpm
+435840 MariaDB tpm
+441660 MariaDB tpm
+Vuser 14:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+440760 MariaDB tpm
+442140 MariaDB tpm
+436560 MariaDB tpm
+449160 MariaDB tpm
+438300 MariaDB tpm
+441720 MariaDB tpm
+438660 MariaDB tpm
+439020 MariaDB tpm
+440880 MariaDB tpm
+Vuser 64:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+440580 MariaDB tpm
+439980 MariaDB tpm
+438300 MariaDB tpm
+439680 MariaDB tpm
+445800 MariaDB tpm
+Vuser 98:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+440220 MariaDB tpm
+433740 MariaDB tpm
+439500 MariaDB tpm
+447540 MariaDB tpm
+439980 MariaDB tpm
+443160 MariaDB tpm
+Vuser 8:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+439200 MariaDB tpm
+434100 MariaDB tpm
+435780 MariaDB tpm
+433320 MariaDB tpm
+431040 MariaDB tpm
+423780 MariaDB tpm
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435180 MariaDB tpm
+437460 MariaDB tpm
+433800 MariaDB tpm
+433140 MariaDB tpm
+429060 MariaDB tpm
+Vuser 95:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+441000 MariaDB tpm
+432660 MariaDB tpm
+440400 MariaDB tpm
+439320 MariaDB tpm
+442560 MariaDB tpm
+438960 MariaDB tpm
+437640 MariaDB tpm
+432300 MariaDB tpm
+Vuser 24:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431520 MariaDB tpm
+431520 MariaDB tpm
+Vuser 85:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 126:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 1:Rampup 3 minutes complete ...
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+436440 MariaDB tpm
+433920 MariaDB tpm
+434640 MariaDB tpm
+435900 MariaDB tpm
+436140 MariaDB tpm
+443520 MariaDB tpm
+439920 MariaDB tpm
+435060 MariaDB tpm
+Vuser 104:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+440940 MariaDB tpm
+432960 MariaDB tpm
+439080 MariaDB tpm
+435840 MariaDB tpm
+437520 MariaDB tpm
+434340 MariaDB tpm
+439560 MariaDB tpm
+Vuser 93:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422760 MariaDB tpm
+444840 MariaDB tpm
+430500 MariaDB tpm
+438780 MariaDB tpm
+440700 MariaDB tpm
+437220 MariaDB tpm
+434160 MariaDB tpm
+437280 MariaDB tpm
+439860 MariaDB tpm
+436080 MariaDB tpm
+437280 MariaDB tpm
+438600 MariaDB tpm
+Vuser 48:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433140 MariaDB tpm
+443640 MariaDB tpm
+441900 MariaDB tpm
+437340 MariaDB tpm
+436200 MariaDB tpm
+429360 MariaDB tpm
+Vuser 100:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433860 MariaDB tpm
+430740 MariaDB tpm
+432240 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432660 MariaDB tpm
+432480 MariaDB tpm
+439440 MariaDB tpm
+Vuser 55:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+434760 MariaDB tpm
+435000 MariaDB tpm
+424140 MariaDB tpm
+433620 MariaDB tpm
+436020 MariaDB tpm
+433260 MariaDB tpm
+Vuser 23:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431220 MariaDB tpm
+432000 MariaDB tpm
+Vuser 94:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+439860 MariaDB tpm
+439560 MariaDB tpm
+435000 MariaDB tpm
+435360 MariaDB tpm
+Vuser 58:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+416100 MariaDB tpm
+432060 MariaDB tpm
+438180 MariaDB tpm
+430980 MariaDB tpm
+Vuser 115:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432600 MariaDB tpm
+433500 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+440580 MariaDB tpm
+434100 MariaDB tpm
+440820 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 1:Rampup 4 minutes complete ...
+441240 MariaDB tpm
+433020 MariaDB tpm
+433200 MariaDB tpm
+Vuser 94:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429660 MariaDB tpm
+435360 MariaDB tpm
+435780 MariaDB tpm
+Vuser 3:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435900 MariaDB tpm
+Vuser 91:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+439440 MariaDB tpm
+445080 MariaDB tpm
+434220 MariaDB tpm
+442980 MariaDB tpm
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435000 MariaDB tpm
+431040 MariaDB tpm
+Vuser 42:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432960 MariaDB tpm
+439920 MariaDB tpm
+Vuser 24:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+441060 MariaDB tpm
+431100 MariaDB tpm
+434760 MariaDB tpm
+435600 MariaDB tpm
+438060 MariaDB tpm
+437760 MariaDB tpm
+431460 MariaDB tpm
+421140 MariaDB tpm
+432420 MariaDB tpm
+434700 MariaDB tpm
+434520 MariaDB tpm
+429300 MariaDB tpm
+425640 MariaDB tpm
+430080 MariaDB tpm
+435240 MariaDB tpm
+Vuser 30:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428940 MariaDB tpm
+Vuser 28:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431160 MariaDB tpm
+434700 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421440 MariaDB tpm
+408900 MariaDB tpm
+395340 MariaDB tpm
+387360 MariaDB tpm
+392580 MariaDB tpm
+Vuser 58:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+388260 MariaDB tpm
+386100 MariaDB tpm
+Vuser 51:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 78:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+391980 MariaDB tpm
+390840 MariaDB tpm
+389220 MariaDB tpm
+395160 MariaDB tpm
+385740 MariaDB tpm
+394320 MariaDB tpm
+389460 MariaDB tpm
+Vuser 74:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+389700 MariaDB tpm
+393420 MariaDB tpm
+387240 MariaDB tpm
+390000 MariaDB tpm
+386280 MariaDB tpm
+393720 MariaDB tpm
+Vuser 52:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+379200 MariaDB tpm
+391080 MariaDB tpm
+Vuser 60:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+213720 MariaDB tpm
+193620 MariaDB tpm
+Vuser 41:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 15:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+193680 MariaDB tpm
+Vuser 84:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+174060 MariaDB tpm
+Vuser 1:Rampup 5 minutes complete ...
+152580 MariaDB tpm
+Vuser 4:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+216000 MariaDB tpm
+217020 MariaDB tpm
+225780 MariaDB tpm
+221280 MariaDB tpm
+232260 MariaDB tpm
+236580 MariaDB tpm
+172380 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 127:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+194160 MariaDB tpm
+258000 MariaDB tpm
+269820 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+285420 MariaDB tpm
+324660 MariaDB tpm
+343020 MariaDB tpm
+Vuser 124:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+357300 MariaDB tpm
+357480 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+391800 MariaDB tpm
+411360 MariaDB tpm
+Vuser 113:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433860 MariaDB tpm
+434160 MariaDB tpm
+433380 MariaDB tpm
+428160 MariaDB tpm
+428040 MariaDB tpm
+Vuser 39:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432240 MariaDB tpm
+Vuser 101:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432960 MariaDB tpm
+437280 MariaDB tpm
+Vuser 79:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+436980 MariaDB tpm
+434460 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426300 MariaDB tpm
+404340 MariaDB tpm
+391200 MariaDB tpm
+386040 MariaDB tpm
+398580 MariaDB tpm
+428160 MariaDB tpm
+430080 MariaDB tpm
+Vuser 95:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428220 MariaDB tpm
+Vuser 29:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429900 MariaDB tpm
+436500 MariaDB tpm
+428160 MariaDB tpm
+432780 MariaDB tpm
+421620 MariaDB tpm
+Vuser 29:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426120 MariaDB tpm
+432960 MariaDB tpm
+423600 MariaDB tpm
+Vuser 97:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 42:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430020 MariaDB tpm
+Vuser 114:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433140 MariaDB tpm
+426000 MariaDB tpm
+422580 MariaDB tpm
+429660 MariaDB tpm
+Vuser 80:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426360 MariaDB tpm
+424260 MariaDB tpm
+427440 MariaDB tpm
+430320 MariaDB tpm
+434040 MariaDB tpm
+435000 MariaDB tpm
+Vuser 103:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430020 MariaDB tpm
+428640 MariaDB tpm
+427140 MariaDB tpm
+Vuser 96:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418800 MariaDB tpm
+Vuser 37:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425760 MariaDB tpm
+Vuser 1:Rampup 6 minutes complete ...
+428580 MariaDB tpm
+427560 MariaDB tpm
+428700 MariaDB tpm
+Vuser 77:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432480 MariaDB tpm
+Vuser 10:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430620 MariaDB tpm
+433500 MariaDB tpm
+Vuser 60:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 120:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429720 MariaDB tpm
+428700 MariaDB tpm
+413580 MariaDB tpm
+432000 MariaDB tpm
+Vuser 66:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428160 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433440 MariaDB tpm
+425280 MariaDB tpm
+427980 MariaDB tpm
+Vuser 121:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427500 MariaDB tpm
+430560 MariaDB tpm
+426840 MariaDB tpm
+437820 MariaDB tpm
+Vuser 31:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428640 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 25:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+439200 MariaDB tpm
+433500 MariaDB tpm
+428880 MariaDB tpm
+427200 MariaDB tpm
+430380 MariaDB tpm
+Vuser 94:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+434940 MariaDB tpm
+435540 MariaDB tpm
+433260 MariaDB tpm
+428940 MariaDB tpm
+429540 MariaDB tpm
+433020 MariaDB tpm
+431880 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428220 MariaDB tpm
+424020 MariaDB tpm
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430200 MariaDB tpm
+428700 MariaDB tpm
+431520 MariaDB tpm
+427980 MariaDB tpm
+420300 MariaDB tpm
+430800 MariaDB tpm
+428580 MariaDB tpm
+428580 MariaDB tpm
+Vuser 127:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428040 MariaDB tpm
+427440 MariaDB tpm
+431580 MariaDB tpm
+414480 MariaDB tpm
+429720 MariaDB tpm
+Vuser 49:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433020 MariaDB tpm
+429780 MariaDB tpm
+424500 MariaDB tpm
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 72:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 57:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427620 MariaDB tpm
+425820 MariaDB tpm
+429360 MariaDB tpm
+431520 MariaDB tpm
+431160 MariaDB tpm
+431820 MariaDB tpm
+425520 MariaDB tpm
+426540 MariaDB tpm
+424800 MariaDB tpm
+431220 MariaDB tpm
+Vuser 60:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 127:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 1:Rampup 7 minutes complete ...
+430200 MariaDB tpm
+Vuser 64:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428520 MariaDB tpm
+Vuser 23:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426540 MariaDB tpm
+427800 MariaDB tpm
+Vuser 118:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428580 MariaDB tpm
+432420 MariaDB tpm
+Vuser 65:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+438120 MariaDB tpm
+Vuser 94:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435300 MariaDB tpm
+435420 MariaDB tpm
+Vuser 36:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 65:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433980 MariaDB tpm
+430260 MariaDB tpm
+431940 MariaDB tpm
+440520 MariaDB tpm
+426540 MariaDB tpm
+436800 MariaDB tpm
+438600 MariaDB tpm
+416700 MariaDB tpm
+427980 MariaDB tpm
+438960 MariaDB tpm
+428820 MariaDB tpm
+Vuser 10:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426660 MariaDB tpm
+428040 MariaDB tpm
+420480 MariaDB tpm
+428340 MariaDB tpm
+432540 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431520 MariaDB tpm
+425880 MariaDB tpm
+Vuser 60:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429300 MariaDB tpm
+429000 MariaDB tpm
+434220 MariaDB tpm
+436440 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435720 MariaDB tpm
+429900 MariaDB tpm
+429300 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428220 MariaDB tpm
+430320 MariaDB tpm
+427080 MariaDB tpm
+428460 MariaDB tpm
+430080 MariaDB tpm
+Vuser 93:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431880 MariaDB tpm
+Vuser 96:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424440 MariaDB tpm
+431460 MariaDB tpm
+424260 MariaDB tpm
+432420 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429900 MariaDB tpm
+432720 MariaDB tpm
+Vuser 82:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 124:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 118:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431400 MariaDB tpm
+434700 MariaDB tpm
+432480 MariaDB tpm
+Vuser 56:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428040 MariaDB tpm
+426360 MariaDB tpm
+435540 MariaDB tpm
+421440 MariaDB tpm
+426540 MariaDB tpm
+430500 MariaDB tpm
+429720 MariaDB tpm
+426360 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427260 MariaDB tpm
+425160 MariaDB tpm
+423300 MariaDB tpm
+Vuser 1:Rampup 8 minutes complete ...
+427980 MariaDB tpm
+430860 MariaDB tpm
+426120 MariaDB tpm
+Vuser 57:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423480 MariaDB tpm
+426360 MariaDB tpm
+431880 MariaDB tpm
+435000 MariaDB tpm
+Vuser 94:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422940 MariaDB tpm
+429480 MariaDB tpm
+Vuser 24:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432780 MariaDB tpm
+424560 MariaDB tpm
+421740 MariaDB tpm
+Vuser 106:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432300 MariaDB tpm
+423780 MariaDB tpm
+431040 MariaDB tpm
+428340 MariaDB tpm
+431100 MariaDB tpm
+433320 MariaDB tpm
+426420 MariaDB tpm
+422340 MariaDB tpm
+433440 MariaDB tpm
+Vuser 129:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 82:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429120 MariaDB tpm
+427920 MariaDB tpm
+425220 MariaDB tpm
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428100 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427080 MariaDB tpm
+Vuser 80:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421680 MariaDB tpm
+423660 MariaDB tpm
+431040 MariaDB tpm
+Vuser 97:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+435120 MariaDB tpm
+429300 MariaDB tpm
+431100 MariaDB tpm
+424920 MariaDB tpm
+428700 MariaDB tpm
+421860 MariaDB tpm
+425700 MariaDB tpm
+423660 MariaDB tpm
+Vuser 88:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 78:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+439260 MariaDB tpm
+Vuser 85:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427560 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 128:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421620 MariaDB tpm
+424740 MariaDB tpm
+426240 MariaDB tpm
+431580 MariaDB tpm
+427680 MariaDB tpm
+433380 MariaDB tpm
+428340 MariaDB tpm
+425280 MariaDB tpm
+435840 MariaDB tpm
+433020 MariaDB tpm
+433140 MariaDB tpm
+Vuser 20:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426960 MariaDB tpm
+428820 MariaDB tpm
+432960 MariaDB tpm
+426840 MariaDB tpm
+429600 MariaDB tpm
+426480 MariaDB tpm
+Vuser 41:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425280 MariaDB tpm
+430800 MariaDB tpm
+Vuser 93:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+437820 MariaDB tpm
+Vuser 1:Rampup 9 minutes complete ...
+423540 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+432960 MariaDB tpm
+426720 MariaDB tpm
+426780 MariaDB tpm
+423900 MariaDB tpm
+Vuser 121:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 17:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425340 MariaDB tpm
+426960 MariaDB tpm
+433560 MariaDB tpm
+428160 MariaDB tpm
+Vuser 47:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 91:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428940 MariaDB tpm
+Vuser 46:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427620 MariaDB tpm
+420300 MariaDB tpm
+Vuser 34:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 104:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430140 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425340 MariaDB tpm
+429180 MariaDB tpm
+429900 MariaDB tpm
+424980 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+392940 MariaDB tpm
+387720 MariaDB tpm
+384840 MariaDB tpm
+Vuser 112:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+387240 MariaDB tpm
+389040 MariaDB tpm
+385080 MariaDB tpm
+382740 MariaDB tpm
+388080 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+383700 MariaDB tpm
+382920 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+384900 MariaDB tpm
+390120 MariaDB tpm
+377520 MariaDB tpm
+379140 MariaDB tpm
+379080 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+380520 MariaDB tpm
+Vuser 67:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 60:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+384480 MariaDB tpm
+381060 MariaDB tpm
+Vuser 57:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+388800 MariaDB tpm
+379680 MariaDB tpm
+330960 MariaDB tpm
+200280 MariaDB tpm
+195840 MariaDB tpm
+191340 MariaDB tpm
+198660 MariaDB tpm
+163560 MariaDB tpm
+134220 MariaDB tpm
+160980 MariaDB tpm
+207120 MariaDB tpm
+Vuser 120:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+202560 MariaDB tpm
+190980 MariaDB tpm
+203760 MariaDB tpm
+195480 MariaDB tpm
+Vuser 43:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+194700 MariaDB tpm
+192960 MariaDB tpm
+200700 MariaDB tpm
+209760 MariaDB tpm
+Vuser 125:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+228420 MariaDB tpm
+229620 MariaDB tpm
+Vuser 58:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+271680 MariaDB tpm
+293460 MariaDB tpm
+Vuser 23:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+231300 MariaDB tpm
+Vuser 77:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+214620 MariaDB tpm
+Vuser 1:Rampup 10 minutes complete ...
+Vuser 1:Rampup complete, Taking start Transaction Count.
+Vuser 1:Timing test period of 20 in minutes
+192900 MariaDB tpm
+182580 MariaDB tpm
+147900 MariaDB tpm
+142920 MariaDB tpm
+167460 MariaDB tpm
+200400 MariaDB tpm
+206160 MariaDB tpm
+205200 MariaDB tpm
+196020 MariaDB tpm
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+171180 MariaDB tpm
+176820 MariaDB tpm
+200220 MariaDB tpm
+208440 MariaDB tpm
+211500 MariaDB tpm
+222420 MariaDB tpm
+218160 MariaDB tpm
+207840 MariaDB tpm
+217620 MariaDB tpm
+195660 MariaDB tpm
+Vuser 116:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+243300 MariaDB tpm
+239280 MariaDB tpm
+240840 MariaDB tpm
+250320 MariaDB tpm
+250380 MariaDB tpm
+235440 MariaDB tpm
+251640 MariaDB tpm
+305340 MariaDB tpm
+299640 MariaDB tpm
+303660 MariaDB tpm
+315300 MariaDB tpm
+328800 MariaDB tpm
+318120 MariaDB tpm
+336600 MariaDB tpm
+Vuser 20:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+352380 MariaDB tpm
+415380 MariaDB tpm
+423480 MariaDB tpm
+424620 MariaDB tpm
+Vuser 129:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423660 MariaDB tpm
+427380 MariaDB tpm
+Vuser 124:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430920 MariaDB tpm
+Vuser 42:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429540 MariaDB tpm
+Vuser 127:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422880 MariaDB tpm
+Vuser 31:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429360 MariaDB tpm
+Vuser 69:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428580 MariaDB tpm
+Vuser 76:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+436740 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+433560 MariaDB tpm
+Vuser 23:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427380 MariaDB tpm
+428520 MariaDB tpm
+424980 MariaDB tpm
+425400 MariaDB tpm
+430980 MariaDB tpm
+427260 MariaDB tpm
+426360 MariaDB tpm
+Vuser 75:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421980 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+409920 MariaDB tpm
+Vuser 122:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425640 MariaDB tpm
+425640 MariaDB tpm
+421020 MariaDB tpm
+Vuser 44:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425760 MariaDB tpm
+Vuser 1:1 ...,
+428160 MariaDB tpm
+392460 MariaDB tpm
+399120 MariaDB tpm
+427380 MariaDB tpm
+432420 MariaDB tpm
+431580 MariaDB tpm
+Vuser 29:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427380 MariaDB tpm
+Vuser 129:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425820 MariaDB tpm
+435000 MariaDB tpm
+427200 MariaDB tpm
+Vuser 6:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424200 MariaDB tpm
+Vuser 118:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 65:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422280 MariaDB tpm
+425700 MariaDB tpm
+430320 MariaDB tpm
+425280 MariaDB tpm
+420480 MariaDB tpm
+422880 MariaDB tpm
+Vuser 90:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428700 MariaDB tpm
+425040 MariaDB tpm
+424920 MariaDB tpm
+420780 MariaDB tpm
+417900 MariaDB tpm
+425820 MariaDB tpm
+426240 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429420 MariaDB tpm
+427800 MariaDB tpm
+Vuser 100:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424800 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424140 MariaDB tpm
+Vuser 103:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428940 MariaDB tpm
+432300 MariaDB tpm
+Vuser 127:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 90:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424260 MariaDB tpm
+426240 MariaDB tpm
+433860 MariaDB tpm
+Vuser 124:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412380 MariaDB tpm
+432180 MariaDB tpm
+421920 MariaDB tpm
+428880 MariaDB tpm
+436920 MariaDB tpm
+425340 MariaDB tpm
+Vuser 56:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421560 MariaDB tpm
+424980 MariaDB tpm
+Vuser 127:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425040 MariaDB tpm
+Vuser 66:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431700 MariaDB tpm
+430980 MariaDB tpm
+Vuser 5:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420120 MariaDB tpm
+Vuser 29:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423840 MariaDB tpm
+427260 MariaDB tpm
+425640 MariaDB tpm
+425160 MariaDB tpm
+424440 MariaDB tpm
+423660 MariaDB tpm
+422940 MariaDB tpm
+Vuser 100:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422220 MariaDB tpm
+423900 MariaDB tpm
+Vuser 105:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428940 MariaDB tpm
+Vuser 2:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+436140 MariaDB tpm
+428220 MariaDB tpm
+425520 MariaDB tpm
+Vuser 121:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429360 MariaDB tpm
+Vuser 1:2 ...,
+429420 MariaDB tpm
+Vuser 35:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429000 MariaDB tpm
+423660 MariaDB tpm
+Vuser 69:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428940 MariaDB tpm
+429900 MariaDB tpm
+414480 MariaDB tpm
+Vuser 120:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427440 MariaDB tpm
+418500 MariaDB tpm
+427800 MariaDB tpm
+424380 MariaDB tpm
+424080 MariaDB tpm
+418740 MariaDB tpm
+Vuser 40:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422220 MariaDB tpm
+428400 MariaDB tpm
+423120 MariaDB tpm
+423660 MariaDB tpm
+418680 MariaDB tpm
+Vuser 78:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420960 MariaDB tpm
+425040 MariaDB tpm
+426900 MariaDB tpm
+427020 MariaDB tpm
+424860 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425880 MariaDB tpm
+Vuser 60:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 28:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424560 MariaDB tpm
+Vuser 37:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423720 MariaDB tpm
+422040 MariaDB tpm
+421200 MariaDB tpm
+422160 MariaDB tpm
+424560 MariaDB tpm
+422580 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426780 MariaDB tpm
+427500 MariaDB tpm
+429960 MariaDB tpm
+426960 MariaDB tpm
+427440 MariaDB tpm
+426060 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424140 MariaDB tpm
+Vuser 65:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419580 MariaDB tpm
+424560 MariaDB tpm
+423720 MariaDB tpm
+424980 MariaDB tpm
+409140 MariaDB tpm
+425820 MariaDB tpm
+427800 MariaDB tpm
+420360 MariaDB tpm
+426300 MariaDB tpm
+425340 MariaDB tpm
+423420 MariaDB tpm
+419520 MariaDB tpm
+425700 MariaDB tpm
+424680 MariaDB tpm
+427860 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419400 MariaDB tpm
+422640 MariaDB tpm
+429120 MariaDB tpm
+420720 MariaDB tpm
+420300 MariaDB tpm
+424680 MariaDB tpm
+423780 MariaDB tpm
+Vuser 32:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426840 MariaDB tpm
+Vuser 1:3 ...,
+431160 MariaDB tpm
+424560 MariaDB tpm
+420660 MariaDB tpm
+421920 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422100 MariaDB tpm
+423780 MariaDB tpm
+425460 MariaDB tpm
+422640 MariaDB tpm
+421260 MariaDB tpm
+419580 MariaDB tpm
+Vuser 67:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427380 MariaDB tpm
+419700 MariaDB tpm
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425340 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423180 MariaDB tpm
+Vuser 110:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 84:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426240 MariaDB tpm
+421740 MariaDB tpm
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421320 MariaDB tpm
+403680 MariaDB tpm
+421920 MariaDB tpm
+422160 MariaDB tpm
+426900 MariaDB tpm
+426660 MariaDB tpm
+423840 MariaDB tpm
+419520 MariaDB tpm
+427320 MariaDB tpm
+Vuser 42:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431880 MariaDB tpm
+426840 MariaDB tpm
+418200 MariaDB tpm
+436560 MariaDB tpm
+421620 MariaDB tpm
+Vuser 5:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427680 MariaDB tpm
+419400 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426180 MariaDB tpm
+423360 MariaDB tpm
+Vuser 83:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425280 MariaDB tpm
+424920 MariaDB tpm
+426000 MariaDB tpm
+426300 MariaDB tpm
+426180 MariaDB tpm
+420060 MariaDB tpm
+429180 MariaDB tpm
+420780 MariaDB tpm
+417720 MariaDB tpm
+Vuser 15:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423000 MariaDB tpm
+420960 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430860 MariaDB tpm
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422520 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 92:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427800 MariaDB tpm
+425880 MariaDB tpm
+Vuser 55:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418560 MariaDB tpm
+Vuser 4:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431700 MariaDB tpm
+Vuser 28:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429720 MariaDB tpm
+419160 MariaDB tpm
+411120 MariaDB tpm
+418500 MariaDB tpm
+424560 MariaDB tpm
+424740 MariaDB tpm
+421080 MariaDB tpm
+Vuser 65:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423180 MariaDB tpm
+Vuser 30:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424200 MariaDB tpm
+Vuser 1:4 ...,
+424140 MariaDB tpm
+422820 MariaDB tpm
+425820 MariaDB tpm
+418860 MariaDB tpm
+426900 MariaDB tpm
+432000 MariaDB tpm
+Vuser 16:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431100 MariaDB tpm
+425820 MariaDB tpm
+425700 MariaDB tpm
+Vuser 57:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420720 MariaDB tpm
+416160 MariaDB tpm
+425640 MariaDB tpm
+417780 MariaDB tpm
+Vuser 99:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425280 MariaDB tpm
+431460 MariaDB tpm
+427920 MariaDB tpm
+423240 MariaDB tpm
+Vuser 97:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424080 MariaDB tpm
+Vuser 67:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421320 MariaDB tpm
+388740 MariaDB tpm
+Vuser 43:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+389940 MariaDB tpm
+387540 MariaDB tpm
+387600 MariaDB tpm
+387180 MariaDB tpm
+Vuser 65:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+380340 MariaDB tpm
+382020 MariaDB tpm
+375960 MariaDB tpm
+382920 MariaDB tpm
+389040 MariaDB tpm
+388080 MariaDB tpm
+384420 MariaDB tpm
+384900 MariaDB tpm
+384360 MariaDB tpm
+387060 MariaDB tpm
+381480 MariaDB tpm
+370680 MariaDB tpm
+372840 MariaDB tpm
+387300 MariaDB tpm
+Vuser 15:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+384180 MariaDB tpm
+320040 MariaDB tpm
+173100 MariaDB tpm
+144000 MariaDB tpm
+149280 MariaDB tpm
+169560 MariaDB tpm
+197760 MariaDB tpm
+200040 MariaDB tpm
+Vuser 37:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+209580 MariaDB tpm
+199500 MariaDB tpm
+181080 MariaDB tpm
+156000 MariaDB tpm
+Vuser 56:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+170460 MariaDB tpm
+195000 MariaDB tpm
+197400 MariaDB tpm
+201660 MariaDB tpm
+165300 MariaDB tpm
+Vuser 84:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+161940 MariaDB tpm
+190080 MariaDB tpm
+287400 MariaDB tpm
+Vuser 100:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+315480 MariaDB tpm
+Vuser 1:5 ...,
+323700 MariaDB tpm
+340200 MariaDB tpm
+360180 MariaDB tpm
+382140 MariaDB tpm
+356580 MariaDB tpm
+422760 MariaDB tpm
+422700 MariaDB tpm
+415740 MariaDB tpm
+Vuser 67:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417360 MariaDB tpm
+419940 MariaDB tpm
+387420 MariaDB tpm
+374100 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+382440 MariaDB tpm
+399720 MariaDB tpm
+425700 MariaDB tpm
+422280 MariaDB tpm
+428160 MariaDB tpm
+422700 MariaDB tpm
+421260 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430080 MariaDB tpm
+426420 MariaDB tpm
+420660 MariaDB tpm
+420480 MariaDB tpm
+425100 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+410580 MariaDB tpm
+426360 MariaDB tpm
+423540 MariaDB tpm
+424020 MariaDB tpm
+421740 MariaDB tpm
+421140 MariaDB tpm
+418560 MariaDB tpm
+425040 MariaDB tpm
+421980 MariaDB tpm
+426060 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422160 MariaDB tpm
+Vuser 22:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423960 MariaDB tpm
+422100 MariaDB tpm
+424740 MariaDB tpm
+418380 MariaDB tpm
+420300 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421980 MariaDB tpm
+426480 MariaDB tpm
+Vuser 42:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 101:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+430980 MariaDB tpm
+420240 MariaDB tpm
+426240 MariaDB tpm
+423780 MariaDB tpm
+433080 MariaDB tpm
+423840 MariaDB tpm
+429900 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424320 MariaDB tpm
+429120 MariaDB tpm
+424560 MariaDB tpm
+429660 MariaDB tpm
+418320 MariaDB tpm
+422640 MariaDB tpm
+404160 MariaDB tpm
+426900 MariaDB tpm
+Vuser 25:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+416580 MariaDB tpm
+422580 MariaDB tpm
+Vuser 1:6 ...,
+425400 MariaDB tpm
+Vuser 105:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424320 MariaDB tpm
+428040 MariaDB tpm
+420120 MariaDB tpm
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429120 MariaDB tpm
+Vuser 90:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424860 MariaDB tpm
+428160 MariaDB tpm
+428520 MariaDB tpm
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427380 MariaDB tpm
+425520 MariaDB tpm
+Vuser 112:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+431760 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428520 MariaDB tpm
+425040 MariaDB tpm
+421800 MariaDB tpm
+Vuser 41:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 2:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425700 MariaDB tpm
+423120 MariaDB tpm
+421320 MariaDB tpm
+421080 MariaDB tpm
+426660 MariaDB tpm
+Vuser 98:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421980 MariaDB tpm
+423600 MariaDB tpm
+430440 MariaDB tpm
+Vuser 92:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428460 MariaDB tpm
+427980 MariaDB tpm
+420060 MariaDB tpm
+427080 MariaDB tpm
+421200 MariaDB tpm
+Vuser 87:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411480 MariaDB tpm
+420780 MariaDB tpm
+421080 MariaDB tpm
+421200 MariaDB tpm
+420600 MariaDB tpm
+Vuser 16:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 39:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+425880 MariaDB tpm
+Vuser 91:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426960 MariaDB tpm
+421680 MariaDB tpm
+426360 MariaDB tpm
+Vuser 15:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417960 MariaDB tpm
+420180 MariaDB tpm
+428280 MariaDB tpm
+427560 MariaDB tpm
+428760 MariaDB tpm
+Vuser 37:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429960 MariaDB tpm
+420900 MariaDB tpm
+425940 MariaDB tpm
+423060 MariaDB tpm
+424920 MariaDB tpm
+422460 MariaDB tpm
+427740 MariaDB tpm
+425940 MariaDB tpm
+424140 MariaDB tpm
+426480 MariaDB tpm
+Vuser 90:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420600 MariaDB tpm
+Vuser 52:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+429960 MariaDB tpm
+419400 MariaDB tpm
+420060 MariaDB tpm
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428460 MariaDB tpm
+427260 MariaDB tpm
+420300 MariaDB tpm
+412860 MariaDB tpm
+428220 MariaDB tpm
+Vuser 1:7 ...,
+426960 MariaDB tpm
+423300 MariaDB tpm
+419400 MariaDB tpm
+421440 MariaDB tpm
+421500 MariaDB tpm
+424980 MariaDB tpm
+416940 MariaDB tpm
+425760 MariaDB tpm
+420720 MariaDB tpm
+Vuser 106:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428040 MariaDB tpm
+431460 MariaDB tpm
+423600 MariaDB tpm
+427800 MariaDB tpm
+418680 MariaDB tpm
+422220 MariaDB tpm
+424920 MariaDB tpm
+422880 MariaDB tpm
+Vuser 44:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421440 MariaDB tpm
+422700 MariaDB tpm
+426300 MariaDB tpm
+Vuser 42:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419100 MariaDB tpm
+427200 MariaDB tpm
+423720 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422160 MariaDB tpm
+421140 MariaDB tpm
+Vuser 33:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 8:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423720 MariaDB tpm
+421200 MariaDB tpm
+428160 MariaDB tpm
+419400 MariaDB tpm
+Vuser 67:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419040 MariaDB tpm
+424380 MariaDB tpm
+422580 MariaDB tpm
+427980 MariaDB tpm
+419880 MariaDB tpm
+Vuser 127:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413880 MariaDB tpm
+Vuser 72:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419040 MariaDB tpm
+421440 MariaDB tpm
+427560 MariaDB tpm
+422400 MariaDB tpm
+Vuser 39:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423660 MariaDB tpm
+423720 MariaDB tpm
+423060 MariaDB tpm
+Vuser 104:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426180 MariaDB tpm
+Vuser 40:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+428880 MariaDB tpm
+420660 MariaDB tpm
+421620 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424980 MariaDB tpm
+426960 MariaDB tpm
+420540 MariaDB tpm
+427440 MariaDB tpm
+424620 MariaDB tpm
+419340 MariaDB tpm
+423660 MariaDB tpm
+423360 MariaDB tpm
+419940 MariaDB tpm
+427200 MariaDB tpm
+425640 MariaDB tpm
+429480 MariaDB tpm
+426900 MariaDB tpm
+Vuser 1:8 ...,
+422400 MariaDB tpm
+Vuser 97:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419520 MariaDB tpm
+425880 MariaDB tpm
+Vuser 74:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424080 MariaDB tpm
+426000 MariaDB tpm
+423240 MariaDB tpm
+420120 MariaDB tpm
+423120 MariaDB tpm
+Vuser 17:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 106:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419760 MariaDB tpm
+424860 MariaDB tpm
+427320 MariaDB tpm
+410220 MariaDB tpm
+422340 MariaDB tpm
+424500 MariaDB tpm
+427920 MariaDB tpm
+426720 MariaDB tpm
+422040 MariaDB tpm
+423840 MariaDB tpm
+417840 MariaDB tpm
+423660 MariaDB tpm
+427620 MariaDB tpm
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421680 MariaDB tpm
+431220 MariaDB tpm
+424920 MariaDB tpm
+Vuser 129:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426780 MariaDB tpm
+425760 MariaDB tpm
+Vuser 96:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 29:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422580 MariaDB tpm
+Vuser 5:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 23:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423420 MariaDB tpm
+424860 MariaDB tpm
+Vuser 67:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+426960 MariaDB tpm
+425820 MariaDB tpm
+424740 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424500 MariaDB tpm
+428640 MariaDB tpm
+419040 MariaDB tpm
+Vuser 28:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420240 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+427620 MariaDB tpm
+423720 MariaDB tpm
+427260 MariaDB tpm
+426960 MariaDB tpm
+420840 MariaDB tpm
+421140 MariaDB tpm
+416220 MariaDB tpm
+424320 MariaDB tpm
+426720 MariaDB tpm
+423480 MariaDB tpm
+Vuser 21:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421200 MariaDB tpm
+425460 MariaDB tpm
+Vuser 3:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 4:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420180 MariaDB tpm
+Vuser 76:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424020 MariaDB tpm
+421500 MariaDB tpm
+421620 MariaDB tpm
+432780 MariaDB tpm
+Vuser 53:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420420 MariaDB tpm
+428580 MariaDB tpm
+421860 MariaDB tpm
+416520 MariaDB tpm
+427020 MariaDB tpm
+425760 MariaDB tpm
+Vuser 69:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+422100 MariaDB tpm
+Vuser 11:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 1:9 ...,
+Vuser 125:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423000 MariaDB tpm
+420360 MariaDB tpm
+419520 MariaDB tpm
+421560 MariaDB tpm
+422460 MariaDB tpm
+429540 MariaDB tpm
+422640 MariaDB tpm
+396840 MariaDB tpm
+388320 MariaDB tpm
+382380 MariaDB tpm
+Vuser 81:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+388860 MariaDB tpm
+379080 MariaDB tpm
+384360 MariaDB tpm
+Vuser 10:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+378960 MariaDB tpm
+382200 MariaDB tpm
+Vuser 26:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+378480 MariaDB tpm
+377940 MariaDB tpm
+375900 MariaDB tpm
+378060 MariaDB tpm
+383820 MariaDB tpm
+382560 MariaDB tpm
+381900 MariaDB tpm
+Vuser 30:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+375960 MariaDB tpm
+Vuser 98:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+363000 MariaDB tpm
+358920 MariaDB tpm
+381060 MariaDB tpm
+382800 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+371460 MariaDB tpm
+197640 MariaDB tpm
+193740 MariaDB tpm
+Vuser 98:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+199740 MariaDB tpm
+Vuser 19:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+186840 MariaDB tpm
+192780 MariaDB tpm
+195840 MariaDB tpm
+Vuser 11:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+198360 MariaDB tpm
+Vuser 37:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+175200 MariaDB tpm
+201180 MariaDB tpm
+196020 MariaDB tpm
+192360 MariaDB tpm
+198600 MariaDB tpm
+189540 MariaDB tpm
+Vuser 76:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+150300 MariaDB tpm
+153300 MariaDB tpm
+155220 MariaDB tpm
+193740 MariaDB tpm
+208080 MariaDB tpm
+203400 MariaDB tpm
+215820 MariaDB tpm
+208080 MariaDB tpm
+211920 MariaDB tpm
+246540 MariaDB tpm
+254460 MariaDB tpm
+255300 MariaDB tpm
+215160 MariaDB tpm
+177660 MariaDB tpm
+199380 MariaDB tpm
+223680 MariaDB tpm
+218040 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+206160 MariaDB tpm
+Vuser 1:10 ...,
+191880 MariaDB tpm
+145920 MariaDB tpm
+158580 MariaDB tpm
+146520 MariaDB tpm
+205980 MariaDB tpm
+Vuser 86:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+207420 MariaDB tpm
+Vuser 111:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+214740 MariaDB tpm
+217380 MariaDB tpm
+220920 MariaDB tpm
+185220 MariaDB tpm
+182820 MariaDB tpm
+222960 MariaDB tpm
+257220 MariaDB tpm
+261240 MariaDB tpm
+Vuser 6:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+268440 MariaDB tpm
+266760 MariaDB tpm
+240180 MariaDB tpm
+240000 MariaDB tpm
+255960 MariaDB tpm
+279120 MariaDB tpm
+277980 MariaDB tpm
+289680 MariaDB tpm
+301680 MariaDB tpm
+299280 MariaDB tpm
+293640 MariaDB tpm
+294840 MariaDB tpm
+293700 MariaDB tpm
+275640 MariaDB tpm
+273780 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+276420 MariaDB tpm
+267480 MariaDB tpm
+288180 MariaDB tpm
+291480 MariaDB tpm
+294780 MariaDB tpm
+284460 MariaDB tpm
+297660 MariaDB tpm
+276120 MariaDB tpm
+294660 MariaDB tpm
+291540 MariaDB tpm
+300600 MariaDB tpm
+294600 MariaDB tpm
+286560 MariaDB tpm
+275220 MariaDB tpm
+276540 MariaDB tpm
+275400 MariaDB tpm
+275280 MariaDB tpm
+269220 MariaDB tpm
+272100 MariaDB tpm
+303960 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+325020 MariaDB tpm
+322080 MariaDB tpm
+Vuser 120:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+311520 MariaDB tpm
+315120 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+298140 MariaDB tpm
+292920 MariaDB tpm
+296640 MariaDB tpm
+284580 MariaDB tpm
+Vuser 123:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+265020 MariaDB tpm
+289620 MariaDB tpm
+Vuser 1:11 ...,
+310800 MariaDB tpm
+310020 MariaDB tpm
+314760 MariaDB tpm
+316500 MariaDB tpm
+323340 MariaDB tpm
+308340 MariaDB tpm
+313800 MariaDB tpm
+302040 MariaDB tpm
+Vuser 72:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+304260 MariaDB tpm
+309060 MariaDB tpm
+340320 MariaDB tpm
+335160 MariaDB tpm
+333420 MariaDB tpm
+335820 MariaDB tpm
+Vuser 39:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+334260 MariaDB tpm
+315660 MariaDB tpm
+309300 MariaDB tpm
+325440 MariaDB tpm
+Vuser 58:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+276300 MariaDB tpm
+262980 MariaDB tpm
+334440 MariaDB tpm
+362160 MariaDB tpm
+344400 MariaDB tpm
+330120 MariaDB tpm
+323460 MariaDB tpm
+327420 MariaDB tpm
+328020 MariaDB tpm
+275580 MariaDB tpm
+Vuser 28:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+220800 MariaDB tpm
+223500 MariaDB tpm
+272700 MariaDB tpm
+Vuser 114:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+322680 MariaDB tpm
+357960 MariaDB tpm
+334200 MariaDB tpm
+338340 MariaDB tpm
+341580 MariaDB tpm
+334080 MariaDB tpm
+248160 MariaDB tpm
+242700 MariaDB tpm
+272340 MariaDB tpm
+248220 MariaDB tpm
+249180 MariaDB tpm
+335220 MariaDB tpm
+362880 MariaDB tpm
+323760 MariaDB tpm
+332460 MariaDB tpm
+333000 MariaDB tpm
+Vuser 112:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+326280 MariaDB tpm
+299880 MariaDB tpm
+223260 MariaDB tpm
+261120 MariaDB tpm
+259320 MariaDB tpm
+254100 MariaDB tpm
+309180 MariaDB tpm
+Vuser 96:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+346020 MariaDB tpm
+Vuser 119:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+341580 MariaDB tpm
+Vuser 38:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+329100 MariaDB tpm
+319620 MariaDB tpm
+325080 MariaDB tpm
+Vuser 1:12 ...,
+322860 MariaDB tpm
+Vuser 108:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+300420 MariaDB tpm
+279840 MariaDB tpm
+285840 MariaDB tpm
+Vuser 18:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+329280 MariaDB tpm
+333840 MariaDB tpm
+325080 MariaDB tpm
+335280 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+325020 MariaDB tpm
+313500 MariaDB tpm
+296520 MariaDB tpm
+303840 MariaDB tpm
+310980 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+338040 MariaDB tpm
+325740 MariaDB tpm
+332340 MariaDB tpm
+326580 MariaDB tpm
+301920 MariaDB tpm
+298920 MariaDB tpm
+301920 MariaDB tpm
+Vuser 98:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+285660 MariaDB tpm
+261600 MariaDB tpm
+173280 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+337140 MariaDB tpm
+338280 MariaDB tpm
+334020 MariaDB tpm
+331260 MariaDB tpm
+306600 MariaDB tpm
+310140 MariaDB tpm
+310500 MariaDB tpm
+305580 MariaDB tpm
+282180 MariaDB tpm
+Vuser 92:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+282840 MariaDB tpm
+Vuser 95:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+336300 MariaDB tpm
+332160 MariaDB tpm
+338760 MariaDB tpm
+333780 MariaDB tpm
+330660 MariaDB tpm
+318840 MariaDB tpm
+314280 MariaDB tpm
+320460 MariaDB tpm
+313260 MariaDB tpm
+262140 MariaDB tpm
+276900 MariaDB tpm
+324420 MariaDB tpm
+351600 MariaDB tpm
+357420 MariaDB tpm
+356700 MariaDB tpm
+357480 MariaDB tpm
+343080 MariaDB tpm
+327720 MariaDB tpm
+326580 MariaDB tpm
+Vuser 58:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+328440 MariaDB tpm
+310560 MariaDB tpm
+323940 MariaDB tpm
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+365580 MariaDB tpm
+361020 MariaDB tpm
+353880 MariaDB tpm
+Vuser 114:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+360540 MariaDB tpm
+Vuser 42:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 85:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+368820 MariaDB tpm
+Vuser 1:13 ...,
+327720 MariaDB tpm
+Vuser 129:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+331380 MariaDB tpm
+363780 MariaDB tpm
+357120 MariaDB tpm
+346140 MariaDB tpm
+Vuser 73:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+305520 MariaDB tpm
+Vuser 51:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+325500 MariaDB tpm
+301320 MariaDB tpm
+Vuser 90:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+355440 MariaDB tpm
+353400 MariaDB tpm
+346740 MariaDB tpm
+299160 MariaDB tpm
+312420 MariaDB tpm
+329040 MariaDB tpm
+300180 MariaDB tpm
+276480 MariaDB tpm
+324360 MariaDB tpm
+369480 MariaDB tpm
+366420 MariaDB tpm
+327900 MariaDB tpm
+330000 MariaDB tpm
+327840 MariaDB tpm
+325320 MariaDB tpm
+Vuser 47:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+269820 MariaDB tpm
+283680 MariaDB tpm
+Vuser 116:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+335820 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+355080 MariaDB tpm
+354360 MariaDB tpm
+318600 MariaDB tpm
+323940 MariaDB tpm
+333360 MariaDB tpm
+319800 MariaDB tpm
+292260 MariaDB tpm
+298500 MariaDB tpm
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+338040 MariaDB tpm
+342900 MariaDB tpm
+349800 MariaDB tpm
+Vuser 30:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+350700 MariaDB tpm
+345300 MariaDB tpm
+307920 MariaDB tpm
+293760 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+300180 MariaDB tpm
+Vuser 11:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+322560 MariaDB tpm
+Vuser 103:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+346080 MariaDB tpm
+Vuser 28:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+344940 MariaDB tpm
+340680 MariaDB tpm
+Vuser 95:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+347160 MariaDB tpm
+340080 MariaDB tpm
+Vuser 101:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+293940 MariaDB tpm
+Vuser 112:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+316620 MariaDB tpm
+Vuser 99:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+347040 MariaDB tpm
+345540 MariaDB tpm
+345840 MariaDB tpm
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+344880 MariaDB tpm
+341940 MariaDB tpm
+306000 MariaDB tpm
+319320 MariaDB tpm
+316680 MariaDB tpm
+Vuser 114:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+304620 MariaDB tpm
+Vuser 1:14 ...,
+328560 MariaDB tpm
+349440 MariaDB tpm
+345900 MariaDB tpm
+352140 MariaDB tpm
+348180 MariaDB tpm
+332820 MariaDB tpm
+Vuser 95:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+311280 MariaDB tpm
+313680 MariaDB tpm
+338580 MariaDB tpm
+342600 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+347220 MariaDB tpm
+350580 MariaDB tpm
+347280 MariaDB tpm
+341400 MariaDB tpm
+351660 MariaDB tpm
+342900 MariaDB tpm
+346980 MariaDB tpm
+346920 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+314820 MariaDB tpm
+329100 MariaDB tpm
+347520 MariaDB tpm
+Vuser 87:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+343320 MariaDB tpm
+Vuser 51:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 47:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+344340 MariaDB tpm
+Vuser 32:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+340620 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+344460 MariaDB tpm
+Vuser 25:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+320460 MariaDB tpm
+320880 MariaDB tpm
+Vuser 87:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+329460 MariaDB tpm
+316440 MariaDB tpm
+305400 MariaDB tpm
+Vuser 33:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+352920 MariaDB tpm
+361380 MariaDB tpm
+358680 MariaDB tpm
+352320 MariaDB tpm
+351840 MariaDB tpm
+334380 MariaDB tpm
+288360 MariaDB tpm
+331200 MariaDB tpm
+354180 MariaDB tpm
+Vuser 26:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+357780 MariaDB tpm
+Vuser 80:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+336960 MariaDB tpm
+276060 MariaDB tpm
+290640 MariaDB tpm
+308220 MariaDB tpm
+322140 MariaDB tpm
+352560 MariaDB tpm
+353580 MariaDB tpm
+351900 MariaDB tpm
+306120 MariaDB tpm
+264000 MariaDB tpm
+268740 MariaDB tpm
+285840 MariaDB tpm
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 95:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+358860 MariaDB tpm
+369060 MariaDB tpm
+308220 MariaDB tpm
+320880 MariaDB tpm
+320700 MariaDB tpm
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+331980 MariaDB tpm
+Vuser 129:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+329940 MariaDB tpm
+378660 MariaDB tpm
+Vuser 1:15 ...,
+Vuser 16:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+378720 MariaDB tpm
+379920 MariaDB tpm
+Vuser 90:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+370980 MariaDB tpm
+377220 MariaDB tpm
+342780 MariaDB tpm
+317820 MariaDB tpm
+348000 MariaDB tpm
+393600 MariaDB tpm
+Vuser 99:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+392460 MariaDB tpm
+386220 MariaDB tpm
+Vuser 69:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+393060 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+389640 MariaDB tpm
+353460 MariaDB tpm
+348000 MariaDB tpm
+348600 MariaDB tpm
+353460 MariaDB tpm
+375420 MariaDB tpm
+371760 MariaDB tpm
+Vuser 66:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+352440 MariaDB tpm
+373140 MariaDB tpm
+382500 MariaDB tpm
+389940 MariaDB tpm
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+373980 MariaDB tpm
+377100 MariaDB tpm
+Vuser 116:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+376200 MariaDB tpm
+Vuser 116:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+371520 MariaDB tpm
+372780 MariaDB tpm
+Vuser 69:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 107:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+370140 MariaDB tpm
+Vuser 75:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+369060 MariaDB tpm
+370260 MariaDB tpm
+372540 MariaDB tpm
+Vuser 29:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+370440 MariaDB tpm
+375780 MariaDB tpm
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+373080 MariaDB tpm
+369000 MariaDB tpm
+372180 MariaDB tpm
+375360 MariaDB tpm
+366480 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+369540 MariaDB tpm
+Vuser 89:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+372720 MariaDB tpm
+373380 MariaDB tpm
+Vuser 46:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 43:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+375000 MariaDB tpm
+368160 MariaDB tpm
+175980 MariaDB tpm
+192000 MariaDB tpm
+197280 MariaDB tpm
+191400 MariaDB tpm
+197160 MariaDB tpm
+171180 MariaDB tpm
+135000 MariaDB tpm
+144180 MariaDB tpm
+201660 MariaDB tpm
+202920 MariaDB tpm
+197580 MariaDB tpm
+211680 MariaDB tpm
+202140 MariaDB tpm
+Vuser 84:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+184500 MariaDB tpm
+197580 MariaDB tpm
+213300 MariaDB tpm
+Vuser 1:16 ...,
+208800 MariaDB tpm
+219420 MariaDB tpm
+211860 MariaDB tpm
+222120 MariaDB tpm
+240120 MariaDB tpm
+Vuser 113:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+226380 MariaDB tpm
+267660 MariaDB tpm
+317460 MariaDB tpm
+Vuser 43:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+395820 MariaDB tpm
+410580 MariaDB tpm
+406440 MariaDB tpm
+Vuser 116:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 100:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412980 MariaDB tpm
+409440 MariaDB tpm
+418320 MariaDB tpm
+415920 MariaDB tpm
+411960 MariaDB tpm
+379980 MariaDB tpm
+Vuser 65:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 95:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+370560 MariaDB tpm
+366300 MariaDB tpm
+392520 MariaDB tpm
+Vuser 52:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 110:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 49:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418920 MariaDB tpm
+418380 MariaDB tpm
+418620 MariaDB tpm
+420840 MariaDB tpm
+418260 MariaDB tpm
+416640 MariaDB tpm
+Vuser 38:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417360 MariaDB tpm
+414000 MariaDB tpm
+413400 MariaDB tpm
+Vuser 15:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418200 MariaDB tpm
+409860 MariaDB tpm
+420360 MariaDB tpm
+Vuser 66:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+415980 MariaDB tpm
+414360 MariaDB tpm
+Vuser 18:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 77:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 103:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418680 MariaDB tpm
+406560 MariaDB tpm
+419040 MariaDB tpm
+416280 MariaDB tpm
+412020 MariaDB tpm
+Vuser 70:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411360 MariaDB tpm
+410340 MariaDB tpm
+418620 MariaDB tpm
+412980 MariaDB tpm
+Vuser 82:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 112:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413640 MariaDB tpm
+414300 MariaDB tpm
+410940 MariaDB tpm
+414660 MariaDB tpm
+414300 MariaDB tpm
+404160 MariaDB tpm
+418200 MariaDB tpm
+413040 MariaDB tpm
+417780 MariaDB tpm
+413040 MariaDB tpm
+417120 MariaDB tpm
+Vuser 60:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411900 MariaDB tpm
+415800 MariaDB tpm
+418740 MariaDB tpm
+418080 MariaDB tpm
+Vuser 63:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+416100 MariaDB tpm
+Vuser 105:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+414900 MariaDB tpm
+Vuser 1:17 ...,
+417960 MariaDB tpm
+Vuser 18:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420360 MariaDB tpm
+416100 MariaDB tpm
+414720 MariaDB tpm
+412380 MariaDB tpm
+418860 MariaDB tpm
+400140 MariaDB tpm
+Vuser 16:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+414420 MariaDB tpm
+Vuser 39:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418560 MariaDB tpm
+412320 MariaDB tpm
+Vuser 105:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 121:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424800 MariaDB tpm
+418800 MariaDB tpm
+416220 MariaDB tpm
+414600 MariaDB tpm
+Vuser 118:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411600 MariaDB tpm
+410100 MariaDB tpm
+Vuser 129:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 24:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417780 MariaDB tpm
+Vuser 61:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411840 MariaDB tpm
+417360 MariaDB tpm
+414300 MariaDB tpm
+414060 MariaDB tpm
+Vuser 79:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418440 MariaDB tpm
+Vuser 29:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+414300 MariaDB tpm
+421200 MariaDB tpm
+415800 MariaDB tpm
+418200 MariaDB tpm
+Vuser 33:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412260 MariaDB tpm
+416460 MariaDB tpm
+405960 MariaDB tpm
+420180 MariaDB tpm
+420360 MariaDB tpm
+Vuser 43:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418260 MariaDB tpm
+413400 MariaDB tpm
+410100 MariaDB tpm
+Vuser 69:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 120:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413640 MariaDB tpm
+Vuser 106:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412800 MariaDB tpm
+Vuser 4:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+407340 MariaDB tpm
+410460 MariaDB tpm
+Vuser 46:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420600 MariaDB tpm
+413760 MariaDB tpm
+416640 MariaDB tpm
+413340 MariaDB tpm
+411420 MariaDB tpm
+Vuser 35:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+416580 MariaDB tpm
+417240 MariaDB tpm
+417420 MariaDB tpm
+413700 MariaDB tpm
+Vuser 80:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411000 MariaDB tpm
+Vuser 61:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417540 MariaDB tpm
+421800 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+416520 MariaDB tpm
+421740 MariaDB tpm
+Vuser 114:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413940 MariaDB tpm
+Vuser 83:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412920 MariaDB tpm
+Vuser 99:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+424080 MariaDB tpm
+417420 MariaDB tpm
+Vuser 80:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419100 MariaDB tpm
+Vuser 11:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+416520 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412200 MariaDB tpm
+Vuser 1:18 ...,
+415800 MariaDB tpm
+411000 MariaDB tpm
+420720 MariaDB tpm
+413700 MariaDB tpm
+415380 MariaDB tpm
+418320 MariaDB tpm
+Vuser 11:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413400 MariaDB tpm
+417180 MariaDB tpm
+412980 MariaDB tpm
+407220 MariaDB tpm
+414540 MariaDB tpm
+Vuser 89:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 74:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417660 MariaDB tpm
+415980 MariaDB tpm
+420000 MariaDB tpm
+Vuser 68:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419340 MariaDB tpm
+419040 MariaDB tpm
+415560 MariaDB tpm
+415620 MariaDB tpm
+415380 MariaDB tpm
+416100 MariaDB tpm
+Vuser 81:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+415380 MariaDB tpm
+Vuser 56:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+420540 MariaDB tpm
+410100 MariaDB tpm
+416220 MariaDB tpm
+413880 MariaDB tpm
+419760 MariaDB tpm
+414840 MariaDB tpm
+413640 MariaDB tpm
+412020 MariaDB tpm
+410580 MariaDB tpm
+414960 MariaDB tpm
+420900 MariaDB tpm
+412320 MariaDB tpm
+414240 MariaDB tpm
+413040 MariaDB tpm
+Vuser 84:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412680 MariaDB tpm
+407760 MariaDB tpm
+414780 MariaDB tpm
+416700 MariaDB tpm
+408840 MariaDB tpm
+413040 MariaDB tpm
+410280 MariaDB tpm
+414780 MariaDB tpm
+414660 MariaDB tpm
+419340 MariaDB tpm
+413700 MariaDB tpm
+Vuser 58:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 106:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418920 MariaDB tpm
+409980 MariaDB tpm
+417240 MariaDB tpm
+409020 MariaDB tpm
+Vuser 19:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+412980 MariaDB tpm
+Vuser 113:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+415860 MariaDB tpm
+416340 MariaDB tpm
+409440 MariaDB tpm
+421920 MariaDB tpm
+410640 MariaDB tpm
+Vuser 3:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+409260 MariaDB tpm
+416100 MariaDB tpm
+412140 MariaDB tpm
+414360 MariaDB tpm
+Vuser 1:19 ...,
+410640 MariaDB tpm
+415140 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411240 MariaDB tpm
+416040 MariaDB tpm
+Vuser 94:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+421020 MariaDB tpm
+419100 MariaDB tpm
+415980 MariaDB tpm
+413640 MariaDB tpm
+Vuser 17:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413100 MariaDB tpm
+418020 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+409380 MariaDB tpm
+415020 MariaDB tpm
+419400 MariaDB tpm
+Vuser 76:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 59:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417960 MariaDB tpm
+Vuser 105:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 52:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418320 MariaDB tpm
+412320 MariaDB tpm
+Vuser 75:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+415380 MariaDB tpm
+417540 MariaDB tpm
+419520 MariaDB tpm
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+415140 MariaDB tpm
+415860 MariaDB tpm
+Vuser 75:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 102:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 62:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411960 MariaDB tpm
+Vuser 66:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417540 MariaDB tpm
+416460 MariaDB tpm
+Vuser 78:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+418680 MariaDB tpm
+415140 MariaDB tpm
+420120 MariaDB tpm
+419160 MariaDB tpm
+413760 MariaDB tpm
+411900 MariaDB tpm
+417180 MariaDB tpm
+Vuser 64:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413700 MariaDB tpm
+411780 MariaDB tpm
+421260 MariaDB tpm
+411540 MariaDB tpm
+412800 MariaDB tpm
+Vuser 92:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 10:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+417960 MariaDB tpm
+415860 MariaDB tpm
+412140 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413220 MariaDB tpm
+417300 MariaDB tpm
+409560 MariaDB tpm
+Vuser 50:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+419340 MariaDB tpm
+Vuser 71:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413280 MariaDB tpm
+419160 MariaDB tpm
+414960 MariaDB tpm
+415560 MariaDB tpm
+410880 MariaDB tpm
+Vuser 128:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+413400 MariaDB tpm
+Vuser 103:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+411000 MariaDB tpm
+408120 MariaDB tpm
+415200 MariaDB tpm
+Vuser 74:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+423120 MariaDB tpm
+416580 MariaDB tpm
+415800 MariaDB tpm
+413640 MariaDB tpm
+418680 MariaDB tpm
+404820 MariaDB tpm
+418860 MariaDB tpm
+Vuser 1:20 ...,
+Vuser 1:Test complete, Taking end Transaction Count.
+Vuser 1:128 Active Virtual Users configured
+Vuser 1:TEST RESULT : System achieved 158003 NOPM from 367041 MariaDB TPM
+Vuser 1:Gathering timing data from Active Virtual Users...
+Vuser 47:FINISHED SUCCESS
+Vuser 115:FINISHED SUCCESS
+Vuser 113:FINISHED SUCCESS
+Vuser 6:FINISHED SUCCESS
+Vuser 42:FINISHED SUCCESS
+Vuser 80:FINISHED SUCCESS
+Vuser 99:FINISHED SUCCESS
+Vuser 126:FINISHED SUCCESS
+Vuser 48:FINISHED SUCCESS
+Vuser 119:FINISHED SUCCESS
+Vuser 23:FINISHED SUCCESS
+Vuser 96:FINISHED SUCCESS
+Vuser 20:FINISHED SUCCESS
+Vuser 102:FINISHED SUCCESS
+Vuser 73:FINISHED SUCCESS
+Vuser 105:FINISHED SUCCESS
+Vuser 62:FINISHED SUCCESS
+Vuser 83:FINISHED SUCCESS
+Vuser 64:FINISHED SUCCESS
+Vuser 11:FINISHED SUCCESS
+Vuser 123:FINISHED SUCCESS
+376800 MariaDB tpm
+Vuser 67:FINISHED SUCCESS
+Vuser 29:FINISHED SUCCESS
+Vuser 91:FINISHED SUCCESS
+Vuser 110:FINISHED SUCCESS
+Vuser 30:FINISHED SUCCESS
+Vuser 54:FINISHED SUCCESS
+Vuser 71:FINISHED SUCCESS
+Vuser 51:FINISHED SUCCESS
+Vuser 69:FINISHED SUCCESS
+Vuser 95:FINISHED SUCCESS
+Vuser 61:FINISHED SUCCESS
+Vuser 41:FINISHED SUCCESS
+Vuser 128:FINISHED SUCCESS
+Vuser 37:FINISHED SUCCESS
+Vuser 57:FINISHED SUCCESS
+Vuser 118:FINISHED SUCCESS
+Vuser 58:FINISHED SUCCESS
+Vuser 63:FINISHED SUCCESS
+Vuser 106:FINISHED SUCCESS
+Vuser 18:FINISHED SUCCESS
+Vuser 33:FINISHED SUCCESS
+Vuser 129:FINISHED SUCCESS
+Vuser 78:FINISHED SUCCESS
+Vuser 40:FINISHED SUCCESS
+Vuser 116:FINISHED SUCCESS
+Vuser 43:FINISHED SUCCESS
+Vuser 72:FINISHED SUCCESS
+Vuser 55:FINISHED SUCCESS
+Vuser 52:FINISHED SUCCESS
+Vuser 117:FINISHED SUCCESS
+Vuser 109:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 24:FINISHED SUCCESS
+Vuser 12:FINISHED SUCCESS
+Vuser 35:FINISHED SUCCESS
+Vuser 97:FINISHED SUCCESS
+Vuser 17:FINISHED SUCCESS
+Vuser 32:FINISHED SUCCESS
+358740 MariaDB tpm
+Vuser 103:FINISHED SUCCESS
+Vuser 111:FINISHED SUCCESS
+Vuser 121:FINISHED SUCCESS
+Vuser 38:FINISHED SUCCESS
+Vuser 77:FINISHED SUCCESS
+Vuser 31:FINISHED SUCCESS
+Vuser 125:FINISHED SUCCESS
+Vuser 76:FINISHED SUCCESS
+Vuser 82:FINISHED SUCCESS
+Vuser 120:FINISHED SUCCESS
+Vuser 112:FINISHED SUCCESS
+Vuser 86:FINISHED SUCCESS
+399960 MariaDB tpm
+Vuser 89:FINISHED SUCCESS
+Vuser 26:FINISHED SUCCESS
+Vuser 34:FINISHED SUCCESS
+Vuser 79:FINISHED SUCCESS
+Vuser 50:FINISHED SUCCESS
+Vuser 107:FINISHED SUCCESS
+Vuser 88:FINISHED SUCCESS
+Vuser 56:FINISHED SUCCESS
+Vuser 45:FINISHED SUCCESS
+Vuser 25:FINISHED SUCCESS
+Vuser 14:FINISHED SUCCESS
+Vuser 27:FINISHED SUCCESS
+Vuser 15:FINISHED SUCCESS
+Vuser 2:FINISHED SUCCESS
+365760 MariaDB tpm
+Vuser 66:FINISHED SUCCESS
+Vuser 46:FINISHED SUCCESS
+Vuser 104:FINISHED SUCCESS
+Vuser 53:FINISHED SUCCESS
+Vuser 59:FINISHED SUCCESS
+Vuser 4:FINISHED SUCCESS
+Vuser 108:FINISHED SUCCESS
+Vuser 101:FINISHED SUCCESS
+Vuser 90:FINISHED SUCCESS
+Vuser 36:FINISHED SUCCESS
+330060 MariaDB tpm
+Vuser 70:FINISHED SUCCESS
+Vuser 92:FINISHED SUCCESS
+Vuser 13:FINISHED SUCCESS
+Vuser 87:FINISHED SUCCESS
+Vuser 81:FINISHED SUCCESS
+Vuser 94:FINISHED SUCCESS
+Vuser 9:FINISHED SUCCESS
+Vuser 16:FINISHED SUCCESS
+Vuser 122:FINISHED SUCCESS
+Vuser 98:FINISHED SUCCESS
+Vuser 68:FINISHED SUCCESS
+Vuser 127:FINISHED SUCCESS
+Vuser 74:FINISHED SUCCESS
+Vuser 100:FINISHED SUCCESS
+Vuser 8:FINISHED SUCCESS
+260220 MariaDB tpm
+Vuser 22:FINISHED SUCCESS
+Vuser 85:FINISHED SUCCESS
+Vuser 39:FINISHED SUCCESS
+Vuser 49:FINISHED SUCCESS
+Vuser 114:FINISHED SUCCESS
+Vuser 7:FINISHED SUCCESS
+Vuser 65:FINISHED SUCCESS
+Vuser 21:FINISHED SUCCESS
+Vuser 19:FINISHED SUCCESS
+Vuser 10:FINISHED SUCCESS
+149100 MariaDB tpm
+Vuser 124:FINISHED SUCCESS
+Vuser 5:FINISHED SUCCESS
+Vuser 109:FINISHED SUCCESS
+Vuser 28:FINISHED SUCCESS
+Vuser 60:FINISHED SUCCESS
+Vuser 75:FINISHED SUCCESS
+82260 MariaDB tpm
+Vuser 44:FINISHED SUCCESS
+Vuser 3:FINISHED SUCCESS
+Vuser 84:FINISHED SUCCESS
+Vuser 93:FINISHED SUCCESS
+43920 MariaDB tpm
+Vuser 1:Calculating timings...
+Vuser 1:Writing timing data to /root/sqlanalysis/run3000/hdbtmp/hdbxtprofile.log
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+Vuser 1:FINISHED SUCCESS
+ALL VIRTUAL USERS COMPLETE
+Transaction Counter thread running with threadid:tid0x7ffdbd7fa6c0
+Stopping Transaction Counter
+vudestroy success
+BENCH_JOBID 6ABEFAF1A09903E273732313

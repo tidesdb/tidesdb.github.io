@@ -1,0 +1,2033 @@
+HammerDB CLI v6.0
+Copyright © HammerDB Ltd hosted by tpc.org 2019-2026
+Type "help" for a list of commands
+Initialized Jobs on-disk database /root/sqlanalysis/run3000/hdbtmp/hammer.DB using existing tables (21,639,168 bytes)
+Database set to MariaDB
+Benchmark set to TPC-C for MariaDB
+Value localhost for connection:maria_host is the same as existing value localhost, no change made
+Value 3306 for connection:maria_port is the same as existing value 3306, no change made
+Value /tmp/mariadb.sock for connection:maria_socket is the same as existing value /tmp/mariadb.sock, no change made
+Value hammer for tpcc:maria_user is the same as existing value hammer, no change made
+Value hammer for tpcc:maria_pass is the same as existing value hammer, no change made
+Value tpcc for tpcc:maria_dbase is the same as existing value tpcc, no change made
+Value timed for tpcc:maria_driver is the same as existing value timed, no change made
+Value 10 for tpcc:maria_rampup is the same as existing value 10, no change made
+Value 20 for tpcc:maria_duration is the same as existing value 20, no change made
+Value true for tpcc:maria_allwarehouse is the same as existing value true, no change made
+Value true for tpcc:maria_timeprofile is the same as existing value true, no change made
+Value false for tpcc:maria_keyandthink is the same as existing value false, no change made
+Value false for tpcc:maria_raiseerror is the same as existing value false, no change made
+Value false for tpcc:maria_purge is the same as existing value false, no change made
+Value 1200 for commandline:keepalive_margin is the same as existing value 1200, no change made
+Value 1200 for timeprofile:xt_gather_timeout is the same as existing value 1200, no change made
+Transaction Counter refresh rate set to 1
+Transaction Counter timestamps set to 1
+Script loaded, Type "print script" to view
+Vuser 1 created MONITOR - WAIT IDLE
+Vuser 2 created - WAIT IDLE
+Vuser 3 created - WAIT IDLE
+Vuser 4 created - WAIT IDLE
+Vuser 5 created - WAIT IDLE
+Vuser 6 created - WAIT IDLE
+Vuser 7 created - WAIT IDLE
+Vuser 8 created - WAIT IDLE
+Vuser 9 created - WAIT IDLE
+Vuser 10 created - WAIT IDLE
+Vuser 11 created - WAIT IDLE
+Vuser 12 created - WAIT IDLE
+Vuser 13 created - WAIT IDLE
+Vuser 14 created - WAIT IDLE
+Vuser 15 created - WAIT IDLE
+Vuser 16 created - WAIT IDLE
+Vuser 17 created - WAIT IDLE
+Logging activated to /root/sqlanalysis/run3000/hdbtmp/hammerdb.log
+17 Virtual Users Created with Monitor VU
+Transaction Counter Started
+Transaction Counter thread running with threadid:tid0x7fffbd7fa6c0
+Vuser 1:RUNNING
+Vuser 1:Initializing xtprof time profiler
+Vuser 1:Ssl_cipher 
+Vuser 1:DBVersion:11.4.13
+Vuser 1:Beginning rampup time of 10 minutes
+0 MariaDB tpm
+Vuser 2:RUNNING
+Vuser 2:Initializing xtprof time profiler
+Vuser 2:Ssl_cipher 
+Vuser 2:Assigned 188 WIDs = 1 17 33 49 65 81 97 113 129 145 161 177 193 209 225 241 257 273 289 305 321 337 353 369 385 401 417 433 449 465 481 497 513 529 545 561 577 593 609 625 641 657 673 689 705 721 737 753 769 785 801 817 833 849 865 881 897 913 929 945 961 977 993 1009 1025 1041 1057 1073 1089 1105 1121 1137 1153 1169 1185 1201 1217 1233 1249 1265 1281 1297 1313 1329 1345 1361 1377 1393 1409 1425 1441 1457 1473 1489 1505 1521 1537 1553 1569 1585 1601 1617 1633 1649 1665 1681 1697 1713 1729 1745 1761 1777 1793 1809 1825 1841 1857 1873 1889 1905 1921 1937 1953 1969 1985 2001 2017 2033 2049 2065 2081 2097 2113 2129 2145 2161 2177 2193 2209 2225 2241 2257 2273 2289 2305 2321 2337 2353 2369 2385 2401 2417 2433 2449 2465 2481 2497 2513 2529 2545 2561 2577 2593 2609 2625 2641 2657 2673 2689 2705 2721 2737 2753 2769 2785 2801 2817 2833 2849 2865 2881 2897 2913 2929 2945 2961 2977 2993 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 2:Processing 10000000 transactions with output suppressed...
+Vuser 3:RUNNING
+Vuser 3:Initializing xtprof time profiler
+Vuser 3:Ssl_cipher 
+Vuser 3:Assigned 188 WIDs = 2 18 34 50 66 82 98 114 130 146 162 178 194 210 226 242 258 274 290 306 322 338 354 370 386 402 418 434 450 466 482 498 514 530 546 562 578 594 610 626 642 658 674 690 706 722 738 754 770 786 802 818 834 850 866 882 898 914 930 946 962 978 994 1010 1026 1042 1058 1074 1090 1106 1122 1138 1154 1170 1186 1202 1218 1234 1250 1266 1282 1298 1314 1330 1346 1362 1378 1394 1410 1426 1442 1458 1474 1490 1506 1522 1538 1554 1570 1586 1602 1618 1634 1650 1666 1682 1698 1714 1730 1746 1762 1778 1794 1810 1826 1842 1858 1874 1890 1906 1922 1938 1954 1970 1986 2002 2018 2034 2050 2066 2082 2098 2114 2130 2146 2162 2178 2194 2210 2226 2242 2258 2274 2290 2306 2322 2338 2354 2370 2386 2402 2418 2434 2450 2466 2482 2498 2514 2530 2546 2562 2578 2594 2610 2626 2642 2658 2674 2690 2706 2722 2738 2754 2770 2786 2802 2818 2834 2850 2866 2882 2898 2914 2930 2946 2962 2978 2994 based on VU count 16, Warehouses = 188 out of 3000
+780 MariaDB tpm
+Vuser 3:Processing 10000000 transactions with output suppressed...
+Vuser 4:RUNNING
+Vuser 4:Initializing xtprof time profiler
+Vuser 4:Ssl_cipher 
+Vuser 4:Assigned 188 WIDs = 3 19 35 51 67 83 99 115 131 147 163 179 195 211 227 243 259 275 291 307 323 339 355 371 387 403 419 435 451 467 483 499 515 531 547 563 579 595 611 627 643 659 675 691 707 723 739 755 771 787 803 819 835 851 867 883 899 915 931 947 963 979 995 1011 1027 1043 1059 1075 1091 1107 1123 1139 1155 1171 1187 1203 1219 1235 1251 1267 1283 1299 1315 1331 1347 1363 1379 1395 1411 1427 1443 1459 1475 1491 1507 1523 1539 1555 1571 1587 1603 1619 1635 1651 1667 1683 1699 1715 1731 1747 1763 1779 1795 1811 1827 1843 1859 1875 1891 1907 1923 1939 1955 1971 1987 2003 2019 2035 2051 2067 2083 2099 2115 2131 2147 2163 2179 2195 2211 2227 2243 2259 2275 2291 2307 2323 2339 2355 2371 2387 2403 2419 2435 2451 2467 2483 2499 2515 2531 2547 2563 2579 2595 2611 2627 2643 2659 2675 2691 2707 2723 2739 2755 2771 2787 2803 2819 2835 2851 2867 2883 2899 2915 2931 2947 2963 2979 2995 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 4:Processing 10000000 transactions with output suppressed...
+Vuser 5:RUNNING
+Vuser 5:Initializing xtprof time profiler
+Vuser 5:Ssl_cipher 
+Vuser 5:Assigned 188 WIDs = 4 20 36 52 68 84 100 116 132 148 164 180 196 212 228 244 260 276 292 308 324 340 356 372 388 404 420 436 452 468 484 500 516 532 548 564 580 596 612 628 644 660 676 692 708 724 740 756 772 788 804 820 836 852 868 884 900 916 932 948 964 980 996 1012 1028 1044 1060 1076 1092 1108 1124 1140 1156 1172 1188 1204 1220 1236 1252 1268 1284 1300 1316 1332 1348 1364 1380 1396 1412 1428 1444 1460 1476 1492 1508 1524 1540 1556 1572 1588 1604 1620 1636 1652 1668 1684 1700 1716 1732 1748 1764 1780 1796 1812 1828 1844 1860 1876 1892 1908 1924 1940 1956 1972 1988 2004 2020 2036 2052 2068 2084 2100 2116 2132 2148 2164 2180 2196 2212 2228 2244 2260 2276 2292 2308 2324 2340 2356 2372 2388 2404 2420 2436 2452 2468 2484 2500 2516 2532 2548 2564 2580 2596 2612 2628 2644 2660 2676 2692 2708 2724 2740 2756 2772 2788 2804 2820 2836 2852 2868 2884 2900 2916 2932 2948 2964 2980 2996 based on VU count 16, Warehouses = 188 out of 3000
+20580 MariaDB tpm
+Vuser 5:Processing 10000000 transactions with output suppressed...
+Vuser 6:RUNNING
+Vuser 6:Initializing xtprof time profiler
+Vuser 6:Ssl_cipher 
+Vuser 6:Assigned 188 WIDs = 5 21 37 53 69 85 101 117 133 149 165 181 197 213 229 245 261 277 293 309 325 341 357 373 389 405 421 437 453 469 485 501 517 533 549 565 581 597 613 629 645 661 677 693 709 725 741 757 773 789 805 821 837 853 869 885 901 917 933 949 965 981 997 1013 1029 1045 1061 1077 1093 1109 1125 1141 1157 1173 1189 1205 1221 1237 1253 1269 1285 1301 1317 1333 1349 1365 1381 1397 1413 1429 1445 1461 1477 1493 1509 1525 1541 1557 1573 1589 1605 1621 1637 1653 1669 1685 1701 1717 1733 1749 1765 1781 1797 1813 1829 1845 1861 1877 1893 1909 1925 1941 1957 1973 1989 2005 2021 2037 2053 2069 2085 2101 2117 2133 2149 2165 2181 2197 2213 2229 2245 2261 2277 2293 2309 2325 2341 2357 2373 2389 2405 2421 2437 2453 2469 2485 2501 2517 2533 2549 2565 2581 2597 2613 2629 2645 2661 2677 2693 2709 2725 2741 2757 2773 2789 2805 2821 2837 2853 2869 2885 2901 2917 2933 2949 2965 2981 2997 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 6:Processing 10000000 transactions with output suppressed...
+Vuser 7:RUNNING
+Vuser 7:Initializing xtprof time profiler
+Vuser 7:Ssl_cipher 
+Vuser 7:Assigned 188 WIDs = 6 22 38 54 70 86 102 118 134 150 166 182 198 214 230 246 262 278 294 310 326 342 358 374 390 406 422 438 454 470 486 502 518 534 550 566 582 598 614 630 646 662 678 694 710 726 742 758 774 790 806 822 838 854 870 886 902 918 934 950 966 982 998 1014 1030 1046 1062 1078 1094 1110 1126 1142 1158 1174 1190 1206 1222 1238 1254 1270 1286 1302 1318 1334 1350 1366 1382 1398 1414 1430 1446 1462 1478 1494 1510 1526 1542 1558 1574 1590 1606 1622 1638 1654 1670 1686 1702 1718 1734 1750 1766 1782 1798 1814 1830 1846 1862 1878 1894 1910 1926 1942 1958 1974 1990 2006 2022 2038 2054 2070 2086 2102 2118 2134 2150 2166 2182 2198 2214 2230 2246 2262 2278 2294 2310 2326 2342 2358 2374 2390 2406 2422 2438 2454 2470 2486 2502 2518 2534 2550 2566 2582 2598 2614 2630 2646 2662 2678 2694 2710 2726 2742 2758 2774 2790 2806 2822 2838 2854 2870 2886 2902 2918 2934 2950 2966 2982 2998 based on VU count 16, Warehouses = 188 out of 3000
+50760 MariaDB tpm
+Vuser 7:Processing 10000000 transactions with output suppressed...
+Vuser 8:RUNNING
+Vuser 8:Initializing xtprof time profiler
+Vuser 8:Ssl_cipher 
+Vuser 8:Assigned 188 WIDs = 7 23 39 55 71 87 103 119 135 151 167 183 199 215 231 247 263 279 295 311 327 343 359 375 391 407 423 439 455 471 487 503 519 535 551 567 583 599 615 631 647 663 679 695 711 727 743 759 775 791 807 823 839 855 871 887 903 919 935 951 967 983 999 1015 1031 1047 1063 1079 1095 1111 1127 1143 1159 1175 1191 1207 1223 1239 1255 1271 1287 1303 1319 1335 1351 1367 1383 1399 1415 1431 1447 1463 1479 1495 1511 1527 1543 1559 1575 1591 1607 1623 1639 1655 1671 1687 1703 1719 1735 1751 1767 1783 1799 1815 1831 1847 1863 1879 1895 1911 1927 1943 1959 1975 1991 2007 2023 2039 2055 2071 2087 2103 2119 2135 2151 2167 2183 2199 2215 2231 2247 2263 2279 2295 2311 2327 2343 2359 2375 2391 2407 2423 2439 2455 2471 2487 2503 2519 2535 2551 2567 2583 2599 2615 2631 2647 2663 2679 2695 2711 2727 2743 2759 2775 2791 2807 2823 2839 2855 2871 2887 2903 2919 2935 2951 2967 2983 2999 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 8:Processing 10000000 transactions with output suppressed...
+Vuser 9:RUNNING
+Vuser 9:Initializing xtprof time profiler
+Vuser 9:Ssl_cipher 
+Vuser 9:Assigned 188 WIDs = 8 24 40 56 72 88 104 120 136 152 168 184 200 216 232 248 264 280 296 312 328 344 360 376 392 408 424 440 456 472 488 504 520 536 552 568 584 600 616 632 648 664 680 696 712 728 744 760 776 792 808 824 840 856 872 888 904 920 936 952 968 984 1000 1016 1032 1048 1064 1080 1096 1112 1128 1144 1160 1176 1192 1208 1224 1240 1256 1272 1288 1304 1320 1336 1352 1368 1384 1400 1416 1432 1448 1464 1480 1496 1512 1528 1544 1560 1576 1592 1608 1624 1640 1656 1672 1688 1704 1720 1736 1752 1768 1784 1800 1816 1832 1848 1864 1880 1896 1912 1928 1944 1960 1976 1992 2008 2024 2040 2056 2072 2088 2104 2120 2136 2152 2168 2184 2200 2216 2232 2248 2264 2280 2296 2312 2328 2344 2360 2376 2392 2408 2424 2440 2456 2472 2488 2504 2520 2536 2552 2568 2584 2600 2616 2632 2648 2664 2680 2696 2712 2728 2744 2760 2776 2792 2808 2824 2840 2856 2872 2888 2904 2920 2936 2952 2968 2984 3000 based on VU count 16, Warehouses = 188 out of 3000
+77280 MariaDB tpm
+Vuser 9:Processing 10000000 transactions with output suppressed...
+Vuser 10:RUNNING
+Vuser 10:Initializing xtprof time profiler
+Vuser 10:Ssl_cipher 
+Vuser 10:Assigned 188 WIDs = 9 25 41 57 73 89 105 121 137 153 169 185 201 217 233 249 265 281 297 313 329 345 361 377 393 409 425 441 457 473 489 505 521 537 553 569 585 601 617 633 649 665 681 697 713 729 745 761 777 793 809 825 841 857 873 889 905 921 937 953 969 985 1001 1017 1033 1049 1065 1081 1097 1113 1129 1145 1161 1177 1193 1209 1225 1241 1257 1273 1289 1305 1321 1337 1353 1369 1385 1401 1417 1433 1449 1465 1481 1497 1513 1529 1545 1561 1577 1593 1609 1625 1641 1657 1673 1689 1705 1721 1737 1753 1769 1785 1801 1817 1833 1849 1865 1881 1897 1913 1929 1945 1961 1977 1993 2009 2025 2041 2057 2073 2089 2105 2121 2137 2153 2169 2185 2201 2217 2233 2249 2265 2281 2297 2313 2329 2345 2361 2377 2393 2409 2425 2441 2457 2473 2489 2505 2521 2537 2553 2569 2585 2601 2617 2633 2649 2665 2681 2697 2713 2729 2745 2761 2777 2793 2809 2825 2841 2857 2873 2889 2905 2921 2937 2953 2969 2985 1 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 10:Processing 10000000 transactions with output suppressed...
+Vuser 11:RUNNING
+Vuser 11:Initializing xtprof time profiler
+Vuser 11:Ssl_cipher 
+Vuser 11:Assigned 188 WIDs = 10 26 42 58 74 90 106 122 138 154 170 186 202 218 234 250 266 282 298 314 330 346 362 378 394 410 426 442 458 474 490 506 522 538 554 570 586 602 618 634 650 666 682 698 714 730 746 762 778 794 810 826 842 858 874 890 906 922 938 954 970 986 1002 1018 1034 1050 1066 1082 1098 1114 1130 1146 1162 1178 1194 1210 1226 1242 1258 1274 1290 1306 1322 1338 1354 1370 1386 1402 1418 1434 1450 1466 1482 1498 1514 1530 1546 1562 1578 1594 1610 1626 1642 1658 1674 1690 1706 1722 1738 1754 1770 1786 1802 1818 1834 1850 1866 1882 1898 1914 1930 1946 1962 1978 1994 2010 2026 2042 2058 2074 2090 2106 2122 2138 2154 2170 2186 2202 2218 2234 2250 2266 2282 2298 2314 2330 2346 2362 2378 2394 2410 2426 2442 2458 2474 2490 2506 2522 2538 2554 2570 2586 2602 2618 2634 2650 2666 2682 2698 2714 2730 2746 2762 2778 2794 2810 2826 2842 2858 2874 2890 2906 2922 2938 2954 2970 2986 2 based on VU count 16, Warehouses = 188 out of 3000
+119580 MariaDB tpm
+Vuser 11:Processing 10000000 transactions with output suppressed...
+Vuser 12:RUNNING
+Vuser 12:Initializing xtprof time profiler
+Vuser 12:Ssl_cipher 
+Vuser 12:Assigned 188 WIDs = 11 27 43 59 75 91 107 123 139 155 171 187 203 219 235 251 267 283 299 315 331 347 363 379 395 411 427 443 459 475 491 507 523 539 555 571 587 603 619 635 651 667 683 699 715 731 747 763 779 795 811 827 843 859 875 891 907 923 939 955 971 987 1003 1019 1035 1051 1067 1083 1099 1115 1131 1147 1163 1179 1195 1211 1227 1243 1259 1275 1291 1307 1323 1339 1355 1371 1387 1403 1419 1435 1451 1467 1483 1499 1515 1531 1547 1563 1579 1595 1611 1627 1643 1659 1675 1691 1707 1723 1739 1755 1771 1787 1803 1819 1835 1851 1867 1883 1899 1915 1931 1947 1963 1979 1995 2011 2027 2043 2059 2075 2091 2107 2123 2139 2155 2171 2187 2203 2219 2235 2251 2267 2283 2299 2315 2331 2347 2363 2379 2395 2411 2427 2443 2459 2475 2491 2507 2523 2539 2555 2571 2587 2603 2619 2635 2651 2667 2683 2699 2715 2731 2747 2763 2779 2795 2811 2827 2843 2859 2875 2891 2907 2923 2939 2955 2971 2987 3 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 12:Processing 10000000 transactions with output suppressed...
+Vuser 13:RUNNING
+Vuser 13:Initializing xtprof time profiler
+Vuser 13:Ssl_cipher 
+Vuser 13:Assigned 188 WIDs = 12 28 44 60 76 92 108 124 140 156 172 188 204 220 236 252 268 284 300 316 332 348 364 380 396 412 428 444 460 476 492 508 524 540 556 572 588 604 620 636 652 668 684 700 716 732 748 764 780 796 812 828 844 860 876 892 908 924 940 956 972 988 1004 1020 1036 1052 1068 1084 1100 1116 1132 1148 1164 1180 1196 1212 1228 1244 1260 1276 1292 1308 1324 1340 1356 1372 1388 1404 1420 1436 1452 1468 1484 1500 1516 1532 1548 1564 1580 1596 1612 1628 1644 1660 1676 1692 1708 1724 1740 1756 1772 1788 1804 1820 1836 1852 1868 1884 1900 1916 1932 1948 1964 1980 1996 2012 2028 2044 2060 2076 2092 2108 2124 2140 2156 2172 2188 2204 2220 2236 2252 2268 2284 2300 2316 2332 2348 2364 2380 2396 2412 2428 2444 2460 2476 2492 2508 2524 2540 2556 2572 2588 2604 2620 2636 2652 2668 2684 2700 2716 2732 2748 2764 2780 2796 2812 2828 2844 2860 2876 2892 2908 2924 2940 2956 2972 2988 4 based on VU count 16, Warehouses = 188 out of 3000
+149700 MariaDB tpm
+Vuser 13:Processing 10000000 transactions with output suppressed...
+Vuser 14:RUNNING
+Vuser 14:Initializing xtprof time profiler
+Vuser 14:Ssl_cipher 
+Vuser 14:Assigned 188 WIDs = 13 29 45 61 77 93 109 125 141 157 173 189 205 221 237 253 269 285 301 317 333 349 365 381 397 413 429 445 461 477 493 509 525 541 557 573 589 605 621 637 653 669 685 701 717 733 749 765 781 797 813 829 845 861 877 893 909 925 941 957 973 989 1005 1021 1037 1053 1069 1085 1101 1117 1133 1149 1165 1181 1197 1213 1229 1245 1261 1277 1293 1309 1325 1341 1357 1373 1389 1405 1421 1437 1453 1469 1485 1501 1517 1533 1549 1565 1581 1597 1613 1629 1645 1661 1677 1693 1709 1725 1741 1757 1773 1789 1805 1821 1837 1853 1869 1885 1901 1917 1933 1949 1965 1981 1997 2013 2029 2045 2061 2077 2093 2109 2125 2141 2157 2173 2189 2205 2221 2237 2253 2269 2285 2301 2317 2333 2349 2365 2381 2397 2413 2429 2445 2461 2477 2493 2509 2525 2541 2557 2573 2589 2605 2621 2637 2653 2669 2685 2701 2717 2733 2749 2765 2781 2797 2813 2829 2845 2861 2877 2893 2909 2925 2941 2957 2973 2989 5 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 14:Processing 10000000 transactions with output suppressed...
+Vuser 15:RUNNING
+Vuser 15:Initializing xtprof time profiler
+Vuser 15:Ssl_cipher 
+Vuser 15:Assigned 188 WIDs = 14 30 46 62 78 94 110 126 142 158 174 190 206 222 238 254 270 286 302 318 334 350 366 382 398 414 430 446 462 478 494 510 526 542 558 574 590 606 622 638 654 670 686 702 718 734 750 766 782 798 814 830 846 862 878 894 910 926 942 958 974 990 1006 1022 1038 1054 1070 1086 1102 1118 1134 1150 1166 1182 1198 1214 1230 1246 1262 1278 1294 1310 1326 1342 1358 1374 1390 1406 1422 1438 1454 1470 1486 1502 1518 1534 1550 1566 1582 1598 1614 1630 1646 1662 1678 1694 1710 1726 1742 1758 1774 1790 1806 1822 1838 1854 1870 1886 1902 1918 1934 1950 1966 1982 1998 2014 2030 2046 2062 2078 2094 2110 2126 2142 2158 2174 2190 2206 2222 2238 2254 2270 2286 2302 2318 2334 2350 2366 2382 2398 2414 2430 2446 2462 2478 2494 2510 2526 2542 2558 2574 2590 2606 2622 2638 2654 2670 2686 2702 2718 2734 2750 2766 2782 2798 2814 2830 2846 2862 2878 2894 2910 2926 2942 2958 2974 2990 6 based on VU count 16, Warehouses = 188 out of 3000
+179760 MariaDB tpm
+Vuser 15:Processing 10000000 transactions with output suppressed...
+Vuser 16:RUNNING
+Vuser 16:Initializing xtprof time profiler
+Vuser 16:Ssl_cipher 
+Vuser 16:Assigned 188 WIDs = 15 31 47 63 79 95 111 127 143 159 175 191 207 223 239 255 271 287 303 319 335 351 367 383 399 415 431 447 463 479 495 511 527 543 559 575 591 607 623 639 655 671 687 703 719 735 751 767 783 799 815 831 847 863 879 895 911 927 943 959 975 991 1007 1023 1039 1055 1071 1087 1103 1119 1135 1151 1167 1183 1199 1215 1231 1247 1263 1279 1295 1311 1327 1343 1359 1375 1391 1407 1423 1439 1455 1471 1487 1503 1519 1535 1551 1567 1583 1599 1615 1631 1647 1663 1679 1695 1711 1727 1743 1759 1775 1791 1807 1823 1839 1855 1871 1887 1903 1919 1935 1951 1967 1983 1999 2015 2031 2047 2063 2079 2095 2111 2127 2143 2159 2175 2191 2207 2223 2239 2255 2271 2287 2303 2319 2335 2351 2367 2383 2399 2415 2431 2447 2463 2479 2495 2511 2527 2543 2559 2575 2591 2607 2623 2639 2655 2671 2687 2703 2719 2735 2751 2767 2783 2799 2815 2831 2847 2863 2879 2895 2911 2927 2943 2959 2975 2991 7 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 16:Processing 10000000 transactions with output suppressed...
+Vuser 17:RUNNING
+Vuser 17:Initializing xtprof time profiler
+Vuser 17:Ssl_cipher 
+221340 MariaDB tpm
+Vuser 17:Assigned 188 WIDs = 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 256 272 288 304 320 336 352 368 384 400 416 432 448 464 480 496 512 528 544 560 576 592 608 624 640 656 672 688 704 720 736 752 768 784 800 816 832 848 864 880 896 912 928 944 960 976 992 1008 1024 1040 1056 1072 1088 1104 1120 1136 1152 1168 1184 1200 1216 1232 1248 1264 1280 1296 1312 1328 1344 1360 1376 1392 1408 1424 1440 1456 1472 1488 1504 1520 1536 1552 1568 1584 1600 1616 1632 1648 1664 1680 1696 1712 1728 1744 1760 1776 1792 1808 1824 1840 1856 1872 1888 1904 1920 1936 1952 1968 1984 2000 2016 2032 2048 2064 2080 2096 2112 2128 2144 2160 2176 2192 2208 2224 2240 2256 2272 2288 2304 2320 2336 2352 2368 2384 2400 2416 2432 2448 2464 2480 2496 2512 2528 2544 2560 2576 2592 2608 2624 2640 2656 2672 2688 2704 2720 2736 2752 2768 2784 2800 2816 2832 2848 2864 2880 2896 2912 2928 2944 2960 2976 2992 8 based on VU count 16, Warehouses = 188 out of 3000
+Vuser 17:Processing 10000000 transactions with output suppressed...
+245400 MariaDB tpm
+259860 MariaDB tpm
+260280 MariaDB tpm
+271920 MariaDB tpm
+277140 MariaDB tpm
+274680 MariaDB tpm
+279120 MariaDB tpm
+282360 MariaDB tpm
+295620 MariaDB tpm
+298020 MariaDB tpm
+297240 MariaDB tpm
+300780 MariaDB tpm
+299460 MariaDB tpm
+313500 MariaDB tpm
+311100 MariaDB tpm
+311580 MariaDB tpm
+321960 MariaDB tpm
+323220 MariaDB tpm
+324480 MariaDB tpm
+325020 MariaDB tpm
+327060 MariaDB tpm
+316380 MariaDB tpm
+336660 MariaDB tpm
+332760 MariaDB tpm
+331380 MariaDB tpm
+335160 MariaDB tpm
+338880 MariaDB tpm
+339960 MariaDB tpm
+338400 MariaDB tpm
+341820 MariaDB tpm
+347820 MariaDB tpm
+339600 MariaDB tpm
+349800 MariaDB tpm
+351720 MariaDB tpm
+344640 MariaDB tpm
+349560 MariaDB tpm
+350220 MariaDB tpm
+353160 MariaDB tpm
+350280 MariaDB tpm
+355560 MariaDB tpm
+353760 MariaDB tpm
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+352440 MariaDB tpm
+356160 MariaDB tpm
+360360 MariaDB tpm
+358860 MariaDB tpm
+359100 MariaDB tpm
+364140 MariaDB tpm
+356340 MariaDB tpm
+363780 MariaDB tpm
+360360 MariaDB tpm
+370740 MariaDB tpm
+Vuser 1:Rampup 1 minutes complete ...
+365100 MariaDB tpm
+360360 MariaDB tpm
+359520 MariaDB tpm
+364860 MariaDB tpm
+364020 MariaDB tpm
+370260 MariaDB tpm
+368160 MariaDB tpm
+370980 MariaDB tpm
+372900 MariaDB tpm
+372300 MariaDB tpm
+371520 MariaDB tpm
+371280 MariaDB tpm
+369240 MariaDB tpm
+380340 MariaDB tpm
+372180 MariaDB tpm
+374040 MariaDB tpm
+371940 MariaDB tpm
+376920 MariaDB tpm
+Vuser 5:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+372960 MariaDB tpm
+374160 MariaDB tpm
+378180 MariaDB tpm
+Vuser 5:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+376800 MariaDB tpm
+376680 MariaDB tpm
+378480 MariaDB tpm
+377880 MariaDB tpm
+384480 MariaDB tpm
+375240 MariaDB tpm
+377220 MariaDB tpm
+383040 MariaDB tpm
+388740 MariaDB tpm
+387120 MariaDB tpm
+376380 MariaDB tpm
+371280 MariaDB tpm
+379920 MariaDB tpm
+384120 MariaDB tpm
+392460 MariaDB tpm
+386280 MariaDB tpm
+382740 MariaDB tpm
+393600 MariaDB tpm
+387780 MariaDB tpm
+391260 MariaDB tpm
+393720 MariaDB tpm
+385140 MariaDB tpm
+389100 MariaDB tpm
+394500 MariaDB tpm
+390300 MariaDB tpm
+382620 MariaDB tpm
+384660 MariaDB tpm
+386820 MariaDB tpm
+386940 MariaDB tpm
+386160 MariaDB tpm
+383340 MariaDB tpm
+388140 MariaDB tpm
+387660 MariaDB tpm
+385320 MariaDB tpm
+390720 MariaDB tpm
+383400 MariaDB tpm
+390900 MariaDB tpm
+382500 MariaDB tpm
+381060 MariaDB tpm
+Vuser 1:Rampup 2 minutes complete ...
+389280 MariaDB tpm
+382680 MariaDB tpm
+393120 MariaDB tpm
+384180 MariaDB tpm
+385140 MariaDB tpm
+386040 MariaDB tpm
+379680 MariaDB tpm
+379140 MariaDB tpm
+378540 MariaDB tpm
+382080 MariaDB tpm
+383580 MariaDB tpm
+386220 MariaDB tpm
+378300 MariaDB tpm
+376020 MariaDB tpm
+380160 MariaDB tpm
+380100 MariaDB tpm
+378060 MariaDB tpm
+375960 MariaDB tpm
+361320 MariaDB tpm
+379080 MariaDB tpm
+378540 MariaDB tpm
+381300 MariaDB tpm
+384900 MariaDB tpm
+376200 MariaDB tpm
+381660 MariaDB tpm
+382020 MariaDB tpm
+390780 MariaDB tpm
+379380 MariaDB tpm
+387240 MariaDB tpm
+377400 MariaDB tpm
+390540 MariaDB tpm
+384120 MariaDB tpm
+380820 MariaDB tpm
+380400 MariaDB tpm
+384780 MariaDB tpm
+385620 MariaDB tpm
+383820 MariaDB tpm
+382800 MariaDB tpm
+385920 MariaDB tpm
+382860 MariaDB tpm
+385260 MariaDB tpm
+387240 MariaDB tpm
+384420 MariaDB tpm
+383520 MariaDB tpm
+384840 MariaDB tpm
+390360 MariaDB tpm
+385140 MariaDB tpm
+387840 MariaDB tpm
+383400 MariaDB tpm
+Vuser 3:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+360600 MariaDB tpm
+384300 MariaDB tpm
+381120 MariaDB tpm
+389760 MariaDB tpm
+383220 MariaDB tpm
+383640 MariaDB tpm
+Vuser 5:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+375540 MariaDB tpm
+379620 MariaDB tpm
+384480 MariaDB tpm
+379620 MariaDB tpm
+387060 MariaDB tpm
+Vuser 1:Rampup 3 minutes complete ...
+379860 MariaDB tpm
+383100 MariaDB tpm
+383760 MariaDB tpm
+376620 MariaDB tpm
+372600 MariaDB tpm
+381900 MariaDB tpm
+378720 MariaDB tpm
+381840 MariaDB tpm
+378780 MariaDB tpm
+380760 MariaDB tpm
+379800 MariaDB tpm
+384000 MariaDB tpm
+384660 MariaDB tpm
+380820 MariaDB tpm
+383160 MariaDB tpm
+383820 MariaDB tpm
+383340 MariaDB tpm
+386280 MariaDB tpm
+382440 MariaDB tpm
+384720 MariaDB tpm
+356820 MariaDB tpm
+375840 MariaDB tpm
+380280 MariaDB tpm
+378780 MariaDB tpm
+380940 MariaDB tpm
+379740 MariaDB tpm
+376440 MariaDB tpm
+379380 MariaDB tpm
+383160 MariaDB tpm
+382620 MariaDB tpm
+379380 MariaDB tpm
+378240 MariaDB tpm
+384060 MariaDB tpm
+378060 MariaDB tpm
+383400 MariaDB tpm
+384780 MariaDB tpm
+378420 MariaDB tpm
+382020 MariaDB tpm
+383760 MariaDB tpm
+379620 MariaDB tpm
+377160 MariaDB tpm
+384480 MariaDB tpm
+384600 MariaDB tpm
+390480 MariaDB tpm
+382200 MariaDB tpm
+381960 MariaDB tpm
+381780 MariaDB tpm
+386940 MariaDB tpm
+377700 MariaDB tpm
+384300 MariaDB tpm
+383520 MariaDB tpm
+385440 MariaDB tpm
+388200 MariaDB tpm
+388140 MariaDB tpm
+379140 MariaDB tpm
+383880 MariaDB tpm
+376800 MariaDB tpm
+361080 MariaDB tpm
+384180 MariaDB tpm
+379800 MariaDB tpm
+Vuser 1:Rampup 4 minutes complete ...
+385740 MariaDB tpm
+381360 MariaDB tpm
+381960 MariaDB tpm
+382740 MariaDB tpm
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+381120 MariaDB tpm
+Vuser 17:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+379440 MariaDB tpm
+379080 MariaDB tpm
+383520 MariaDB tpm
+379200 MariaDB tpm
+377580 MariaDB tpm
+383520 MariaDB tpm
+382860 MariaDB tpm
+375720 MariaDB tpm
+383040 MariaDB tpm
+386640 MariaDB tpm
+385380 MariaDB tpm
+379500 MariaDB tpm
+383820 MariaDB tpm
+380760 MariaDB tpm
+374640 MariaDB tpm
+377760 MariaDB tpm
+380760 MariaDB tpm
+379980 MariaDB tpm
+378180 MariaDB tpm
+377460 MariaDB tpm
+383640 MariaDB tpm
+385080 MariaDB tpm
+380700 MariaDB tpm
+361620 MariaDB tpm
+384300 MariaDB tpm
+387660 MariaDB tpm
+384240 MariaDB tpm
+388860 MariaDB tpm
+382260 MariaDB tpm
+380100 MariaDB tpm
+378900 MariaDB tpm
+386700 MariaDB tpm
+377040 MariaDB tpm
+377040 MariaDB tpm
+381240 MariaDB tpm
+379740 MariaDB tpm
+380580 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+375180 MariaDB tpm
+384720 MariaDB tpm
+389160 MariaDB tpm
+378420 MariaDB tpm
+380340 MariaDB tpm
+377340 MariaDB tpm
+383580 MariaDB tpm
+376620 MariaDB tpm
+376020 MariaDB tpm
+381180 MariaDB tpm
+378540 MariaDB tpm
+378120 MariaDB tpm
+375060 MariaDB tpm
+375060 MariaDB tpm
+377400 MariaDB tpm
+381120 MariaDB tpm
+380040 MariaDB tpm
+380820 MariaDB tpm
+Vuser 1:Rampup 5 minutes complete ...
+377100 MariaDB tpm
+379800 MariaDB tpm
+379080 MariaDB tpm
+385380 MariaDB tpm
+383340 MariaDB tpm
+Vuser 17:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+379140 MariaDB tpm
+381000 MariaDB tpm
+381360 MariaDB tpm
+386400 MariaDB tpm
+378900 MariaDB tpm
+380280 MariaDB tpm
+377280 MariaDB tpm
+378600 MariaDB tpm
+384000 MariaDB tpm
+379080 MariaDB tpm
+382920 MariaDB tpm
+355620 MariaDB tpm
+357960 MariaDB tpm
+348480 MariaDB tpm
+334020 MariaDB tpm
+352800 MariaDB tpm
+350940 MariaDB tpm
+349320 MariaDB tpm
+344280 MariaDB tpm
+350940 MariaDB tpm
+316200 MariaDB tpm
+350880 MariaDB tpm
+349920 MariaDB tpm
+347520 MariaDB tpm
+349560 MariaDB tpm
+346080 MariaDB tpm
+344940 MariaDB tpm
+343020 MariaDB tpm
+345120 MariaDB tpm
+346080 MariaDB tpm
+352320 MariaDB tpm
+200580 MariaDB tpm
+154800 MariaDB tpm
+154920 MariaDB tpm
+145920 MariaDB tpm
+129060 MariaDB tpm
+168840 MariaDB tpm
+168000 MariaDB tpm
+170460 MariaDB tpm
+169800 MariaDB tpm
+172500 MariaDB tpm
+164580 MariaDB tpm
+191880 MariaDB tpm
+202140 MariaDB tpm
+266400 MariaDB tpm
+299100 MariaDB tpm
+319080 MariaDB tpm
+322560 MariaDB tpm
+344640 MariaDB tpm
+360240 MariaDB tpm
+365220 MariaDB tpm
+375300 MariaDB tpm
+376440 MariaDB tpm
+371700 MariaDB tpm
+Vuser 1:Rampup 6 minutes complete ...
+373620 MariaDB tpm
+376080 MariaDB tpm
+376800 MariaDB tpm
+375540 MariaDB tpm
+381540 MariaDB tpm
+377760 MariaDB tpm
+374760 MariaDB tpm
+373500 MariaDB tpm
+374220 MariaDB tpm
+370260 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+374880 MariaDB tpm
+376980 MariaDB tpm
+376200 MariaDB tpm
+372900 MariaDB tpm
+375060 MariaDB tpm
+345540 MariaDB tpm
+295380 MariaDB tpm
+315840 MariaDB tpm
+374220 MariaDB tpm
+373800 MariaDB tpm
+376140 MariaDB tpm
+370800 MariaDB tpm
+360060 MariaDB tpm
+298920 MariaDB tpm
+372600 MariaDB tpm
+370740 MariaDB tpm
+375540 MariaDB tpm
+375360 MariaDB tpm
+371820 MariaDB tpm
+374640 MariaDB tpm
+370800 MariaDB tpm
+375180 MariaDB tpm
+371220 MariaDB tpm
+371640 MariaDB tpm
+376200 MariaDB tpm
+376980 MariaDB tpm
+376140 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+379980 MariaDB tpm
+374460 MariaDB tpm
+376260 MariaDB tpm
+377340 MariaDB tpm
+376680 MariaDB tpm
+373200 MariaDB tpm
+369660 MariaDB tpm
+376560 MariaDB tpm
+376140 MariaDB tpm
+371280 MariaDB tpm
+375240 MariaDB tpm
+375360 MariaDB tpm
+371640 MariaDB tpm
+373440 MariaDB tpm
+371040 MariaDB tpm
+377340 MariaDB tpm
+377820 MariaDB tpm
+353340 MariaDB tpm
+381480 MariaDB tpm
+375600 MariaDB tpm
+374160 MariaDB tpm
+380160 MariaDB tpm
+377640 MariaDB tpm
+Vuser 1:Rampup 7 minutes complete ...
+372360 MariaDB tpm
+376920 MariaDB tpm
+372240 MariaDB tpm
+373740 MariaDB tpm
+375600 MariaDB tpm
+371580 MariaDB tpm
+377160 MariaDB tpm
+376080 MariaDB tpm
+372540 MariaDB tpm
+373200 MariaDB tpm
+375660 MariaDB tpm
+376740 MariaDB tpm
+372060 MariaDB tpm
+379500 MariaDB tpm
+378180 MariaDB tpm
+372960 MariaDB tpm
+374220 MariaDB tpm
+377580 MariaDB tpm
+372960 MariaDB tpm
+372780 MariaDB tpm
+374340 MariaDB tpm
+378480 MariaDB tpm
+374820 MariaDB tpm
+375540 MariaDB tpm
+380580 MariaDB tpm
+351480 MariaDB tpm
+380400 MariaDB tpm
+379560 MariaDB tpm
+378780 MariaDB tpm
+376320 MariaDB tpm
+375420 MariaDB tpm
+373800 MariaDB tpm
+375600 MariaDB tpm
+378540 MariaDB tpm
+371160 MariaDB tpm
+374100 MariaDB tpm
+374280 MariaDB tpm
+374280 MariaDB tpm
+376440 MariaDB tpm
+373320 MariaDB tpm
+377520 MariaDB tpm
+381900 MariaDB tpm
+378420 MariaDB tpm
+376980 MariaDB tpm
+378420 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+377100 MariaDB tpm
+379440 MariaDB tpm
+373260 MariaDB tpm
+375360 MariaDB tpm
+372600 MariaDB tpm
+372720 MariaDB tpm
+376500 MariaDB tpm
+370440 MariaDB tpm
+376500 MariaDB tpm
+376920 MariaDB tpm
+374340 MariaDB tpm
+359820 MariaDB tpm
+373860 MariaDB tpm
+372420 MariaDB tpm
+373800 MariaDB tpm
+Vuser 1:Rampup 8 minutes complete ...
+373260 MariaDB tpm
+378960 MariaDB tpm
+370560 MariaDB tpm
+375240 MariaDB tpm
+375300 MariaDB tpm
+373020 MariaDB tpm
+380340 MariaDB tpm
+377280 MariaDB tpm
+382200 MariaDB tpm
+371640 MariaDB tpm
+376320 MariaDB tpm
+376020 MariaDB tpm
+376500 MariaDB tpm
+378360 MariaDB tpm
+374040 MariaDB tpm
+377400 MariaDB tpm
+376260 MariaDB tpm
+380940 MariaDB tpm
+377820 MariaDB tpm
+380520 MariaDB tpm
+374760 MariaDB tpm
+376740 MariaDB tpm
+380220 MariaDB tpm
+381120 MariaDB tpm
+376440 MariaDB tpm
+372360 MariaDB tpm
+379980 MariaDB tpm
+375960 MariaDB tpm
+380700 MariaDB tpm
+377040 MariaDB tpm
+374820 MariaDB tpm
+374640 MariaDB tpm
+373320 MariaDB tpm
+361680 MariaDB tpm
+379260 MariaDB tpm
+378420 MariaDB tpm
+373680 MariaDB tpm
+372420 MariaDB tpm
+374580 MariaDB tpm
+377640 MariaDB tpm
+377820 MariaDB tpm
+377100 MariaDB tpm
+373980 MariaDB tpm
+371100 MariaDB tpm
+375900 MariaDB tpm
+376320 MariaDB tpm
+372360 MariaDB tpm
+382680 MariaDB tpm
+373800 MariaDB tpm
+376680 MariaDB tpm
+378120 MariaDB tpm
+374160 MariaDB tpm
+379740 MariaDB tpm
+366540 MariaDB tpm
+371160 MariaDB tpm
+379560 MariaDB tpm
+374580 MariaDB tpm
+375720 MariaDB tpm
+376260 MariaDB tpm
+379260 MariaDB tpm
+Vuser 1:Rampup 9 minutes complete ...
+384540 MariaDB tpm
+376200 MariaDB tpm
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+377520 MariaDB tpm
+377100 MariaDB tpm
+373020 MariaDB tpm
+377640 MariaDB tpm
+379740 MariaDB tpm
+377940 MariaDB tpm
+375240 MariaDB tpm
+374160 MariaDB tpm
+373740 MariaDB tpm
+379140 MariaDB tpm
+376380 MariaDB tpm
+373620 MariaDB tpm
+377700 MariaDB tpm
+376080 MariaDB tpm
+378540 MariaDB tpm
+377700 MariaDB tpm
+380460 MariaDB tpm
+360720 MariaDB tpm
+375900 MariaDB tpm
+374580 MariaDB tpm
+374040 MariaDB tpm
+375360 MariaDB tpm
+377280 MariaDB tpm
+377520 MariaDB tpm
+382680 MariaDB tpm
+382920 MariaDB tpm
+381960 MariaDB tpm
+376980 MariaDB tpm
+380760 MariaDB tpm
+376920 MariaDB tpm
+377760 MariaDB tpm
+378300 MariaDB tpm
+375960 MariaDB tpm
+Vuser 3:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+378360 MariaDB tpm
+379620 MariaDB tpm
+375720 MariaDB tpm
+377460 MariaDB tpm
+378120 MariaDB tpm
+374580 MariaDB tpm
+375960 MariaDB tpm
+378900 MariaDB tpm
+379020 MariaDB tpm
+382440 MariaDB tpm
+376320 MariaDB tpm
+374220 MariaDB tpm
+376800 MariaDB tpm
+376560 MariaDB tpm
+376440 MariaDB tpm
+377880 MariaDB tpm
+376860 MariaDB tpm
+373620 MariaDB tpm
+373260 MariaDB tpm
+378000 MariaDB tpm
+357480 MariaDB tpm
+383460 MariaDB tpm
+377400 MariaDB tpm
+378000 MariaDB tpm
+380460 MariaDB tpm
+Vuser 1:Rampup 10 minutes complete ...
+Vuser 1:Rampup complete, Taking start Transaction Count.
+Vuser 1:Timing test period of 20 in minutes
+375300 MariaDB tpm
+377880 MariaDB tpm
+381780 MariaDB tpm
+373620 MariaDB tpm
+376380 MariaDB tpm
+378840 MariaDB tpm
+373740 MariaDB tpm
+376380 MariaDB tpm
+380700 MariaDB tpm
+377820 MariaDB tpm
+375960 MariaDB tpm
+383580 MariaDB tpm
+380340 MariaDB tpm
+379380 MariaDB tpm
+378960 MariaDB tpm
+378000 MariaDB tpm
+379380 MariaDB tpm
+378660 MariaDB tpm
+380280 MariaDB tpm
+379020 MariaDB tpm
+388620 MariaDB tpm
+376260 MariaDB tpm
+383280 MariaDB tpm
+376980 MariaDB tpm
+374820 MariaDB tpm
+383940 MariaDB tpm
+363240 MariaDB tpm
+369060 MariaDB tpm
+379920 MariaDB tpm
+378180 MariaDB tpm
+379320 MariaDB tpm
+380460 MariaDB tpm
+372540 MariaDB tpm
+361440 MariaDB tpm
+349140 MariaDB tpm
+345960 MariaDB tpm
+352440 MariaDB tpm
+342720 MariaDB tpm
+348660 MariaDB tpm
+350340 MariaDB tpm
+346920 MariaDB tpm
+346320 MariaDB tpm
+351300 MariaDB tpm
+351360 MariaDB tpm
+347040 MariaDB tpm
+346200 MariaDB tpm
+341220 MariaDB tpm
+339660 MariaDB tpm
+341520 MariaDB tpm
+343260 MariaDB tpm
+338820 MariaDB tpm
+341700 MariaDB tpm
+335040 MariaDB tpm
+296100 MariaDB tpm
+155040 MariaDB tpm
+157080 MariaDB tpm
+153960 MariaDB tpm
+148440 MariaDB tpm
+135600 MariaDB tpm
+124920 MariaDB tpm
+Vuser 1:1 ...,
+117660 MariaDB tpm
+141000 MariaDB tpm
+153540 MariaDB tpm
+146940 MariaDB tpm
+152640 MariaDB tpm
+149880 MariaDB tpm
+124560 MariaDB tpm
+171600 MariaDB tpm
+222420 MariaDB tpm
+241440 MariaDB tpm
+256980 MariaDB tpm
+170160 MariaDB tpm
+132300 MariaDB tpm
+109740 MariaDB tpm
+102300 MariaDB tpm
+125400 MariaDB tpm
+154740 MariaDB tpm
+151380 MariaDB tpm
+152760 MariaDB tpm
+144060 MariaDB tpm
+143220 MariaDB tpm
+108720 MariaDB tpm
+149700 MariaDB tpm
+154860 MariaDB tpm
+141840 MariaDB tpm
+159960 MariaDB tpm
+201480 MariaDB tpm
+212580 MariaDB tpm
+178980 MariaDB tpm
+162720 MariaDB tpm
+177780 MariaDB tpm
+204060 MariaDB tpm
+204780 MariaDB tpm
+225120 MariaDB tpm
+225060 MariaDB tpm
+221700 MariaDB tpm
+228840 MariaDB tpm
+262020 MariaDB tpm
+273960 MariaDB tpm
+320940 MariaDB tpm
+355440 MariaDB tpm
+352320 MariaDB tpm
+302580 MariaDB tpm
+299580 MariaDB tpm
+319140 MariaDB tpm
+378240 MariaDB tpm
+377100 MariaDB tpm
+376440 MariaDB tpm
+370860 MariaDB tpm
+378120 MariaDB tpm
+381540 MariaDB tpm
+377340 MariaDB tpm
+380700 MariaDB tpm
+378600 MariaDB tpm
+376860 MariaDB tpm
+380520 MariaDB tpm
+374760 MariaDB tpm
+377460 MariaDB tpm
+374580 MariaDB tpm
+Vuser 1:2 ...,
+374640 MariaDB tpm
+375240 MariaDB tpm
+374400 MariaDB tpm
+375540 MariaDB tpm
+377220 MariaDB tpm
+382980 MariaDB tpm
+381300 MariaDB tpm
+372540 MariaDB tpm
+378180 MariaDB tpm
+378720 MariaDB tpm
+374340 MariaDB tpm
+317940 MariaDB tpm
+313500 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+372000 MariaDB tpm
+380400 MariaDB tpm
+375180 MariaDB tpm
+374340 MariaDB tpm
+372780 MariaDB tpm
+376200 MariaDB tpm
+374460 MariaDB tpm
+371880 MariaDB tpm
+375060 MariaDB tpm
+372900 MariaDB tpm
+367800 MariaDB tpm
+373800 MariaDB tpm
+374160 MariaDB tpm
+376020 MariaDB tpm
+372180 MariaDB tpm
+372480 MariaDB tpm
+374100 MariaDB tpm
+373920 MariaDB tpm
+Vuser 8:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+370560 MariaDB tpm
+374520 MariaDB tpm
+372540 MariaDB tpm
+368160 MariaDB tpm
+372480 MariaDB tpm
+370980 MariaDB tpm
+371880 MariaDB tpm
+372660 MariaDB tpm
+373440 MariaDB tpm
+367260 MariaDB tpm
+367740 MariaDB tpm
+367800 MariaDB tpm
+347340 MariaDB tpm
+370680 MariaDB tpm
+373800 MariaDB tpm
+372780 MariaDB tpm
+376080 MariaDB tpm
+379380 MariaDB tpm
+375300 MariaDB tpm
+374160 MariaDB tpm
+375360 MariaDB tpm
+377040 MariaDB tpm
+373920 MariaDB tpm
+374340 MariaDB tpm
+375120 MariaDB tpm
+374820 MariaDB tpm
+367920 MariaDB tpm
+367140 MariaDB tpm
+371040 MariaDB tpm
+Vuser 1:3 ...,
+373620 MariaDB tpm
+375360 MariaDB tpm
+374700 MariaDB tpm
+377760 MariaDB tpm
+374940 MariaDB tpm
+374340 MariaDB tpm
+371880 MariaDB tpm
+373560 MariaDB tpm
+372300 MariaDB tpm
+372960 MariaDB tpm
+372360 MariaDB tpm
+374280 MariaDB tpm
+373680 MariaDB tpm
+374280 MariaDB tpm
+350820 MariaDB tpm
+372000 MariaDB tpm
+374460 MariaDB tpm
+371340 MariaDB tpm
+373440 MariaDB tpm
+377100 MariaDB tpm
+373980 MariaDB tpm
+376500 MariaDB tpm
+371820 MariaDB tpm
+371100 MariaDB tpm
+372420 MariaDB tpm
+375540 MariaDB tpm
+374580 MariaDB tpm
+375180 MariaDB tpm
+374460 MariaDB tpm
+370140 MariaDB tpm
+372240 MariaDB tpm
+374520 MariaDB tpm
+377220 MariaDB tpm
+377400 MariaDB tpm
+373140 MariaDB tpm
+379320 MariaDB tpm
+376380 MariaDB tpm
+374940 MariaDB tpm
+373740 MariaDB tpm
+377520 MariaDB tpm
+372840 MariaDB tpm
+373320 MariaDB tpm
+373560 MariaDB tpm
+376680 MariaDB tpm
+374520 MariaDB tpm
+354660 MariaDB tpm
+366780 MariaDB tpm
+376020 MariaDB tpm
+377520 MariaDB tpm
+375480 MariaDB tpm
+371940 MariaDB tpm
+372060 MariaDB tpm
+378540 MariaDB tpm
+369540 MariaDB tpm
+369900 MariaDB tpm
+371340 MariaDB tpm
+371820 MariaDB tpm
+377040 MariaDB tpm
+367260 MariaDB tpm
+371940 MariaDB tpm
+Vuser 1:4 ...,
+376140 MariaDB tpm
+374640 MariaDB tpm
+373980 MariaDB tpm
+371460 MariaDB tpm
+377700 MariaDB tpm
+376500 MariaDB tpm
+377700 MariaDB tpm
+374460 MariaDB tpm
+371880 MariaDB tpm
+376200 MariaDB tpm
+374400 MariaDB tpm
+368760 MariaDB tpm
+378300 MariaDB tpm
+375960 MariaDB tpm
+380220 MariaDB tpm
+369660 MariaDB tpm
+358320 MariaDB tpm
+361740 MariaDB tpm
+371760 MariaDB tpm
+366120 MariaDB tpm
+368040 MariaDB tpm
+373140 MariaDB tpm
+375480 MariaDB tpm
+365220 MariaDB tpm
+372900 MariaDB tpm
+374220 MariaDB tpm
+371760 MariaDB tpm
+369240 MariaDB tpm
+375660 MariaDB tpm
+376020 MariaDB tpm
+370020 MariaDB tpm
+378660 MariaDB tpm
+377040 MariaDB tpm
+374760 MariaDB tpm
+370860 MariaDB tpm
+376020 MariaDB tpm
+369480 MariaDB tpm
+373680 MariaDB tpm
+374340 MariaDB tpm
+374460 MariaDB tpm
+376560 MariaDB tpm
+373080 MariaDB tpm
+380160 MariaDB tpm
+370980 MariaDB tpm
+373260 MariaDB tpm
+372000 MariaDB tpm
+368760 MariaDB tpm
+366840 MariaDB tpm
+351960 MariaDB tpm
+373380 MariaDB tpm
+370620 MariaDB tpm
+375060 MariaDB tpm
+373560 MariaDB tpm
+363900 MariaDB tpm
+375480 MariaDB tpm
+369840 MariaDB tpm
+373500 MariaDB tpm
+377820 MariaDB tpm
+373380 MariaDB tpm
+354720 MariaDB tpm
+Vuser 1:5 ...,
+363420 MariaDB tpm
+370740 MariaDB tpm
+371940 MariaDB tpm
+376980 MariaDB tpm
+373260 MariaDB tpm
+368640 MariaDB tpm
+373680 MariaDB tpm
+371460 MariaDB tpm
+370560 MariaDB tpm
+372060 MariaDB tpm
+375960 MariaDB tpm
+372420 MariaDB tpm
+373680 MariaDB tpm
+371400 MariaDB tpm
+370440 MariaDB tpm
+373020 MariaDB tpm
+374040 MariaDB tpm
+374820 MariaDB tpm
+370800 MariaDB tpm
+368880 MariaDB tpm
+373860 MariaDB tpm
+374580 MariaDB tpm
+374040 MariaDB tpm
+371400 MariaDB tpm
+356220 MariaDB tpm
+374760 MariaDB tpm
+376020 MariaDB tpm
+371940 MariaDB tpm
+374220 MariaDB tpm
+365940 MariaDB tpm
+373740 MariaDB tpm
+374460 MariaDB tpm
+373800 MariaDB tpm
+372480 MariaDB tpm
+368520 MariaDB tpm
+368880 MariaDB tpm
+370560 MariaDB tpm
+374280 MariaDB tpm
+371640 MariaDB tpm
+374520 MariaDB tpm
+Vuser 11:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+373620 MariaDB tpm
+373440 MariaDB tpm
+384000 MariaDB tpm
+374460 MariaDB tpm
+377700 MariaDB tpm
+370380 MariaDB tpm
+372240 MariaDB tpm
+374340 MariaDB tpm
+372660 MariaDB tpm
+373080 MariaDB tpm
+376380 MariaDB tpm
+Vuser 4:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+377640 MariaDB tpm
+374100 MariaDB tpm
+375840 MariaDB tpm
+377340 MariaDB tpm
+348060 MariaDB tpm
+371040 MariaDB tpm
+378120 MariaDB tpm
+372000 MariaDB tpm
+369660 MariaDB tpm
+Vuser 1:6 ...,
+370740 MariaDB tpm
+375360 MariaDB tpm
+Vuser 13:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+369960 MariaDB tpm
+378300 MariaDB tpm
+373860 MariaDB tpm
+377160 MariaDB tpm
+373680 MariaDB tpm
+379380 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+379500 MariaDB tpm
+377460 MariaDB tpm
+363900 MariaDB tpm
+343740 MariaDB tpm
+350760 MariaDB tpm
+346140 MariaDB tpm
+347580 MariaDB tpm
+341700 MariaDB tpm
+340080 MariaDB tpm
+344280 MariaDB tpm
+345600 MariaDB tpm
+339900 MariaDB tpm
+344460 MariaDB tpm
+342600 MariaDB tpm
+340920 MariaDB tpm
+346740 MariaDB tpm
+338820 MariaDB tpm
+344520 MariaDB tpm
+337080 MariaDB tpm
+343920 MariaDB tpm
+342480 MariaDB tpm
+345180 MariaDB tpm
+279660 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+138360 MariaDB tpm
+122280 MariaDB tpm
+130320 MariaDB tpm
+125520 MariaDB tpm
+145620 MariaDB tpm
+148080 MariaDB tpm
+148560 MariaDB tpm
+160380 MariaDB tpm
+141900 MariaDB tpm
+103500 MariaDB tpm
+109260 MariaDB tpm
+109440 MariaDB tpm
+151740 MariaDB tpm
+169860 MariaDB tpm
+227760 MariaDB tpm
+243900 MariaDB tpm
+231000 MariaDB tpm
+243120 MariaDB tpm
+295380 MariaDB tpm
+348360 MariaDB tpm
+365580 MariaDB tpm
+361800 MariaDB tpm
+363720 MariaDB tpm
+360180 MariaDB tpm
+364860 MariaDB tpm
+364800 MariaDB tpm
+363180 MariaDB tpm
+365280 MariaDB tpm
+Vuser 1:7 ...,
+364620 MariaDB tpm
+366720 MariaDB tpm
+365940 MariaDB tpm
+371100 MariaDB tpm
+365400 MariaDB tpm
+374040 MariaDB tpm
+366780 MariaDB tpm
+370620 MariaDB tpm
+370860 MariaDB tpm
+367020 MariaDB tpm
+365820 MariaDB tpm
+363840 MariaDB tpm
+366960 MariaDB tpm
+367020 MariaDB tpm
+367320 MariaDB tpm
+366240 MariaDB tpm
+324240 MariaDB tpm
+294540 MariaDB tpm
+293400 MariaDB tpm
+342720 MariaDB tpm
+371040 MariaDB tpm
+370440 MariaDB tpm
+371040 MariaDB tpm
+370200 MariaDB tpm
+372300 MariaDB tpm
+374160 MariaDB tpm
+373620 MariaDB tpm
+371760 MariaDB tpm
+375180 MariaDB tpm
+367740 MariaDB tpm
+376320 MariaDB tpm
+369180 MariaDB tpm
+372600 MariaDB tpm
+372060 MariaDB tpm
+Vuser 16:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+371340 MariaDB tpm
+377400 MariaDB tpm
+372660 MariaDB tpm
+378480 MariaDB tpm
+373680 MariaDB tpm
+371220 MariaDB tpm
+369660 MariaDB tpm
+369720 MariaDB tpm
+371340 MariaDB tpm
+374280 MariaDB tpm
+374640 MariaDB tpm
+373800 MariaDB tpm
+371400 MariaDB tpm
+369600 MariaDB tpm
+370200 MariaDB tpm
+367500 MariaDB tpm
+351000 MariaDB tpm
+370980 MariaDB tpm
+366420 MariaDB tpm
+373080 MariaDB tpm
+369840 MariaDB tpm
+368580 MariaDB tpm
+372300 MariaDB tpm
+369840 MariaDB tpm
+371340 MariaDB tpm
+367920 MariaDB tpm
+Vuser 1:8 ...,
+370500 MariaDB tpm
+374640 MariaDB tpm
+365040 MariaDB tpm
+368520 MariaDB tpm
+369420 MariaDB tpm
+374400 MariaDB tpm
+375240 MariaDB tpm
+374880 MariaDB tpm
+370200 MariaDB tpm
+373020 MariaDB tpm
+369540 MariaDB tpm
+369960 MariaDB tpm
+371640 MariaDB tpm
+369120 MariaDB tpm
+373020 MariaDB tpm
+373740 MariaDB tpm
+375720 MariaDB tpm
+377760 MariaDB tpm
+369780 MariaDB tpm
+370140 MariaDB tpm
+370560 MariaDB tpm
+374580 MariaDB tpm
+373440 MariaDB tpm
+370680 MariaDB tpm
+366060 MariaDB tpm
+373740 MariaDB tpm
+353400 MariaDB tpm
+369240 MariaDB tpm
+375240 MariaDB tpm
+372420 MariaDB tpm
+367920 MariaDB tpm
+367920 MariaDB tpm
+374220 MariaDB tpm
+372780 MariaDB tpm
+370500 MariaDB tpm
+374340 MariaDB tpm
+375780 MariaDB tpm
+371100 MariaDB tpm
+374280 MariaDB tpm
+364200 MariaDB tpm
+367500 MariaDB tpm
+374400 MariaDB tpm
+Vuser 11:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+370500 MariaDB tpm
+369300 MariaDB tpm
+368940 MariaDB tpm
+371100 MariaDB tpm
+374640 MariaDB tpm
+372780 MariaDB tpm
+367680 MariaDB tpm
+366480 MariaDB tpm
+368880 MariaDB tpm
+372660 MariaDB tpm
+368040 MariaDB tpm
+371280 MariaDB tpm
+372840 MariaDB tpm
+370260 MariaDB tpm
+370380 MariaDB tpm
+349140 MariaDB tpm
+372120 MariaDB tpm
+370500 MariaDB tpm
+Vuser 1:9 ...,
+375120 MariaDB tpm
+374700 MariaDB tpm
+372060 MariaDB tpm
+372120 MariaDB tpm
+370560 MariaDB tpm
+371100 MariaDB tpm
+374640 MariaDB tpm
+371760 MariaDB tpm
+370080 MariaDB tpm
+376320 MariaDB tpm
+376680 MariaDB tpm
+374460 MariaDB tpm
+373800 MariaDB tpm
+372660 MariaDB tpm
+372360 MariaDB tpm
+369000 MariaDB tpm
+375180 MariaDB tpm
+376500 MariaDB tpm
+374100 MariaDB tpm
+372000 MariaDB tpm
+371700 MariaDB tpm
+370020 MariaDB tpm
+371520 MariaDB tpm
+372180 MariaDB tpm
+375720 MariaDB tpm
+375180 MariaDB tpm
+376080 MariaDB tpm
+374340 MariaDB tpm
+354720 MariaDB tpm
+375480 MariaDB tpm
+369600 MariaDB tpm
+371820 MariaDB tpm
+378240 MariaDB tpm
+373320 MariaDB tpm
+368400 MariaDB tpm
+375480 MariaDB tpm
+369480 MariaDB tpm
+375240 MariaDB tpm
+366900 MariaDB tpm
+374820 MariaDB tpm
+374040 MariaDB tpm
+374760 MariaDB tpm
+371520 MariaDB tpm
+376560 MariaDB tpm
+376440 MariaDB tpm
+373020 MariaDB tpm
+372420 MariaDB tpm
+378540 MariaDB tpm
+371040 MariaDB tpm
+375060 MariaDB tpm
+378840 MariaDB tpm
+Vuser 8:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+369420 MariaDB tpm
+373920 MariaDB tpm
+372600 MariaDB tpm
+374520 MariaDB tpm
+375900 MariaDB tpm
+373920 MariaDB tpm
+373980 MariaDB tpm
+371520 MariaDB tpm
+356340 MariaDB tpm
+Vuser 1:10 ...,
+368820 MariaDB tpm
+375180 MariaDB tpm
+374940 MariaDB tpm
+373260 MariaDB tpm
+367080 MariaDB tpm
+369600 MariaDB tpm
+369960 MariaDB tpm
+372360 MariaDB tpm
+373800 MariaDB tpm
+374340 MariaDB tpm
+374340 MariaDB tpm
+370140 MariaDB tpm
+372840 MariaDB tpm
+377580 MariaDB tpm
+369000 MariaDB tpm
+368820 MariaDB tpm
+373920 MariaDB tpm
+366180 MariaDB tpm
+372420 MariaDB tpm
+372420 MariaDB tpm
+374160 MariaDB tpm
+373200 MariaDB tpm
+378120 MariaDB tpm
+367560 MariaDB tpm
+378840 MariaDB tpm
+374160 MariaDB tpm
+368880 MariaDB tpm
+375540 MariaDB tpm
+374640 MariaDB tpm
+382020 MariaDB tpm
+363120 MariaDB tpm
+366420 MariaDB tpm
+372660 MariaDB tpm
+373380 MariaDB tpm
+370980 MariaDB tpm
+375900 MariaDB tpm
+375120 MariaDB tpm
+367740 MariaDB tpm
+375000 MariaDB tpm
+371160 MariaDB tpm
+373620 MariaDB tpm
+375600 MariaDB tpm
+378480 MariaDB tpm
+Vuser 4:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+378360 MariaDB tpm
+374760 MariaDB tpm
+378840 MariaDB tpm
+374400 MariaDB tpm
+372720 MariaDB tpm
+376800 MariaDB tpm
+375900 MariaDB tpm
+373080 MariaDB tpm
+371340 MariaDB tpm
+375780 MariaDB tpm
+375000 MariaDB tpm
+374100 MariaDB tpm
+373980 MariaDB tpm
+373860 MariaDB tpm
+371340 MariaDB tpm
+377460 MariaDB tpm
+375720 MariaDB tpm
+Vuser 1:11 ...,
+377820 MariaDB tpm
+370800 MariaDB tpm
+352680 MariaDB tpm
+376080 MariaDB tpm
+376320 MariaDB tpm
+374160 MariaDB tpm
+374460 MariaDB tpm
+375240 MariaDB tpm
+375720 MariaDB tpm
+376140 MariaDB tpm
+371700 MariaDB tpm
+376920 MariaDB tpm
+377100 MariaDB tpm
+373140 MariaDB tpm
+365340 MariaDB tpm
+374700 MariaDB tpm
+373920 MariaDB tpm
+366360 MariaDB tpm
+375120 MariaDB tpm
+374460 MariaDB tpm
+373560 MariaDB tpm
+375420 MariaDB tpm
+374460 MariaDB tpm
+376860 MariaDB tpm
+375720 MariaDB tpm
+371520 MariaDB tpm
+366840 MariaDB tpm
+370200 MariaDB tpm
+371400 MariaDB tpm
+369780 MariaDB tpm
+370980 MariaDB tpm
+375900 MariaDB tpm
+369660 MariaDB tpm
+349260 MariaDB tpm
+362220 MariaDB tpm
+343860 MariaDB tpm
+350040 MariaDB tpm
+342120 MariaDB tpm
+345660 MariaDB tpm
+343980 MariaDB tpm
+339480 MariaDB tpm
+344460 MariaDB tpm
+343080 MariaDB tpm
+341640 MariaDB tpm
+342240 MariaDB tpm
+340140 MariaDB tpm
+342660 MariaDB tpm
+341220 MariaDB tpm
+339960 MariaDB tpm
+336900 MariaDB tpm
+336780 MariaDB tpm
+338700 MariaDB tpm
+339420 MariaDB tpm
+344400 MariaDB tpm
+275340 MariaDB tpm
+156600 MariaDB tpm
+150240 MariaDB tpm
+156480 MariaDB tpm
+153660 MariaDB tpm
+137640 MariaDB tpm
+Vuser 1:12 ...,
+122700 MariaDB tpm
+114780 MariaDB tpm
+140760 MariaDB tpm
+147540 MariaDB tpm
+151320 MariaDB tpm
+151560 MariaDB tpm
+143940 MariaDB tpm
+130620 MariaDB tpm
+139380 MariaDB tpm
+145800 MariaDB tpm
+137580 MariaDB tpm
+152340 MariaDB tpm
+158640 MariaDB tpm
+180720 MariaDB tpm
+193920 MariaDB tpm
+152880 MariaDB tpm
+162540 MariaDB tpm
+158400 MariaDB tpm
+155760 MariaDB tpm
+158520 MariaDB tpm
+152100 MariaDB tpm
+155940 MariaDB tpm
+146520 MariaDB tpm
+141660 MariaDB tpm
+134100 MariaDB tpm
+136800 MariaDB tpm
+101160 MariaDB tpm
+107640 MariaDB tpm
+126000 MariaDB tpm
+162660 MariaDB tpm
+185700 MariaDB tpm
+205260 MariaDB tpm
+198420 MariaDB tpm
+173640 MariaDB tpm
+175020 MariaDB tpm
+174060 MariaDB tpm
+179940 MariaDB tpm
+211140 MariaDB tpm
+254580 MariaDB tpm
+254220 MariaDB tpm
+251940 MariaDB tpm
+252780 MariaDB tpm
+248400 MariaDB tpm
+197520 MariaDB tpm
+220740 MariaDB tpm
+250200 MariaDB tpm
+249420 MariaDB tpm
+252120 MariaDB tpm
+253200 MariaDB tpm
+213600 MariaDB tpm
+193380 MariaDB tpm
+193740 MariaDB tpm
+242340 MariaDB tpm
+251160 MariaDB tpm
+251220 MariaDB tpm
+247620 MariaDB tpm
+196320 MariaDB tpm
+195300 MariaDB tpm
+198120 MariaDB tpm
+Vuser 1:13 ...,
+198360 MariaDB tpm
+211860 MariaDB tpm
+250920 MariaDB tpm
+255600 MariaDB tpm
+250680 MariaDB tpm
+256740 MariaDB tpm
+258300 MariaDB tpm
+222780 MariaDB tpm
+203880 MariaDB tpm
+215640 MariaDB tpm
+209400 MariaDB tpm
+238140 MariaDB tpm
+274980 MariaDB tpm
+273600 MariaDB tpm
+272580 MariaDB tpm
+276120 MariaDB tpm
+240660 MariaDB tpm
+217740 MariaDB tpm
+211440 MariaDB tpm
+192720 MariaDB tpm
+277500 MariaDB tpm
+287940 MariaDB tpm
+289800 MariaDB tpm
+290580 MariaDB tpm
+289560 MariaDB tpm
+269040 MariaDB tpm
+205080 MariaDB tpm
+205860 MariaDB tpm
+266280 MariaDB tpm
+292200 MariaDB tpm
+276240 MariaDB tpm
+178620 MariaDB tpm
+181440 MariaDB tpm
+162960 MariaDB tpm
+224160 MariaDB tpm
+297360 MariaDB tpm
+164820 MariaDB tpm
+146640 MariaDB tpm
+147360 MariaDB tpm
+170220 MariaDB tpm
+149580 MariaDB tpm
+289920 MariaDB tpm
+294300 MariaDB tpm
+158700 MariaDB tpm
+172980 MariaDB tpm
+163260 MariaDB tpm
+150300 MariaDB tpm
+269280 MariaDB tpm
+278100 MariaDB tpm
+166560 MariaDB tpm
+169800 MariaDB tpm
+171720 MariaDB tpm
+146160 MariaDB tpm
+179580 MariaDB tpm
+297540 MariaDB tpm
+281880 MariaDB tpm
+170040 MariaDB tpm
+167220 MariaDB tpm
+181380 MariaDB tpm
+Vuser 9:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+186600 MariaDB tpm
+Vuser 1:14 ...,
+212460 MariaDB tpm
+287700 MariaDB tpm
+290100 MariaDB tpm
+291720 MariaDB tpm
+244680 MariaDB tpm
+208500 MariaDB tpm
+209880 MariaDB tpm
+252960 MariaDB tpm
+289440 MariaDB tpm
+287880 MariaDB tpm
+287160 MariaDB tpm
+257460 MariaDB tpm
+204900 MariaDB tpm
+221280 MariaDB tpm
+207060 MariaDB tpm
+219540 MariaDB tpm
+253800 MariaDB tpm
+291600 MariaDB tpm
+292020 MariaDB tpm
+294480 MariaDB tpm
+287040 MariaDB tpm
+267960 MariaDB tpm
+207420 MariaDB tpm
+213360 MariaDB tpm
+223680 MariaDB tpm
+209940 MariaDB tpm
+296520 MariaDB tpm
+293400 MariaDB tpm
+295500 MariaDB tpm
+292140 MariaDB tpm
+282420 MariaDB tpm
+205140 MariaDB tpm
+215880 MariaDB tpm
+228660 MariaDB tpm
+290100 MariaDB tpm
+296940 MariaDB tpm
+293820 MariaDB tpm
+203400 MariaDB tpm
+206280 MariaDB tpm
+214200 MariaDB tpm
+206100 MariaDB tpm
+209940 MariaDB tpm
+306060 MariaDB tpm
+310980 MariaDB tpm
+309000 MariaDB tpm
+310260 MariaDB tpm
+311760 MariaDB tpm
+256860 MariaDB tpm
+244140 MariaDB tpm
+256680 MariaDB tpm
+308340 MariaDB tpm
+308100 MariaDB tpm
+313620 MariaDB tpm
+312480 MariaDB tpm
+310200 MariaDB tpm
+272160 MariaDB tpm
+250800 MariaDB tpm
+226860 MariaDB tpm
+305220 MariaDB tpm
+314160 MariaDB tpm
+Vuser 1:15 ...,
+289320 MariaDB tpm
+215340 MariaDB tpm
+217980 MariaDB tpm
+219300 MariaDB tpm
+215280 MariaDB tpm
+257400 MariaDB tpm
+Vuser 17:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+310080 MariaDB tpm
+319080 MariaDB tpm
+268020 MariaDB tpm
+194640 MariaDB tpm
+197880 MariaDB tpm
+230940 MariaDB tpm
+262140 MariaDB tpm
+318720 MariaDB tpm
+298020 MariaDB tpm
+205200 MariaDB tpm
+208260 MariaDB tpm
+199800 MariaDB tpm
+193440 MariaDB tpm
+251700 MariaDB tpm
+306120 MariaDB tpm
+312300 MariaDB tpm
+Vuser 12:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+302220 MariaDB tpm
+237780 MariaDB tpm
+198360 MariaDB tpm
+233280 MariaDB tpm
+242340 MariaDB tpm
+223320 MariaDB tpm
+272940 MariaDB tpm
+299400 MariaDB tpm
+301560 MariaDB tpm
+297540 MariaDB tpm
+293520 MariaDB tpm
+270480 MariaDB tpm
+235680 MariaDB tpm
+239940 MariaDB tpm
+283800 MariaDB tpm
+296040 MariaDB tpm
+302640 MariaDB tpm
+303420 MariaDB tpm
+306180 MariaDB tpm
+262680 MariaDB tpm
+239520 MariaDB tpm
+249300 MariaDB tpm
+245100 MariaDB tpm
+224700 MariaDB tpm
+292500 MariaDB tpm
+298680 MariaDB tpm
+300480 MariaDB tpm
+307260 MariaDB tpm
+305940 MariaDB tpm
+267240 MariaDB tpm
+252180 MariaDB tpm
+226740 MariaDB tpm
+245640 MariaDB tpm
+302520 MariaDB tpm
+306480 MariaDB tpm
+304440 MariaDB tpm
+307560 MariaDB tpm
+Vuser 1:16 ...,
+299640 MariaDB tpm
+304380 MariaDB tpm
+299940 MariaDB tpm
+305640 MariaDB tpm
+305760 MariaDB tpm
+302340 MariaDB tpm
+250800 MariaDB tpm
+234420 MariaDB tpm
+259200 MariaDB tpm
+303960 MariaDB tpm
+301320 MariaDB tpm
+307020 MariaDB tpm
+303780 MariaDB tpm
+280680 MariaDB tpm
+247200 MariaDB tpm
+245820 MariaDB tpm
+226620 MariaDB tpm
+219300 MariaDB tpm
+266220 MariaDB tpm
+307620 MariaDB tpm
+306360 MariaDB tpm
+303660 MariaDB tpm
+301680 MariaDB tpm
+259320 MariaDB tpm
+211380 MariaDB tpm
+211020 MariaDB tpm
+244500 MariaDB tpm
+305940 MariaDB tpm
+300180 MariaDB tpm
+265800 MariaDB tpm
+224280 MariaDB tpm
+209700 MariaDB tpm
+195240 MariaDB tpm
+189660 MariaDB tpm
+274380 MariaDB tpm
+303540 MariaDB tpm
+305400 MariaDB tpm
+236700 MariaDB tpm
+198540 MariaDB tpm
+225900 MariaDB tpm
+272160 MariaDB tpm
+317220 MariaDB tpm
+309600 MariaDB tpm
+284040 MariaDB tpm
+Vuser 3:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+240780 MariaDB tpm
+251040 MariaDB tpm
+245880 MariaDB tpm
+228120 MariaDB tpm
+270960 MariaDB tpm
+329700 MariaDB tpm
+324060 MariaDB tpm
+328260 MariaDB tpm
+330960 MariaDB tpm
+309780 MariaDB tpm
+284880 MariaDB tpm
+226200 MariaDB tpm
+262980 MariaDB tpm
+259440 MariaDB tpm
+339240 MariaDB tpm
+345660 MariaDB tpm
+Vuser 1:17 ...,
+344940 MariaDB tpm
+345960 MariaDB tpm
+347520 MariaDB tpm
+302400 MariaDB tpm
+351900 MariaDB tpm
+350940 MariaDB tpm
+349560 MariaDB tpm
+346620 MariaDB tpm
+355080 MariaDB tpm
+353460 MariaDB tpm
+351000 MariaDB tpm
+355200 MariaDB tpm
+352920 MariaDB tpm
+362760 MariaDB tpm
+354480 MariaDB tpm
+360780 MariaDB tpm
+357960 MariaDB tpm
+356880 MariaDB tpm
+359520 MariaDB tpm
+354540 MariaDB tpm
+364740 MariaDB tpm
+363300 MariaDB tpm
+360420 MariaDB tpm
+361680 MariaDB tpm
+361440 MariaDB tpm
+364140 MariaDB tpm
+362220 MariaDB tpm
+364800 MariaDB tpm
+366060 MariaDB tpm
+363060 MariaDB tpm
+360540 MariaDB tpm
+360360 MariaDB tpm
+362220 MariaDB tpm
+366180 MariaDB tpm
+341340 MariaDB tpm
+366420 MariaDB tpm
+363480 MariaDB tpm
+367020 MariaDB tpm
+360720 MariaDB tpm
+366960 MariaDB tpm
+359400 MariaDB tpm
+364320 MariaDB tpm
+372720 MariaDB tpm
+360480 MariaDB tpm
+362520 MariaDB tpm
+354300 MariaDB tpm
+366660 MariaDB tpm
+361500 MariaDB tpm
+360660 MariaDB tpm
+365940 MariaDB tpm
+363780 MariaDB tpm
+365460 MariaDB tpm
+364080 MariaDB tpm
+364320 MariaDB tpm
+364980 MariaDB tpm
+357600 MariaDB tpm
+363540 MariaDB tpm
+361920 MariaDB tpm
+371880 MariaDB tpm
+365880 MariaDB tpm
+Vuser 1:18 ...,
+368400 MariaDB tpm
+366840 MariaDB tpm
+359700 MariaDB tpm
+366480 MariaDB tpm
+368820 MariaDB tpm
+362820 MariaDB tpm
+359160 MariaDB tpm
+366120 MariaDB tpm
+368340 MariaDB tpm
+363900 MariaDB tpm
+356460 MariaDB tpm
+360180 MariaDB tpm
+359940 MariaDB tpm
+357540 MariaDB tpm
+365040 MariaDB tpm
+360720 MariaDB tpm
+362040 MariaDB tpm
+362820 MariaDB tpm
+364740 MariaDB tpm
+355200 MariaDB tpm
+350460 MariaDB tpm
+348300 MariaDB tpm
+362640 MariaDB tpm
+361620 MariaDB tpm
+364440 MariaDB tpm
+356940 MariaDB tpm
+365040 MariaDB tpm
+358020 MariaDB tpm
+367500 MariaDB tpm
+361680 MariaDB tpm
+359640 MariaDB tpm
+359820 MariaDB tpm
+361980 MariaDB tpm
+356400 MariaDB tpm
+358020 MariaDB tpm
+362940 MariaDB tpm
+361920 MariaDB tpm
+360840 MariaDB tpm
+332040 MariaDB tpm
+333720 MariaDB tpm
+339120 MariaDB tpm
+Vuser 7:mariaexec/db server: Got error 149 Lock deadlock; Retry transaction during COMMIT
+332820 MariaDB tpm
+330600 MariaDB tpm
+333120 MariaDB tpm
+333540 MariaDB tpm
+320820 MariaDB tpm
+325800 MariaDB tpm
+339120 MariaDB tpm
+332940 MariaDB tpm
+331260 MariaDB tpm
+324060 MariaDB tpm
+328320 MariaDB tpm
+319920 MariaDB tpm
+334980 MariaDB tpm
+328500 MariaDB tpm
+331260 MariaDB tpm
+331440 MariaDB tpm
+305940 MariaDB tpm
+188160 MariaDB tpm
+146460 MariaDB tpm
+Vuser 1:19 ...,
+157740 MariaDB tpm
+152820 MariaDB tpm
+150180 MariaDB tpm
+124920 MariaDB tpm
+108960 MariaDB tpm
+115800 MariaDB tpm
+149100 MariaDB tpm
+145320 MariaDB tpm
+151920 MariaDB tpm
+153060 MariaDB tpm
+149160 MariaDB tpm
+138360 MariaDB tpm
+168120 MariaDB tpm
+193140 MariaDB tpm
+213060 MariaDB tpm
+256080 MariaDB tpm
+244620 MariaDB tpm
+204660 MariaDB tpm
+230400 MariaDB tpm
+283500 MariaDB tpm
+352440 MariaDB tpm
+350040 MariaDB tpm
+359100 MariaDB tpm
+354000 MariaDB tpm
+354300 MariaDB tpm
+353040 MariaDB tpm
+352740 MariaDB tpm
+351720 MariaDB tpm
+358860 MariaDB tpm
+358620 MariaDB tpm
+359760 MariaDB tpm
+360420 MariaDB tpm
+359880 MariaDB tpm
+360420 MariaDB tpm
+355260 MariaDB tpm
+365520 MariaDB tpm
+357060 MariaDB tpm
+352680 MariaDB tpm
+359100 MariaDB tpm
+359520 MariaDB tpm
+361320 MariaDB tpm
+360060 MariaDB tpm
+353880 MariaDB tpm
+355020 MariaDB tpm
+361860 MariaDB tpm
+291720 MariaDB tpm
+354540 MariaDB tpm
+361320 MariaDB tpm
+358620 MariaDB tpm
+359160 MariaDB tpm
+360720 MariaDB tpm
+294960 MariaDB tpm
+281160 MariaDB tpm
+346860 MariaDB tpm
+356880 MariaDB tpm
+356160 MariaDB tpm
+360420 MariaDB tpm
+352260 MariaDB tpm
+357120 MariaDB tpm
+358200 MariaDB tpm
+Vuser 1:20 ...,
+Vuser 1:Test complete, Taking end Transaction Count.
+Vuser 1:16 Active Virtual Users configured
+Vuser 1:TEST RESULT : System achieved 137137 NOPM from 318609 MariaDB TPM
+Vuser 1:Gathering timing data from Active Virtual Users...
+Vuser 15:FINISHED SUCCESS
+Vuser 6:FINISHED SUCCESS
+332640 MariaDB tpm
+Vuser 3:FINISHED SUCCESS
+Vuser 13:FINISHED SUCCESS
+Vuser 4:FINISHED SUCCESS
+Vuser 17:FINISHED SUCCESS
+Vuser 8:FINISHED SUCCESS
+Vuser 9:FINISHED SUCCESS
+Vuser 11:FINISHED SUCCESS
+Vuser 16:FINISHED SUCCESS
+218520 MariaDB tpm
+Vuser 2:FINISHED SUCCESS
+Vuser 5:FINISHED SUCCESS
+Vuser 7:FINISHED SUCCESS
+Vuser 12:FINISHED SUCCESS
+Vuser 10:FINISHED SUCCESS
+Vuser 14:FINISHED SUCCESS
+55560 MariaDB tpm
+Vuser 1:Calculating timings...
+Vuser 1:Writing timing data to /root/sqlanalysis/run3000/hdbtmp/hdbxtprofile.log
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+0 MariaDB tpm
+Vuser 1:FINISHED SUCCESS
+ALL VIRTUAL USERS COMPLETE
+0 MariaDB tpm
+Transaction Counter thread running with threadid:tid0x7fffbd7fa6c0
+Stopping Transaction Counter
+vudestroy success
+BENCH_JOBID 6ABEE38E3BB603E283031333

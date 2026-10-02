@@ -1,0 +1,9 @@
+customer	InnoDB
+district	InnoDB
+history	InnoDB
+item	InnoDB
+new_order	InnoDB
+orders	InnoDB
+order_line	InnoDB
+stock	InnoDB
+warehouse	InnoDB

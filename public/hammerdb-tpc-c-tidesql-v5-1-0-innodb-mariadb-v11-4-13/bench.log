@@ -1,0 +1,82 @@
+[2026-10-01 21:56:11] === start: engines=[tidesdb innodb] WH=3000 VU=[4 8 16 32 64 128] 10+20m peak=3 mem=96G
+PARITY OK: 27 server settings identical
+[2026-10-01 21:56:11] creating pristine datadir copy
+[2026-10-01 21:56:19] config ok (build-tidesdb): 11.4.13-MariaDB TidesDB build
+[2026-10-01 21:56:19] building tidesdb: 3000 WH, 24 build VUs, partition=true
+[2026-10-01 23:37:00] built tidesdb in 6033s, 229G; saving golden copy
+[2026-10-01 23:44:03] config ok (run-tidesdb-4vu-sweep-1): 11.4.13-MariaDB TidesDB run
+[2026-10-01 23:44:03] run tidesdb-4vu-sweep-1: 10m rampup + 20m measure
+TidesDB sweep 4VU iter1: status=ok nopm=47346 tpm=109981 p99=4.84ms errors=0 failed_vus=0
+[2026-10-02 00:16:54] config ok (run-tidesdb-8vu-sweep-1): 11.4.13-MariaDB TidesDB run
+[2026-10-02 00:16:54] run tidesdb-8vu-sweep-1: 10m rampup + 20m measure
+TidesDB sweep 8VU iter1: status=ok nopm=89876 tpm=208674 p99=5.75ms errors=0 failed_vus=0
+[2026-10-02 00:49:49] config ok (run-tidesdb-16vu-sweep-1): 11.4.13-MariaDB TidesDB run
+[2026-10-02 00:49:49] run tidesdb-16vu-sweep-1: 10m rampup + 20m measure
+TidesDB sweep 16VU iter1: status=ok nopm=137137 tpm=318609 p99=9.94ms errors=31 failed_vus=0
+[2026-10-02 01:22:48] config ok (run-tidesdb-32vu-sweep-1): 11.4.13-MariaDB TidesDB run
+[2026-10-02 01:22:48] run tidesdb-32vu-sweep-1: 10m rampup + 20m measure
+TidesDB sweep 32VU iter1: status=ok nopm=160327 tpm=372833 p99=22.70ms errors=72 failed_vus=0
+[2026-10-02 01:56:19] config ok (run-tidesdb-64vu-sweep-1): 11.4.13-MariaDB TidesDB run
+[2026-10-02 01:56:19] run tidesdb-64vu-sweep-1: 10m rampup + 20m measure
+TidesDB sweep 64VU iter1: status=ok nopm=158544 tpm=368166 p99=34.68ms errors=82 failed_vus=0
+[2026-10-02 02:29:36] config ok (run-tidesdb-128vu-sweep-1): 11.4.13-MariaDB TidesDB run
+[2026-10-02 02:29:36] run tidesdb-128vu-sweep-1: 10m rampup + 20m measure
+TidesDB sweep 128VU iter1: status=ok nopm=158003 tpm=367041 p99=59.55ms errors=517 failed_vus=0
+[2026-10-02 03:00:33] tidesdb peak at 32 VU; 3 runs there
+[2026-10-02 03:03:04] config ok (run-tidesdb-32vu-peak-1): 11.4.13-MariaDB TidesDB run
+[2026-10-02 03:03:04] run tidesdb-32vu-peak-1: 10m rampup + 20m measure
+TidesDB peak 32VU iter1: status=ok nopm=160055 tpm=371929 p99=22.44ms errors=66 failed_vus=0
+[2026-10-02 03:36:36] config ok (run-tidesdb-32vu-peak-2): 11.4.13-MariaDB TidesDB run
+[2026-10-02 03:36:36] run tidesdb-32vu-peak-2: 10m rampup + 20m measure
+TidesDB peak 32VU iter2: status=ok nopm=160106 tpm=372008 p99=21.80ms errors=51 failed_vus=0
+[2026-10-02 04:10:06] config ok (run-tidesdb-32vu-peak-3): 11.4.13-MariaDB TidesDB run
+[2026-10-02 04:10:06] run tidesdb-32vu-peak-3: 10m rampup + 20m measure
+TidesDB peak 32VU iter3: status=ok nopm=160389 tpm=372861 p99=22.69ms errors=61 failed_vus=0
+[2026-10-02 04:41:05] removing golden copy for tidesdb
+[2026-10-02 04:41:13] config ok (build-innodb): 11.4.13-MariaDB InnoDB build
+[2026-10-02 04:41:13] building innodb: 3000 WH, 24 build VUs, partition=true
+[2026-10-02 06:09:44] built innodb in 5308s, 286G; saving golden copy
+[2026-10-02 06:18:45] config ok (run-innodb-4vu-sweep-1): 11.4.13-MariaDB InnoDB run
+[2026-10-02 06:18:45] run innodb-4vu-sweep-1: 10m rampup + 20m measure
+InnoDB sweep 4VU iter1: status=ok nopm=44234 tpm=102782 p99=5.80ms errors=0 failed_vus=0
+[2026-10-02 06:52:10] config ok (run-innodb-8vu-sweep-1): 11.4.13-MariaDB InnoDB run
+[2026-10-02 06:52:10] run innodb-8vu-sweep-1: 10m rampup + 20m measure
+InnoDB sweep 8VU iter1: status=ok nopm=74847 tpm=173843 p99=6.37ms errors=0 failed_vus=0
+[2026-10-02 07:25:41] config ok (run-innodb-16vu-sweep-1): 11.4.13-MariaDB InnoDB run
+[2026-10-02 07:25:41] run innodb-16vu-sweep-1: 10m rampup + 20m measure
+InnoDB sweep 16VU iter1: status=ok nopm=110158 tpm=256006 p99=7.90ms errors=0 failed_vus=0
+[2026-10-02 07:59:16] config ok (run-innodb-32vu-sweep-1): 11.4.13-MariaDB InnoDB run
+[2026-10-02 07:59:16] run innodb-32vu-sweep-1: 10m rampup + 20m measure
+InnoDB sweep 32VU iter1: status=ok nopm=156502 tpm=363707 p99=11.23ms errors=0 failed_vus=0
+[2026-10-02 08:33:09] config ok (run-innodb-64vu-sweep-1): 11.4.13-MariaDB InnoDB run
+[2026-10-02 08:33:09] run innodb-64vu-sweep-1: 10m rampup + 20m measure
+InnoDB sweep 64VU iter1: status=ok nopm=133489 tpm=310294 p99=44.71ms errors=0 failed_vus=0
+[2026-10-02 09:07:18] config ok (run-innodb-128vu-sweep-1): 11.4.13-MariaDB InnoDB run
+[2026-10-02 09:07:18] run innodb-128vu-sweep-1: 10m rampup + 20m measure
+InnoDB sweep 128VU iter1: status=ok nopm=102899 tpm=239160 p99=101.03ms errors=0 failed_vus=0
+[2026-10-02 09:38:38] innodb peak at 32 VU; 3 runs there
+[2026-10-02 09:41:36] config ok (run-innodb-32vu-peak-1): 11.4.13-MariaDB InnoDB run
+[2026-10-02 09:41:36] run innodb-32vu-peak-1: 10m rampup + 20m measure
+InnoDB peak 32VU iter1: status=ok nopm=156589 tpm=363961 p99=11.07ms errors=0 failed_vus=0
+[2026-10-02 10:15:28] config ok (run-innodb-32vu-peak-2): 11.4.13-MariaDB InnoDB run
+[2026-10-02 10:15:28] run innodb-32vu-peak-2: 10m rampup + 20m measure
+InnoDB peak 32VU iter2: status=ok nopm=154879 tpm=359635 p99=11.66ms errors=0 failed_vus=0
+[2026-10-02 10:49:18] config ok (run-innodb-32vu-peak-3): 11.4.13-MariaDB InnoDB run
+[2026-10-02 10:49:18] run innodb-32vu-peak-3: 10m rampup + 20m measure
+InnoDB peak 32VU iter3: status=ok nopm=156282 tpm=362980 p99=11.30ms errors=0 failed_vus=0
+[2026-10-02 11:20:17] removing golden copy for innodb
+[2026-10-02 11:20:18] === done; plotting
+engines: TidesDB, InnoDB
+caption: MariaDB 11.4.13 | HammerDB TPROC-C, 3,000 WH | REPEATABLE READ | non-durable (commit to OS, doublewrite on, binlog off) / 10 min rampup / 20 min measure | 1 run per VU level, median of 3 at the peak
+    figures/nopm_vs_vu.{pdf,png,svg}
+    figures/tpm_vs_vu.{pdf,png,svg}
+    figures/neworder_p99_vs_vu.{pdf,png,svg}
+    figures/neworder_p50_vs_vu.{pdf,png,svg}
+    figures/errors_vs_vu.{pdf,png,svg}
+    figures/peak_nopm.{pdf,png,svg}
+    figures/build_time.{pdf,png,svg}
+    figures/timeline_tidesdb.{pdf,png,svg}
+    figures/timeline_innodb.{pdf,png,svg}
+    figures/throughput_over_time.{pdf,png,svg}
+    summary.md
+done -> ./figures

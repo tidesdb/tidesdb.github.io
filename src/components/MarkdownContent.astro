@@ -1,0 +1,22 @@
+---
+// MarkdownContent override, used only to append share links to the end of an
+// article. Everything else, docs pages included, renders exactly as Starlight
+// does by default.
+//
+// This is the slot that sits immediately after the article body and before the
+// pagination, which is where share links belong. Putting them under the title
+// instead would place them above the cover image, with the byline and date
+// below it, leaving two competing blocks of metadata around the photo.
+import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+import { SITE } from '../utils/articles.js';
+import ShareLinks from './ShareLinks.astro';
+
+const entry = Astro.locals.starlightRoute.entry;
+const isArticle = typeof entry.id === 'string' && entry.id.startsWith('articles/');
+const canonical = new URL(Astro.url.pathname, SITE).href;
+---
+
+<Default>
+	<slot />
+	{isArticle && <ShareLinks title={entry.data.title} url={canonical} />}
+</Default>

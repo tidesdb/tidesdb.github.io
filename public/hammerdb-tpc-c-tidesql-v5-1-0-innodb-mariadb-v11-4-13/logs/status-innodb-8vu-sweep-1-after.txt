@@ -1,0 +1,69 @@
+*************************** 1. row ***************************
+  Type: InnoDB
+  Name: 
+Status: 
+=====================================
+2026-10-02 07:22:22 0x7fffe31fe6c0 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 12 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 0 srv_active, 1807 srv_idle
+srv_master_thread log flush and writes: 1807
+----------
+SEMAPHORES
+----------
+------------
+TRANSACTIONS
+------------
+Trx id counter 12079456
+Purge done for trx's n:o < 12079456 undo n:o < 0 state: running
+History list length 0
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION (0x7fffe3c821c0), not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+--------
+FILE I/O
+--------
+Pending flushes (fsync): 1
+33831526 OS file reads, 25851756 OS file writes, 1780598 OS fsyncs
+3162.90 reads/s, 16102 avg bytes/read, 19426.71 writes/s, 1494.79 fsyncs/s
+---
+LOG
+---
+Log sequence number 330729987699
+Log flushed up to   330729987699
+Pages flushed up to 329128068333
+Last checkpoint at  329084401468
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 68853694464
+Dictionary memory allocated 424918104
+Buffer pool size   4153344
+Free buffers       2758
+Database pages     4150586
+Old database pages 1532169
+Modified db pages  1144157
+Percent of dirty pages(LRU & free pages): 27.548
+Max dirty pages percent: 1.000
+Pending reads 0
+Pending writes: LRU 1, flush list 3
+Pages made young 11720843, not young 61400691
+1110.57 youngs/s, 5951.17 non-youngs/s
+Pages read 33831439, created 292847, written 25624977
+3162.90 reads/s, 21.33 creates/s, 17801.02 writes/s
+Buffer pool hit rate 975 / 1000, young-making rate 8 / 1000 not 46 / 1000
+Pages read ahead 54.33/s, evicted without access 0.33/s, Random read ahead 0.00/s
+LRU len: 4150586, unzip_LRU len: 0
+I/O sum[1907861]:cur[269297], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 read views open inside InnoDB
+state: sleeping
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+

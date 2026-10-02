@@ -1,0 +1,67 @@
+*************************** 1. row ***************************
+  Type: InnoDB
+  Name: 
+Status: 
+=====================================
+2026-10-02 10:12:04 0x7fffe31fe6c0 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 14 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 0 srv_active, 1810 srv_idle
+srv_master_thread log flush and writes: 1810
+----------
+SEMAPHORES
+----------
+------------
+TRANSACTIONS
+------------
+Trx id counter 22932782
+Purge done for trx's n:o < 22932782 undo n:o < 0 state: running
+History list length 0
+LIST OF TRANSACTIONS FOR EACH SESSION:
+--------
+FILE I/O
+--------
+Pending flushes (fsync): 0
+69665341 OS file reads, 48099979 OS file writes, 2665077 OS fsyncs
+0.00 reads/s, 0 avg bytes/read, 19323.91 writes/s, 1685.45 fsyncs/s
+---
+LOG
+---
+Log sequence number 369487188701
+Log flushed up to   369487188701
+Pages flushed up to 367117379077
+Last checkpoint at  367087308323
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 68853694464
+Dictionary memory allocated 424918104
+Buffer pool size   4153344
+Free buffers       4301
+Database pages     4149043
+Old database pages 1531600
+Modified db pages  1247230
+Percent of dirty pages(LRU & free pages): 30.030
+Max dirty pages percent: 1.000
+Pending reads 0
+Pending writes: LRU 1, flush list 122
+Pages made young 22330234, not young 149109444
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 69665254, created 473695, written 47715831
+0.00 reads/s, 0.00 creates/s, 18570.10 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 4149043, unzip_LRU len: 0
+I/O sum[3178105]:cur[268744], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 read views open inside InnoDB
+state: sleeping
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+

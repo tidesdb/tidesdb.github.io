@@ -1,0 +1,1 @@
+      66  mariaexec/db server: Got error # "Lock deadlock; Retry transaction" during COMMIT

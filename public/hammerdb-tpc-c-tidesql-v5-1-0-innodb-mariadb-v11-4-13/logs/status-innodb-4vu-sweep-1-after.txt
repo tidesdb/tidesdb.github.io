@@ -1,0 +1,67 @@
+*************************** 1. row ***************************
+  Type: InnoDB
+  Name: 
+Status: 
+=====================================
+2026-10-02 06:48:54 0x7fffe311d6c0 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 55 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 0 srv_active, 1809 srv_idle
+srv_master_thread log flush and writes: 1809
+----------
+SEMAPHORES
+----------
+------------
+TRANSACTIONS
+------------
+Trx id counter 8003848
+Purge done for trx's n:o < 8003848 undo n:o < 0 state: running
+History list length 0
+LIST OF TRANSACTIONS FOR EACH SESSION:
+--------
+FILE I/O
+--------
+Pending flushes (fsync): 0
+20152223 OS file reads, 14530956 OS file writes, 1025965 OS fsyncs
+8968.26 reads/s, 16077 avg bytes/read, 8827.31 writes/s, 622.68 fsyncs/s
+---
+LOG
+---
+Log sequence number 316310711485
+Log flushed up to   316310711485
+Pages flushed up to 314588179918
+Last checkpoint at  314588130335
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 68853694464
+Dictionary memory allocated 424918104
+Buffer pool size   4153344
+Free buffers       2750
+Database pages     4150594
+Old database pages 1532172
+Modified db pages  1197263
+Percent of dirty pages(LRU & free pages): 28.826
+Max dirty pages percent: 1.000
+Pending reads 0
+Pending writes: LRU 0, flush list 0
+Pages made young 6764280, not young 37897935
+3020.02 youngs/s, 17553.72 non-youngs/s
+Pages read 20152136, created 205776, written 14412662
+8968.26 reads/s, 64.64 creates/s, 8755.60 writes/s
+Buffer pool hit rate 976 / 1000, young-making rate 8 / 1000 not 46 / 1000
+Pages read ahead 167.91/s, evicted without access 0.40/s, Random read ahead 0.00/s
+LRU len: 4150594, unzip_LRU len: 0
+I/O sum[1104637]:cur[162315], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 read views open inside InnoDB
+state: sleeping
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+
