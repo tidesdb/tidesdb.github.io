@@ -62,6 +62,41 @@ export function ogImage(entry) {
 	}
 }
 
+/**
+ * Summary for an article, for the blog card and the RSS item.
+ *
+ * `description` frontmatter when it exists, otherwise the opening prose of the
+ * body. Two articles ship without one, which left both the blog card and the
+ * feed item blank; a feed item with no description is close to useless in a
+ * reader, so it falls back rather than showing nothing.
+ */
+export function summarize(entry, limit = 200) {
+	const described = entry.data?.description;
+	if (described) return described;
+
+	const text = (entry.body ?? '')
+		.replace(/^---\r?\n[\s\S]*?\r?\n---/, '')
+		.replace(/```[\s\S]*?```/g, ' ')
+		.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/^\s*\|.*$/gm, ' ')
+		.replace(/[`*_#>]/g, '')
+		// Articles open with a byline and a published-on line, so an excerpt taken
+		// straight from the top would read "by Alex Gaetano Padula published on
+		// June 4th, 2026 ..." instead of the article's first sentence.
+		.replace(/^\s*(by|published on)\b.*$/gim, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+	if (!text) return '';
+	if (text.length <= limit) return text;
+	// Cut on a word boundary so the excerpt does not end mid-word.
+	const cut = text.slice(0, limit);
+	const lastSpace = cut.lastIndexOf(' ');
+	return `${(lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}\u2026`;
+}
+
 /** Human-readable date, e.g. "January 16, 2026". */
 export function fmtDate(d) {
 	return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
