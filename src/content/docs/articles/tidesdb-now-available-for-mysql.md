@@ -1,5 +1,5 @@
 ---
-title: "TidesDB now available for MySQL 9.x, 26.x"
+title: "TidesDB now available for MySQL v9, v26"
 description: "TidesDB becomes available under project TideSQL for MySQL."
 head:
   - tag: meta
@@ -14,7 +14,7 @@ head:
 
 <div class="article-image">
 
-![TidesDB now available for MySQL 9.x, 26.x](/pexels-charmain-33529218.jpg)
+![TidesDB now available for MySQL v9, v26](/pexels-charmain-33529218.jpg)
 <a target="_blank" href="https://www.instagram.com/jvrs_photography">Charmain Jansen van Rensburg</a>
 </div>
 
@@ -22,14 +22,13 @@ head:
 
 *published on October 5th, 2026*
 
-
-Maybe most don't know, but originally TideSQL started as a <a target="_blank"  href="https://github.com/tidesdb/tidesql/tree/3ef20028f1a184112019b9767e7cd70e88667368">MySQL fork</a> in which I started to implement the TidesDB library as a plugin, making its powerful storage engine available to MySQL users, but at the time the MySQL community had no way for us to make this possible.  Almost a year has passed and lots has changed. A <a target="_blank"  href="https://github.com/mysql/mysql-community/issues/82">proposal</a> was created for TidesDB to become available for MySQL and well, this has happened, TidesDB is <a target="_blank" href="https://github.com/tidesdb/tidesql-mysql">now available</a> as an external plugin storage engine for MySQL v9.x.x, v26.x.x with a wonderful set of features and more to come.
+Possibly most don't know, but originally TideSQL started as a <a target="_blank"  href="https://github.com/tidesdb/tidesql/tree/3ef20028f1a184112019b9767e7cd70e88667368">MySQL fork</a> in which existed to implement the TidesDB library as a plugin, making its powerful storage engine available to MySQL users, but at the time the MySQL community had no way for us to make this possible, thus it's original course changed.  Almost a year has passed and lots has changed since then. A <a target="_blank"  href="https://github.com/mysql/mysql-community/issues/82">proposal</a> was created for TidesDB to become available for MySQL and well, this has happened, TidesDB is <a target="_blank" href="https://github.com/tidesdb/tidesql-mysql">now available</a> as an external plugin storage engine for MySQL with a wonderful set of features and more to come.
 
 Currently the way to access the TidesDB plugin engine is through the `install.sh` script in the repository which you either point to your build or let the installer build the bundle for you.   Going down the line we'd like this to be easier for you the users and are in discussions with appropriate parties in regards to that.
 
 TidesDB is a write and space optimized storage engine which can keep up very well on reads.
 
-It's a plugin, not a fork.  You run a stock MySQL and load the engine into it, and a TidesDB table can sit next to an InnoDB one in the same server.  TideSQL v2.0.0 is paired with TidesDB v10.1.1 and tested against MySQL 9.7.0 and 26.7.0.
+It's a plugin, not a fork.  You run a stock MySQL and load the engine into it, and a TidesDB table can sit next to an InnoDB one in the same server.  TideSQL-MySQL v2.0.0 is paired with TidesDB v10.1.1 and tested against MySQL v9.7.0 and v26.7.0.
 
 ```sql
 INSTALL PLUGIN TidesDB SONAME 'ha_tidesdb.so';
