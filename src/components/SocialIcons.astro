@@ -27,9 +27,16 @@ const sections = siteNavSections();
 <Default><slot /></Default>
 
 <style>
+	/* Matches .nav-dd__btn in NavDropdown.astro box for box, so the plain Blog
+	   link and the two dropdown triggers are the same shape. Astro scopes styles
+	   per component, so `.header-nav-link` here never reaches the buttons even
+	   though they carry the class; the two definitions have to agree by hand. */
 	.header-nav-link {
+		display: inline-flex;
+		align-items: center;
 		font-size: var(--sl-text-sm);
 		font-weight: 500;
+		line-height: 1.2;
 		white-space: nowrap;
 		border-bottom: none;
 		align-self: center;

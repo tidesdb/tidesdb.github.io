@@ -38,6 +38,13 @@ const menuId = `nav-dd-${id}`;
 <style>
 	.nav-dd {
 		position: relative;
+		/* A flex container, not the default block. As a block it wrapped the
+		   inline-flex button in a line box, which added half-leading and made the
+		   wrapper 28px tall against the 24.5px of the plain Blog link beside it.
+		   The glyphs only drifted a quarter pixel, but the boxes, and so the hit
+		   areas and any focus ring, did not line up. */
+		display: flex;
+		align-items: center;
 		align-self: center;
 	}
 	.nav-dd__btn {
@@ -50,6 +57,7 @@ const menuId = `nav-dd-${id}`;
 		font-family: inherit;
 		font-size: var(--sl-text-sm);
 		font-weight: 500;
+		line-height: 1.2;
 		white-space: nowrap;
 		color: var(--nav-fg);
 		padding-inline: 0.25rem;
