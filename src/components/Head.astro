@@ -69,6 +69,14 @@ const seo = articleSeo();
 	})();
 </script>
 
+{/*
+	Feed autodiscovery. It lives here rather than in the `head` array in
+	astro.config.mjs because a StarlightPage (/blog, /docs/<v>/compatibility)
+	supplies its own `head` and replaces the configured one, so pages built that
+	way never saw it. This component renders for every page either way.
+*/}
+<link rel="alternate" type="application/rss+xml" title="TidesDB Blog" href="/rss.xml" />
+
 {
 	seo && (
 		<>

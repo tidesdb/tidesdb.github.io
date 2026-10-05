@@ -1,7 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-import { gitMeta, resolveAuthor, ogImage, fmtDate, SITE } from '../utils/articles.js';
+import { gitMeta, resolveAuthor, ogImage, fmtDate, summarize, SITE } from '../utils/articles.js';
 import { readingMinutes } from '../utils/reading-time.js';
 
 const articles = (await getCollection('docs'))
@@ -11,7 +11,7 @@ const articles = (await getCollection('docs'))
 		return {
 			href: `/${entry.id}`,
 			title: entry.data.title,
-			description: entry.data.description,
+			description: summarize(entry),
 			image: ogImage(entry),
 			author: resolveAuthor(entry, meta.gitAuthor),
 			minutes: readingMinutes(entry.body ?? ''),
@@ -87,7 +87,10 @@ const head = [
 		head,
 	}}
 >
-	<p class="blog-intro">{pageDescription}</p>
+	<p class="blog-intro">
+		{pageDescription}
+		<a class="blog-feed" href="/rss.xml">RSS feed</a>
+	</p>
 
 	<ul class="blog-grid" data-blog-grid data-initial={INITIAL_BATCH}>
 		{
@@ -222,6 +225,12 @@ const head = [
 		align-items: baseline;
 		gap: 0.5rem;
 		font-size: 0.8rem;
+	}
+
+	.blog-feed {
+		margin-inline-start: 0.5rem;
+		font-size: 0.85em;
+		white-space: nowrap;
 	}
 
 	.blog-card-time {
