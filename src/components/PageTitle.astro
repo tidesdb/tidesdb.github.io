@@ -6,6 +6,12 @@ import { readingMinutes } from '../utils/reading-time.js';
 const entry = Astro.locals.starlightRoute.entry;
 const isSplash = entry.data.template === 'splash';
 
+// Index pages list other pages, so there is nothing on them worth printing.
+// Matched on the route rather than the entry, because /blog is a StarlightPage
+// with a synthetic entry and no template of its own to key off.
+const INDEX_ROUTES = ['/blog'];
+const isIndex = INDEX_ROUTES.includes(Astro.url.pathname.replace(/\/$/, ''));
+
 // Reading time is for articles only, not the manual. The id is the collection
 // path, so articles are exactly the `articles/` prefix, matching how blog.astro
 // and blog/[slug].astro select them. Share links live at the end of the article
@@ -19,6 +25,7 @@ const minutes = isArticle ? readingMinutes(entry.body ?? '') : 0;
 	<h1 id="_top">{entry.data.title}</h1>
 	<div class="page-title-tools">
 	{ isArticle && <span class="read-time">{minutes} min read</span> }
+	{ !isIndex && (
 	<button class="print-btn" id="print-page-btn" title="Print this page" aria-label="Print this page">
 		<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 			<polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -27,6 +34,7 @@ const minutes = isArticle ? readingMinutes(entry.body ?? '') : 0;
 		</svg>
 		<span>Print</span>
 	</button>
+	) }
 	</div>
 </div>
 ) }

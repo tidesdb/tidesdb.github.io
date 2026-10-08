@@ -138,6 +138,15 @@ starlight-menu-button[aria-expanded='true'] button {
 	color: var(--nav-fg-strong, #fff) !important;
 }
 
+/* /blog lays out a card grid rather than prose, so it needs more than the 45rem
+   prose column Starlight gives every page. Without this the grid is stuck at two
+   columns on a 1920px screen exactly as it is on a 1280px one. Keyed off the grid
+   itself so no other page widens, the same way the homepage rule below is keyed
+   off .home. */
+html:has(.blog-grid) {
+	--sl-content-width: 85rem;
+}
+
 /* Homepage only: transparent and blended into the hero until scrolled. */
 html:has(.home) header:not(.is-scrolled) {
 	background: transparent !important;
