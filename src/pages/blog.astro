@@ -1,7 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-import { gitMeta, resolveAuthor, ogImage, fmtDate, summarize, SITE } from '../utils/articles.js';
+import { gitMeta, resolveAuthor, ogImage, fmtDateShort, summarize, SITE } from '../utils/articles.js';
 import { readingMinutes } from '../utils/reading-time.js';
 
 const articles = (await getCollection('docs'))
@@ -92,19 +92,17 @@ const head = [
 		<a class="blog-feed" href="/rss.xml">RSS feed</a>
 	</p>
 
-	<ul class="blog-grid" data-blog-grid data-initial={INITIAL_BATCH}>
+	<ul class="blog-grid not-content" data-blog-grid data-initial={INITIAL_BATCH}>
 		{
 			articles.map((a) => (
 				<li class="blog-item">
 					<a class="blog-card" href={a.href}>
-						{a.image && (
-							<div class="blog-card-media">
-								<img src={a.image} alt={a.title} loading="lazy" />
-							</div>
-						)}
+						<div class="blog-card-media">
+							{a.image && <img src={a.image} alt={a.title} loading="lazy" />}
+						</div>
 						<div class="blog-card-body">
 							<div class="blog-card-meta">
-								<time datetime={a.created.toISOString()}>{fmtDate(a.created)}</time>
+								<time datetime={a.created.toISOString()}>{fmtDateShort(a.created)}</time>
 								{a.author.name && <span class="blog-card-author">by {a.author.name}</span>}
 								<span class="blog-card-time">{a.minutes} min read</span>
 							</div>
@@ -171,10 +169,16 @@ const head = [
 		padding: 0;
 		margin: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 		gap: 1.5rem;
 	}
 
+	/* `not-content` on the grid is Starlight's opt-out from its prose styles, and
+	   this markup needs it. `.sl-markdown-content li + li` sets margin-top 0.25rem,
+	   which gave every card except the first a 4px offset inside its grid row, and
+	   its `:not(...) + :not(...)` rule adds 1rem between the title and description
+	   on top of the body's own gap. Both outrank a scoped `.blog-item` reset, so
+	   opting the subtree out is the fix rather than fighting specificity. */
 	.blog-item {
 		margin: 0;
 		padding: 0;
@@ -202,7 +206,13 @@ const head = [
 	.blog-card-media {
 		aspect-ratio: 16 / 9;
 		overflow: hidden;
-		background: var(--sl-color-gray-6);
+		flex-shrink: 0;
+		/* Also the placeholder for the articles that ship no og:image. */
+		background: linear-gradient(
+			135deg,
+			var(--sl-color-gray-6) 0%,
+			var(--sl-color-bg-sidebar) 100%
+		);
 	}
 
 	.blog-card-media img {
@@ -217,14 +227,26 @@ const head = [
 		flex-direction: column;
 		gap: 0.5rem;
 		padding: 1.15rem 1.25rem 1.35rem;
+		flex: 1;
 	}
 
+	/* Three items in roughly 250px, so it is set small and tight. Separated by
+	   middots rather than whitespace alone, which keeps the parts legible as one
+	   line and reads correctly if it does wrap. */
 	.blog-card-meta {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
-		gap: 0.5rem;
-		font-size: 0.8rem;
+		gap: 0.3rem;
+		font-size: 0.72rem;
+		line-height: 1.4;
+	}
+
+	.blog-card-author::before,
+	.blog-card-time::before {
+		content: '\00b7';
+		margin-inline-end: 0.3rem;
+		color: var(--sl-color-gray-5);
 	}
 
 	.blog-feed {
@@ -233,8 +255,10 @@ const head = [
 		white-space: nowrap;
 	}
 
+	/* No `margin-inline-start: auto` here. It pinned this to the right edge, so
+	   once the row wrapped the reading time sat alone on a second line far from
+	   the date and author it belongs with. */
 	.blog-card-time {
-		margin-inline-start: auto;
 		white-space: nowrap;
 		opacity: 0.85;
 	}
@@ -250,15 +274,30 @@ const head = [
 		color: var(--sl-color-gray-4);
 	}
 
+	/* Two lines always, so a one-line title does not pull its description up a
+	   line above the card beside it. Longer titles clamp with an ellipsis. */
 	.blog-card-body h2 {
 		font-size: 1.05rem;
 		line-height: 1.35;
 		font-weight: 600;
 		margin: 0;
 		color: var(--sl-color-white);
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		min-height: calc(2 * 1.35 * 1.05rem);
 	}
 
+	/* Fixed three lines, like the two-line title above it. Clamping alone only
+	   caps the height, it does not set one, so a short description still made its
+	   card shorter than the card beside it and the row then bottom-aligned them. */
 	.blog-card-body p {
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		min-height: calc(3 * 1.5 * 0.9rem);
 		font-size: 0.9rem;
 		line-height: 1.5;
 		margin: 0;

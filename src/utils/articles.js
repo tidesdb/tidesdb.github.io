@@ -97,7 +97,11 @@ export function summarize(entry, limit = 200) {
 	return `${(lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}\u2026`;
 }
 
-/** Human-readable date, e.g. "January 16, 2026". */
-export function fmtDate(d) {
-	return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+/**
+ * Compact date, e.g. "Jan 16, 2026", for the blog cards. At three and four
+ * columns a card's meta row is about 250px wide, and the long month name alone
+ * pushed the row onto a second line.
+ */
+export function fmtDateShort(d) {
+	return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
