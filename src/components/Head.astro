@@ -1,6 +1,6 @@
 ---
 import Default from '@astrojs/starlight/components/Head.astro';
-import { gitMeta, resolveAuthor, ogImage, SITE } from '../utils/articles.js';
+import { articleDates, resolveAuthor, ogImage, SITE } from '../utils/articles.js';
 
 // Starlight already emits <title>, canonical, description, og/twitter tags and
 // og:image (from each article's frontmatter). Here we add the SEO that is
@@ -11,7 +11,7 @@ const { entry } = Astro.locals.starlightRoute;
 /** Build the article-only SEO payload, or null for non-article pages. */
 function articleSeo() {
 	if (!entry.id.startsWith('articles/')) return null;
-	const meta = gitMeta(entry.filePath);
+	const meta = articleDates(entry);
 	const author = resolveAuthor(entry, meta.gitAuthor);
 	const url = `${SITE}/${entry.id}`;
 	const image = ogImage(entry);
