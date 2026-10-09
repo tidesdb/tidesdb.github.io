@@ -5,11 +5,11 @@ head:
   - tag: meta
     attrs:
       property: og:image
-      content: https://tidesdb.com/pexels-pexels-user-178764159-11166072.jpg
+      content: https://tidesdb.com/pexels-alexn-34164215.jpg
   - tag: meta
     attrs:
       name: twitter:image
-      content: https://tidesdb.com/pexels-pexels-user-178764159-11166072.jpg
+      content: https://tidesdb.com/pexels-alexn-34164215.jpg
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -73,7 +73,7 @@ TidesDB leads at every point. Both engines peak at 32 VU, where TidesDB's median
 
 Neither engine falls over past its peak. TidesDB keeps 88% of its peak out at 1,024 VU and InnoDB keeps 97% of its own, but from a lower peak, so TidesDB is still 15% ahead at the top of the sweep.
 
-For latency at peak TidesDB's new order p99 is 13.46ms against InnoDB's 36.38ms, about a third. The gap narrows as concurrency climbs and past 512 VU it reverses. At 1,024 VU InnoDB's tail is the better one, 555.93 ms against 621.88 ms.
+For latency at peak TidesDB's new order p99 is 13.46ms against InnoDB's 36.38ms, about a third. The gap narrows as concurrency climbs and past 512 VU it reverses. At 1,024 VU InnoDB's tail is better, 555.93 ms against 621.88 ms.
 
 ![New order p99 vs concurrency](/large-tpc-c-analysis-with-mysql-v26-7-0-on-innodb-and-tidesdb/neworder_p99_vs_vu.png)
 
@@ -81,7 +81,7 @@ The median tells you the same thing.
 
 ![New order p50 vs concurrency](/large-tpc-c-analysis-with-mysql-v26-7-0-on-innodb-and-tidesdb/neworder_p50_vs_vu.png)
 
-Watching a single run second by second shows TidesDB sits higher for most of the run and drops sharply every so often, most likely backpressure while flushes and compaction do their work in the background. InnoDB is flatter and lower though still rather sporadic. 
+Watching a single run second by second shows TidesDB sits higher for most of the run and drops every so often, most likely backpressure while flushes and compaction do their work in the background. InnoDB is flatter and lower though still rather sporadic. 
 
 ![Throughput over time at 32 VU](/large-tpc-c-analysis-with-mysql-v26-7-0-on-innodb-and-tidesdb/throughput_over_time.png)
 
@@ -114,4 +114,4 @@ Thank you for reading.
 
 -- 
 
-For article data, figures, reproducible scripts: <a href="/large-tpc-c-analysis-with-mysql-v26-7-0-on-innodb-and-tidesdb/tpcc-mysql-4000wh.zip">tpcc-mysql-4000wh.zip (35f5eb5deb9dba5c447e3b3bf425a322a89e614eb873d3753744d4b40cebae07)</a>
+For article data, figures, reproducible scripts: <a href="/large-tpc-c-analysis-with-mysql-v26-7-0-on-innodb-and-tidesdb/tpcc-mysql-4000wh.zip">tpcc-mysql-4000wh.zip (sha256: 35f5eb5deb9dba5c447e3b3bf425a322a89e614eb873d3753744d4b40cebae07)</a>
