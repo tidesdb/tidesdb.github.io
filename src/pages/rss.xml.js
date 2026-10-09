@@ -12,11 +12,10 @@
 
 import rss from '@astrojs/rss';
 import { getCollection } from 'astro:content';
-import { SITE, gitMeta, resolveAuthor, summarize } from '../utils/articles.js';
+import { SITE, gitMeta, publishedArticles, resolveAuthor, summarize } from '../utils/articles.js';
 
 export async function GET(context) {
-	const articles = (await getCollection('docs'))
-		.filter((entry) => entry.id.startsWith('articles/'))
+	const articles = publishedArticles(await getCollection('docs'))
 		.map((entry) => ({ entry, meta: gitMeta(entry.filePath ?? '') }))
 		.sort((a, b) => b.meta.created.getTime() - a.meta.created.getTime());
 

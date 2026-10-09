@@ -63,6 +63,30 @@ export function ogImage(entry) {
 }
 
 /**
+ * The articles to list, matching Starlight's own draft rule exactly.
+ *
+ * Starlight filters drafts with `import.meta.env.MODE !== 'production' || draft
+ * === false`, so a draft renders under `astro dev` (with its draft notice) and
+ * is not generated at all in a production build. Our pages query the collection
+ * directly, so without this they would advertise a card, a feed item and a
+ * /blog/<slug> redirect for a page that does not exist once deployed.
+ *
+ * `unlisted: true` is also excluded here, but unlike a draft that page is still
+ * built, so it keeps a public URL you can share while it stays off the listing,
+ * the feed and the redirects. Publish either by removing the line.
+ *
+ * @param {any[]} entries - everything in the `docs` collection
+ */
+export function publishedArticles(entries) {
+	return entries.filter(
+		(entry) =>
+			entry.id.startsWith('articles/') &&
+			entry.data?.unlisted !== true &&
+			(import.meta.env.MODE !== 'production' || entry.data?.draft !== true)
+	);
+}
+
+/**
  * Summary for an article, for the blog card and the RSS item.
  *
  * `description` frontmatter when it exists, otherwise the opening prose of the

@@ -7,11 +7,30 @@ export const collections = {
 		loader: docsLoader(),
 		// Optional author overrides. When omitted, the article's creator is taken
 		// from git history (see src/utils/articles.js).
-		schema: docsSchema({
-			extend: z.object({
-				author: z.string().optional(),
-				authorUrl: z.string().url().optional(),
-			}),
-		}),
+		//
+		// Two ways to hold an article back, which do different things:
+		//
+		//   draft: true     Starlight's own flag. The page renders under
+		//                   `astro dev` with a draft notice and is NOT generated
+		//                   in a production build, so it has no public URL.
+		//   unlisted: true  The page IS built and can be shared by link, but it
+		//                   is kept out of /blog, the RSS feed, the /blog/<slug>
+		//                   redirects, the sitemap and search, and is marked
+		//                   noindex. Use this for a preview link.
+		// The transform is how `unlisted` reaches Starlight's own `pagefind` flag.
+		// Page.astro indexes a page when `entry.data.pagefind !== false`, and that
+		// is read from the parsed frontmatter, so setting it here keeps an unlisted
+		// article out of the site search without having to write two lines in every
+		// draft's frontmatter.
+		schema: (context) =>
+			docsSchema({
+				extend: z.object({
+					author: z.string().optional(),
+					authorUrl: z.string().url().optional(),
+					unlisted: z.boolean().default(false),
+				}),
+			})(context).transform((data) =>
+				data.unlisted ? { ...data, pagefind: false } : data
+			),
 	}),
 };

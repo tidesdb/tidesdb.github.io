@@ -1,6 +1,7 @@
 // @ts-check
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
+import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import { LATEST } from './src/config/versions.js';
 
@@ -59,6 +60,30 @@ const LEGACY_REFERENCE = {
 	'/reference/typescript': componentDocs('typescript'),
 };
 
+/**
+ * Articles marked `unlisted: true`, as site paths.
+ *
+ * An unlisted article is still built so its URL can be shared, so it has to be
+ * kept out of the sitemap as well, otherwise the link is published to every
+ * crawler and the page is only unlisted in name. Read straight from frontmatter
+ * because the sitemap filter runs at config time, before any collection exists.
+ */
+function unlistedArticlePaths() {
+	const dir = new URL('./src/content/docs/articles/', import.meta.url);
+	/** @type {Set<string>} */
+	const paths = new Set();
+	for (const file of readdirSync(dir)) {
+		if (!/\.mdx?$/.test(file)) continue;
+		const frontmatter = readFileSync(new URL(file, dir), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+		if (frontmatter && /^unlisted:\s*true\s*$/m.test(frontmatter[1])) {
+			paths.add(`/articles/${file.replace(/\.mdx?$/, '')}/`);
+		}
+	}
+	return paths;
+}
+
+const UNLISTED = unlistedArticlePaths();
+
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://tidesdb.com',
@@ -69,6 +94,9 @@ export default defineConfig({
 		...LEGACY_REFERENCE,
 	},
 	integrations: [
+		sitemap({
+			filter: (page) => !UNLISTED.has(new URL(page).pathname),
+		}),
 		starlight({
 			title: 'TidesDB',
 			description: 'Fast, embeddable LSM-tree based key-value storage engine library written in C. ACID transactions, great concurrency, cross-platform support.',
