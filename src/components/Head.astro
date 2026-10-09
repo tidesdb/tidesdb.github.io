@@ -70,6 +70,14 @@ const seo = articleSeo();
 </script>
 
 {/*
+	An unlisted article keeps a working URL so it can be shared, but it must not
+	be indexed. This is a second robots meta alongside the site-wide
+	"index, follow" one in astro.config.mjs; crawlers take the most restrictive
+	directive when they conflict, so noindex wins here.
+*/}
+{entry.data.unlisted && <meta name="robots" content="noindex, nofollow" />}
+
+{/*
 	Feed autodiscovery. It lives here rather than in the `head` array in
 	astro.config.mjs because a StarlightPage (/blog, /docs/<v>/compatibility)
 	supplies its own `head` and replaces the configured one, so pages built that

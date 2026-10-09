@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 250" width="640" height="250" font-family="system-ui, sans-serif" font-size="13">
+  <title>A segment nothing references is deleted whole, a half live one is drained by the next compaction</title>
+  <g>
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+             keyTimes="0;0.03;0.9;0.93;1" values="0;1;1;0;0"/>
+    <text x="320" y="24" text-anchor="middle" fill="#8792a2">live bytes per segment come from the sstable footers, no scan</text>
+
+    <!-- segment 1, every value overwritten, deleted whole -->
+    <g>
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+               keyTimes="0;0.3;0.38;0.93;1" values="1;1;0;0;1"/>
+      <text x="115" y="72" text-anchor="middle" fill="#8792a2">segment 1</text>
+      <rect x="30" y="80" width="170" height="50" rx="4" fill="none" stroke="#8792a2"/>
+      <g fill="#b4dbf7">
+        <animate attributeName="fill" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.1;0.18;0.93;1" values="#b4dbf7;#b4dbf7;#d5dbe2;#d5dbe2;#b4dbf7"/>
+        <rect x="36" y="90" width="36" height="30" rx="3"/>
+        <rect x="76" y="90" width="36" height="30" rx="3"/>
+        <rect x="116" y="90" width="36" height="30" rx="3"/>
+        <rect x="156" y="90" width="36" height="30" rx="3"/>
+      </g>
+      <text x="115" y="152" text-anchor="middle" fill="#8792a2">live 16 KB
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.14;1" values="1;0;0" calcMode="discrete"/>
+      </text>
+      <text x="115" y="152" text-anchor="middle" fill="#8792a2" opacity="0">live 0
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.14;1" values="0;1;1" calcMode="discrete"/>
+      </text>
+    </g>
+
+    <!-- segment 2, half overwritten, drained by the next compaction -->
+    <g>
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+               keyTimes="0;0.72;0.8;0.93;1" values="1;1;0;0;1"/>
+      <text x="320" y="72" text-anchor="middle" fill="#8792a2">segment 2</text>
+      <rect x="235" y="80" width="170" height="50" rx="4" fill="none" stroke="#8792a2"/>
+      <g fill="#b4dbf7">
+        <animate attributeName="fill" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.1;0.18;0.93;1" values="#b4dbf7;#b4dbf7;#d5dbe2;#d5dbe2;#b4dbf7"/>
+        <rect x="241" y="90" width="36" height="30" rx="3"/>
+        <rect x="281" y="90" width="36" height="30" rx="3"/>
+      </g>
+      <text x="320" y="152" text-anchor="middle" fill="#8792a2">live 16 KB
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.14;1" values="1;0;0" calcMode="discrete"/>
+      </text>
+      <text x="320" y="152" text-anchor="middle" fill="#8792a2" opacity="0">live 8 KB, half live, marked
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.14;0.58;1" values="0;1;0;0" calcMode="discrete"/>
+      </text>
+      <text x="320" y="152" text-anchor="middle" fill="#8792a2" opacity="0">live 0
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.58;1" values="0;1;1" calcMode="discrete"/>
+      </text>
+    </g>
+    <!-- the two values still live in segment 2, rewritten by a compaction into the active segment -->
+    <g fill="#b4dbf7">
+      <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite"
+                        keyTimes="0;0.42;0.58;0.93;1" values="0 0;0 0;125 0;125 0;0 0"/>
+      <rect x="321" y="90" width="36" height="30" rx="3"/>
+      <rect x="361" y="90" width="36" height="30" rx="3"/>
+    </g>
+
+    <!-- segment 3, the one taking appends -->
+    <text x="525" y="72" text-anchor="middle" fill="#8792a2">segment 3, taking appends</text>
+    <rect x="440" y="80" width="170" height="50" rx="4" fill="none" stroke="#8792a2"/>
+    <g fill="none" stroke="#c1c9d2" stroke-dasharray="3 3">
+      <rect x="446" y="90" width="36" height="30" rx="3"/>
+      <rect x="486" y="90" width="36" height="30" rx="3"/>
+      <rect x="526" y="90" width="36" height="30" rx="3"/>
+      <rect x="566" y="90" width="36" height="30" rx="3"/>
+    </g>
+    <text x="525" y="152" text-anchor="middle" fill="#8792a2">live 0
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+               keyTimes="0;0.58;1" values="1;0;0" calcMode="discrete"/>
+    </text>
+    <text x="525" y="152" text-anchor="middle" fill="#8792a2" opacity="0">live 8 KB
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+               keyTimes="0;0.58;1" values="0;1;1" calcMode="discrete"/>
+    </text>
+
+    <!-- what is happening, one line at a time -->
+    <g fill="#697386" text-anchor="middle">
+      <text x="320" y="200" opacity="0">an overwrite leaves the old values unreferenced
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.1;0.3;1" values="0;1;0;0" calcMode="discrete"/>
+      </text>
+      <text x="320" y="200" opacity="0">nothing references segment 1, so it is unlinked, no copying
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.3;0.42;1" values="0;1;0;0" calcMode="discrete"/>
+      </text>
+      <text x="320" y="200" opacity="0">a compaction already running writes segment 2's live values afresh
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.42;0.66;1" values="0;1;0;0" calcMode="discrete"/>
+      </text>
+      <text x="320" y="200" opacity="0">segment 2 is now empty and goes the same way
+        <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+                 keyTimes="0;0.66;0.9;1" values="0;1;0;0" calcMode="discrete"/>
+      </text>
+    </g>
+  </g>
+</svg>

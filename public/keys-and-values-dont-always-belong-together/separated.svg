@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 270" width="640" height="270" font-family="system-ui, sans-serif" font-size="13">
+  <title>Separated values stay where they were written while only keys are merged</title>
+  <g fill="#8792a2">
+    <text x="12" y="50">L1</text>
+    <text x="12" y="110">L2</text>
+    <text x="12" y="170">L3</text>
+    <text x="12" y="212">vlog</text>
+    <text x="628" y="20" text-anchor="end">values separated</text>
+    <text x="12" y="250">compaction rewrote</text>
+  </g>
+  <g stroke="#8792a2" stroke-opacity="0.5">
+    <line x1="44" y1="64" x2="628" y2="64"/>
+    <line x1="44" y1="124" x2="628" y2="124"/>
+    <line x1="44" y1="184" x2="628" y2="184"/>
+  </g>
+  <g>
+    <animate attributeName="opacity" dur="7s" repeatCount="indefinite"
+             keyTimes="0;0.05;0.1;0.25;0.4;0.55;0.85;0.92;1" values="0;1;1;1;1;1;1;0;0"/>
+    <g stroke="#8792a2" stroke-dasharray="3 3">
+      <line x1="91" y1="58" x2="154" y2="196">
+        <animate attributeName="y1" dur="7s" repeatCount="indefinite"
+                 keyTimes="0;0.05;0.1;0.25;0.4;0.55;0.85;0.92;1" values="58;58;58;118;118;178;178;178;58"/>
+      </line>
+      <line x1="283" y1="58" x2="346" y2="196">
+        <animate attributeName="y1" dur="7s" repeatCount="indefinite"
+                 keyTimes="0;0.05;0.1;0.25;0.4;0.55;0.85;0.92;1" values="58;58;58;118;118;178;178;178;58"/>
+      </line>
+      <line x1="475" y1="58" x2="538" y2="196">
+        <animate attributeName="y1" dur="7s" repeatCount="indefinite"
+                 keyTimes="0;0.05;0.1;0.25;0.4;0.55;0.85;0.92;1" values="58;58;58;118;118;178;178;178;58"/>
+      </line>
+    </g>
+    <g>
+      <animateTransform attributeName="transform" type="translate" dur="7s" repeatCount="indefinite"
+                        keyTimes="0;0.05;0.1;0.25;0.4;0.55;0.85;0.92;1"
+                        values="0 0;0 0;0 0;0 60;0 60;0 120;0 120;0 120;0 0"/>
+      <g fill="#fff" font-size="12">
+        <rect x="60" y="34" width="22" height="24" rx="3" fill="#193EDC"/>
+        <rect x="84" y="34" width="14" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+        <text x="71" y="51" text-anchor="middle">k</text>
+        <rect x="252" y="34" width="22" height="24" rx="3" fill="#193EDC"/>
+        <rect x="276" y="34" width="14" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+        <text x="263" y="51" text-anchor="middle">k</text>
+        <rect x="444" y="34" width="22" height="24" rx="3" fill="#193EDC"/>
+        <rect x="468" y="34" width="14" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+        <text x="455" y="51" text-anchor="middle">k</text>
+      </g>
+    </g>
+    <g fill="#fff" font-size="12">
+      <rect x="84" y="196" width="140" height="24" rx="3" fill="#b4dbf7"/>
+      <text x="154" y="213" text-anchor="middle" fill="#0a2540">4 KB value</text>
+      <rect x="276" y="196" width="140" height="24" rx="3" fill="#b4dbf7"/>
+      <text x="346" y="213" text-anchor="middle" fill="#0a2540">4 KB value</text>
+      <rect x="468" y="196" width="140" height="24" rx="3" fill="#b4dbf7"/>
+      <text x="538" y="213" text-anchor="middle" fill="#0a2540">4 KB value</text>
+    </g>
+    <rect x="150" y="238" height="16" rx="3" fill="#193EDC" width="0">
+      <animate attributeName="width" dur="7s" repeatCount="indefinite"
+               keyTimes="0;0.05;0.1;0.25;0.4;0.55;0.85;0.92;1" values="0;0;0;6;6;12;12;12;0"/>
+    </rect>
+  </g>
+</svg>

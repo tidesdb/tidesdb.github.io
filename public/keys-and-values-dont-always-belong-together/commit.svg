@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 310" width="640" height="310" font-family="system-ui, sans-serif" font-size="13">
+  <title>A commit with a large value writes the value once and moves only the key and its id after that</title>
+  <g fill="#8792a2">
+    <text x="30" y="32">commit put(k, 4 KB)</text>
+    <text x="628" y="32" text-anchor="end">1  value log, disk</text>
+    <text x="628" y="102" text-anchor="end">2  write-ahead log, disk</text>
+    <text x="628" y="172" text-anchor="end">3  memtable, memory</text>
+    <text x="628" y="242" text-anchor="end">4  L1 key log, disk</text>
+  </g>
+  <g stroke="#8792a2" stroke-opacity="0.5">
+    <line x1="350" y1="68" x2="628" y2="68"/>
+    <line x1="350" y1="138" x2="628" y2="138"/>
+    <line x1="350" y1="278" x2="628" y2="278"/>
+  </g>
+  <rect x="350" y="176" width="278" height="36" rx="4" fill="none" stroke="#8792a2" stroke-opacity="0.6" stroke-dasharray="4 3"/>
+  <g>
+    <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+             keyTimes="0;0.04;0.88;0.91;1" values="0;1;1;0;0"/>
+    <!-- the transaction: a key, its value, and the id the value log hands back -->
+    <rect x="30" y="40" width="22" height="24" rx="3" fill="#193EDC"/>
+    <text x="41" y="57" text-anchor="middle" fill="#fff" font-size="12">k</text>
+    <g>
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.22;0.26;0.92;1" values="0;0;1;1;0"/>
+      <rect x="54" y="40" width="26" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+      <text x="67" y="57" text-anchor="middle" fill="#809ae0" font-size="11">id</text>
+    </g>
+    <!-- step 1, the value goes to the value log, the only time its bytes are written -->
+    <g>
+      <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite"
+                        keyTimes="0;0.08;0.22;0.92;1" values="0 0;0 0;306 0;306 0;0 0"/>
+      <rect x="54" y="40" width="140" height="24" rx="3" fill="#b4dbf7"/>
+      <text x="124" y="57" text-anchor="middle" fill="#0a2540" font-size="12">4 KB value</text>
+    </g>
+    <!-- step 2, the log record carries the key and the id -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.3;0.31;0.92;1" values="0;0;1;1;0"/>
+      <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite"
+                        keyTimes="0;0.31;0.45;0.92;1" values="0 0;0 0;330 70;330 70;0 0"/>
+      <rect x="30" y="40" width="22" height="24" rx="3" fill="#193EDC"/>
+      <text x="41" y="57" text-anchor="middle" fill="#fff" font-size="12">k</text>
+      <rect x="54" y="40" width="26" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+      <text x="67" y="57" text-anchor="middle" fill="#809ae0" font-size="11">id</text>
+    </g>
+    <!-- step 3, the memtable holds the key and the id, not the bytes -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.5;0.51;0.84;0.88;1" values="0;0;1;1;0;0"/>
+      <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite"
+                        keyTimes="0;0.51;0.63;0.92;1" values="0 0;0 0;330 140;330 140;0 0"/>
+      <rect x="30" y="40" width="22" height="24" rx="3" fill="#193EDC"/>
+      <text x="41" y="57" text-anchor="middle" fill="#fff" font-size="12">k</text>
+      <rect x="54" y="40" width="26" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+      <text x="67" y="57" text-anchor="middle" fill="#809ae0" font-size="11">id</text>
+    </g>
+    <!-- step 4, the flush writes the key and the id into the key log -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.7;0.71;0.92;1" values="0;0;1;1;0"/>
+      <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite"
+                        keyTimes="0;0.71;0.83;0.92;1" values="330 140;330 140;330 210;330 210;330 140"/>
+      <rect x="30" y="40" width="22" height="24" rx="3" fill="#193EDC"/>
+      <text x="41" y="57" text-anchor="middle" fill="#fff" font-size="12">k</text>
+      <rect x="54" y="40" width="26" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+      <text x="67" y="57" text-anchor="middle" fill="#809ae0" font-size="11">id</text>
+    </g>
+    <text x="30" y="300" fill="#8792a2" opacity="0">value bytes written to disk, 4 KB, once
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.22;0.26;0.92;1" values="0;0;1;1;0"/>
+    </text>
+  </g>
+</svg>
