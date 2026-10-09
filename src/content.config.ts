@@ -28,6 +28,12 @@ export const collections = {
 					author: z.string().optional(),
 					authorUrl: z.string().url().optional(),
 					unlisted: z.boolean().default(false),
+					// Publication date override. Dates normally come from git, where
+					// the oldest commit is treated as publication, which is wrong for
+					// anything held back as a draft: it would publish carrying the date
+					// you started writing and sort below newer posts. Set this on the
+					// commit that publishes it.
+					date: z.coerce.date().optional(),
 				}),
 			})(context).transform((data) =>
 				data.unlisted ? { ...data, pagefind: false } : data

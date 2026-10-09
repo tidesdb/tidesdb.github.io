@@ -1,12 +1,12 @@
 ---
 import { getCollection } from 'astro:content';
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-import { gitMeta, resolveAuthor, ogImage, fmtDateShort, summarize, SITE, publishedArticles } from '../utils/articles.js';
+import { articleDates, resolveAuthor, ogImage, fmtDateShort, summarize, SITE, publishedArticles } from '../utils/articles.js';
 import { readingMinutes } from '../utils/reading-time.js';
 
 const articles = publishedArticles(await getCollection('docs'))
 	.map((entry) => {
-		const meta = gitMeta(entry.filePath ?? '');
+		const meta = articleDates(entry);
 		return {
 			href: `/${entry.id}`,
 			title: entry.data.title,

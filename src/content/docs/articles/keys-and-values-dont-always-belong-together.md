@@ -1,7 +1,6 @@
 ---
 title: "Keys and Values Don't Always Belong Together"
 description: "Why an LSM tree should keep large values out of compaction, how TidesDB's value log does it, and what it costs."
-unlisted: true
 head:
   - tag: meta
     attrs:
@@ -17,31 +16,35 @@ head:
 
 <div class="article-image">
 
-![Why separating large values from keys is a must in an LSM tree](/pexels-asadphoto-24245330.jpg)
+![Keys and Values Don't Always Belong Together](/pexels-asadphoto-24245330.jpg)
 <a target="_blank" href="https://www.instagram.com/asad.photo">Asad Photo Maldives</a>
 </div>
 
 *by <a target="_blank" href="https://alexpadula.com">Alex Gaetano Padula</a>*
 
-*published on October 8th, 2026*
+*published on October 9th, 2026*
 
-In an LSM (log-structured-merge) tree engine where writes buffer in memory and disk at L0 then flush with to sorted files to L1 and above, when you write large values they normally in many cases live with the key in a file usually in block format.  This is sometimes problematic.
+Let's talk keys and values.  Most all databases in the world are built on this foundation, storing raw bytes and indexing them in the form of a key and its value once called upon.  
 
-An LSM tree stays sorted by merging, with every merge comes rewriting everything it reads.  A 16 byte key moving down the levels is rather cheap, but a 4 KB value riding along with it gets rewritten at every level too, even though the value itself never changes, which is costly.
+There are many data structures to achieve this, today we will focus on a normally persisted one called the <a href="https://en.wikipedia.org/wiki/Log-structured_merge-tree">log-structured-merge-tree</a>. 
+
+In an LSM tree engine, writes are buffered at Level 0, flushing to sorted files at Level 1 then compacting up levels. Those sorted files usually have K, V, K, V, side by side often described as inline. That can be fine for small values, but for large values, this can cause severe write overhead.
+
+An LSM tree keeps its levels sorted by merging them as it works, rewriting whatever each merge reads.  Doing that for 16 byte keys is not a big deal, but when the values riding along are 4 KB, every merge writes them out again even though they never change.  That phenomenon is called write amplification, the bytes the engine writes to disk for every byte you wrote, and it's what separating values is meant to cut.
 
 ![Values kept inline are rewritten by every merge](/keys-and-values-dont-always-belong-together/inline.svg)
 
-The fix, laid out by the <a target="_blank" href="https://www.usenix.org/system/files/conference/fast16/fast16-papers-lu.pdf">WiscKey paper (Lu et al., FAST '16)</a>, is to keep only keys in the tree and put values somewhere they're written once and left alone.  In TidesDB a value at or above `value_separation_threshold`, goes to a value log shared by the whole engine, and the key log(klog) stores a small logical id in its place.  Merges then move keys and ids, never values.
+The fix, laid out by the <a target="_blank" href="https://www.usenix.org/system/files/conference/fast16/fast16-papers-lu.pdf">WiscKey paper (Lu et al., FAST '16)</a>, is to keep only keys in the tree and put values somewhere they're written once and left alone.  In TidesDB a value at or above `value_separation_threshold` goes to a value log shared by the whole engine, and the key log(klog) stores a small logical id in its place.  Merges then move keys and ids, never values.
 
 ![Separated values stay where they were written while only keys are merged](/keys-and-values-dont-always-belong-together/separated.svg)
 
-In TidesDB it starts at the commit where the value is appended to the value log once, and from there on everything carries the key and the id, the write-ahead log record, the memtable entry in memory, and the key log the flush writes.  The 4 KB never gets copied again.
+In TidesDB, a value is appended to the value log once -- at commit -- and from there onward, every layer just carries the key and the id, so the write-ahead log record, the memtable entry and the key log never copy the value.
 
 ![A commit writes the value once and moves only the key and its id after that](/keys-and-values-dont-always-belong-together/commit.svg)
 
-Because in TidesDB an SSTable (sorted string table) is essentially a klog which in itself is a B+tree.  A key log node is 4 KB by default, set with `btree_klog_block_size`, and the default 1024 byte large value threshold is a quarter of it on purpose, since a 4 KB value kept inline fills a node by itself.  So I thought I'd measure inline with 64 KB nodes too.
+In TidesDB an SSTable (sorted string table) is essentially a klog which in itself is a B+tree. A key log node is 4 KB by default, set with `btree_klog_block_size`, and the default large value threshold is a quarter of it (1 KB) on purpose -- since a 4 KB value kept inline fills a node by itself.
 
-I wrote a <a href="/home/agpmastersystem/tidesdb.github.io/public/keys-and-values-dont-always-belong-together/separation.c">program</a> against the TidesDB 10 that loads 250k keys with 4 KB values in random order, overwrites them all once more, waits for compaction to finish, then times 100,000 point reads and a full scan.
+I thought I’d measure inline with 64 KB nodes to see how that plays out! A <a href="/keys-and-values-dont-always-belong-together/separation.c">program</a> against TidesDB 10 loads 250k keys with 4 KB values in random order, overwrites them all once more, waits for compaction to finish, then measures 100,000 point reads and a full scan to see how they perform.
 
 <div class="not-content" style="display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;margin:2rem 0 0.5rem;font-size:0.85rem;color:#8792a2;">
   <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#193EDC;margin-right:6px;"></span>separated</span>
@@ -120,17 +123,21 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-As you can see separated writes run almost three times faster, and the compaction row shows rewrite of 0.
+Separated writes run almost three times faster, and the compaction panel shows they rewrote nothing.
 
-The large 64 KB run still rewrote 5.1 GB, because compaction pays for the bytes it moves, however they do make scans the fastest of the three, and point reads three times slower, since every lookup now decodes a 64 KB node.
 
-There is cost of seperating, of course, a scan pays a second read per row, and old values stay on disk until compaction drops the keys pointing at them.  Reclaiming that is cheap in TidesDB, since every key log records which value log segments its values live in, thus a segment nothing references is deleted whole and a half empty one is drained by the next compaction that was going to run anyway.
+The 64 KB node run still rewrote 5.1 GB, because compaction pays for the bytes it moves, however large nodes do make scans the fastest of the three, and point reads three times slower, since every lookup now decodes a 64 KB node.
+
+There is a cost of separating, of course, a scan pays a second read per row, and old values stay on disk until compaction drops the keys pointing at them.  Reclaiming that is cheap in TidesDB, since every key log records which value log segments its values live in, thus a segment nothing references is deleted whole and a half empty one is drained by the next compaction that was going to run anyway.
 
 ![A segment nothing references is deleted whole, a half live one is drained by the next compaction](/keys-and-values-dont-always-belong-together/reclaim.svg)
 
-So for large values written often and read by key, separating them is big win, and for tables you mostly scan, `keep_values_inline` with bigger nodes is the better fit.
+So for large values written often and read by key, separating them is a big win, and for tables you mostly scan, `keep_values_inline` with bigger nodes is the better fit.
 
-If you are curious in how TidesDB compares to <a target="_blank" href="https://github.com/facebook/rocksdb">RocksDB</a> utilizing a tool I wrote called <a target="_blank" href="https://github.com/guycipher/keybench">keybench</a>, especially comparing against the BlobDB configuration you can find that <a target="_blank" href="/articles/keybench-analysis-tidesdb-10-0-0-rocksdb-11-8-1">here</a>.  
+If you are curious about how TidesDB compares to <a target="_blank" href="https://github.com/facebook/rocksdb">RocksDB</a> utilizing a tool I wrote called <a target="_blank" href="https://github.com/guycipher/keybench">keybench</a>, especially comparing against the BlobDB configuration you can find that <a target="_blank" href="/articles/keybench-analysis-tidesdb-10-0-0-rocksdb-11-8-1">here</a>.  
 
 Thanks for reading!
 
+-- 
+
+Thank you to Amar Sood (<a target="_blank" href="https://x.com/tekacs">@tekacs</a>) for proofreading this article and putting his own twist on it.

@@ -38,6 +38,26 @@ export function gitMeta(filePath) {
 }
 
 /**
+ * Dates and author for one article, with frontmatter winning over git.
+ *
+ * `created` is the publication date, taken from `date` in frontmatter when it is
+ * set and from the oldest commit otherwise. The override exists because git's
+ * first commit is the date writing STARTED, which is the wrong date for anything
+ * that sat as a draft or unlisted for a while. `updated` always comes from git,
+ * since the last commit really is the last edit.
+ *
+ * @param {any} entry - a `docs` collection entry
+ */
+export function articleDates(entry) {
+	const meta = gitMeta(entry.filePath ?? '');
+	return {
+		created: entry.data?.date ?? meta.created,
+		updated: meta.updated,
+		gitAuthor: meta.gitAuthor,
+	};
+}
+
+/**
  * Resolve the display author: explicit frontmatter `author` wins, otherwise the
  * git creator, otherwise the org. `authorUrl` (frontmatter) optionally links it.
  */
