@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 330" width="640" height="330" font-family="system-ui, sans-serif" font-size="13">
+  <title>Smaller levels are sized from what the largest level holds, and a full largest level adds a new one</title>
+
+  <g font-size="12" fill="#697386">
+    <rect x="60" y="10" width="12" height="12" rx="2" fill="#193EDC"/><text x="78" y="21">data the level holds</text>
+    <rect x="210" y="10" width="12" height="12" rx="2" fill="none" stroke="#809ae0" stroke-width="2"/><text x="228" y="21">its capacity</text>
+    <text x="628" y="21" text-anchor="end">drawn with a size ratio of 4 so the small levels show</text>
+  </g>
+  <g fill="#8792a2">
+    <text x="12" y="65">L1</text>
+    <text x="12" y="115">L2</text>
+    <text x="12" y="165">L3</text>
+    <text x="12" y="215">L4</text>
+  </g>
+
+  <!-- before growth, L3 is largest and fills toward its fixed capacity, the small levels follow it -->
+  <g>
+    <animate attributeName="opacity" dur="11s" repeatCount="indefinite"
+             keyTimes="0;0.55;0.58;0.96;1" values="1;1;0;0;1"/>
+    <rect x="60" y="48" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2" width="8">
+      <animate attributeName="width" dur="11s" repeatCount="indefinite" keyTimes="0;0.2;0.5;1" values="8;8;30;30"/>
+    </rect>
+    <rect x="60" y="98" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2" width="30">
+      <animate attributeName="width" dur="11s" repeatCount="indefinite" keyTimes="0;0.2;0.5;1" values="30;30;120;120"/>
+    </rect>
+    <rect x="60" y="148" width="480" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+    <rect x="60" y="148" height="24" rx="3" fill="#193EDC" width="120">
+      <animate attributeName="width" dur="11s" repeatCount="indefinite" keyTimes="0;0.2;0.5;1" values="120;120;480;480"/>
+    </rect>
+    <text x="548" y="165" fill="#8792a2">largest, fixed</text>
+    <text x="200" y="115" fill="#697386" font-size="12">a quarter of what L3 holds</text>
+    <text x="200" y="65" fill="#697386" font-size="12">a sixteenth of what L3 holds</text>
+  </g>
+
+  <!-- after growth, the data sits in a new L4 and every capacity above shifts down a level -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="11s" repeatCount="indefinite"
+             keyTimes="0;0.55;0.58;0.96;1" values="0;0;1;1;0"/>
+    <rect x="60" y="48" width="8" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+    <rect x="60" y="98" width="30" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+    <rect x="60" y="148" width="120" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2"/>
+    <rect x="60" y="198" width="566" height="24" rx="3" fill="none" stroke="#809ae0" stroke-width="2" stroke-dasharray="6 4"/>
+    <rect x="60" y="198" width="480" height="24" rx="3" fill="#193EDC"/>
+    <text x="300" y="215" text-anchor="middle" fill="#fff" font-size="12">the new largest, room for four times as much</text>
+    <text x="200" y="165" fill="#697386" font-size="12">L3 is now a quarter of L4</text>
+  </g>
+
+  <g fill="#697386" font-size="13">
+    <text x="12" y="268" opacity="0">
+      <animate attributeName="opacity" dur="11s" repeatCount="indefinite" keyTimes="0;0.02;0.19;0.22;1" values="0;1;1;0;0"/>
+      1. only the largest level has a fixed capacity, the levels above are fractions of its data
+    </text>
+    <text x="12" y="268" opacity="0">
+      <animate attributeName="opacity" dur="11s" repeatCount="indefinite" keyTimes="0;0.22;0.25;0.52;0.55;1" values="0;0;1;1;0;0"/>
+      2. as L3 fills, the capacities above grow with it, a half full tree stays small above
+    </text>
+    <text x="12" y="268" opacity="0">
+      <animate attributeName="opacity" dur="11s" repeatCount="indefinite" keyTimes="0;0.55;0.58;0.94;0.97;1" values="0;0;1;1;0;0"/>
+      3. L3 is full, so the next merge lands in a new L4 and every level above shifts down
+    </text>
+    <text x="12" y="296" opacity="0" font-size="12">
+      <animate attributeName="opacity" dur="11s" repeatCount="indefinite" keyTimes="0;0.6;0.63;0.94;0.97;1" values="0;0;1;1;0;0"/>
+      if deletes later empty L4 well below what grew it, the level is given back the same way
+    </text>
+  </g>
+</svg>

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" font-family="system-ui, sans-serif" font-size="13">
+  <title>A merge into one large file rewrites all of it, a partitioned merge rewrites only the partition it meets</title>
+
+  <!-- legend -->
+  <g font-size="12" fill="#697386">
+    <rect x="60" y="10" width="12" height="12" rx="2" fill="#193EDC"/><text x="78" y="21">incoming keys</text>
+    <rect x="190" y="10" width="12" height="12" rx="2" fill="#b4dbf7"/><text x="208" y="21">left alone</text>
+    <rect x="300" y="10" width="12" height="12" rx="2" fill="#809ae0"/><text x="318" y="21">read and written again</text>
+  </g>
+
+  <g fill="#0a2540" font-weight="600">
+    <text x="12" y="52">one file for the whole level</text>
+    <text x="12" y="200">split at the largest level's file boundaries</text>
+  </g>
+  <g fill="#8792a2">
+    <text x="12" y="135">L3</text>
+    <text x="12" y="283">L3</text>
+  </g>
+
+  <!-- top, the incoming run -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite"
+                      keyTimes="0;0.25;0.42;0.9;0.95;1" values="0 0;0 0;0 52;0 52;0 0;0 0"/>
+    <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+             keyTimes="0;0.42;0.47;0.9;0.95;1" values="1;1;0;0;1;1"/>
+    <rect x="390" y="68" width="66" height="22" rx="3" fill="#193EDC"/>
+    <text x="423" y="84" text-anchor="middle" fill="#fff" font-size="12">keys p..r</text>
+  </g>
+  <rect x="60" y="118" width="540" height="24" rx="3" fill="#b4dbf7">
+    <animate attributeName="fill" dur="9s" repeatCount="indefinite"
+             keyTimes="0;0.42;0.47;0.88;0.93;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+  </rect>
+  <text x="330" y="135" text-anchor="middle" fill="#0a2540" font-size="12">one file holding a..z</text>
+  <g opacity="0">
+    <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+             keyTimes="0;0.47;0.55;0.88;0.93;1" values="0;0;1;1;0;0"/>
+    <text x="60" y="164" fill="#193EDC" font-weight="600">all of L3 rewritten for three keys' worth of new data</text>
+  </g>
+
+  <!-- bottom, the incoming run -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite"
+                      keyTimes="0;0.25;0.42;0.9;0.95;1" values="0 0;0 0;0 52;0 52;0 0;0 0"/>
+    <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+             keyTimes="0;0.42;0.47;0.9;0.95;1" values="1;1;0;0;1;1"/>
+    <rect x="390" y="216" width="66" height="22" rx="3" fill="#193EDC"/>
+    <text x="423" y="232" text-anchor="middle" fill="#fff" font-size="12">keys p..r</text>
+  </g>
+  <g font-size="12" fill="#0a2540" text-anchor="middle">
+    <rect x="60" y="266" width="130" height="24" rx="3" fill="#b4dbf7"/>
+    <rect x="196" y="266" width="130" height="24" rx="3" fill="#b4dbf7"/>
+    <rect x="332" y="266" width="130" height="24" rx="3" fill="#b4dbf7">
+      <animate attributeName="fill" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.42;0.47;0.88;0.93;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+    </rect>
+    <rect x="468" y="266" width="132" height="24" rx="3" fill="#b4dbf7"/>
+    <text x="125" y="283">file a..f</text>
+    <text x="261" y="283">file g..m</text>
+    <text x="397" y="283">file n..s</text>
+    <text x="534" y="283">file t..z</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+             keyTimes="0;0.47;0.55;0.88;0.93;1" values="0;0;1;1;0;0"/>
+    <text x="60" y="312" fill="#193EDC" font-weight="600">only the file holding n..s rewritten, a quarter of L3</text>
+  </g>
+
+  <!-- step captions -->
+  <g fill="#697386" font-size="13">
+    <text x="12" y="360" opacity="0">
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.02;0.24;0.27;1" values="0;1;1;0;0"/>
+      1. a run from L2 holding keys p..r is due to merge down into L3
+    </text>
+    <text x="12" y="360" opacity="0">
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.27;0.3;0.45;0.48;1" values="0;0;1;1;0;0"/>
+      2. a merge rewrites every L3 file the incoming keys fall inside
+    </text>
+    <text x="12" y="360" opacity="0">
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite"
+               keyTimes="0;0.48;0.51;0.88;0.91;1" values="0;0;1;1;0;0"/>
+      3. split at file boundaries, the same merge touches one partition, not the level
+    </text>
+  </g>
+</svg>
