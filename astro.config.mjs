@@ -104,6 +104,9 @@ export default defineConfig({
 				'./src/styles/custom.css',
 				'./src/styles/home.css',
 			  ],
+			// Clears the table of contents on pages with nothing to list, so the
+			// panel and its reserved gutter both go away. See src/routeData.ts.
+			routeMiddleware: './src/routeData.ts',
 			components: {
 				PageTitle: './src/components/PageTitle.astro',
 				Head: './src/components/Head.astro',

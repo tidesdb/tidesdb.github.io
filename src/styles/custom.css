@@ -147,6 +147,19 @@ html:has(.blog-grid) {
 	--sl-content-width: 85rem;
 }
 
+/* Starlight sets `--sl-content-margin-inline: auto 0` on .main-pane only when a
+   table of contents is present, which pulls the content column up against the
+   right-hand panel. With no panel that rule does not apply, ContentPanel falls
+   back to `margin-inline: auto`, and the column centres itself in the full width
+   leaving a wide gap between it and the left sidebar. Pin it to the start so a
+   page without a table of contents sits where one with a table of contents
+   does. The breakpoint matches the one Starlight uses for that rule. */
+@media (min-width: 72rem) {
+	[data-has-sidebar]:not([data-has-toc]) .main-pane {
+		--sl-content-margin-inline: 0 auto;
+	}
+}
+
 /* Homepage only: transparent and blended into the hero until scrolled. */
 html:has(.home) header:not(.is-scrolled) {
 	background: transparent !important;
