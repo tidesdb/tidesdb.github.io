@@ -10,6 +10,14 @@
 // JavaScript off and need no third-party script. Only "Copy link" needs script,
 // and it degrades to a visible URL via the title attribute if the clipboard API
 // is unavailable (it needs a secure context, so it is absent over plain http).
+//
+// Marks come from Starlight's own icon set wherever it has one, so they stay
+// consistent with the header's social icons and are maintained upstream rather
+// than being logo paths pasted in here. Hacker News and the copy mark are drawn
+// below because Starlight has neither (its `hackerOne` is the security platform,
+// not Hacker News).
+import { Icon } from '@astrojs/starlight/components';
+
 interface Props {
 	/** Article title, used as the prefilled share text. */
 	title: string;
@@ -22,15 +30,17 @@ const { title, url } = Astro.props;
 const u = encodeURIComponent(url);
 const t = encodeURIComponent(title);
 
-// Where engineering and database writing actually gets shared. Kept to text
-// labels rather than brand marks, which keeps the row quiet next to the title
-// and avoids carrying five logo paths around.
+/** @type {{label: string, href: string, icon?: string}[]} */
 const targets = [
-	{ label: 'X', href: `https://x.com/intent/tweet?text=${t}&url=${u}` },
-	{ label: 'LinkedIn', href: `https://www.linkedin.com/sharing/share-offsite/?url=${u}` },
+	{ label: 'X', href: `https://x.com/intent/tweet?text=${t}&url=${u}`, icon: 'x.com' },
+	{
+		label: 'LinkedIn',
+		href: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
+		icon: 'linkedin',
+	},
 	{ label: 'Hacker News', href: `https://news.ycombinator.com/submitlink?u=${u}&t=${t}` },
-	{ label: 'Reddit', href: `https://www.reddit.com/submit?url=${u}&title=${t}` },
-	{ label: 'Bluesky', href: `https://bsky.app/intent/compose?text=${t}%20${u}` },
+	{ label: 'Reddit', href: `https://www.reddit.com/submit?url=${u}&title=${t}`, icon: 'reddit' },
+	{ label: 'Bluesky', href: `https://bsky.app/intent/compose?text=${t}%20${u}`, icon: 'blueSky' },
 ];
 ---
 
@@ -44,13 +54,70 @@ const targets = [
 					href={target.href}
 					target="_blank"
 					rel="noopener noreferrer"
+					title={`Share on ${target.label}`}
+					aria-label={`Share on ${target.label}`}
 				>
-					{target.label}
+					{
+						target.icon ? (
+							<Icon name={target.icon as any} />
+						) : (
+							/* Hacker News: the Y mark in its square. */
+							<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+								<rect
+									x="2.5"
+									y="2.5"
+									width="19"
+									height="19"
+									rx="2"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+								/>
+								<path
+									d="M8 7l4 5.5V17"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								/>
+								<path
+									d="M16 7l-4 5.5"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="round"
+								/>
+							</svg>
+						)
+					}
 				</a>
 			))
 		}
-		<button class="article-meta__link article-meta__copy" data-url={url} title={url}>
-			Copy link
+		<button
+			class="article-meta__link article-meta__copy"
+			data-url={url}
+			title="Copy link"
+			aria-label="Copy link"
+		>
+			{/*
+				One svg, two groups swapped by opacity. Earlier versions stacked two
+				separate svg boxes and every centring trick fought something: the
+				button's line-height strut, `translate` composed with `scale`, and
+				transform-origin on an <svg> resolving against its viewBox. A single
+				box is centred by the same flex rule that already centres the other
+				five marks, and the groups inside share its viewBox, so the swap
+				cannot move anything.
+			*/}
+			<svg viewBox="0 0 24 24" aria-hidden="true">
+				<g class="article-meta__glyph-copy" fill="none" stroke="currentColor" stroke-width="1.8">
+					<rect x="9" y="9" width="11" height="11" rx="2" />
+					<path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H5.5A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15" stroke-linecap="round" />
+				</g>
+				<g class="article-meta__glyph-done" fill="none" stroke="currentColor" stroke-width="2.2">
+					<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+				</g>
+			</svg>
 		</button>
 	</div>
 </div>
@@ -59,8 +126,8 @@ const targets = [
 	.article-meta {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.5rem 1rem;
+		align-items: center;
+		gap: 0.5rem 0.75rem;
 		margin-top: 2.5rem;
 		padding-top: 1rem;
 		border-top: 1px solid var(--sl-color-hairline-light);
@@ -71,43 +138,92 @@ const targets = [
 	.article-meta__share {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.3rem 0.65rem;
+		align-items: center;
+		gap: 0.3rem 0.6rem;
 	}
 
 	.article-meta__label {
 		white-space: nowrap;
+		margin-inline-end: 0.15rem;
 	}
 
-	/* Buttons and links share one look so "Copy link" sits in the row as a peer
-	   rather than as a form control. */
+	/* Icon-only targets, so the row stays quiet at the foot of an article. The
+	   name is carried by aria-label and title rather than visible text. */
 	.article-meta__link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.9rem;
+		height: 1.9rem;
 		padding: 0;
-		border: 0;
+		border: 1px solid transparent;
+		border-radius: 8px;
 		background: none;
 		font: inherit;
 		color: var(--sl-color-gray-2) !important;
 		text-decoration: none !important;
 		border-bottom: 1px solid transparent !important;
-		white-space: nowrap;
 		cursor: pointer;
-		transition: color 0.15s ease, border-color 0.15s ease;
+		transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 	}
 
 	.article-meta__link:hover,
 	.article-meta__link:focus-visible {
 		color: var(--sl-color-white) !important;
-		border-bottom-color: var(--sl-color-accent) !important;
+		background: rgba(127, 127, 127, 0.14);
+		background: color-mix(in srgb, currentColor 12%, transparent);
+		border-color: rgba(127, 127, 127, 0.26) !important;
+		border-color: color-mix(in srgb, currentColor 24%, transparent) !important;
 		outline: none;
+	}
+
+	/* One size for every mark. Starlight's Icon sizes itself in `em`, so against
+	   this row's 0.8rem it came out at 13px while the two hand-drawn marks were
+	   a hardcoded 16px. CSS beats the inline width/height presentation
+	   attributes, so this normalises both sources. */
+	.article-meta__link svg {
+		flex-shrink: 0;
+		width: 16px;
+		height: 16px;
+	}
+
+	/* The clipboard and the tick are stacked, both absolutely centred, and the
+	   swap is a cross-fade. Toggling `display` instead left the tick 8px below
+	   centre as the only flex item, and a keyframe on a just-shown element never
+	   got to run, so it sat frozen on its first frame at scale(0.6). Centring by
+	   position rather than by flex alignment cannot drift, and opacity animates
+	   from a stable starting state. `translate` and `scale` are the individual
+	   properties so neither clobbers the other. */
+	/* The copy button keeps the plain flex centring of every other mark. Only
+	   the glyphs inside its single svg change. */
+	.article-meta__glyph-done {
+		opacity: 0;
+		transition: opacity 0.15s ease;
+	}
+
+	.article-meta__glyph-copy {
+		opacity: 1;
+		transition: opacity 0.15s ease;
+	}
+
+	.article-meta__copy[data-copied] .article-meta__glyph-copy {
+		opacity: 0;
+	}
+
+	.article-meta__copy[data-copied] .article-meta__glyph-done {
+		opacity: 1;
 	}
 
 	.article-meta__copy[data-copied] {
 		color: var(--sl-color-accent-high) !important;
-		border-bottom-color: transparent !important;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.article-meta__link {
+			transition: none;
+		}
+		.article-meta__glyph-copy,
+		.article-meta__glyph-done {
 			transition: none;
 		}
 	}
@@ -120,25 +236,25 @@ const targets = [
 </style>
 
 <script>
+	// Close the loop visually rather than with text, since the button is icon
+	// only. If the clipboard API is unavailable (it needs a secure context) the
+	// title attribute still carries the label and nothing pretends to succeed.
 	const copy = document.querySelector<HTMLButtonElement>('.article-meta__copy');
 	if (copy) {
-		const original = copy.textContent;
 		copy.addEventListener('click', async () => {
 			const url = copy.dataset.url;
 			if (!url) return;
 			try {
 				await navigator.clipboard.writeText(url);
-				copy.textContent = 'Copied';
+				copy.dataset.copied = '';
+				copy.title = 'Link copied';
+				setTimeout(() => {
+					delete copy.dataset.copied;
+					copy.title = 'Copy link';
+				}, 2000);
 			} catch {
-				// No clipboard access (insecure context, or the user denied it).
-				// Select nothing and say so rather than pretending it worked.
-				copy.textContent = 'Press Ctrl+C';
+				copy.title = 'Copy failed, select the address bar instead';
 			}
-			copy.dataset.copied = '';
-			setTimeout(() => {
-				copy.textContent = original;
-				delete copy.dataset.copied;
-			}, 2000);
 		});
 	}
 </script>

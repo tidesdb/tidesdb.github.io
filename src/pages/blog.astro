@@ -1,6 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { Icon } from '@astrojs/starlight/components';
 import { articleDates, resolveAuthor, ogImage, fmtDateShort, summarize, SITE, publishedArticles } from '../utils/articles.js';
 import { readingMinutes } from '../utils/reading-time.js';
 
@@ -86,10 +87,13 @@ const head = [
 		head,
 	}}
 >
-	<p class="blog-intro">
-		{pageDescription}
-		<a class="blog-feed" href="/rss.xml">RSS feed</a>
-	</p>
+	<div class="blog-head not-content">
+		<p class="blog-intro">{pageDescription}</p>
+		<a class="blog-feed" href="/rss.xml" title="Subscribe to the RSS feed">
+			<Icon name="rss" />
+			<span>RSS feed</span>
+		</a>
+	</div>
 
 	<ul class="blog-grid not-content" data-blog-grid data-initial={INITIAL_BATCH}>
 		{
@@ -157,10 +161,23 @@ const head = [
 </script>
 
 <style>
+	/* The intro and the feed button share a row, with the button pushed to the
+	   trailing edge. `not-content` keeps Starlight's prose margins off the row,
+	   which would otherwise space the two children apart vertically. */
+	.blog-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.75rem 1.5rem;
+		margin-bottom: 2rem;
+	}
+
 	.blog-intro {
 		color: var(--sl-color-gray-3);
 		font-size: var(--sl-text-lg);
-		margin-bottom: 2rem;
+		margin: 0;
+		flex: 1 1 18rem;
 	}
 
 	.blog-grid {
@@ -248,10 +265,44 @@ const head = [
 		color: var(--sl-color-gray-5);
 	}
 
+	/* Same shape as the Print button on article pages, so the site has one
+	   button style rather than two. */
 	.blog-feed {
-		margin-inline-start: 0.5rem;
-		font-size: 0.85em;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex-shrink: 0;
+		margin-inline-start: auto;
+		padding: 0.35rem 0.75rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 6px;
+		background: transparent;
+		color: var(--sl-color-gray-3) !important;
+		font-size: 0.8rem;
+		text-decoration: none !important;
+		border-bottom: 1px solid var(--sl-color-gray-5) !important;
 		white-space: nowrap;
+		transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+	}
+
+	.blog-feed:hover,
+	.blog-feed:focus-visible {
+		color: var(--sl-color-white) !important;
+		border-color: var(--sl-color-accent) !important;
+		background: var(--sl-color-accent-low);
+		outline: none;
+	}
+
+	.blog-feed svg {
+		flex-shrink: 0;
+		width: 15px;
+		height: 15px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.blog-feed {
+			transition: none;
+		}
 	}
 
 	/* No `margin-inline-start: auto` here. It pinned this to the right edge, so
