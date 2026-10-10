@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" font-family="system-ui, sans-serif" font-size="13">
+  <title>Aligned inputs fan out into one job per partition, a run that spans every partition is one job split across threads</title>
+
+  <g font-size="12" fill="#697386">
+    <rect x="60" y="10" width="12" height="12" rx="2" fill="#193EDC"/><text x="78" y="21">being merged</text>
+    <rect x="180" y="10" width="12" height="12" rx="2" fill="#b4dbf7"/><text x="198" y="21">L3 partition</text>
+    <rect x="296" y="10" width="12" height="12" rx="2" fill="#809ae0"/><text x="314" y="21">written by that job or thread</text>
+  </g>
+
+  <g fill="#0a2540" font-weight="600">
+    <text x="12" y="52">runs that each sit inside one partition</text>
+    <text x="12" y="208">a fresh flush that spans every key</text>
+  </g>
+  <g fill="#8792a2">
+    <text x="12" y="85">L2</text>
+    <text x="12" y="141">L3</text>
+    <text x="12" y="241">L1</text>
+    <text x="12" y="297">L3</text>
+  </g>
+
+  <!-- top, four disjoint jobs moving at once -->
+  <g font-size="11" fill="#fff" text-anchor="middle">
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite"
+                      keyTimes="0;0.2;0.35;0.9;0.95;1" values="0 0;0 0;0 56;0 56;0 0;0 0"/>
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+             keyTimes="0;0.35;0.4;0.9;0.95;1" values="1;1;0;0;1;1"/>
+    <rect x="80" y="70" width="70" height="22" rx="3" fill="#193EDC"/>
+    <rect x="216" y="70" width="70" height="22" rx="3" fill="#193EDC"/>
+    <rect x="352" y="70" width="70" height="22" rx="3" fill="#193EDC"/>
+    <rect x="490" y="70" width="70" height="22" rx="3" fill="#193EDC"/>
+    <text x="115" y="85">job 1</text>
+    <text x="251" y="85">job 2</text>
+    <text x="387" y="85">job 3</text>
+    <text x="525" y="85">job 4</text>
+  </g>
+  <g font-size="12" fill="#0a2540" text-anchor="middle">
+    <rect x="60" y="124" width="130" height="24" rx="3" fill="#b4dbf7">
+      <animate attributeName="fill" dur="10s" repeatCount="indefinite" keyTimes="0;0.35;0.4;0.88;0.93;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+    </rect>
+    <rect x="196" y="124" width="130" height="24" rx="3" fill="#b4dbf7">
+      <animate attributeName="fill" dur="10s" repeatCount="indefinite" keyTimes="0;0.35;0.4;0.88;0.93;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+    </rect>
+    <rect x="332" y="124" width="130" height="24" rx="3" fill="#b4dbf7">
+      <animate attributeName="fill" dur="10s" repeatCount="indefinite" keyTimes="0;0.35;0.4;0.88;0.93;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+    </rect>
+    <rect x="468" y="124" width="132" height="24" rx="3" fill="#b4dbf7">
+      <animate attributeName="fill" dur="10s" repeatCount="indefinite" keyTimes="0;0.35;0.4;0.88;0.93;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+    </rect>
+    <text x="125" y="141">a..f</text>
+    <text x="261" y="141">g..m</text>
+    <text x="397" y="141">n..s</text>
+    <text x="534" y="141">t..z</text>
+  </g>
+  <text x="12" y="176" fill="#193EDC" font-size="12" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0;0.4;0.45;0.88;0.93;1" values="0;0;1;1;0;0"/>
+    four jobs, no file shared between them, so all four run at the same time
+  </text>
+
+  <!-- bottom, one spanning run split at the boundaries into two thread ranges -->
+  <g stroke="#0a2540" stroke-dasharray="3 3" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+             keyTimes="0;0.5;0.55;0.75;0.8;1" values="0;0;1;1;0;0"/>
+    <line x1="329" y1="220" x2="329" y2="256"/>
+  </g>
+  <g font-size="11" fill="#fff" text-anchor="middle">
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite"
+                      keyTimes="0;0.62;0.77;0.9;0.95;1" values="0 0;0 0;0 56;0 56;0 0;0 0"/>
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+             keyTimes="0;0.77;0.8;0.9;0.95;1" values="1;1;0;0;1;1"/>
+    <rect x="60" y="226" width="266" height="22" rx="3" fill="#193EDC"/>
+    <rect x="332" y="226" width="268" height="22" rx="3" fill="#193EDC"/>
+    <text x="193" y="241">keys a..m, thread 1</text>
+    <text x="466" y="241">keys n..z, thread 2</text>
+  </g>
+  <g>
+    <rect x="60" y="280" width="266" height="24" rx="3" fill="#b4dbf7">
+      <animate attributeName="fill" dur="10s" repeatCount="indefinite" keyTimes="0;0.77;0.8;0.9;0.95;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+    </rect>
+    <rect x="332" y="280" width="268" height="24" rx="3" fill="#b4dbf7">
+      <animate attributeName="fill" dur="10s" repeatCount="indefinite" keyTimes="0;0.77;0.8;0.9;0.95;1" values="#b4dbf7;#b4dbf7;#809ae0;#809ae0;#b4dbf7;#b4dbf7"/>
+    </rect>
+  </g>
+  <text x="12" y="330" fill="#193EDC" font-size="12" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0;0.8;0.83;0.9;0.95;1" values="0;0;1;1;0;0"/>
+    one job, cut at the same boundaries, its halves built side by side
+  </text>
+
+  <g fill="#697386" font-size="13">
+    <text x="12" y="362" opacity="0">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0;0.02;0.47;0.5;1" values="0;1;1;0;0"/>
+      1. earlier merges wrote L2 split at L3's boundaries, so every run fits one partition
+    </text>
+    <text x="12" y="362" opacity="0">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0;0.5;0.53;0.9;0.93;1" values="0;0;1;1;0;0"/>
+      2. a flush spans everything and cannot be split by file, so its one job splits by key
+    </text>
+  </g>
+</svg>
