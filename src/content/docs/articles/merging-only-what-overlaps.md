@@ -6,24 +6,24 @@ head:
   - tag: meta
     attrs:
       property: og:image
-      content: https://tidesdb.com/pexels-stijn-dijkstra-1306815-2499791.jpg
+      content: https://tidesdb.com/pexels-mavicair2tw-15328458.jpg
   - tag: meta
     attrs:
       name: twitter:image
-      content: https://tidesdb.com/pexels-stijn-dijkstra-1306815-2499791.jpg
+      content: https://tidesdb.com/pexels-mavicair2tw-15328458.jpg
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <div class="article-image">
 
-![Merging Only What Overlaps](/pexels-stijn-dijkstra-1306815-2499791.jpg)
-<a target="_blank" href="https://www.instagram.com/furstset">Stijn Dijkstra</a>
+![Merging Only What Overlaps](/pexels-mavicair2tw-15328458.jpg)
+<a target="_blank" href="https://www.instagram.com/mavicair2tw">William Chen</a>
 </div>
 
 *by <a target="_blank" href="https://alexpadula.com">Alex Gaetano Padula</a>*
 
-*published on October 10th, 2026*
+*published on October TBD, 2026*
 
 Every <a target="_blank" href="https://en.wikipedia.org/wiki/Log-structured_merge-tree">LSM-tree</a> writes your data more than once. It has to, that's how it keeps reads fast and gives deleted space back. The question is how much it rewrites each time, and whether it can stop at the parts that actually changed.
 
