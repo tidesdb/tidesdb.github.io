@@ -66,14 +66,16 @@ export const VERSIONS = [
 			{
 				id: 'tidesql',
 				label: 'TideSQL',
+				// Each server gets its own engine build from its own repo, and the
+				// three release lines are NOT the same number: the MariaDB engine is
+				// on 5.x while the MySQL and Percona engines are both on 2.x. That is
+				// why `track` is declared per variant rather than shared.
 				variants: [
 					// The primary target: expanded when TideSQL opens, so the common
 					// case stays one click.
-					{ id: 'mariadb', label: 'MariaDB', repo: 'tidesql', track: '5', tidesdb: '10.0.0', open: true },
-					// Listed before it exists on purpose: the compatibility page shows
-					// it as announced, and the day tidesdb/tidesql-mysql is pushed with
-					// a doc/ directory it appears in the sidebar on the next sync.
-					{ id: 'mysql', label: 'MySQL', repo: 'tidesql-mysql', track: '5' },
+					{ id: 'mariadb', label: 'MariaDB', repo: 'tidesql', track: '5', tidesdb: '10', open: true },
+					{ id: 'mysql', label: 'MySQL', repo: 'tidesql-mysql', track: '2', tidesdb: '10' },
+					{ id: 'percona', label: 'Percona', repo: 'tidesql-percona', track: '2', tidesdb: '10' },
 				],
 			},
 			{ id: 'kafka', label: 'Kafka connector', repo: 'tidesdb-kafka', tag: null, tidesdb: '9' },
