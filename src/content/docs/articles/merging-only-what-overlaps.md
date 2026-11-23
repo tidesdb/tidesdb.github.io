@@ -1,7 +1,7 @@
 ---
 title: "Merging Only What Overlaps"
 description: "How TidesDB compacts, from the shared memtable and its flush through partitioned merges, levels that size themselves and every kind of delete, measured."
-unlisted: true
+unlisted: false
 head:
   - tag: meta
     attrs:
