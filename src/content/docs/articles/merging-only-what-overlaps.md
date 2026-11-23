@@ -1,7 +1,7 @@
 ---
 title: "Merging Only What Overlaps"
 description: "How TidesDB compacts, from the shared memtable and its flush through partitioned merges, levels that size themselves and every kind of delete, measured."
-unlisted: true
+unlisted: false
 head:
   - tag: meta
     attrs:
@@ -23,7 +23,7 @@ head:
 
 *by <a target="_blank" href="https://alexpadula.com">Alex Gaetano Padula</a>*
 
-*published on October TBD, 2026*
+*published on November 23rd, 2026*
 
 Every <a target="_blank" href="https://en.wikipedia.org/wiki/Log-structured_merge-tree">LSM-tree</a> writes your data more than once. It has to, that's how it keeps reads fast and gives deleted space back. The question is how much it rewrites each time, and whether it can stop at the parts that actually changed.
 
